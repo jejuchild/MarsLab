@@ -1,0 +1,63 @@
+You are in a Node.js + TypeScript environment (Claude Code).
+
+Task: Crawl HiRISE “Arcadia” search results from:
+https://www.uahirise.org/results.php?keyword=arcadia&order=release_date&submit=Search
+
+Goal:
+For EVERY HiRISE observation shown in the results (across all pages):
+1) Open the observation detail page.
+2) Extract and download:
+   A) Map-projected JPEG (B&W)
+      - On the detail page, find the JPEG section.
+      - Under the “JPEG” header, there is a “black and white” area.
+      - Click/parse the anchor whose text is “map projected”.
+      - It looks like:
+        <a href="http://hirise-pds.lpl.arizona.edu/PDS/EXTRAS/RDR/ESP/ORB_013000_013099/ESP_013034_2185/ESP_013034_2185_RED.abrowse.jpg" class="caption">map projected</a>
+      - Download that .jpg.
+
+   B) LBL file (B&W label)
+      - On the detail page, under “Additional Information”, there is a link “B&W label”.
+      - It looks like:
+        <a href="https://hirise-pds.lpl.arizona.edu/PDS/RDR/ESP/ORB_013000_013099/ESP_013034_2185/ESP_013034_2185_RED.LBL" class="caption">B&amp;W label</a>
+      - Download that .LBL.
+
+3) Extract and store metadata:
+   - The observation title text from:
+     <span class="observation-title-milo">Gullies in Arcadia Region</span>
+     Store exactly the inner text, e.g. "Gullies in Arcadia Region".
+   - Also store the observation id (e.g., ESP_013034_2185) from the page / URL.
+
+Output & data modeling requirements:
+- Save files under a single output directory, e.g. `./arcadia_hirise/`
+  - JPEG: `./arcadia_hirise/jpeg/{OBS_ID}_RED.abrowse.jpg`
+  - LBL:  `./arcadia_hirise/lbl/{OBS_ID}_RED.LBL`
+- Create a machine-readable index file:
+  - `./arcadia_hirise/index.json` (or index.geojson if appropriate)
+- Each record must include:
+  - obs_id
+  - title
+  - detail_page_url
+  - jpeg_url
+  - lbl_url
+  - local_jpeg_path
+  - local_lbl_path
+
+IMPORTANT:
+- The output data must be structured and stored in a way that allows **direct visualization on a map**.
+- Organize metadata so each observation can be spatially indexed and easily linked to its raster (JPEG) when rendering map layers.
+- If spatial information is available or can be inferred from the LBL, structure the index so it can later be converted or extended into `index.geojson` for map-based rendering.
+- The goal is not just downloading files, but preparing a dataset that can be immediately consumed by a map-based visualization frontend.
+
+Crawling details:
+- The search results are paginated. Automatically traverse all pages until no “next” page exists.
+- Be polite: limit concurrency (e.g. 3–5), retry transient failures, and skip/record failures without crashing.
+- Deduplicate by obs_id.
+- Log progress: total results discovered, downloaded, skipped, failed.
+
+Implementation notes:
+- Use a robust HTML parser (cheerio / jsdom).
+- Identify result items and detail page links from the search results HTML.
+- On the detail page, locate the specific anchors by their visible text:
+  - "map projected" (for the JPEG)
+  - "B&W label" (for the LBL)
+- Don’t scrape thumbnails; only use the explicit map-projected JPEG and B&W label links described above.

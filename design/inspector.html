@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MarsLab HiRISE Pixel Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0a0e17",
+                        "surface-dark": "#161e2d",
+                        "border-dark": "#2d3a54"
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 20px;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0e17;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3a54;
+            border-radius: 10px;
+        }
+        .mars-grid {
+            background-image: 
+                linear-gradient(to right, rgba(45, 58, 84, 0.2) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(45, 58, 84, 0.2) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .histogram-bar {
+            background: linear-gradient(to top, #135bec, #3b82f6);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-white overflow-hidden h-screen flex flex-col">
+<header class="flex items-center justify-between px-6 py-3 border-b border-border-dark bg-background-dark/80 backdrop-blur-md z-50">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<div class="size-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white">analytics</span>
+</div>
+<h2 class="text-lg font-bold tracking-tight">MarsLab <span class="text-primary font-normal text-base">HiRISE Pixel Analytics</span></h2>
+</div>
+<div class="h-6 w-px bg-border-dark"></div>
+<nav class="flex items-center gap-2 text-sm">
+<a class="text-slate-400 hover:text-white transition-colors" href="#">Jezero Basin</a>
+<span class="text-slate-600">/</span>
+<span class="text-white font-medium">ESP_012344_1855</span>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="text-[10px] text-slate-500 font-mono tracking-widest uppercase flex items-center gap-2">
+<span class="size-1.5 bg-primary rounded-full animate-pulse"></span>
+            Analysis Engine Active
+        </div>
+</div>
+</header>
+<main class="flex flex-1 overflow-hidden">
+<aside class="w-72 border-r border-border-dark bg-surface-dark/30 flex flex-col">
+<div class="p-4 border-b border-border-dark">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">search</span>
+<input class="w-full bg-background-dark border-border-dark rounded-lg pl-10 text-sm focus:ring-primary focus:border-primary placeholder:text-slate-600" placeholder="Search data..." type="text"/>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-2 space-y-4">
+<div>
+<h3 class="px-2 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Map Layers</h3>
+<div class="space-y-1">
+<div class="flex items-center gap-2 px-2 py-1.5 rounded bg-primary/20 text-primary border border-primary/30">
+<span class="material-symbols-outlined text-sm">visibility</span>
+<span class="text-xs font-medium">HiRISE RED Mosaic</span>
+<span class="material-symbols-outlined text-[14px] ml-auto text-primary/60">public</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 text-slate-300">
+<span class="material-symbols-outlined text-sm">visibility</span>
+<span class="text-xs font-medium">CRISM S-Cube</span>
+<span class="material-symbols-outlined text-[14px] ml-auto text-slate-500">public</span>
+</div>
+</div>
+</div>
+<div>
+<h3 class="px-2 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Instruments</h3>
+<div class="space-y-1">
+<div class="flex items-center gap-2 px-3 py-2 bg-background-dark/50 border border-border-dark rounded">
+<span class="material-symbols-outlined text-blue-400">satellite_alt</span>
+<div class="flex flex-col">
+<span class="text-xs font-bold">HiRISE</span>
+<span class="text-[9px] text-slate-500 uppercase tracking-tighter leading-none">High Resolution Imaging Science Experiment</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-background-dark border-t border-border-dark">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Map Coverage</span>
+<span class="text-[10px] text-primary">02 ACTIVE</span>
+</div>
+<div class="flex gap-1">
+<div class="h-1 flex-1 bg-primary"></div>
+<div class="h-1 flex-1 bg-primary/30"></div>
+<div class="h-1 flex-1 bg-slate-800"></div>
+</div>
+</div>
+</aside>
+<section class="flex-1 relative bg-[#05070a] mars-grid overflow-hidden">
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="relative w-[1400px] h-[1400px] rounded-full bg-[#1c1410] border border-white/5 overflow-hidden shadow-[inset_0_0_100px_rgba(0,0,0,0.8)]">
+<div class="absolute inset-0 opacity-40 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]"></div>
+<svg class="absolute inset-0 w-full h-full" viewBox="0 0 1000 1000">
+<rect fill="rgba(19, 91, 236, 0.2)" height="240" stroke="#135bec" stroke-width="1" transform="rotate(-15 480 500)" width="60" x="450" y="380"></rect>
+<rect fill="none" height="12" stroke="#fff" stroke-width="1.5" transform="rotate(-15 470 460)" width="12" x="464" y="454"></rect>
+<rect fill="rgba(255, 255, 255, 0.2)" height="12" stroke="none" transform="rotate(-15 470 460)" width="12" x="464" y="454"></rect>
+<path d="M420,420 L580,440 L560,540 L400,520 Z" fill="rgba(168, 85, 247, 0.1)" stroke="#a855f7" stroke-dasharray="2,2" stroke-width="1"></path>
+</svg>
+</div>
+</div>
+<div class="absolute top-6 left-6">
+<div class="bg-background-dark/90 backdrop-blur-md border border-border-dark p-3 rounded-lg space-y-3">
+<div class="flex items-center gap-4">
+<div class="space-y-1">
+<div class="text-[9px] text-slate-500 uppercase tracking-tighter">Analysis X,Y</div>
+<div class="text-xs font-mono">4,522 , 12,840</div>
+</div>
+<div class="w-px h-6 bg-border-dark"></div>
+<div class="space-y-1">
+<div class="text-[9px] text-slate-500 uppercase tracking-tighter">Value (DN)</div>
+<div class="text-xs font-mono text-primary font-bold">2,441.5</div>
+</div>
+</div>
+</div>
+</div>
+<div class="absolute bottom-6 left-1/2 -translate-x-1/2">
+<div class="bg-background-dark/90 backdrop-blur-md border border-border-dark px-1 py-1 rounded-full flex gap-1 items-center">
+<button class="px-5 py-1.5 text-[10px] font-bold uppercase tracking-widest bg-primary text-white rounded-full shadow-lg">Map View</button>
+<button class="px-5 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-white rounded-full transition-colors">Surface Reconstruction</button>
+</div>
+</div>
+<div class="absolute top-6 right-6 flex flex-col gap-2">
+<div class="bg-background-dark/90 backdrop-blur-md border border-border-dark p-1 rounded-lg flex flex-col gap-1">
+<button class="p-2 bg-primary/20 text-primary rounded" title="Sample Tool">
+<span class="material-symbols-outlined">crop_free</span>
+</button>
+<button class="p-2 hover:bg-white/10 text-slate-400 rounded transition-colors" title="Zoom">
+<span class="material-symbols-outlined">zoom_in</span>
+</button>
+<div class="h-px bg-border-dark mx-1 my-1"></div>
+<button class="p-2 hover:bg-white/10 text-slate-400 rounded transition-colors" title="Settings">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</div>
+</section>
+<aside class="w-96 border-l border-border-dark bg-surface-dark/40 flex flex-col">
+<div class="flex border-b border-border-dark">
+<button class="flex-1 py-3 text-[10px] font-bold text-slate-500 hover:text-white border-b-2 border-transparent tracking-widest uppercase">Metadata</button>
+<button class="flex-1 py-3 text-[10px] font-bold border-b-2 border-primary text-white tracking-widest uppercase">Pixel</button>
+<button class="flex-1 py-3 text-[10px] font-bold text-slate-500 hover:text-white border-b-2 border-transparent tracking-widest uppercase">Bands</button>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-6">
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<h3 class="text-xs font-bold text-primary flex items-center gap-2 uppercase tracking-wider">
+<span class="material-symbols-outlined text-sm">analytics</span>
+                        Neighborhood Statistics
+                    </h3>
+<div class="flex items-center gap-2">
+<span class="text-[9px] text-slate-500 uppercase">Window</span>
+<select class="bg-background-dark border-border-dark text-[10px] py-0.5 pl-2 pr-6 rounded focus:ring-primary focus:border-primary">
+<option>3x3</option>
+<option selected="">5x5</option>
+<option>7x7</option>
+<option>11x11</option>
+<option>21x21</option>
+</select>
+</div>
+</div>
+<div class="p-3 bg-background-dark/60 border border-border-dark rounded-lg">
+<div class="flex justify-between items-center mb-4">
+<span class="text-[10px] text-slate-500 uppercase font-bold tracking-tight">DN Distribution (Sampled Area)</span>
+<span class="text-[9px] font-mono text-slate-500">n=25</span>
+</div>
+<div class="h-32 flex items-end gap-1 px-1">
+<div class="histogram-bar flex-1 h-[20%] rounded-t-sm opacity-50"></div>
+<div class="histogram-bar flex-1 h-[35%] rounded-t-sm opacity-60"></div>
+<div class="histogram-bar flex-1 h-[65%] rounded-t-sm opacity-80"></div>
+<div class="histogram-bar flex-1 h-[90%] rounded-t-sm"></div>
+<div class="histogram-bar flex-1 h-[100%] rounded-t-sm"></div>
+<div class="histogram-bar flex-1 h-[85%] rounded-t-sm"></div>
+<div class="histogram-bar flex-1 h-[60%] rounded-t-sm opacity-80"></div>
+<div class="histogram-bar flex-1 h-[40%] rounded-t-sm opacity-60"></div>
+<div class="histogram-bar flex-1 h-[15%] rounded-t-sm opacity-50"></div>
+<div class="histogram-bar flex-1 h-[8%] rounded-t-sm opacity-40"></div>
+</div>
+<div class="flex justify-between mt-2 text-[8px] font-mono text-slate-600">
+<span>0</span>
+<span>1024</span>
+<span>2048</span>
+<span>3072</span>
+<span>4095</span>
+</div>
+</div>
+<div class="space-y-1">
+<div class="grid grid-cols-2 gap-2">
+<div class="bg-background-dark/40 border border-border-dark/50 p-2.5 rounded">
+<div class="text-[9px] text-slate-500 uppercase mb-0.5">Mean</div>
+<div class="text-sm font-mono font-bold text-white">2,481.22</div>
+</div>
+<div class="bg-background-dark/40 border border-border-dark/50 p-2.5 rounded">
+<div class="text-[9px] text-slate-500 uppercase mb-0.5">Median</div>
+<div class="text-sm font-mono font-bold text-white">2,440.00</div>
+</div>
+<div class="bg-background-dark/40 border border-border-dark/50 p-2.5 rounded">
+<div class="text-[9px] text-slate-500 uppercase mb-0.5">Std Dev</div>
+<div class="text-sm font-mono font-bold text-blue-400">±142.4</div>
+</div>
+<div class="bg-background-dark/40 border border-border-dark/50 p-2.5 rounded">
+<div class="text-[9px] text-slate-500 uppercase mb-0.5">Sum</div>
+<div class="text-sm font-mono font-bold text-white">62,030</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2 mt-2">
+<div class="flex justify-between items-center p-2 bg-background-dark/20 border border-border-dark/30 rounded">
+<span class="text-[9px] text-slate-500 uppercase">Min</span>
+<span class="text-xs font-mono text-slate-300">1,940</span>
+</div>
+<div class="flex justify-between items-center p-2 bg-background-dark/20 border border-border-dark/30 rounded">
+<span class="text-[9px] text-slate-500 uppercase">Max</span>
+<span class="text-xs font-mono text-slate-300">2,884</span>
+</div>
+</div>
+</div>
+<div class="h-px bg-border-dark"></div>
+<div class="space-y-3">
+<h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Extraction</h4>
+<div class="space-y-2">
+<label class="flex items-center gap-3 p-2 rounded hover:bg-white/5 cursor-pointer border border-transparent hover:border-border-dark transition-all">
+<input checked="" class="rounded border-border-dark bg-background-dark text-primary focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<div class="flex flex-col">
+<span class="text-xs font-medium">Slope Correction</span>
+<span class="text-[9px] text-slate-500">MOLA/HiRISE Fusion alignment</span>
+</div>
+</label>
+<label class="flex items-center gap-3 p-2 rounded hover:bg-white/5 cursor-pointer border border-transparent hover:border-border-dark transition-all">
+<input class="rounded border-border-dark bg-background-dark text-primary focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<div class="flex flex-col">
+<span class="text-xs font-medium">Bilinear Interpolation</span>
+<span class="text-[9px] text-slate-500">Sub-pixel resampling</span>
+</div>
+</label>
+</div>
+</div>
+</section>
+</div>
+<div class="p-4 border-t border-border-dark bg-background-dark">
+<button class="w-full bg-primary text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">ios_share</span>
+                Export Statistics
+            </button>
+</div>
+</aside>
+</main>
+<footer class="h-8 border-t border-border-dark bg-background-dark/95 px-4 flex items-center justify-between text-[10px] text-slate-500 font-medium">
+<div class="flex gap-6">
+<span class="flex items-center gap-1.5"><span class="size-1.5 rounded-full bg-green-500"></span> ENGINE: IDL-V8.8</span>
+<span>LAT: 18.441° N</span>
+<span>LON: 77.452° E</span>
+<span>RES: 0.25 cm/px</span>
+</div>
+<div class="flex gap-4 items-center">
+<span>Processing: Batch ID 884-A</span>
+<span class="h-3 w-px bg-border-dark"></span>
+<span class="text-slate-400">v2.5.0-pixel.node</span>
+</div>
+</footer>
+
+</body></html>

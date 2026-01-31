@@ -1,0 +1,37 @@
+I want to visualize precomputed CRISM score maps on a web-based Mars map.
+
+Context:
+- I have a directory called `arcadia_score_maps/`
+- Inside it, there are PNG files:
+  - `{obs_id}_hydration_score.png`
+  - `{obs_id}_ice_score.png`
+- `obs_id` uniquely identifies the CRISM observation (e.g. frt000108ad, hrs00013747).
+- Background is transparent; maps are meant to be overlaid on a Mars basemap.
+
+Goal:
+1. Load all score maps into the backend.
+2. Link each score map to its corresponding CRISM observation using `obs_id`.
+3. If needed, update `index.geojson` so each observation feature knows:
+   - hydration_score_map path
+   - ice_score_map path
+4. Expose these as raster overlay layers.
+
+Frontend requirements:
+- In the left Analysis / Layer panel, add two toggleable layers:
+  - "Hydrated Mineral Score"
+  - "Ice Score"
+- When a layer is toggled on:
+  - The corresponding score map is rendered on the map
+  - Only observations with available score maps are shown
+- Multiple observations can be visible simultaneously.
+- No legend is required (color encoding is self-explanatory).
+
+Assumptions:
+- Score maps are already georeferenced implicitly via their CRISM observation footprint.
+- CRS, reprojection, and alignment follow the existing CRISM footprint logic.
+- This is a visualization-only layer (no recalculation needed).
+
+Please propose:
+- Backend data model / API changes
+- How `index.geojson` should be extended (example schema)
+- Frontend layer wiring logic (high-level, not full UI code)

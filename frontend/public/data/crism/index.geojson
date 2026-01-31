@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "product_id": "frt0001fd76_07_if166j_mtr3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [74.25, 22.5]
+      }
+    }
+  ]
+}

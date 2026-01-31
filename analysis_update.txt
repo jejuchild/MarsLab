@@ -1,0 +1,71 @@
+You are working inside the MarsLab codebase.
+
+Context:
+- The file design/analysis_layer.html is the UI reference.
+- The left-side panel is the Analysis Layer.
+- This task is strictly limited to analysis-layer–related functionality.
+- CRISM-related layers only.
+
+Scope Constraint (IMPORTANT):
+1) Only touch code related to the Analysis Layer.
+   - Do NOT modify unrelated map logic, download logic, or other UI panels.
+   - No global refactors outside analysis-layer responsibilities.
+
+Task:
+Implement the left-side Analysis Layer with the following structure and behavior:
+
+1) Sections to support
+- Footprints
+  - CRISM (toggle)
+  - HiRISE (toggle)
+
+- Quick Views
+  - CRISM (toggle)
+  - HiRISE (toggle)
+
+- Browse Products (CRISM-related)
+  - HYD
+  - ICE
+  - IC2
+  - Ice Score
+  - Hydrated Mineral Score
+  Each item should be a toggleable overlay layer.
+
+2) Global opacity control
+- Add a single opacity slider in the Browse Products section.
+- This slider controls opacity for ALL visible analysis overlays:
+  - quick views
+  - high-resolution images
+  - browse products
+- Changing the slider should immediately update the opacity of every active overlay.
+- No per-layer opacity sliders.
+
+3) In Current View section
+- Keep the existing structure.
+- Minimum change only:
+  - reflect which analysis layers are currently visible
+  - no redesign or logic overhaul
+
+4) Active Overlays section
+- Keep the existing layout.
+- Each active overlay should:
+  - respect the global opacity slider
+  - reflect visibility state accurately
+
+5) Ice Score / Hydrated Mineral Score (PREPARATION ONLY)
+- These layers do NOT have real data yet.
+- Prepare the system so they can be added later without refactoring:
+  - create placeholder directory structure (e.g. /data/crism/scores/)
+  - define expected GeoJSON or raster layer schema
+  - wire toggles so they activate/deactivate placeholder layers safely
+- Do NOT implement real scoring logic.
+- Do NOT block UI just because data is missing.
+
+Constraints:
+- Do NOT redesign the UI.
+- Do NOT change the overall layout or styling system.
+- Follow the structure and class names in design/analysis_layer.html as closely as possible.
+- Changes must be minimal, incremental, and reversible.
+
+Focus on clean state management, predictable layer visibility,
+and future-proof CRISM score layer integration.

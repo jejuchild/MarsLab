@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "cesium": "^1.137.0",
+    "ol": "^10.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.1.0",
+    "cheerio": "^1.2.0",
+    "p-limit": "^7.2.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

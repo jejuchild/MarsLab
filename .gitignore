@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data directories (large files)
+backend/crism_browse/
+backend/crism_data/
+backend/crism_quickview/
+backend/crism_score_maps
+backend/hirise_data/
+backend/hirise_quickview/
+backend/sharad_data/
+backend/sharad_highres/
+backend/sharad_quickview/
+backend/.overlay_cache/
+
+# Large data folders
+arcadia_browse/
+arcadia_score_maps/
+arcadia_hirise/
+arcadia_sharad_thm/
+hirise_jp2_test/
+Data/
+
+# Frontend tiles (generated/large)
+frontend/public/tiles/
+frontend/public/data/
+frontend/node_modules/
+
+# Large binary files
+*.img
+*.IMG
+
+# Logs
+*.log
+/tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Build outputs
+dist/
+build/
+
+# Environment
+.env
+.env.local

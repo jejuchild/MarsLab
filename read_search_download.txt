@@ -1,0 +1,250 @@
+MarsLab Search & Download Specification
+
+================================================
+1. Data Sources
+================================================
+
+Primary endpoints:
+- ODE_PRODUCTFILES:
+  https://ode.rsl.wustl.edu/mars/productfiles.aspx
+- ODE_REST:
+  https://oderest.rsl.wustl.edu/live2/
+
+All downloadable file URLs must be discovered dynamically
+via ODE_PRODUCTFILES or ODE_REST responses.
+Never hardcode filenames or URLs.
+
+================================================
+2. Search
+================================================
+
+Search inputs:
+- Product ID text (partial or full)
+- Latitude / Longitude (point or small radius)
+
+Search behavior:
+- Typeahead search while typing
+- Max 10 results
+- Sorting priority:
+  1) Exact prefix match
+  2) Substring match
+- Highlight the matched substring in each result
+
+Search result item must include:
+- Instrument type (CRISM / HiRISE)
+- Observation-level identifier (base key)
+- Lat/Lon (if available)
+- Availability status:
+  - "exists" if dataset already downloaded on server
+  - "new" if not yet downloaded
+
+================================================
+3. Existence Check (IMPORTANT)
+================================================
+
+Before rendering search results:
+- Check whether the corresponding dataset directory
+  already exists on the server.
+
+If fileset exists:
+- Mark the result as "EXISTS"
+- Disable or gray out the download button
+  (or change label to "Already downloaded")
+
+Existence is determined by:
+- data/crism/<base_key>/ for CRISM
+- data/hirise/<product_id>/ for HiRISE
+
+================================================
+4. CRISM Selection Logic
+================================================
+
+User may type a full product ID such as:
+- frt00009312_07_if166l_trr3
+- frt0001fd76_07_if166j_mtr3
+
+Selection is ALWAYS observation-level (OBS-level).
+
+Define:
+- base_key = first two underscore-separated tokens
+  Example:
+    frt0001fd76_07_if166j_mtr3
+    → base_key = frt0001fd76_07
+
+All downloads are resolved from base_key.
+
+================================================
+5. CRISM Download Bundle
+================================================
+
+For a selected CRISM base_key, automatically download:
+
+------------------------------------------------
+5.1 Core MTR/TRR products
+------------------------------------------------
+
+Depending on availability (discover via ODE):
+
+- MTR3 or TRR3:
+  - *.img
+  - *.lbl
+  - *.hdr (if exists)
+
+Example:
+- frt0001fd76_07_if166j_mtr3.img
+- frt0001fd76_07_if166j_mtr3.lbl
+- frt0001fd76_07_if166j_mtr3.hdr
+
+------------------------------------------------
+5.2 Wavelength table
+------------------------------------------------
+
+- *.tab file associated with the observation
+  Example:
+  - frt0001fd76_07_wv166j_mtr3.tab
+
+------------------------------------------------
+5.3 Quicklook / Browse images
+------------------------------------------------
+
+Download CRISM browse & quickview products, if available:
+
+Quickview:
+- Example:
+  - frt0001fd76_07_brvnaj_mtr3.png
+
+Browse products (ALL if available):
+- HYD (hydration)
+- ICE
+- IC2
+
+Examples:
+- frt0001fd76_07_brhydj_mtr3.png
+- frt0001fd76_07_bricej_mtr3.png
+- frt0001fd76_07_bric2j_mtr3.png
+
+These must be discovered via ODE_PRODUCTFILES,
+not guessed.
+
+------------------------------------------------
+5.4 Storage layout (CRISM)
+------------------------------------------------
+
+Store all CRISM files under:
+
+data/crism/<base_key>/
+
+Example:
+data/crism/frt0001fd76_07/
+  ├─ frt0001fd76_07_if166j_mtr3.img
+  ├─ frt0001fd76_07_if166j_mtr3.lbl
+  ├─ frt0001fd76_07_if166j_mtr3.hdr
+  ├─ frt0001fd76_07_wv166j_mtr3.tab
+  ├─ frt0001fd76_07_brvnaj_mtr3.png
+  ├─ frt0001fd76_07_brhydj_mtr3.png
+  ├─ frt0001fd76_07_bricej_mtr3.png
+  └─ frt0001fd76_07_bric2j_mtr3.png
+
+================================================
+6. HiRISE Download Bundle
+================================================
+
+For HiRISE products (example: ESP_045857_2350):
+
+------------------------------------------------
+6.1 Download
+------------------------------------------------
+
+Download:
+- RED JP2 image
+- Corresponding label
+
+Example:
+- ESP_045857_2350_RED.JP2
+- ESP_045857_2350_RED.lbl
+
+------------------------------------------------
+6.2 GDAL Conversion
+------------------------------------------------
+
+After download:
+- Convert JP2 → GeoTIFF using GDAL
+
+Output:
+- ESP_045857_2350_RED.tif
+
+Keep the original JP2 and LBL files.
+
+------------------------------------------------
+6.3 Storage layout (HiRISE)
+------------------------------------------------
+
+Store under:
+
+data/hirise/ESP_045857_2350/
+
+  ├─ ESP_045857_2350_RED.JP2
+  ├─ ESP_045857_2350_RED.lbl
+  └─ ESP_045857_2350_RED.tif
+
+================================================
+7. Post-download Index Update
+================================================
+
+After successful download and processing:
+
+- Update index.geojson
+- Include:
+  - product_id / base_key
+  - instrument (CRISM / HiRISE)
+  - lat / lon footprint or center
+  - file paths
+  - availability flags
+
+The dataset must:
+- Appear immediately in the UI
+- Be selectable and renderable without reload
+
+================================================
+8. UI Requirements
+================================================
+
+- Follow layout and interaction patterns in:
+  design/search_download.html
+
+UI must support:
+- Live search suggestions
+- Highlighted matches
+- Existence indicator ("exists")
+- Download progress feedback
+- Error handling (missing products, partial availability)
+
+================================================
+9. Deliverables
+================================================
+
+Provide:
+1) Backend API endpoints
+   - search (ODE REST)
+   - resolve bundle
+   - download
+   - status / existence check
+
+2) Frontend wiring
+   - typeahead search
+   - selection
+   - download trigger
+   - progress UI
+
+3) Server-side logic
+   - file storage
+   - GDAL conversion for HiRISE
+   - index.geojson update
+
+4) Notes on:
+   - ODE REST query parameters
+   - ODE_PRODUCTFILES parsing rules
+   - Edge cases:
+     - missing HDR
+     - MTR vs TRR
+     - DDR / browse availability differences

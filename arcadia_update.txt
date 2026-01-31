@@ -1,0 +1,64 @@
+You are a backend / data-engineering assistant.
+
+I have a folder named `arcadia_browse/` containing CRISM image files:
+- Quickview images (VNIR)
+- Browse products: HYD, ICE, IC2
+
+Your task is to reorganize files and update metadata.
+
+---
+
+## 1. File classification & move rules
+
+Inside `arcadia_browse/`, classify files by product type inferred from filename:
+
+- VNIR quickview images
+  → move ALL to:
+    /backend/crism_quickview/
+
+- HYD, ICE, IC2 browse product images
+  → move ALL to:
+    /backend/crism_browse/
+
+Do NOT rename files.
+Only move them into the correct directories.
+
+If destination directories do not exist, create them.
+
+---
+
+## 2. index.geojson update
+
+There is an existing `index.geojson` file that references these image paths.
+
+Update `index.geojson` so that:
+- VNIR entries point to `/backend/crism_quickview/<filename>`
+- HYD / ICE / IC2 entries point to `/backend/crism_browse/<filename>`
+
+Constraints:
+- Preserve all existing feature properties (geometry, product_id, lat/lon, etc).
+- Only update fields related to file path / image URL.
+- Do NOT reorder features.
+- Do NOT drop or duplicate entries.
+
+---
+
+## 3. Safety / robustness
+
+- If a file already exists in the destination, skip moving it but still ensure `index.geojson` points to the correct path.
+- Log skipped files clearly.
+- Assume filenames are the single source of truth for product type.
+
+---
+
+## 4. Deliverable
+
+Provide:
+1. A Python script that performs:
+   - Classification
+   - File moving
+   - `index.geojson` update
+2. The script should be runnable from the project root.
+3. No explanations unless strictly necessary.
+
+Focus on correctness and clean implementation.

@@ -1,0 +1,100 @@
+You are working in a web-based planetary data visualization platform (Claude Code).
+The system already supports CRISM and HiRISE data with footprints, browse products, and quick views.
+
+I want to introduce a new PRODUCT-LEVEL FILTERING feature based on a quantitative ICE score.
+This ICE score is already computed from CRISM browse products and must be treated as a true scientific score.
+
+----------------------------------------------------------------
+ICE SCORE DEFINITION (IMPORTANT – USE AS-IS)
+----------------------------------------------------------------
+
+ICE score is a pixel-level continuous value defined in the range ~[0, 2].
+
+Interpretation:
+- 0        : no ice-like signal
+- 0–1      : weak to moderate ice-like signal (grayscale)
+- 1–2      : strong ice-like signal (highlighted in red)
+
+Visualization rule (already implemented elsewhere, listed here for consistency):
+- ICE score 0–1 is rendered in grayscale
+- ICE score 1–2 is rendered in red
+- Background pixels are transparent
+
+The threshold value n used for filtering refers to this ICE score definition.
+
+----------------------------------------------------------------
+FILTERING LOGIC (PRODUCT-LEVEL)
+----------------------------------------------------------------
+
+For each CRISM observation:
+
+1) From the ICE score map, identify valid pixels (background excluded).
+2) For a given threshold value n:
+   - Mark pixels where ICE score ≥ n
+3) Compute the area fraction:
+   area_fraction(n) =
+     (number of pixels with ICE score ≥ n)
+     / (number of valid pixels)
+
+4) KEEP the CRISM product ONLY IF:
+   area_fraction(n) ≥ n%
+
+This promotes ICE score from a visualization-only metric to a true product-level score.
+The purpose is to retain only observations with spatially meaningful ice signals
+(not single-pixel spikes or noise).
+
+----------------------------------------------------------------
+FRONTEND REQUIREMENTS
+----------------------------------------------------------------
+
+- Add a new section in the left panel called **“Filter”**
+- Inside Filter, implement ONE feature initially:
+  - **ICE Score Filtering**
+
+UI elements:
+- A slider or numeric input controlling the value `n`
+- The SAME value `n` is used for:
+  - ICE score threshold (ICE score ≥ n)
+  - Area threshold (≥ n%)
+- An **Apply** button
+
+Behavior when filter is applied:
+- Only CRISM products that pass the ICE score filtering rule remain visible.
+- For CRISM, the filter must apply consistently to:
+  - footprint
+  - browse product
+  - quick view
+- HiRISE products must remain completely unaffected by this filter.
+
+Map behavior:
+- After applying the filter:
+  - Only qualifying CRISM footprints are shown
+  - Only their associated browse products and quick views are rendered
+- Non-qualifying CRISM observations are fully hidden.
+
+----------------------------------------------------------------
+BACKEND / DATA ASSUMPTIONS
+----------------------------------------------------------------
+
+- ICE score maps are already available and linked by obs_id.
+- ICE score statistics can be:
+  - precomputed and stored per obs_id, OR
+  - computed on demand when filter parameters change.
+
+Each CRISM observation should expose (or be able to compute):
+- valid_pixel_count
+- ice_pixel_count(threshold = n)
+- ice_area_fraction(threshold = n)
+
+Filtering is CRISM-only.
+Do NOT apply or propagate this filter to HiRISE data.
+
+----------------------------------------------------------------
+REQUEST
+----------------------------------------------------------------
+
+Please propose:
+1) Backend logic and data structures to support this ICE score filtering
+2) How the filter state should be represented and propagated
+3) How CRISM layers (footprint, browse, quick view) subscribe to the filter
+4) A clean frontend interaction flow (high-level; no full UI code required)

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>HiRISE World Tile Viewer</title>
+
+  <!-- Cesium -->
+  <script src="https://unpkg.com/cesium/Build/Cesium/Cesium.js"></script>
+  <link
+    href="https://unpkg.com/cesium/Build/Cesium/Widgets/widgets.css"
+    rel="stylesheet"
+  />
+
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 8px 10px;
+      font-family: monospace;
+      font-size: 12px;
+      border: 1px solid #333;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="cesiumContainer"></div>
+  <div id="overlay">Loading...</div>
+
+  <script>
+    // =====================================================
+    // 1. Parse productId from URL
+    // =====================================================
+    const params = new URLSearchParams(window.location.search);
+    const productId = params.get("productId");
+
+    if (!productId) {
+      document.getElementById("overlay").innerText =
+        "❌ No productId provided";
+      throw new Error("productId missing");
+    }
+
+    document.getElementById("overlay").innerText =
+      `HiRISE Viewer\n${productId}`;
+
+    // =====================================================
+    // 2. Create Cesium Viewer (2D, Mars)
+    // =====================================================
+    const MARS_RADIUS = 3389500.0;
+    const MARS_ELLIPSOID = new Cesium.Ellipsoid(
+      MARS_RADIUS,
+      MARS_RADIUS,
+      MARS_RADIUS
+    );
+
+    const viewer = new Cesium.Viewer("cesiumContainer", {
+      sceneMode: Cesium.SceneMode.SCENE2D,
+      mapProjection: new Cesium.GeographicProjection(MARS_ELLIPSOID),
+      baseLayerPicker: false,
+      animation: false,
+      timeline: false,
+      geocoder: false,
+      homeButton: false,
+      navigationHelpButton: false,
+      sceneModePicker: false,
+      fullscreenButton: false,
+      infoBox: false,
+      selectionIndicator: false,
+    });
+
+    viewer.scene.globe = new Cesium.Globe(MARS_ELLIPSOID);
+    viewer.scene.globe.depthTestAgainstTerrain = false;
+
+    // =====================================================
+    // 3. Fetch world_meta (extent + zoom)
+    // =====================================================
+    async function init() {
+      const res = await fetch("http://localhost:8000/world_meta");
+      const meta = await res.json();
+
+      if (!meta.extent) {
+        document.getElementById("overlay").innerText =
+          "❌ Failed to load world_meta";
+        console.error(meta);
+        return;
+      }
+
+      const [left, bottom, right, top] = meta.extent;
+      const maxZoom = meta.max_zoom;
+
+      // =====================================================
+      // 4. Add HiRISE world tile layer
+      // =====================================================
+      const imagery = new Cesium.UrlTemplateImageryProvider({
+        url:
+          `http://localhost:8000/world_tiles/${productId}/{z}/{x}/{y}.png`,
+        tilingScheme: new Cesium.GeographicTilingScheme({
+          ellipsoid: MARS_ELLIPSOID,
+        }),
+        maximumLevel: maxZoom,
+        minimumLevel: 0,
+      });
+
+      viewer.imageryLayers.removeAll();
+      viewer.imageryLayers.addImageryProvider(imagery);
+
+      // =====================================================
+      // 5. Zoom to data extent
+      // =====================================================
+      const rect = Cesium.Rectangle.fromDegrees(
+        left, bottom, right, top
+      );
+
+      viewer.camera.setView({
+        destination: rect,
+      });
+
+      document.getElementById("overlay").innerText =
+        `HiRISE Viewer\n${productId}\nZoom: ${maxZoom}`;
+    }
+
+    init();
+  </script>
+</body>
+</html>

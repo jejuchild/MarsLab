@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MarsLab CRISM RGB Band Controller</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "mono": ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body { font-family: 'Space Grotesk', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #232f48; border-radius: 10px; }
+        .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.4); }
+        .crosshair::before { width: 60px; height: 1px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .crosshair::after { width: 1px; height: 60px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        input[type="range"].vertical {
+            writing-mode: bt-lr;-webkit-appearance: slider-vertical;width: 8px;
+            height: 120px;
+            padding: 0 5px;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: #232f48;
+            height: 4px;
+            border-radius: 2px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: #135bec;
+            cursor: pointer;
+            margin-top: -4px;
+        }
+        .slider-red::-webkit-slider-thumb { background: #ef4444 !important; }
+        .slider-green::-webkit-slider-thumb { background: #22c55e !important; }
+        .slider-blue::-webkit-slider-thumb { background: #3b82f6 !important; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-white overflow-hidden h-screen flex flex-col">
+<header class="flex items-center justify-between border-b border-solid border-[#232f48] px-6 py-2 h-14 bg-background-light dark:bg-background-dark shrink-0">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3">
+<div class="size-6 text-primary">
+<span class="material-symbols-outlined text-2xl">rocket_launch</span>
+</div>
+<h2 class="text-white text-xl font-bold tracking-tight font-display">MarsLab</h2>
+</div>
+<div class="h-6 w-px bg-[#232f48]"></div>
+<nav class="flex items-center gap-6">
+<a class="text-white text-sm font-medium hover:text-primary transition-colors" href="#">Workbench</a>
+<a class="text-[#92a4c9] text-sm font-medium hover:text-white transition-colors" href="#">Missions</a>
+<a class="text-[#92a4c9] text-sm font-medium hover:text-white transition-colors" href="#">Data Archive</a>
+</nav>
+</div>
+<div class="flex items-center gap-4 flex-1 justify-center max-w-xl px-10">
+<div class="flex w-full items-stretch rounded-lg h-9 bg-[#232f48]">
+<div class="text-[#92a4c9] flex items-center justify-center pl-3">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+<input class="w-full border-none bg-transparent focus:ring-0 text-sm placeholder:text-[#92a4c9] text-white px-2" placeholder="Search coordinates, feature names, or product IDs..."/>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<button class="size-9 flex items-center justify-center rounded-lg bg-[#232f48] hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<button class="size-9 flex items-center justify-center rounded-lg bg-[#232f48] hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+</div>
+</header>
+<main class="flex flex-1 overflow-hidden">
+<aside class="w-72 border-r border-[#232f48] flex flex-col bg-background-light dark:bg-background-dark shrink-0">
+<div class="p-4 flex flex-col gap-1 border-b border-[#232f48]">
+<h1 class="text-white text-sm font-bold uppercase tracking-wider font-display">Data Catalog</h1>
+<p class="text-[#92a4c9] text-[12px]">Project: Jezero Crater Mapping</p>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<div class="p-4 border-b border-[#232f48]">
+<h3 class="text-[#92a4c9] text-[11px] font-bold uppercase tracking-widest mb-3">Instruments</h3>
+<div class="flex flex-wrap gap-2">
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-primary text-white text-[11px] font-medium">
+<span>CRISM</span>
+<span class="material-symbols-outlined text-[14px]">close</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#232f48] text-[#92a4c9] hover:text-white text-[11px] font-medium">
+<span>HiRISE</span>
+<span class="material-symbols-outlined text-[14px]">add</span>
+</button>
+<button class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#232f48] text-[#92a4c9] hover:text-white text-[11px] font-medium">
+<span>THEMIS</span>
+<span class="material-symbols-outlined text-[14px]">add</span>
+</button>
+</div>
+</div>
+<div class="p-4">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-[#92a4c9] text-[11px] font-bold uppercase tracking-widest">Active Layers</h3>
+<span class="material-symbols-outlined text-[18px] text-[#92a4c9]">layers</span>
+</div>
+<div class="flex flex-col gap-3">
+<div class="p-3 rounded-lg bg-[#1a2333] border border-[#232f48]">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-primary">visibility</span>
+<span class="text-[12px] font-medium">CRISM RGB Composite</span>
+</div>
+<span class="material-symbols-outlined text-[16px] text-[#92a4c9] cursor-pointer">tune</span>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between items-center mb-1">
+<span class="text-[10px] text-[#92a4c9]">Opacity</span>
+<span class="text-[10px] text-white font-mono">85%</span>
+</div>
+<input class="w-full" max="100" min="0" type="range" value="85"/>
+</div>
+</div>
+<div class="p-3 rounded-lg bg-[#1a2333] border border-[#232f48]">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-primary/60">visibility</span>
+<span class="text-[12px] font-medium text-[#92a4c9]">HiRISE Grayscale</span>
+</div>
+</div>
+<input class="w-full opacity-50" max="100" min="0" type="range" value="40"/>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-[#232f48] bg-[#1a2333]/30">
+<div class="flex items-center gap-3">
+<div class="size-2 rounded-full bg-green-500 animate-pulse"></div>
+<span class="text-[11px] font-medium text-[#92a4c9]">PDS NODE: ACTIVE</span>
+</div>
+</div>
+</aside>
+<section class="flex-1 relative bg-[#080b12] flex items-center justify-center overflow-hidden">
+<div class="absolute inset-0 bg-[#080b12] overflow-hidden">
+<div class="absolute inset-0 opacity-40 grayscale mix-blend-luminosity bg-center bg-cover" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDU3f5OktsA3gVUWZJYJ4waUWSlbze1kUXq9zgeQ84bZipMlykl6jM0WY682pzwJp2UndwiSJ0kbsny2ZQXSG5Z-hzA6s_Olo8Ru_dvbLcoZ0jT0g2MNnp8fWyzqe--TvB8C16LnkFsKQSuDcpGZSeNzQdtWz-SAQdBYNlcUaO02r4_4MeYH1oFEwBA5ZowiHBa-BHf-d06zkEsQ3Ek4BYR5ZSFkK2Lg2kpzrgtxUL316e7QEmYaYlVrS2E1BaKVl2yFoBXijIoolg');"></div>
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: linear-gradient(#92a4c9 1px, transparent 1px), linear-gradient(90deg, #92a4c9 1px, transparent 1px); background-size: 100px 100px;"></div>
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] flex items-center justify-center">
+<div class="absolute w-[400px] h-[600px] bg-gradient-to-tr from-red-900/40 via-green-800/40 to-blue-900/40 border border-blue-500/30 opacity-75 backdrop-blur-sm">
+<div class="absolute inset-0 bg-cover mix-blend-overlay opacity-50" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDU3f5OktsA3gVUWZJYJ4waUWSlbze1kUXq9zgeQ84bZipMlykl6jM0WY682pzwJp2UndwiSJ0kbsny2ZQXSG5Z-hzA6s_Olo8Ru_dvbLcoZ0jT0g2MNnp8fWyzqe--TvB8C16LnkFsKQSuDcpGZSeNzQdtWz-SAQdBYNlcUaO02r4_4MeYH1oFEwBA5ZowiHBa-BHf-d06zkEsQ3Ek4BYR5ZSFkK2Lg2kpzrgtxUL316e7QEmYaYlVrS2E1BaKVl2yFoBXijIoolg');"></div>
+<div class="absolute top-2 left-2 text-[8px] font-mono text-white/60 font-bold uppercase tracking-widest">CRISM_L_FRS0000C12_RGB</div>
+</div>
+</div>
+</div>
+<div class="absolute top-4 right-4 flex flex-col gap-2">
+<div class="flex flex-col rounded-lg bg-[#111722]/80 backdrop-blur border border-[#232f48] overflow-hidden shadow-xl">
+<button class="p-2.5 hover:bg-primary/20 text-[#92a4c9] hover:text-white transition-colors"><span class="material-symbols-outlined text-[20px]">add</span></button>
+<div class="h-px bg-[#232f48]"></div>
+<button class="p-2.5 hover:bg-primary/20 text-[#92a4c9] hover:text-white transition-colors"><span class="material-symbols-outlined text-[20px]">remove</span></button>
+</div>
+</div>
+<div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-6 px-8 py-3.5 rounded-xl bg-[#111722]/90 backdrop-blur-md border border-[#232f48] shadow-2xl">
+<div class="flex flex-col">
+<span class="text-[9px] text-[#92a4c9] uppercase tracking-widest font-bold mb-0.5">Latitude</span>
+<span class="text-sm font-mono text-white">18° 27' 07.9" N</span>
+</div>
+<div class="w-px bg-[#232f48] h-8 self-center"></div>
+<div class="flex flex-col">
+<span class="text-[9px] text-[#92a4c9] uppercase tracking-widest font-bold mb-0.5">Longitude</span>
+<span class="text-sm font-mono text-white">77° 27' 29.2" E</span>
+</div>
+<div class="w-px bg-[#232f48] h-8 self-center"></div>
+<div class="flex flex-col">
+<span class="text-[9px] text-[#92a4c9] uppercase tracking-widest font-bold mb-0.5">Pixel I/F</span>
+<span class="text-sm font-mono text-primary font-bold">0.0342</span>
+</div>
+</div>
+<div class="crosshair w-12 h-12 relative pointer-events-none opacity-50">
+<div class="absolute inset-0 border border-white/10 rounded-full"></div>
+</div>
+</section>
+<aside class="w-80 border-l border-[#232f48] flex flex-col bg-background-light dark:bg-background-dark shrink-0">
+<div class="flex border-b border-[#232f48]">
+<button class="flex-1 py-3 text-[11px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary bg-primary/5">Pixel Spectrum</button>
+<button class="flex-1 py-3 text-[11px] font-bold uppercase tracking-wider text-[#92a4c9] hover:text-white border-b-2 border-transparent">Metadata</button>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+<section>
+<div class="flex items-center justify-between mb-4">
+<h4 class="text-white text-[12px] font-bold uppercase tracking-wider">Reflectance Profile</h4>
+<span class="material-symbols-outlined text-[18px] text-[#92a4c9] cursor-pointer">info</span>
+</div>
+<div class="h-44 bg-[#111722] rounded-lg border border-[#232f48] p-3 relative flex items-end justify-between overflow-hidden">
+<div class="absolute inset-0 p-4">
+<svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+<path d="M0,80 Q10,75 20,85 T40,60 T60,70 T80,30 T100,20" fill="none" stroke="#6366f1" stroke-width="2"></path>
+<line stroke="#ef4444" stroke-dasharray="2,2" stroke-width="1" x1="25" x2="25" y1="0" y2="100"></line>
+<line stroke="#22c55e" stroke-dasharray="2,2" stroke-width="1" x1="55" x2="55" y1="0" y2="100"></line>
+<line stroke="#3b82f6" stroke-dasharray="2,2" stroke-width="1" x1="85" x2="85" y1="0" y2="100"></line>
+</svg>
+</div>
+<div class="absolute bottom-1 right-2 text-[9px] font-mono text-[#92a4c9]">λ (μm)</div>
+<div class="absolute top-2 left-2 text-[9px] font-mono text-[#92a4c9] rotate-90 origin-top-left translate-y-12">I/F</div>
+</div>
+</section>
+<section class="bg-[#1a2333] rounded-lg border border-[#232f48] p-4">
+<h4 class="text-white text-[12px] font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">palette</span>
+                    Band Selection
+                </h4>
+<div class="flex justify-between gap-4 h-[180px] pt-2">
+<div class="flex flex-col items-center gap-3 flex-1">
+<input class="vertical slider-red" max="3.9" min="1.0" step="0.01" type="range" value="1.05"/>
+<div class="text-center">
+<span class="block text-[10px] text-red-400 font-bold">RED</span>
+<span class="text-[11px] font-mono">1.05 μm</span>
+</div>
+</div>
+<div class="flex flex-col items-center gap-3 flex-1">
+<input class="vertical slider-green" max="3.9" min="1.0" step="0.01" type="range" value="1.50"/>
+<div class="text-center">
+<span class="block text-[10px] text-green-400 font-bold">GREEN</span>
+<span class="text-[11px] font-mono">1.50 μm</span>
+</div>
+</div>
+<div class="flex flex-col items-center gap-3 flex-1">
+<input class="vertical slider-blue" max="3.9" min="1.0" step="0.01" type="range" value="2.30"/>
+<div class="text-center">
+<span class="block text-[10px] text-blue-400 font-bold">BLUE</span>
+<span class="text-[11px] font-mono">2.30 μm</span>
+</div>
+</div>
+</div>
+</section>
+<section class="space-y-3">
+<h4 class="text-white text-[12px] font-bold uppercase tracking-wider">Band Ratios</h4>
+<div class="grid grid-cols-2 gap-2">
+<div class="bg-[#1a2333]/50 p-2 rounded border border-[#232f48]/50">
+<span class="text-[9px] text-[#92a4c9] uppercase block mb-1">D2300</span>
+<span class="text-[12px] font-mono">0.0152</span>
+</div>
+<div class="bg-[#1a2333]/50 p-2 rounded border border-[#232f48]/50">
+<span class="text-[9px] text-[#92a4c9] uppercase block mb-1">BD1900</span>
+<span class="text-[12px] font-mono">0.0084</span>
+</div>
+</div>
+</section>
+</div>
+<div class="p-4 border-t border-[#232f48] bg-[#1a2333]/30">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-bold py-2.5 rounded-lg text-xs tracking-wider transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">file_download</span>
+                EXPORT SPECTRA
+            </button>
+</div>
+</aside>
+</main>
+<footer class="h-8 border-t border-[#232f48] bg-background-light dark:bg-background-dark px-4 flex items-center justify-between shrink-0">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px] text-green-500">database</span>
+<span class="text-[10px] uppercase font-bold text-[#92a4c9] tracking-wider">PDS Geosciences Node</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px] text-[#92a4c9]">info</span>
+<span class="text-[10px] uppercase font-bold text-[#92a4c9] tracking-wider">CRISM L-Level Data</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[10px] font-mono text-[#92a4c9]">ENGINE: v4.2-CRISM</span>
+<div class="h-4 w-px bg-[#232f48]"></div>
+<span class="text-[10px] font-mono text-[#92a4c9]">COORD: MOLA_GEO</span>
+</div>
+</footer>
+
+</body></html>
