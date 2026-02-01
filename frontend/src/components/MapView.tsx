@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
-import { FootprintManager, InstrumentType as FPInstrumentType, FootprintFeature } from "../utils/FootprintManager";
+import FootprintManager from "../utils/FootprintManager";
 
 /* ==================================================
  * Types
@@ -461,6 +461,10 @@ export default function MapView({
   const [crismEntitiesLoaded, setCrismEntitiesLoaded] = useState(false);
   const [isLoadingFootprints, setIsLoadingFootprints] = useState(false);
 
+  // Current LOD state for UI feedback
+  const [currentLOD, setCurrentLOD] = useState<"none" | "point" | "poly">("none");
+  const [cameraHeightKm, setCameraHeightKm] = useState<number>(Infinity);
+
   // FootprintManager ref for viewport-based loading
   const footprintManagerRef = useRef<FootprintManager | null>(null);
 
@@ -543,14 +547,26 @@ export default function MapView({
       onLoadEnd: (instrument, count) => {
         console.log(`[FootprintManager] Loaded ${instrument}: ${count} features`);
         setIsLoadingFootprints(false);
-        // Clear disclaimer if not truncated
-        if (instrument === "CRISM" && crismDisclaimer?.displayed === count) {
-          // Keep disclaimer
+        // Clear disclaimer when data is not truncated
+        if (instrument === "CRISM") {
+          setCrismDisclaimer(null);
+        } else if (instrument === "HIRISE") {
+          setHiriseDisclaimer(null);
         }
       },
       onError: (instrument, error) => {
         console.error(`[FootprintManager] Error loading ${instrument}:`, error);
         setIsLoadingFootprints(false);
+      },
+      onLODChange: (lod, cameraHeight) => {
+        console.log(`[FootprintManager] LOD changed: ${lod}, height: ${(cameraHeight / 1000).toFixed(0)} km`);
+        setCurrentLOD(lod);
+        setCameraHeightKm(cameraHeight / 1000);
+        // Clear disclaimers when LOD changes to none (zoomed out)
+        if (lod === "none") {
+          setCrismDisclaimer(null);
+          setHiriseDisclaimer(null);
+        }
       },
     });
     footprintManagerRef.current = footprintManager;
@@ -2247,15 +2263,39 @@ export default function MapView({
         </div>
       )}
 
-      {/* Footprint Disclaimers */}
+      {/* Zoom Gating Hint - Show when zoomed out and footprints are enabled */}
+      {(showCRISM || showHiRISE) && currentLOD === "none" && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border border-sky-500/50 bg-sky-900/80 px-4 py-2 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-sky-200">
+            <span className="material-symbols-outlined text-sm">zoom_in</span>
+            <span className="text-[11px]">
+              Zoom in to see footprints (current: {cameraHeightKm.toFixed(0)} km)
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* LOD Indicator - Show current view mode */}
+      {(showCRISM || showHiRISE) && currentLOD === "point" && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border border-cyan-500/50 bg-cyan-900/80 px-4 py-2 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-cyan-200">
+            <span className="material-symbols-outlined text-sm">radio_button_checked</span>
+            <span className="text-[11px]">
+              Showing centroids only. Zoom in for polygons ({cameraHeightKm.toFixed(0)} km)
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Footprint Truncation Warnings */}
       {(showCRISM && crismDisclaimer) || (showHiRISE && hiriseDisclaimer) ? (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border border-amber-500/50 bg-amber-900/80 px-4 py-2 backdrop-blur-md">
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 rounded-lg border border-amber-500/50 bg-amber-900/80 px-4 py-2 backdrop-blur-md">
           <div className="flex flex-col gap-1">
             {showCRISM && crismDisclaimer && (
               <div className="flex items-center gap-2 text-amber-200">
                 <span className="material-symbols-outlined text-sm">warning</span>
                 <span className="text-[11px]">
-                  Showing {crismDisclaimer.displayed} of {crismDisclaimer.total} CRISM footprints. Zoom in to see more.
+                  Too many footprints — zoom in further ({crismDisclaimer.displayed}/{crismDisclaimer.total} CRISM)
                 </span>
               </div>
             )}
@@ -2263,7 +2303,7 @@ export default function MapView({
               <div className="flex items-center gap-2 text-amber-200">
                 <span className="material-symbols-outlined text-sm">warning</span>
                 <span className="text-[11px]">
-                  Showing {hiriseDisclaimer.displayed} of {hiriseDisclaimer.total} HiRISE footprints. Zoom in to see more.
+                  Too many footprints — zoom in further ({hiriseDisclaimer.displayed}/{hiriseDisclaimer.total} HiRISE)
                 </span>
               </div>
             )}

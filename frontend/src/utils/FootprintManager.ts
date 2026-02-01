@@ -63,27 +63,28 @@ export interface FootprintManagerConfig {
   onLoadStart?: (instrument: InstrumentType) => void;
   onLoadEnd?: (instrument: InstrumentType, count: number) => void;
   onError?: (instrument: InstrumentType, error: Error) => void;
+  onLODChange?: (lod: LODType, cameraHeight: number) => void;
 }
 
 // ============================================================
 // LOD Thresholds (camera height in meters)
+// STRICT ZOOM GATING - These thresholds are NON-NEGOTIABLE
 // ============================================================
 
-// LOD thresholds for CRISM/HiRISE (small footprints)
 const LOD_THRESHOLDS = {
-  // Above this height: no footprints
-  FAR: 20_000_000, // 20,000 km
-  // Above this height: points only
-  MID: 2_000_000, // 2,000 km
-  // Below this: full polygons
-  CLOSE: 2_000_000,
+  // FAR VIEW: camera height > 2,000 km → NO footprints at all
+  FAR: 2_000_000, // 2,000 km in meters
+  // MID VIEW: 2,000 km >= height > 500 km → points only
+  MID: 500_000, // 500 km in meters
+  // CLOSE VIEW: height <= 500 km → polygons allowed
 };
 
-// Simplification levels based on camera height
+// Simplification levels based on camera height (for CLOSE VIEW only)
 const SIMPLIFY_THRESHOLDS = {
-  HIGH: 500_000, // Below 500km: high detail (minimal simplification)
-  MID: 1_000_000, // Below 1000km: medium simplification
-  // Above 1000km: low detail (aggressive simplification)
+  // < 200 km → high detail (minimal simplification)
+  HIGH: 200_000, // 200 km
+  // 200-500 km → mid simplification
+  MID: 500_000, // 500 km
 };
 
 // ============================================================
@@ -202,6 +203,11 @@ export class FootprintManager {
   private onLoadStart?: (instrument: InstrumentType) => void;
   private onLoadEnd?: (instrument: InstrumentType, count: number) => void;
   private onError?: (instrument: InstrumentType, error: Error) => void;
+  private onLODChange?: (lod: LODType, cameraHeight: number) => void;
+
+  // Current LOD state
+  private currentLOD: LODType = "none";
+  private currentCameraHeight: number = Infinity;
 
   // Colors
   private static COLORS: Record<InstrumentType, Cesium.Color> = {
@@ -219,6 +225,7 @@ export class FootprintManager {
     this.onLoadStart = config.onLoadStart;
     this.onLoadEnd = config.onLoadEnd;
     this.onError = config.onError;
+    this.onLODChange = config.onLODChange;
 
     // Initialize state for each instrument
     (["CRISM", "HIRISE", "SHARAD"] as InstrumentType[]).forEach((inst) => {
@@ -314,6 +321,26 @@ export class FootprintManager {
     const viewport = this.getViewportState();
     if (!viewport) return;
 
+    const { lod, cameraHeight } = viewport;
+
+    // Notify LOD change
+    if (lod !== this.currentLOD || Math.abs(cameraHeight - this.currentCameraHeight) > 10000) {
+      this.currentLOD = lod;
+      this.currentCameraHeight = cameraHeight;
+      this.onLODChange?.(lod, cameraHeight);
+    }
+
+    // FAR VIEW: Clear all footprints and do NOT fetch
+    if (lod === "none") {
+      const instruments: InstrumentType[] = ["CRISM", "HIRISE"];
+      for (const instrument of instruments) {
+        if (this.enabled.get(instrument)) {
+          this.clearInstrumentFootprints(instrument);
+        }
+      }
+      return;
+    }
+
     // Update each enabled instrument
     const instruments: InstrumentType[] = ["CRISM", "HIRISE"];
 
@@ -321,6 +348,25 @@ export class FootprintManager {
       if (!this.enabled.get(instrument)) continue;
       await this.updateInstrument(instrument, viewport);
     }
+  }
+
+  private clearInstrumentFootprints(instrument: InstrumentType): void {
+    const viewer = this.viewer;
+    const entityIdSet = this.entityIds.get(instrument)!;
+
+    // Remove all entities for this instrument
+    for (const id of entityIdSet) {
+      const entity = viewer.entities.getById(id);
+      if (entity) {
+        viewer.entities.remove(entity);
+      }
+    }
+    entityIdSet.clear();
+
+    // Clear current features
+    this.currentFeatures.get(instrument)?.clear();
+
+    viewer.scene.requestRender();
   }
 
   private async updateInstrument(
@@ -461,11 +507,25 @@ export class FootprintManager {
 
       const entityId = `${instrument}_VP_${id}`;
 
-      if (lod === "point" || geom.type === "Point") {
-        // Render as point
-        const coords = geom.coordinates as number[];
-        const lon = normalizeLon(coords[0]);
-        const lat = coords[1];
+      // MID VIEW: ONLY render points, never polygons
+      if (lod === "point") {
+        // Render as point (centroid)
+        let lon: number, lat: number;
+        if (geom.type === "Point") {
+          const coords = geom.coordinates as number[];
+          lon = normalizeLon(coords[0]);
+          lat = coords[1];
+        } else if (geom.type === "Polygon") {
+          // Compute centroid from polygon
+          const coords = geom.coordinates as number[][][];
+          const ring = coords[0];
+          const lons = ring.map((c) => c[0]);
+          const lats = ring.map((c) => c[1]);
+          lon = normalizeLon(lons.reduce((a, b) => a + b, 0) / lons.length);
+          lat = lats.reduce((a, b) => a + b, 0) / lats.length;
+        } else {
+          continue; // Skip unsupported geometry types in point mode
+        }
 
         viewer.entities.add({
           id: entityId,
@@ -484,8 +544,8 @@ export class FootprintManager {
           },
         });
         entityIdSet.add(entityId);
-      } else if (geom.type === "Polygon") {
-        // Render as rectangle/polygon
+      } else if (lod === "poly" && geom.type === "Polygon") {
+        // CLOSE VIEW: Render polygons with minimal material, NO outline
         const coords = geom.coordinates as number[][][];
         const ring = coords[0];
 
@@ -514,9 +574,10 @@ export class FootprintManager {
             id: rectEntityId,
             rectangle: {
               coordinates: rect,
-              material: color.withAlpha(0.3),
-              outline: true,
-              outlineColor: color,
+              // Minimal material - solid color, no translucency for performance
+              material: color.withAlpha(0.4),
+              // NO outline for performance
+              outline: false,
               height: 0,
             },
             properties: {
@@ -673,6 +734,27 @@ export class FootprintManager {
    */
   isEnabled(instrument: InstrumentType): boolean {
     return this.enabled.get(instrument) ?? false;
+  }
+
+  /**
+   * Get current LOD level.
+   */
+  getCurrentLOD(): LODType {
+    return this.currentLOD;
+  }
+
+  /**
+   * Get current camera height in meters.
+   */
+  getCameraHeight(): number {
+    return this.currentCameraHeight;
+  }
+
+  /**
+   * Get LOD thresholds for UI display.
+   */
+  static getLODThresholds() {
+    return { ...LOD_THRESHOLDS };
   }
 
   /**

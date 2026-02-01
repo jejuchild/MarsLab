@@ -208,6 +208,14 @@ def simplify_geometry(geom: dict, tolerance: float) -> dict:
         return geom
 
 
+# Server-side LOD enforcement thresholds (in km)
+LOD_THRESHOLDS_KM = {
+    "FAR": 2000,   # > 2000 km: no footprints
+    "MID": 500,    # 500-2000 km: points only
+    # < 500 km: polygons allowed
+}
+
+
 @router.get("/api/footprints")
 async def get_footprints(
     instrument: str = Query(..., description="Instrument: CRISM, HIRISE, or SHARAD"),
@@ -215,6 +223,7 @@ async def get_footprints(
     lod: LODType = Query("poly", description="Level of detail: none, point, or poly"),
     simplify: Optional[SimplifyLevel] = Query(None, description="Simplification level: low, mid, high"),
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT, description="Maximum features to return"),
+    camera_height_km: Optional[float] = Query(None, description="Camera height in km for server-side LOD enforcement"),
 ):
     """
     Get footprints within a bounding box.
@@ -223,9 +232,29 @@ async def get_footprints(
     - truncated: boolean indicating if results were limited
     - returned: number of features returned
     - total_estimate: estimated total features in bbox (if truncated)
-    - lod: the LOD level used
+    - lod: the LOD level used (may be downgraded by server)
     - simplify: the simplification level used (if any)
+    - lod_enforced: true if server downgraded the LOD
+
+    Server-side LOD enforcement:
+    - If camera_height_km > 2000: forces lod=none
+    - If camera_height_km > 500 and lod=poly: downgrades to lod=point
     """
+    lod_enforced = False
+    original_lod = lod
+
+    # Server-side LOD enforcement based on camera height
+    if camera_height_km is not None:
+        if camera_height_km > LOD_THRESHOLDS_KM["FAR"]:
+            # Too zoomed out - no footprints
+            if lod != "none":
+                lod = "none"
+                lod_enforced = True
+        elif camera_height_km > LOD_THRESHOLDS_KM["MID"]:
+            # Mid zoom - points only
+            if lod == "poly":
+                lod = "point"
+                lod_enforced = True
     # Parse bbox
     try:
         parts = [float(x.strip()) for x in bbox.split(",")]
@@ -256,9 +285,12 @@ async def get_footprints(
                 "returned": 0,
                 "total_estimate": 0,
                 "lod": lod,
+                "original_lod": original_lod,
+                "lod_enforced": lod_enforced,
                 "simplify": simplify,
                 "bbox": [min_lon, min_lat, max_lon, max_lat],
                 "instrument": instrument.upper(),
+                "reason": "Zoom in to see footprints" if lod_enforced else None,
             }
         })
 
@@ -316,6 +348,8 @@ async def get_footprints(
             "returned": len(result_features),
             "total_estimate": total_matching,
             "lod": lod,
+            "original_lod": original_lod,
+            "lod_enforced": lod_enforced,
             "simplify": simplify,
             "bbox": [min_lon, min_lat, max_lon, max_lat],
             "instrument": instrument.upper(),

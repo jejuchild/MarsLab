@@ -40,7 +40,12 @@
       "Bash(xxd:*)",
       "Bash(wc:*)",
       "Bash(xargs:*)",
-      "Bash(comm:*)"
+      "Bash(comm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(python -m uvicorn:*)",
+      "Bash(kill:*)",
+      "Bash(python -m json.tool:*)"
     ]
   }
 }
