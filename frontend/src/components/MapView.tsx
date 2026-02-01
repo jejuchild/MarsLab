@@ -572,183 +572,18 @@ export default function MapView({
     footprintManagerRef.current = footprintManager;
     // =================
 
-    // Load HiRISE index - use GeoJSON geometry directly when available
-    fetch("/hirise_index.geojson")
-      .then((res) => res.json())
-      .then(async (geojson: any) => {
-        const features = geojson.features || [];
-        console.log("[DEBUG][HIRISE] GeoJSON features:", features.length);
+    // HiRISE footprints are now loaded via FootprintManager (viewport-based)
+    // Legacy global loading disabled for performance
+    console.log("[HIRISE] Footprints will be loaded via FootprintManager (viewport-based)");
 
-        let loadedCount = 0;
-        let lblFallbackCount = 0;
-
-        for (const feature of features) {
-          const props = feature.properties || {};
-          const id = props.product_id;
-          const title = props.title;  // HiRISE observation title
-          if (!id) continue;
-
-          let rects: Cesium.Rectangle[] = [];
-
-          // Check if GeoJSON has valid polygon geometry
-          const geom = feature.geometry;
-          if (geom?.type === "Polygon" && geom.coordinates?.[0]?.length >= 4) {
-            // Use coordinates directly from GeoJSON
-            const coords = geom.coordinates[0];
-            // Extract bounds from polygon coordinates (normalize to -180 to 180)
-            let minLon = Infinity, maxLon = -Infinity;
-            let minLat = Infinity, maxLat = -Infinity;
-            for (const [lon, lat] of coords) {
-              const normLon = normalizeLonTo180(lon);
-              if (normLon < minLon) minLon = normLon;
-              if (normLon > maxLon) maxLon = normLon;
-              if (lat < minLat) minLat = lat;
-              if (lat > maxLat) maxLat = lat;
-            }
-            // Skip invalid coordinates (like [0,0] placeholders)
-            if (minLon !== 0 || maxLon !== 0 || minLat !== 0 || maxLat !== 0) {
-              const rect = Cesium.Rectangle.fromDegrees(minLon, minLat, maxLon, maxLat);
-              rects = [rect];
-            }
-          }
-
-          // Fallback to LBL if no valid geometry
-          if (rects.length === 0) {
-            lblFallbackCount++;
-            const lbl = await loadHiRISELBL(id);
-            if (!lbl) {
-              console.warn("[HIRISE] skip footprint, no LBL:", id);
-              continue;
-            }
-            rects = rectanglesFromLBL_BBOX(lbl);
-          }
-
-          if (rects.length === 0) continue;
-
-          loadedCount++;
-          rects.forEach((rect, i) => {
-            const ent = viewer.entities.add({
-              id: `HIRISE_${id}_${i}`,
-              show: false, // Will be toggled by effect
-              rectangle: {
-                coordinates: rect,
-                material: Cesium.Color.YELLOW.withAlpha(0.3),
-                outline: true,
-                outlineColor: Cesium.Color.YELLOW,
-                height: 0,
-              },
-              properties: {
-                product_id: id,
-                instrument: "HIRISE",
-                title: title,  // Store title for inspector
-              },
-            });
-            hiriseEntitiesRef.current.push(ent);
-
-            const { labelEnt, pointEnt } = addFootprintLabelAndPoint({
-              viewer,
-              id,
-              instrument: "HIRISE",
-              rect,
-              show: false, // Will be toggled by effect
-              color: Cesium.Color.YELLOW,
-            });
-            hiriseEntitiesRef.current.push(labelEnt);
-            hiriseEntitiesRef.current.push(pointEnt);
-          });
-        }
-
-        console.log(`[HIRISE] Loaded ${loadedCount} footprints (${lblFallbackCount} needed LBL fallback)`);
-        viewer.scene.requestRender();
-      });
-
-    // Load CRISM index and create footprints
-    const CRISM_MAX_DISPLAY = 2000;
-    // Add cache-busting parameter to ensure fresh data
+    // CRISM footprints are now loaded via FootprintManager (viewport-based)
+    // Only load score map features here for ICE/Hydration overlays
+    console.log("[CRISM] Footprints will be loaded via FootprintManager (viewport-based)");
     fetch(`/crism_index.geojson?_=${Date.now()}`)
       .then((res) => res.json())
       .then((geojson: any) => {
-        const totalFeatures = geojson.features?.length || 0;
-        console.log("[DEBUG][CRISM] Total GeoJSON features:", totalFeatures);
-
-        // Limit to max display
-        const features = (geojson.features || []).slice(0, CRISM_MAX_DISPLAY);
-        let crismCount = 0;
-
-        for (const feature of features) {
-          const props = feature.properties || {};
-          const id = props.product_id;
-          if (!id) continue;
-
-          const geom = feature.geometry;
-          let rects: Cesium.Rectangle[] = [];
-
-          // Try to get coordinates from GeoJSON geometry directly
-          if (geom?.type === "Polygon" && geom.coordinates?.[0]?.length >= 4) {
-            const coords = geom.coordinates[0];
-            // Normalize longitudes to -180 to 180 range
-            const lons = coords.map((c: number[]) => normalizeLonTo180(c[0]));
-            const lats = coords.map((c: number[]) => c[1]);
-            const west = Math.min(...lons);
-            const east = Math.max(...lons);
-            const south = Math.min(...lats);
-            const north = Math.max(...lats);
-
-            // Check if coordinates are valid (not at 0,0)
-            if (west === 0 && east === 0 && south === 0 && north === 0) continue;
-
-            // Check for antimeridian crossing (width > 180° indicates wrap-around)
-            const width = east - west;
-            if (width > 180) {
-              // Split into two rectangles
-              rects = [
-                Cesium.Rectangle.fromDegrees(east, south, 180, north),
-                Cesium.Rectangle.fromDegrees(-180, south, west, north),
-              ];
-            } else {
-              rects = [Cesium.Rectangle.fromDegrees(west, south, east, north)];
-            }
-          }
-
-          // Skip if no valid geometry
-          if (rects.length === 0) continue;
-
-          crismCount++;
-          rects.forEach((rect, i) => {
-            const ent = viewer.entities.add({
-              id: `CRISM_${id}_${i}`,
-              show: false, // Will be toggled by effect
-              rectangle: {
-                coordinates: rect,
-                material: Cesium.Color.CYAN.withAlpha(0.35),
-                outline: true,
-                outlineColor: Cesium.Color.BLACK,
-                height: 0,
-              },
-              properties: {
-                product_id: id,
-                instrument: "CRISM",
-              },
-            });
-            crismEntitiesRef.current.push(ent);
-
-            const { labelEnt, pointEnt } = addFootprintLabelAndPoint({
-              viewer,
-              id,
-              instrument: "CRISM",
-              rect,
-              show: false, // Will be toggled by effect
-              color: Cesium.Color.CYAN,
-            });
-            crismEntitiesRef.current.push(labelEnt);
-            crismEntitiesRef.current.push(pointEnt);
-          });
-        }
-
-        // Set disclaimer if there are more features than displayed
-        if (totalFeatures > crismCount) {
-          setCrismDisclaimer({ displayed: crismCount, total: totalFeatures });
-        }
+        const features = geojson.features || [];
+        console.log("[DEBUG][CRISM] Total GeoJSON features:", features.length);
 
         // Store features for score map overlays (only those with score maps)
         const scoreFeatures = features.filter((f: any) => {
@@ -757,17 +592,7 @@ export default function MapView({
         });
         setCrismScoreFeatures(scoreFeatures);
         console.log("[DEBUG][CRISM] Features with score maps:", scoreFeatures.length);
-        if (scoreFeatures.length > 0) {
-          console.log("[DEBUG][CRISM] Sample score feature:", scoreFeatures[0].properties?.product_id,
-            "ice:", scoreFeatures[0].properties?.ice_score_map,
-            "hyd:", scoreFeatures[0].properties?.hydration_score_map);
-        } else {
-          console.log("[DEBUG][CRISM] No score features found! First feature props:", features[0]?.properties);
-        }
-
-        console.log("[DEBUG][CRISM] Created", crismEntitiesRef.current.length, "entities (displayed:", crismCount, "of", totalFeatures, ")");
         setCrismEntitiesLoaded(true);
-        viewer.scene.requestRender();
       });
 
     // Load SHARAD index and create polylines
@@ -1236,9 +1061,7 @@ export default function MapView({
   }, []);
 
   useEffect(() => {
-    // Toggle legacy entities (for overlays and score maps compatibility)
-    hiriseEntitiesRef.current.forEach((e) => (e.show = showHiRISE));
-    // Toggle FootprintManager viewport-based entities
+    // Toggle FootprintManager viewport-based entities for HiRISE
     if (footprintManagerRef.current) {
       footprintManagerRef.current.setEnabled("HIRISE", showHiRISE);
     }
@@ -1246,26 +1069,7 @@ export default function MapView({
   }, [showHiRISE]);
 
   useEffect(() => {
-    // Toggle legacy entities (for overlays and score maps compatibility)
-    crismEntitiesRef.current.forEach((e) => {
-      if (!showCRISM) {
-        e.show = false;
-        return;
-      }
-      // If ICE filter is active, only show CRISM entities that pass the filter
-      if (iceFilterPassingObs !== null) {
-        const productId = e.properties?.getValue(Cesium.JulianDate.now())?.product_id;
-        if (productId) {
-          const obsId = productId.split("_")[0];
-          e.show = iceFilterPassingObs.has(obsId);
-        } else {
-          e.show = false;
-        }
-      } else {
-        e.show = true;
-      }
-    });
-    // Toggle FootprintManager viewport-based entities
+    // Toggle FootprintManager viewport-based entities for CRISM
     if (footprintManagerRef.current) {
       footprintManagerRef.current.setEnabled("CRISM", showCRISM);
     }
@@ -1277,86 +1081,8 @@ export default function MapView({
     viewerRef.current?.scene.requestRender();
   }, [showSHARAD]);
 
-  // Hide footprints when they have image overlays
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-
-    // Collect all product IDs and obs_ids that have overlays
-    const productsWithOverlays = new Set<string>();
-    const obsIdsWithOverlays = new Set<string>();
-
-    // Quickview overlays
-    quickviewOverlays.forEach((pid) => productsWithOverlays.add(pid));
-
-    // High-res overlays
-    highResOverlays.forEach((pid) => productsWithOverlays.add(pid));
-
-    // Browse overlays
-    browseOverlays.forEach((_, pid) => productsWithOverlays.add(pid));
-
-    // Ice Score overlays (when enabled)
-    if (showIceScore) {
-      iceScoreEntitiesRef.current.forEach((e) => {
-        const obsId = e.properties?.getValue(Cesium.JulianDate.now())?.obs_id;
-        if (obsId) obsIdsWithOverlays.add(obsId);
-      });
-    }
-
-    // Hydration Score overlays (when enabled)
-    if (showHydratedScore) {
-      hydrationScoreEntitiesRef.current.forEach((e) => {
-        const obsId = e.properties?.getValue(Cesium.JulianDate.now())?.obs_id;
-        if (obsId) obsIdsWithOverlays.add(obsId);
-      });
-    }
-
-    // Update HiRISE footprints
-    hiriseEntitiesRef.current.forEach((e) => {
-      const props = e.properties?.getValue(Cesium.JulianDate.now());
-      const kind = props?.kind;
-      if (kind === "FOOTPRINT_LABEL" || kind === "FOOTPRINT_POINT") return;
-
-      const pid = props?.product_id;
-      if (!pid) return;
-
-      const hasOverlay = productsWithOverlays.has(pid);
-      if (e.rectangle?.material) {
-        if (hasOverlay) {
-          // Make footprint fully transparent
-          (e.rectangle.material as any) = Cesium.Color.TRANSPARENT;
-        } else {
-          // Restore original color
-          (e.rectangle.material as any) = Cesium.Color.YELLOW.withAlpha(0.3);
-        }
-      }
-    });
-
-    // Update CRISM footprints
-    crismEntitiesRef.current.forEach((e) => {
-      const props = e.properties?.getValue(Cesium.JulianDate.now());
-      const kind = props?.kind;
-      if (kind === "FOOTPRINT_LABEL" || kind === "FOOTPRINT_POINT") return;
-
-      const pid = props?.product_id;
-      if (!pid) return;
-
-      const obsId = pid.split("_")[0];
-      const hasOverlay = productsWithOverlays.has(pid) || obsIdsWithOverlays.has(obsId);
-
-      if (e.rectangle?.material) {
-        if (hasOverlay) {
-          // Make footprint fully transparent
-          (e.rectangle.material as any) = Cesium.Color.TRANSPARENT;
-        } else {
-          // Restore original color
-          (e.rectangle.material as any) = Cesium.Color.CYAN.withAlpha(0.35);
-        }
-      }
-    });
-
-    viewer.scene.requestRender();
-  }, [quickviewOverlays, highResOverlays, browseOverlays, showIceScore, showHydratedScore]);
+  // Note: Legacy footprint overlay hiding is no longer needed since
+  // footprints are now managed by FootprintManager (viewport-based loading)
 
   // Handle Ice Score layer toggle - uses crismScoreFeatures from GeoJSON
   useEffect(() => {
