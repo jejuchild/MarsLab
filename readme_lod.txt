@@ -1,27 +1,21 @@
-ZOOM LEVEL GATING (NON-NEGOTIABLE)
+Use camera height above Mars ellipsoid surface as the ONLY zoom proxy.
 
-Implement strict zoom / camera-height based gating.
-Do NOT render polygon footprints unless the camera is sufficiently zoomed in.
+Thresholds (MUST use these exact values unless justified)
+FAR VIEW (Global)
 
-1) Define zoom proxy
-
-Use camera height (distance from Mars ellipsoid surface) as zoom proxy.
-
-Example thresholds (tune if needed, but must exist):
-
-FAR VIEW
-
-camera height > 2,000 km
+camera height > 10,000 km
 
 Behavior:
 
-DO NOT fetch footprints at all
+DO NOT fetch footprints
+
+DO NOT render anything
 
 lod = none
 
-MID VIEW
+MID VIEW (Continental)
 
-2,000 km ≥ height > 500 km
+10,000 km ≥ height > 6,000 km
 
 Behavior:
 
@@ -29,11 +23,27 @@ Fetch centroid points only
 
 lod = point
 
-Max count cap (e.g. 3,000 points)
+Hard cap: max 3,000 points
 
-CLOSE VIEW
+No polygons, no outlines
 
-height ≤ 500 km
+MID VIEW (Regional)
+
+6,000 km ≥ height > 3,000 km
+
+Behavior:
+
+Fetch centroid points only
+
+lod = point
+
+Cap can increase (e.g. 5,000)
+
+Used for candidate-area discovery
+
+CLOSE VIEW (Local / Analysis)
+
+height ≤ 3,000 km
 
 Behavior:
 
@@ -41,69 +51,52 @@ Fetch polygon footprints
 
 lod = poly
 
-Use geometry simplification based on height:
+Geometry simplification by height:
 
-500–200 km → simplify = mid
+3,000–1,000 km → simplify = low
 
-<200 km → simplify = high
+1,000–300 km → simplify = mid
 
-These exact numbers can be constants in a config file, but gating logic MUST exist.
+<300 km → simplify = high
 
-2) Enforce gating on BOTH client and server
+Enforcement (STRICT)
 
 Client:
 
-Must NOT request polygons when zoom is FAR or MID.
+MUST NOT request polygons unless height ≤ 3,000 km
 
-Must NOT render polygons if returned accidentally.
+MUST NOT render polygons if accidentally returned
 
 Server:
 
-If lod=poly but zoom/height too large:
+If lod=poly but height > 3,000 km:
 
-either downgrade to lod=point
+downgrade to lod=point OR
 
-or return empty FeatureCollection with reason
+return empty FeatureCollection with reason
 
-3) Rendering rules (hard constraints)
+Rendering constraints
 
-FAR:
+FAR: zero draw calls
 
-zero footprint rendering (nothing)
+MID: PointPrimitiveCollection only
 
-MID:
-
-PointPrimitiveCollection ONLY
-
-no polygons, no outlines
-
-CLOSE:
-
-GroundPrimitive / Primitive polygons only
+CLOSE: GroundPrimitive / Primitive polygons only
 
 outline disabled
 
-minimal material (no translucency)
+minimal material
 
-4) UI feedback
+no translucency
 
-When user is too zoomed out:
+UX feedback
 
-show hint: “Zoom in to see footprints”
+If height > 6,000 km:
 
-If polygon data is truncated:
+show “Zoom in to see footprints”
 
-show: “Too many footprints — zoom in further”
+If polygon response is truncated:
 
-5) Acceptance criteria (zoom gating)
+show “Too many footprints — zoom in further”
 
-At global view: 0 footprint draw calls
-
-At mid zoom: points only
-
-Polygons appear ONLY when zoomed in
-
-No FPS drop when panning at global scale
-
-This zoom gating is NOT optional.
-Implement as a first-class system, not a heuristic.
+This gating is mandatory and must be enforced consistently on both client and server.

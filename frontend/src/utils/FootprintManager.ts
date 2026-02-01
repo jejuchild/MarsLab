@@ -72,19 +72,19 @@ export interface FootprintManagerConfig {
 // ============================================================
 
 const LOD_THRESHOLDS = {
-  // FAR VIEW: camera height > 2,000 km → NO footprints at all
-  FAR: 2_000_000, // 2,000 km in meters
-  // MID VIEW: 2,000 km >= height > 500 km → points only
-  MID: 500_000, // 500 km in meters
-  // CLOSE VIEW: height <= 500 km → polygons allowed
+  // FAR VIEW: camera height > 15,000 km → NO footprints at all
+  FAR: 15_000_000, // 15,000 km in meters
+  // MID VIEW: 15,000 km >= height > 5,000 km → points only
+  MID: 5_000_000, // 5,000 km in meters
+  // CLOSE VIEW: height <= 5,000 km → polygons allowed
 };
 
 // Simplification levels based on camera height (for CLOSE VIEW only)
 const SIMPLIFY_THRESHOLDS = {
-  // < 200 km → high detail (minimal simplification)
-  HIGH: 200_000, // 200 km
-  // 200-500 km → mid simplification
-  MID: 500_000, // 500 km
+  // < 2,000 km → high detail (minimal simplification)
+  HIGH: 2_000_000, // 2,000 km
+  // 2,000-5,000 km → mid simplification
+  MID: 5_000_000, // 5,000 km
 };
 
 // ============================================================

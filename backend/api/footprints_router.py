@@ -210,9 +210,9 @@ def simplify_geometry(geom: dict, tolerance: float) -> dict:
 
 # Server-side LOD enforcement thresholds (in km)
 LOD_THRESHOLDS_KM = {
-    "FAR": 2000,   # > 2000 km: no footprints
-    "MID": 500,    # 500-2000 km: points only
-    # < 500 km: polygons allowed
+    "FAR": 15000,   # > 15,000 km: no footprints
+    "MID": 5000,    # 5,000-15,000 km: points only
+    # < 5,000 km: polygons allowed
 }
 
 
