@@ -1,7 +1,8 @@
 // src/MapView.tsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
+import { FootprintManager, InstrumentType as FPInstrumentType, FootprintFeature } from "../utils/FootprintManager";
 
 /* ==================================================
  * Types
@@ -455,8 +456,13 @@ export default function MapView({
 
   const [hover, setHover] = useState<LatLon | null>(null);
   const [crismDisclaimer, setCrismDisclaimer] = useState<{ displayed: number; total: number } | null>(null);
+  const [hiriseDisclaimer, setHiriseDisclaimer] = useState<{ displayed: number; total: number } | null>(null);
   const [viewerReady, setViewerReady] = useState(false);
   const [crismEntitiesLoaded, setCrismEntitiesLoaded] = useState(false);
+  const [isLoadingFootprints, setIsLoadingFootprints] = useState(false);
+
+  // FootprintManager ref for viewport-based loading
+  const footprintManagerRef = useRef<FootprintManager | null>(null);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -515,6 +521,39 @@ export default function MapView({
         viewer.scene.requestRender();
       }
     });
+
+    // Initialize FootprintManager for viewport-based loading
+    const footprintManager = new FootprintManager({
+      viewer,
+      ellipsoid: MARS_ELLIPSOID,
+      debounceMs: 300,
+      maxCacheSize: 100,
+      onTruncated: (instrument, returned, total) => {
+        console.log(`[FootprintManager] ${instrument} truncated: ${returned}/${total}`);
+        if (instrument === "CRISM") {
+          setCrismDisclaimer({ displayed: returned, total });
+        } else if (instrument === "HIRISE") {
+          setHiriseDisclaimer({ displayed: returned, total });
+        }
+      },
+      onLoadStart: (instrument) => {
+        console.log(`[FootprintManager] Loading ${instrument}...`);
+        setIsLoadingFootprints(true);
+      },
+      onLoadEnd: (instrument, count) => {
+        console.log(`[FootprintManager] Loaded ${instrument}: ${count} features`);
+        setIsLoadingFootprints(false);
+        // Clear disclaimer if not truncated
+        if (instrument === "CRISM" && crismDisclaimer?.displayed === count) {
+          // Keep disclaimer
+        }
+      },
+      onError: (instrument, error) => {
+        console.error(`[FootprintManager] Error loading ${instrument}:`, error);
+        setIsLoadingFootprints(false);
+      },
+    });
+    footprintManagerRef.current = footprintManager;
     // =================
 
     // Load HiRISE index - use GeoJSON geometry directly when available
@@ -1172,15 +1211,26 @@ export default function MapView({
     return () => {
       hoverHandler.destroy();
       clickHandler.destroy();
+      // Dispose FootprintManager
+      if (footprintManagerRef.current) {
+        footprintManagerRef.current.dispose();
+        footprintManagerRef.current = null;
+      }
     };
   }, []);
 
   useEffect(() => {
+    // Toggle legacy entities (for overlays and score maps compatibility)
     hiriseEntitiesRef.current.forEach((e) => (e.show = showHiRISE));
+    // Toggle FootprintManager viewport-based entities
+    if (footprintManagerRef.current) {
+      footprintManagerRef.current.setEnabled("HIRISE", showHiRISE);
+    }
     viewerRef.current?.scene.requestRender();
   }, [showHiRISE]);
 
   useEffect(() => {
+    // Toggle legacy entities (for overlays and score maps compatibility)
     crismEntitiesRef.current.forEach((e) => {
       if (!showCRISM) {
         e.show = false;
@@ -1199,6 +1249,10 @@ export default function MapView({
         e.show = true;
       }
     });
+    // Toggle FootprintManager viewport-based entities
+    if (footprintManagerRef.current) {
+      footprintManagerRef.current.setEnabled("CRISM", showCRISM);
+    }
     viewerRef.current?.scene.requestRender();
   }, [showCRISM, iceFilterPassingObs]);
 
@@ -2193,14 +2247,36 @@ export default function MapView({
         </div>
       )}
 
-      {/* CRISM Disclaimer */}
-      {showCRISM && crismDisclaimer && (
+      {/* Footprint Disclaimers */}
+      {(showCRISM && crismDisclaimer) || (showHiRISE && hiriseDisclaimer) ? (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border border-amber-500/50 bg-amber-900/80 px-4 py-2 backdrop-blur-md">
-          <div className="flex items-center gap-2 text-amber-200">
-            <span className="material-symbols-outlined text-sm">warning</span>
-            <span className="text-[11px]">
-              Showing {crismDisclaimer.displayed} of {crismDisclaimer.total} CRISM footprints (max 1000)
-            </span>
+          <div className="flex flex-col gap-1">
+            {showCRISM && crismDisclaimer && (
+              <div className="flex items-center gap-2 text-amber-200">
+                <span className="material-symbols-outlined text-sm">warning</span>
+                <span className="text-[11px]">
+                  Showing {crismDisclaimer.displayed} of {crismDisclaimer.total} CRISM footprints. Zoom in to see more.
+                </span>
+              </div>
+            )}
+            {showHiRISE && hiriseDisclaimer && (
+              <div className="flex items-center gap-2 text-amber-200">
+                <span className="material-symbols-outlined text-sm">warning</span>
+                <span className="text-[11px]">
+                  Showing {hiriseDisclaimer.displayed} of {hiriseDisclaimer.total} HiRISE footprints. Zoom in to see more.
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Loading Indicator */}
+      {isLoadingFootprints && (
+        <div className="absolute top-4 right-4 rounded-lg border border-blue-500/50 bg-blue-900/80 px-3 py-1.5 backdrop-blur-md">
+          <div className="flex items-center gap-2 text-blue-200">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-blue-300 border-t-transparent" />
+            <span className="text-[11px]">Loading footprints...</span>
           </div>
         </div>
       )}

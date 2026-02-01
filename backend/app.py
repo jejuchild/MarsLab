@@ -270,9 +270,11 @@ def get_crism_index():
 
 from api.crism.router import router as crism_router
 from api.search_router import router as search_router
+from api.footprints_router import router as footprints_router
 
 app.include_router(crism_router, prefix="/crism")
 app.include_router(search_router)  # Mounts at /api/*
+app.include_router(footprints_router)  # Viewport-based footprint API
 
 app.mount(
     "/hirise_lbl",
