@@ -7,11 +7,16 @@
  * - Start and monitor downloads
  */
 
+import {
+  detectInstrument as detectInstrumentFromRegistry,
+  type InstrumentId,
+} from "../config/instrumentRegistry";
+
 // =============================================================================
 // Types
 // =============================================================================
 
-export type Instrument = "crism" | "hirise" | "sharad";
+export type Instrument = InstrumentId;
 
 export interface SearchResult {
   product_id: string;
@@ -301,33 +306,33 @@ export function parseCrismBaseKey(productId: string): string {
 }
 
 /**
+ * Detect instrument from product ID using the registry.
+ */
+export function detectInstrument(productId: string): Instrument | null {
+  const config = detectInstrumentFromRegistry(productId);
+  return config ? (config.id as Instrument) : null;
+}
+
+/**
  * Check if a string looks like a CRISM product ID.
+ * @deprecated Use detectInstrument() instead
  */
 export function isCrismProductId(productId: string): boolean {
-  const prefixes = ["frt", "hrl", "hrs", "frs", "arl", "atl"];
-  return prefixes.some((p) => productId.toLowerCase().startsWith(p));
+  return detectInstrument(productId) === "crism";
 }
 
 /**
  * Check if a string looks like a HiRISE product ID.
+ * @deprecated Use detectInstrument() instead
  */
 export function isHiriseProductId(productId: string): boolean {
-  return /^(ESP|PSP|TRA)_\d+/i.test(productId);
+  return detectInstrument(productId) === "hirise";
 }
 
 /**
  * Check if a string looks like a SHARAD product ID.
+ * @deprecated Use detectInstrument() instead
  */
 export function isSharadProductId(productId: string): boolean {
-  return /^S_\d+/i.test(productId);
-}
-
-/**
- * Detect instrument from product ID.
- */
-export function detectInstrument(productId: string): Instrument | null {
-  if (isCrismProductId(productId)) return "crism";
-  if (isHiriseProductId(productId)) return "hirise";
-  if (isSharadProductId(productId)) return "sharad";
-  return null;
+  return detectInstrument(productId) === "sharad";
 }

@@ -1,0 +1,62 @@
+{
+  "version": "1.0",
+  "instruments": {
+    "crism": {
+      "id": "crism",
+      "name": "CRISM",
+      "display_name": "Compact Reconnaissance Imaging Spectrometer for Mars",
+      "geometry_type": "Polygon",
+      "color": "#00FFFF",
+      "data_directory": "crism_data",
+      "index_file": "index.geojson",
+      "product_id_pattern": "^(frt|hrl|hrs|frs|arl|atl)[0-9a-f]+",
+      "quickview_path": "crism_quickview",
+      "browse_path": "crism_browse",
+      "supports_spectrum": true,
+      "supports_rgb": true,
+      "file_types": {
+        "primary": [".img"],
+        "label": [".lbl"],
+        "header": [".hdr"],
+        "supplementary": [".tab"]
+      }
+    },
+    "hirise": {
+      "id": "hirise",
+      "name": "HiRISE",
+      "display_name": "High Resolution Imaging Science Experiment",
+      "geometry_type": "Polygon",
+      "color": "#FFFF00",
+      "data_directory": "hirise_data",
+      "index_file": "index.geojson",
+      "product_id_pattern": "^(ESP|PSP|TRA)_[0-9]+",
+      "quickview_path": "hirise_quickview",
+      "supports_spectrum": false,
+      "supports_rgb": false,
+      "file_types": {
+        "primary": [".tif", ".jp2"],
+        "label": [".lbl"],
+        "supplementary": []
+      }
+    },
+    "sharad": {
+      "id": "sharad",
+      "name": "SHARAD",
+      "display_name": "SHAllow RADar",
+      "geometry_type": "LineString",
+      "color": "#FFA500",
+      "data_directory": "sharad_data",
+      "index_file": "index.geojson",
+      "product_id_pattern": "^S_[0-9]+",
+      "quickview_path": "sharad_quickview",
+      "highres_path": "sharad_highres",
+      "supports_spectrum": false,
+      "supports_rgb": false,
+      "file_types": {
+        "primary": [".tif"],
+        "label": [],
+        "supplementary": []
+      }
+    }
+  }
+}

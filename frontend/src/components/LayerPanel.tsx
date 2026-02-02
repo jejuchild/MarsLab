@@ -1,5 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { VisibleProduct, BrowseProductType, BaseLayerType, BoundingBox } from "../pages/MainPage";
+
+type InstrumentType = "CRISM" | "HIRISE" | "SHARAD";
+
+// localStorage key for panel collapse state
+const PANEL_COLLAPSED_KEY = "marslab-layer-panel-collapsed";
 
 interface LayerPanelProps {
   // Base layer selection
@@ -32,12 +37,6 @@ interface LayerPanelProps {
   onToggleBrowseICE: (v: boolean) => void;
   onToggleBrowseIC2: (v: boolean) => void;
 
-  // Score layer toggles (placeholder)
-  showIceScore: boolean;
-  showHydratedScore: boolean;
-  onToggleIceScore: (v: boolean) => void;
-  onToggleHydratedScore: (v: boolean) => void;
-
   // Global opacity
   overlayOpacity: number;
   onOpacityChange: (v: number) => void;
@@ -57,16 +56,6 @@ interface LayerPanelProps {
   onDeactivateAll?: () => void;
   onTurnOnAllBrowse?: () => void;
   onTurnOnAllQuickviews?: () => void;
-
-  // ICE Score Filter
-  iceScoreThreshold: number;  // n: ICE score threshold (0-2)
-  iceAreaThreshold: number;   // m: area percentage threshold (0-100)
-  iceFilterActive: boolean;
-  iceFilterLoading: boolean;
-  onIceScoreThresholdChange: (v: number) => void;
-  onIceAreaThresholdChange: (v: number) => void;
-  onApplyIceFilter: () => void;
-  onClearIceFilter: () => void;
 }
 
 // View Bounds Input Component
@@ -195,11 +184,6 @@ export default function LayerPanel({
   onToggleBrowseHYD,
   onToggleBrowseICE,
   onToggleBrowseIC2,
-  // Score layers
-  showIceScore,
-  showHydratedScore,
-  onToggleIceScore,
-  onToggleHydratedScore,
   // Opacity
   overlayOpacity,
   onOpacityChange,
@@ -212,23 +196,30 @@ export default function LayerPanel({
   // Callbacks
   onToggleQuickview,
   onToggleHighRes,
-  onToggleBrowseProduct,
+  onToggleBrowseProduct: _onToggleBrowseProduct,
   onSelectProduct,
   onDeactivateAll,
   onTurnOnAllBrowse,
   onTurnOnAllQuickviews,
-  // ICE Filter
-  iceScoreThreshold = 1.0,
-  iceAreaThreshold = 10,
-  iceFilterActive = false,
-  iceFilterLoading = false,
-  onIceScoreThresholdChange,
-  onIceAreaThresholdChange,
-  onApplyIceFilter,
-  onClearIceFilter,
 }: LayerPanelProps) {
-  const hiriseProducts = visibleProducts.filter((p) => p.instrument === "HIRISE");
-  const crismProducts = visibleProducts.filter((p) => p.instrument === "CRISM");
+  // Panel collapse state - initialize from localStorage
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem(PANEL_COLLAPSED_KEY);
+      return stored === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  // Persist collapse state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(PANEL_COLLAPSED_KEY, String(isCollapsed));
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [isCollapsed]);
 
   // Count active overlays
   const totalActiveOverlays =
@@ -236,14 +227,71 @@ export default function LayerPanel({
     highResOverlays.length +
     Array.from(browseOverlays.values()).reduce((sum, set) => sum + set.size, 0);
 
+  // Collapsed state - show thin bar with toggle button
+  if (isCollapsed) {
+    return (
+      <div className="flex h-full w-12 flex-col border-r border-[#232f48] bg-[#101622] transition-all duration-300 ease-in-out">
+        {/* Expand button */}
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="flex flex-col items-center justify-center gap-2 p-3 border-b border-[#232f48] hover:bg-[#1a2333] transition-colors"
+          title="Expand Control Panel"
+        >
+          <span className="material-symbols-outlined text-[#92a4c9]">chevron_right</span>
+        </button>
+
+        {/* Vertical icons indicating panel contents */}
+        <div className="flex flex-col items-center gap-3 py-4">
+          <span
+            className="material-symbols-outlined text-sm text-[#6b7c9c]"
+            title="Layers"
+          >
+            layers
+          </span>
+          <span
+            className="material-symbols-outlined text-sm text-[#6b7c9c]"
+            title="Footprints"
+          >
+            hexagon
+          </span>
+          <span
+            className="material-symbols-outlined text-sm text-[#6b7c9c]"
+            title="Browse Products"
+          >
+            image
+          </span>
+        </div>
+
+        {/* Active overlays indicator */}
+        {totalActiveOverlays > 0 && (
+          <div className="mt-auto mb-4 flex flex-col items-center">
+            <div className="w-6 h-6 rounded-full bg-green-500/20 border border-green-500/50 flex items-center justify-center">
+              <span className="text-[9px] font-bold text-green-400">{totalActiveOverlays}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Expanded state - full panel
   return (
-    <div className="flex h-full w-80 flex-col border-r border-[#232f48] bg-[#101622]">
+    <div className="flex h-full w-80 flex-col border-r border-[#232f48] bg-[#101622] transition-all duration-300 ease-in-out">
       {/* Header */}
       <div className="p-4 border-b border-[#232f48]">
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-white text-xs font-bold uppercase tracking-wider">
-            Control Center
-          </h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="p-1 rounded hover:bg-[#1a2333] transition-colors"
+              title="Collapse Panel"
+            >
+              <span className="material-symbols-outlined text-sm text-[#92a4c9]">chevron_left</span>
+            </button>
+            <h1 className="text-white text-xs font-bold uppercase tracking-wider">
+              Control Center
+            </h1>
+          </div>
           <span className="text-[10px] text-[#92a4c9] font-mono">
             {visibleProducts.length} products
           </span>
@@ -294,102 +342,6 @@ export default function LayerPanel({
 
           {/* View Bounds */}
           <ViewBoundsInput viewBounds={viewBounds} onViewBoundsChange={onViewBoundsChange} />
-        </div>
-
-        {/* Filter Section */}
-        <div className="p-4 border-b border-[#232f48]">
-          <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest mb-3">
-            Filter
-          </h3>
-
-          {/* ICE Score Filter */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-sky-400">ICE Score Filter</span>
-              {iceFilterActive && (
-                <span className="text-[9px] px-1.5 py-0.5 bg-sky-500/20 text-sky-400 rounded border border-sky-500/30">
-                  Active
-                </span>
-              )}
-            </div>
-
-            {/* ICE Score Threshold (n) */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-[#92a4c9]">ICE Score Threshold (n)</span>
-                <span className="text-[10px] text-white font-mono">{iceScoreThreshold.toFixed(1)}</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="2"
-                step="0.1"
-                value={iceScoreThreshold}
-                onChange={(e) => onIceScoreThresholdChange?.(parseFloat(e.target.value))}
-                className="w-full h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer
-                  [&::-webkit-slider-thumb]:appearance-none
-                  [&::-webkit-slider-thumb]:h-3
-                  [&::-webkit-slider-thumb]:w-3
-                  [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:bg-sky-400
-                  [&::-webkit-slider-thumb]:cursor-pointer"
-              />
-              <div className="flex justify-between text-[8px] text-[#6b7c9c] mt-1">
-                <span>0</span>
-                <span>1</span>
-                <span>2</span>
-              </div>
-            </div>
-
-            {/* Area Threshold (m%) */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] text-[#92a4c9]">Area Threshold (m%)</span>
-                <span className="text-[10px] text-white font-mono">{iceAreaThreshold}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={iceAreaThreshold}
-                onChange={(e) => onIceAreaThresholdChange?.(parseInt(e.target.value))}
-                className="w-full h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer
-                  [&::-webkit-slider-thumb]:appearance-none
-                  [&::-webkit-slider-thumb]:h-3
-                  [&::-webkit-slider-thumb]:w-3
-                  [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:bg-sky-400
-                  [&::-webkit-slider-thumb]:cursor-pointer"
-              />
-              <div className="flex justify-between text-[8px] text-[#6b7c9c] mt-1">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
-
-            <p className="text-[9px] text-[#6b7c9c]">
-              Keep CRISM if ≥{iceAreaThreshold}% pixels have ICE score ≥{iceScoreThreshold.toFixed(1)}
-            </p>
-
-            <div className="flex gap-2">
-              <button
-                onClick={onApplyIceFilter}
-                disabled={iceFilterLoading}
-                className="flex-1 px-2 py-1.5 text-[10px] font-bold bg-sky-500/20 border border-sky-500/50 rounded text-sky-400 hover:bg-sky-500/30 transition-colors disabled:opacity-50 uppercase"
-              >
-                {iceFilterLoading ? "Applying..." : "Apply"}
-              </button>
-              <button
-                onClick={onClearIceFilter}
-                disabled={!iceFilterActive}
-                className="flex-1 px-2 py-1.5 text-[10px] font-medium bg-[#1a2333] border border-[#232f48] rounded text-[#92a4c9] hover:border-[#3a4a68] transition-colors disabled:opacity-50 uppercase"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Footprints Section */}
@@ -555,38 +507,6 @@ export default function LayerPanel({
                 CO2 Ice
               </span>
             </label>
-
-            {/* Ice Score */}
-            <label className="flex items-center justify-between p-2 rounded hover:bg-[#1a2333] group cursor-pointer">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={showIceScore}
-                  onChange={(e) => onToggleIceScore(e.target.checked)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-sky-400 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[12px] text-sky-400 font-medium">Ice Score</span>
-              </div>
-              <span className="text-[10px] text-[#92a4c9] opacity-0 group-hover:opacity-100 transition-opacity">
-                CRISM Analysis
-              </span>
-            </label>
-
-            {/* Hydrated Mineral Score */}
-            <label className="flex items-center justify-between p-2 rounded hover:bg-[#1a2333] group cursor-pointer">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={showHydratedScore}
-                  onChange={(e) => onToggleHydratedScore(e.target.checked)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-amber-400 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[12px] text-amber-400 font-medium">Hydration Score</span>
-              </div>
-              <span className="text-[10px] text-[#92a4c9] opacity-0 group-hover:opacity-100 transition-opacity">
-                CRISM Analysis
-              </span>
-            </label>
           </div>
 
           {/* Global Opacity Slider */}
@@ -614,228 +534,362 @@ export default function LayerPanel({
           </div>
         </div>
 
-        {/* In Current View Section */}
-        {(showHiRISE || showCRISM) && visibleProducts.length > 0 && (
-          <div className="p-4 border-b border-[#232f48]">
-            <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest mb-3 flex items-center justify-between">
-              In Current View
-              <span className="text-primary text-[10px]">{visibleProducts.length} items</span>
-            </h3>
+        {/* Displayed Products Section */}
+        <DisplayedProductsSection
+          visibleProducts={visibleProducts}
+          quickviewOverlays={quickviewOverlays}
+          highResOverlays={highResOverlays}
+          productsWithHighRes={productsWithHighRes}
+          onToggleQuickview={onToggleQuickview}
+          onToggleHighRes={onToggleHighRes}
+          onSelectProduct={onSelectProduct}
+        />
 
-            <div className="space-y-1 max-h-48 overflow-y-auto scrollbar-dark">
-              {/* CRISM Products */}
-              {showCRISM &&
-                crismProducts.slice(0, 10).map((product) => {
-                  const hasQuickview = quickviewOverlays.includes(product.productId);
-                  const hasHighRes = highResOverlays.includes(product.productId);
-                  const productBrowse = browseOverlays.get(product.productId);
+        {/* Active Products Section */}
+        <ActiveProductsSection
+          quickviewOverlays={quickviewOverlays}
+          highResOverlays={highResOverlays}
+          visibleProducts={visibleProducts}
+          onDeactivateAll={onDeactivateAll}
+        />
+      </div>
+    </div>
+  );
+}
 
-                  return (
-                    <div
-                      key={product.productId}
-                      className="flex items-center justify-between p-1.5 rounded bg-[#1a2333]/40 border border-[#232f48]/50 hover:bg-[#1a2333] transition-colors cursor-pointer"
-                      onClick={() => onSelectProduct?.(product)}
-                    >
-                      <span className="text-[11px] font-mono text-[#92a4c9] truncate max-w-[140px]">
-                        {product.productId.split("_")[0]}
-                      </span>
-                      <div className="flex gap-1">
-                        {hasHighRes && (
-                          <span className="text-[9px] px-1 bg-green-500/20 text-green-400 rounded uppercase">
-                            RGB
-                          </span>
-                        )}
-                        {hasQuickview && !hasHighRes && (
-                          <span className="text-[9px] px-1 bg-primary/20 text-primary rounded uppercase">
-                            QV
-                          </span>
-                        )}
-                        {productBrowse?.has("HYD") && (
-                          <span className="text-[9px] px-1 bg-fuchsia-500/20 text-fuchsia-400 rounded uppercase">
-                            HYD
-                          </span>
-                        )}
-                        {productBrowse?.has("ICE") && (
-                          <span className="text-[9px] px-1 bg-blue-500/20 text-blue-400 rounded uppercase">
-                            ICE
-                          </span>
-                        )}
-                        {productBrowse?.has("IC2") && (
-                          <span className="text-[9px] px-1 bg-cyan-400/20 text-cyan-400 rounded uppercase">
-                            IC2
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+// Instrument colors for badges
+const INSTRUMENT_COLORS: Record<InstrumentType, { bg: string; text: string; border: string }> = {
+  CRISM: { bg: "bg-cyan-500/20", text: "text-cyan-400", border: "border-cyan-500/30" },
+  HIRISE: { bg: "bg-yellow-500/20", text: "text-yellow-400", border: "border-yellow-500/30" },
+  SHARAD: { bg: "bg-orange-500/20", text: "text-orange-400", border: "border-orange-500/30" },
+};
 
-              {/* HiRISE Products */}
-              {showHiRISE &&
-                hiriseProducts.slice(0, 10).map((product) => {
-                  const hasQuickview = quickviewOverlays.includes(product.productId);
-                  const hasHighRes = highResOverlays.includes(product.productId);
+// Displayed Products Section Component
+function DisplayedProductsSection({
+  visibleProducts,
+  quickviewOverlays,
+  highResOverlays,
+  productsWithHighRes,
+  onToggleQuickview,
+  onToggleHighRes,
+  onSelectProduct,
+}: {
+  visibleProducts: VisibleProduct[];
+  quickviewOverlays: string[];
+  highResOverlays: string[];
+  productsWithHighRes: Set<string>;
+  onToggleQuickview?: (productId: string) => void;
+  onToggleHighRes?: (productId: string) => void;
+  onSelectProduct?: (product: VisibleProduct) => void;
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-                  return (
-                    <div
-                      key={product.productId}
-                      className="flex items-center justify-between p-1.5 rounded bg-[#1a2333]/40 border border-[#232f48]/50 hover:bg-[#1a2333] transition-colors cursor-pointer"
-                      onClick={() => onSelectProduct?.(product)}
-                    >
-                      <span className="text-[11px] font-mono text-[#92a4c9] truncate max-w-[140px]">
-                        {product.productId}
-                      </span>
-                      <div className="flex gap-1">
-                        {hasHighRes && (
-                          <span className="text-[9px] px-1 bg-green-500/20 text-green-400 rounded uppercase">
-                            HD
-                          </span>
-                        )}
-                        {hasQuickview && !hasHighRes && (
-                          <span className="text-[9px] px-1 bg-primary/20 text-primary rounded uppercase">
-                            QV
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+  // Group products by instrument
+  const groupedProducts = useMemo(() => {
+    const groups: Record<InstrumentType, VisibleProduct[]> = {
+      CRISM: [],
+      HIRISE: [],
+      SHARAD: [],
+    };
+    for (const product of visibleProducts) {
+      groups[product.instrument].push(product);
+    }
+    return groups;
+  }, [visibleProducts]);
 
-              {visibleProducts.length > 10 && (
-                <div className="text-center text-[10px] text-[#92a4c9] py-2">
-                  +{visibleProducts.length - 10} more...
-                </div>
-              )}
+  const totalCount = visibleProducts.length;
+
+  return (
+    <div className="p-4 border-b border-[#232f48]">
+      {/* Header */}
+      <div
+        className="flex items-center justify-between mb-2 cursor-pointer"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+          <span className="material-symbols-outlined text-xs">
+            {isCollapsed ? "expand_more" : "expand_less"}
+          </span>
+          Displayed Products
+        </h3>
+        <span className="text-primary text-[10px] font-mono">{totalCount}</span>
+      </div>
+
+      {!isCollapsed && (
+        <div className="space-y-3 max-h-64 overflow-y-auto scrollbar-dark">
+          {totalCount === 0 ? (
+            <div className="text-center py-4">
+              <span className="material-symbols-outlined text-2xl text-[#3a4a68] mb-1">layers_clear</span>
+              <p className="text-[10px] text-[#6b7c9c]">No products in view</p>
+              <p className="text-[9px] text-[#4a5a7c] mt-1">Enable footprints and zoom in</p>
             </div>
-          </div>
-        )}
+          ) : (
+            Object.entries(groupedProducts).map(([instrument, products]) => {
+              if (products.length === 0) return null;
 
-        {/* Active Overlays Section */}
-        {totalActiveOverlays > 0 && (
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest">
-                Active Overlays
-              </h3>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-green-400">{totalActiveOverlays} active</span>
-                <button
-                  onClick={onDeactivateAll}
-                  className="text-[9px] px-2 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors border border-red-500/30 font-bold uppercase"
-                >
-                  Clear All
-                </button>
-              </div>
-            </div>
+              const instColors = INSTRUMENT_COLORS[instrument as InstrumentType];
 
-            <div className="space-y-2 max-h-60 overflow-y-auto scrollbar-dark">
-              {/* High-res / RGB Overlays */}
-              {highResOverlays.map((productId) => {
-                const isHiRISE = productId.startsWith("ESP_");
-                return (
-                  <div
-                    key={`highres-${productId}`}
-                    className="rounded-lg border border-[#232f48] bg-[#1a2333]/20 p-3"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-bold text-white truncate max-w-[160px]">
-                        {productId.split("_")[0]}
-                      </span>
-                      <div className="flex gap-1 items-center">
-                        <span
-                          className={`text-[8px] px-1.5 py-0.5 rounded-sm border font-bold uppercase ${
-                            isHiRISE
-                              ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                              : "bg-green-500/20 text-green-400 border-green-500/30"
-                          }`}
-                        >
-                          {isHiRISE ? "HD" : "RGB"}
-                        </span>
-                        <button
-                          onClick={() => onToggleHighRes?.(productId)}
-                          className="p-0.5 text-red-400 hover:text-red-300 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-sm">close</span>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-[10px] text-[#92a4c9]">
-                      Opacity: {overlayOpacity}%
-                    </div>
+              return (
+                <div key={instrument}>
+                  {/* Instrument group header */}
+                  <div className={`text-[9px] font-bold uppercase tracking-wider mb-1.5 ${instColors.text}`}>
+                    {instrument} ({products.length})
                   </div>
-                );
-              })}
 
-              {/* Quickview Overlays */}
-              {quickviewOverlays
-                .filter((id) => !highResOverlays.includes(id))
-                .map((productId) => {
-                  const isHiRISE = productId.startsWith("ESP_");
-                  return (
-                    <div
-                      key={`quickview-${productId}`}
-                      className="rounded-lg border border-[#232f48] bg-[#1a2333]/20 p-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-bold text-white truncate max-w-[160px]">
-                          {productId.split("_")[0]}
-                        </span>
-                        <div className="flex gap-1 items-center">
-                          <span className="text-[8px] px-1.5 py-0.5 bg-white/10 text-[#92a4c9] rounded-sm border border-white/10 font-bold uppercase">
-                            Quickview
-                          </span>
-                          <button
-                            onClick={() => onToggleQuickview?.(productId)}
-                            className="p-0.5 text-red-400 hover:text-red-300 transition-colors"
+                  {/* Products list */}
+                  <div className="space-y-1">
+                    {products.map((product) => {
+                      const hasQuickview = quickviewOverlays.includes(product.productId);
+                      const hasHighRes = highResOverlays.includes(product.productId);
+                      const canHighRes = productsWithHighRes.has(product.productId);
+
+                      return (
+                        <div
+                          key={product.productId}
+                          className="flex items-center gap-2 p-1.5 rounded bg-[#1a2333]/40 border border-[#232f48]/50 hover:bg-[#1a2333] transition-colors group"
+                        >
+                          {/* Instrument badge */}
+                          <span
+                            className={`text-[8px] px-1 py-0.5 rounded font-bold ${instColors.bg} ${instColors.text} ${instColors.border} border`}
                           >
-                            <span className="material-symbols-outlined text-sm">close</span>
-                          </button>
+                            {instrument.slice(0, 3)}
+                          </span>
+
+                          {/* Product ID - clickable */}
+                          <span
+                            className="flex-1 text-[10px] font-mono text-[#92a4c9] truncate cursor-pointer hover:text-white"
+                            onClick={() => onSelectProduct?.(product)}
+                            title={product.productId}
+                          >
+                            {product.productId}
+                          </span>
+
+                          {/* Toggle controls */}
+                          <div className="flex items-center gap-1">
+                            {/* Quickview toggle */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleQuickview?.(product.productId);
+                              }}
+                              className={`p-0.5 rounded transition-colors ${
+                                hasQuickview
+                                  ? "text-emerald-400 bg-emerald-500/20"
+                                  : "text-slate-600 hover:text-slate-400"
+                              }`}
+                              title={hasQuickview ? "Hide Quickview" : "Show Quickview"}
+                            >
+                              <span className="material-symbols-outlined text-xs">visibility</span>
+                            </button>
+
+                            {/* High-res toggle */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleHighRes?.(product.productId);
+                              }}
+                              disabled={!canHighRes}
+                              className={`p-0.5 rounded transition-colors ${
+                                hasHighRes
+                                  ? "text-purple-400 bg-purple-500/20"
+                                  : canHighRes
+                                    ? "text-slate-600 hover:text-slate-400"
+                                    : "text-slate-700 cursor-not-allowed"
+                              }`}
+                              title={
+                                !canHighRes
+                                  ? "High-res not available"
+                                  : hasHighRes
+                                    ? "Hide High-Res"
+                                    : "Show High-Res"
+                              }
+                            >
+                              <span className="material-symbols-outlined text-xs">hd</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Active Products Section Component (view-only)
+function ActiveProductsSection({
+  quickviewOverlays,
+  highResOverlays,
+  visibleProducts,
+  onDeactivateAll,
+}: {
+  quickviewOverlays: string[];
+  highResOverlays: string[];
+  visibleProducts: VisibleProduct[];
+  onDeactivateAll?: () => void;
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Derive active products: those with quickview OR high-res ON
+  const activeProducts = useMemo(() => {
+    const activeIds = new Set([...quickviewOverlays, ...highResOverlays]);
+
+    // Build list of active products with their active layers
+    const result: Array<{
+      productId: string;
+      instrument: InstrumentType;
+      hasQuickview: boolean;
+      hasHighRes: boolean;
+    }> = [];
+
+    const seen = new Set<string>();
+
+    // First, add products from visibleProducts that are active
+    for (const product of visibleProducts) {
+      if (activeIds.has(product.productId) && !seen.has(product.productId)) {
+        seen.add(product.productId);
+        result.push({
+          productId: product.productId,
+          instrument: product.instrument,
+          hasQuickview: quickviewOverlays.includes(product.productId),
+          hasHighRes: highResOverlays.includes(product.productId),
+        });
+      }
+    }
+
+    // Then, add any active products not in visibleProducts (outside viewport)
+    for (const productId of activeIds) {
+      if (!seen.has(productId)) {
+        seen.add(productId);
+        const instrument: InstrumentType = productId.startsWith("ESP_") ? "HIRISE" : "CRISM";
+        result.push({
+          productId,
+          instrument,
+          hasQuickview: quickviewOverlays.includes(productId),
+          hasHighRes: highResOverlays.includes(productId),
+        });
+      }
+    }
+
+    return result;
+  }, [quickviewOverlays, highResOverlays, visibleProducts]);
+
+  // Group by instrument
+  const groupedActive = useMemo(() => {
+    const groups: Record<InstrumentType, typeof activeProducts> = {
+      CRISM: [],
+      HIRISE: [],
+      SHARAD: [],
+    };
+    for (const product of activeProducts) {
+      groups[product.instrument].push(product);
+    }
+    return groups;
+  }, [activeProducts]);
+
+  const activeCount = activeProducts.length;
+
+  return (
+    <div className="p-4">
+      {/* Header */}
+      <div
+        className="flex items-center justify-between mb-2 cursor-pointer"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+          <span className="material-symbols-outlined text-xs">
+            {isCollapsed ? "expand_more" : "expand_less"}
+          </span>
+          Active Products
+        </h3>
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] font-mono ${activeCount > 0 ? "text-green-400" : "text-[#6b7c9c]"}`}>
+            {activeCount}
+          </span>
+          {activeCount > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeactivateAll?.();
+              }}
+              className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors border border-red-500/30 font-bold uppercase"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!isCollapsed && (
+        <div className="space-y-3 max-h-48 overflow-y-auto scrollbar-dark">
+          {activeCount === 0 ? (
+            <div className="text-center py-4">
+              <span className="material-symbols-outlined text-2xl text-[#3a4a68] mb-1">check_circle</span>
+              <p className="text-[10px] text-[#6b7c9c]">No active overlays</p>
+              <p className="text-[9px] text-[#4a5a7c] mt-1">Toggle QV or HD on products above</p>
+            </div>
+          ) : (
+            Object.entries(groupedActive).map(([instrument, products]) => {
+              if (products.length === 0) return null;
+
+              const instColors = INSTRUMENT_COLORS[instrument as InstrumentType];
+
+              return (
+                <div key={instrument}>
+                  {/* Instrument group header */}
+                  <div className={`text-[9px] font-bold uppercase tracking-wider mb-1.5 ${instColors.text}`}>
+                    {instrument} ({products.length})
+                  </div>
+
+                  {/* Products list (view-only) */}
+                  <div className="space-y-1">
+                    {products.map((product) => (
+                      <div
+                        key={product.productId}
+                        className="flex items-center gap-2 p-1.5 rounded bg-[#1a2333]/40 border border-[#232f48]/50"
+                      >
+                        {/* Instrument badge */}
+                        <span
+                          className={`text-[8px] px-1 py-0.5 rounded font-bold ${instColors.bg} ${instColors.text} ${instColors.border} border`}
+                        >
+                          {instrument.slice(0, 3)}
+                        </span>
+
+                        {/* Product ID */}
+                        <span
+                          className="flex-1 text-[10px] font-mono text-[#92a4c9] truncate"
+                          title={product.productId}
+                        >
+                          {product.productId}
+                        </span>
+
+                        {/* Active layer badges (view-only) */}
+                        <div className="flex items-center gap-1">
+                          {product.hasQuickview && (
+                            <span className="text-[8px] px-1 py-0.5 bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/30 font-bold">
+                              QV
+                            </span>
+                          )}
+                          {product.hasHighRes && (
+                            <span className="text-[8px] px-1 py-0.5 bg-purple-500/20 text-purple-400 rounded border border-purple-500/30 font-bold">
+                              {product.instrument === "CRISM" ? "RGB" : "HD"}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="mt-2 text-[10px] text-[#92a4c9]">
-                        Opacity: {overlayOpacity}%
-                      </div>
-                    </div>
-                  );
-                })}
-
-              {/* Browse Overlays */}
-              {Array.from(browseOverlays.entries()).map(([productId, types]) => (
-                <div
-                  key={`browse-${productId}`}
-                  className="rounded-lg border border-[#232f48] bg-[#1a2333]/20 p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono font-bold text-white truncate max-w-[120px]">
-                      {productId.split("_")[0]}
-                    </span>
-                    <div className="flex gap-1 items-center">
-                      {types.has("HYD") && (
-                        <span className="text-[8px] px-1.5 py-0.5 bg-fuchsia-500/20 text-fuchsia-400 rounded-sm border border-fuchsia-500/30 font-bold">
-                          HYD
-                        </span>
-                      )}
-                      {types.has("ICE") && (
-                        <span className="text-[8px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded-sm border border-blue-500/30 font-bold">
-                          ICE
-                        </span>
-                      )}
-                      {types.has("IC2") && (
-                        <span className="text-[8px] px-1.5 py-0.5 bg-cyan-400/20 text-cyan-400 rounded-sm border border-cyan-400/30 font-bold">
-                          IC2
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-[10px] text-[#92a4c9]">
-                    Opacity: {overlayOpacity}%
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
   );
 }

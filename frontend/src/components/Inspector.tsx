@@ -104,6 +104,11 @@ export default function Inspector({
       return;
     }
 
+    // Capture values for async function
+    const productId = selected.productId;
+    const pixelSample = selected.pixelSample;
+    const pixelLine = selected.pixelLine;
+
     const controller = new AbortController();
 
     async function fetchStats() {
@@ -112,9 +117,9 @@ export default function Inspector({
         const halfSize = Math.floor(windowSize / 2);
         // Use pixel coordinates (sample = x, line = y)
         const data = await fetchHiRISEWindow(
-          selected.productId,
-          selected.pixelSample!,  // x = sample (column)
-          selected.pixelLine!,    // y = line (row)
+          productId,
+          pixelSample,  // x = sample (column)
+          pixelLine,    // y = line (row)
           halfSize
         );
 
@@ -164,15 +169,20 @@ export default function Inspector({
       return;
     }
 
+    // Capture values for async function
+    const productId = selected.productId;
+    const pixelLine = selected.pixelLine;
+    const pixelSample = selected.pixelSample;
+
     async function fetchSpectrum() {
       setSpectrumLoading(true);
       try {
-        const response = await fetch(`/crism/${selected.productId}/spectrum`, {
+        const response = await fetch(`/crism/${productId}/spectrum`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            line: selected.pixelLine,
-            sample: selected.pixelSample,
+            line: pixelLine,
+            sample: pixelSample,
           }),
         });
 

@@ -17,6 +17,9 @@ from functools import lru_cache
 import json
 import os
 
+# Import instrument registry
+from .registry import get_registry
+
 # Try to import shapely for geometry operations
 try:
     from shapely.geometry import shape, box, Point, mapping
@@ -47,24 +50,21 @@ DEFAULT_LIMIT = 2000
 MAX_LIMIT = 5000
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def load_geojson_index(instrument: str) -> dict:
-    """Load and cache GeoJSON index for an instrument."""
-    instrument_lower = instrument.lower()
+    """Load and cache GeoJSON index for an instrument using the registry."""
+    registry = get_registry()
+    config = registry.get(instrument)
 
-    if instrument_lower == "crism":
-        path = os.path.join(BASE_DIR, "crism_data", "index.geojson")
-    elif instrument_lower == "hirise":
-        path = os.path.join(BASE_DIR, "hirise_data", "index.geojson")
-    elif instrument_lower == "sharad":
-        path = os.path.join(BASE_DIR, "sharad_data", "index.geojson")
-    else:
+    if not config:
         raise HTTPException(status_code=400, detail=f"Unknown instrument: {instrument}")
 
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail=f"{instrument} index.geojson not found")
+    index_path = config.get_index_path(registry.base_dir)
 
-    with open(path, "r", encoding="utf-8") as f:
+    if not index_path.exists():
+        raise HTTPException(status_code=404, detail=f"{instrument} index.geojson not found at {index_path}")
+
+    with open(index_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 

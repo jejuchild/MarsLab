@@ -9,7 +9,6 @@ import {
   type Instrument,
   type BoundingBox,
   formatBytes,
-  parseCrismBaseKey,
 } from "../api/search";
 
 // =============================================================================

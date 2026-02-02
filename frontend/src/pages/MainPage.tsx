@@ -67,17 +67,6 @@ export default function MainPage() {
   const [showBrowseICE, setShowBrowseICE] = useState(false);
   const [showBrowseIC2, setShowBrowseIC2] = useState(false);
 
-  // Score layer toggles (placeholder - no real data yet)
-  const [showIceScore, setShowIceScore] = useState(false);
-  const [showHydratedScore, setShowHydratedScore] = useState(false);
-
-  // ICE Score Filter state
-  const [iceScoreThreshold, setIceScoreThreshold] = useState(1.0);  // n: ICE score threshold (0-2)
-  const [iceAreaThreshold, setIceAreaThreshold] = useState(10);     // m: area percentage threshold (0-100)
-  const [iceFilterActive, setIceFilterActive] = useState(false);
-  const [iceFilterLoading, setIceFilterLoading] = useState(false);
-  const [iceFilterPassingObs, setIceFilterPassingObs] = useState<Set<string> | null>(null);
-
   // Global overlay opacity (0-100)
   const [overlayOpacity, setOverlayOpacity] = useState(80);
 
@@ -225,34 +214,6 @@ export default function MainPage() {
     setQuickviewOverlays(productIds);
   }, [visibleProducts]);
 
-  // Apply ICE score filter
-  const handleApplyIceFilter = useCallback(async () => {
-    setIceFilterLoading(true);
-    try {
-      const response = await fetch(`/api/crism/ice_filter?score_threshold=${iceScoreThreshold}&area_threshold=${iceAreaThreshold}`);
-      if (response.ok) {
-        const data = await response.json();
-        const passingSet = new Set<string>(data.passing_obs_ids);
-        setIceFilterPassingObs(passingSet);
-        setIceFilterActive(true);
-        console.log(`[ICE Filter] Applied: ${data.passing_count}/${data.total_count} observations pass (score>=${iceScoreThreshold}, area>=${iceAreaThreshold}%)`);
-      } else {
-        console.error("[ICE Filter] Failed to apply filter:", response.statusText);
-      }
-    } catch (e) {
-      console.error("[ICE Filter] Error:", e);
-    } finally {
-      setIceFilterLoading(false);
-    }
-  }, [iceScoreThreshold, iceAreaThreshold]);
-
-  // Clear ICE score filter
-  const handleClearIceFilter = useCallback(() => {
-    setIceFilterPassingObs(null);
-    setIceFilterActive(false);
-    console.log("[ICE Filter] Cleared");
-  }, []);
-
   // Check high-res availability for visible products
   useEffect(() => {
     const checkHighResAvailability = async () => {
@@ -332,11 +293,6 @@ export default function MainPage() {
           onToggleBrowseHYD={setShowBrowseHYD}
           onToggleBrowseICE={setShowBrowseICE}
           onToggleBrowseIC2={setShowBrowseIC2}
-          // Score layer toggles (placeholder)
-          showIceScore={showIceScore}
-          showHydratedScore={showHydratedScore}
-          onToggleIceScore={setShowIceScore}
-          onToggleHydratedScore={setShowHydratedScore}
           // Global opacity
           overlayOpacity={overlayOpacity}
           onOpacityChange={setOverlayOpacity}
@@ -353,15 +309,6 @@ export default function MainPage() {
           onTurnOnAllBrowse={handleTurnOnAllBrowse}
           onTurnOnAllQuickviews={handleTurnOnAllQuickviews}
           productsWithHighRes={productsWithHighRes}
-          // ICE Filter
-          iceScoreThreshold={iceScoreThreshold}
-          iceAreaThreshold={iceAreaThreshold}
-          iceFilterActive={iceFilterActive}
-          iceFilterLoading={iceFilterLoading}
-          onIceScoreThresholdChange={setIceScoreThreshold}
-          onIceAreaThresholdChange={setIceAreaThreshold}
-          onApplyIceFilter={handleApplyIceFilter}
-          onClearIceFilter={handleClearIceFilter}
         />
       }
       rightPanel={
@@ -397,9 +344,6 @@ export default function MainPage() {
         bringToFrontId={bringToFrontId}
         onBringToFrontComplete={handleBringToFrontComplete}
         rgbWavelengths={rgbWavelengths}
-        showIceScore={showIceScore}
-        showHydratedScore={showHydratedScore}
-        iceFilterPassingObs={iceFilterPassingObs}
       />
 
       {/* SHARAD Quickview Popup */}

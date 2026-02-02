@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { searchWithHighlight } from "../utils/search";
 
 export interface SearchableItem {
@@ -164,7 +164,7 @@ export default function TopBar({
               <div className="p-1">
                 {results.map((result, index) => {
                   // Parse "productId|title" format
-                  const [productId, title] = result.item.split("|");
+                  const [_productId, title] = result.item.split("|");
                   return (
                     <button
                       key={result.item}
