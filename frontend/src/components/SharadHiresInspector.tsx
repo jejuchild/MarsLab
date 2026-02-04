@@ -140,11 +140,17 @@ export default function SharadHiresInspector({
   // Panel width (resizable)
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
 
+  // MOLA alignment offset (trace index shift)
+  const [molaAlignMode, setMolaAlignMode] = useState(false);
+  const [molaXOffset, setMolaXOffset] = useState(0);
+
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const molaCanvasRef = useRef<HTMLCanvasElement>(null);
   const molaContainerRef = useRef<HTMLDivElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const plotsWrapperRef = useRef<HTMLDivElement>(null);
   const [cursor, setCursor] = useState<{ normX: number; normY: number } | null>(null);
 
   // ── Data fetching ──────────────────────────────────────
@@ -404,12 +410,16 @@ export default function SharadHiresInspector({
     const n = molaProfile.elevation_m.length;
     if (n === 0) return;
 
+    // molaXOffset shifts MOLA left/right relative to SHARAD x-axis
     const iStart = Math.floor(viewX.start * n);
     const iEnd = Math.ceil(viewX.end * n);
 
+    // For visible range calculation, account for offset
     const visibleElevs: number[] = [];
     for (let i = iStart; i < iEnd && i < n; i++) {
-      const e = molaProfile.elevation_m[i];
+      const si = i + molaXOffset;
+      if (si < 0 || si >= n) continue;
+      const e = molaProfile.elevation_m[si];
       if (e !== null) visibleElevs.push(e);
     }
     if (visibleElevs.length === 0) return;
@@ -420,6 +430,7 @@ export default function SharadHiresInspector({
     const yMin = eMin - ePad;
     const yMax = eMax + ePad;
 
+    // xOf maps a SHARAD-aligned display index to pixel x
     const xOf = (i: number) => pad.left + ((i / (n - 1) - viewX.start) / (viewX.end - viewX.start)) * plotW;
     const yOf = (v: number) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
@@ -446,13 +457,18 @@ export default function SharadHiresInspector({
     ctx.textAlign = "center";
     const dStart = molaProfile.distance_km[iStart] ?? 0;
     const dEnd = molaProfile.distance_km[Math.min(iEnd, n - 1)] ?? molaProfile.total_distance_km;
-    ctx.fillText(`${dStart.toFixed(0)}\u2013${dEnd.toFixed(0)} km along track`, pad.left + plotW / 2, H - 3);
+    const offsetLabel = molaXOffset !== 0 ? ` [offset: ${molaXOffset > 0 ? "+" : ""}${molaXOffset}]` : "";
+    ctx.fillText(`${dStart.toFixed(0)}\u2013${dEnd.toFixed(0)} km along track${offsetLabel}`, pad.left + plotW / 2, H - 3);
 
     // Title
     ctx.fillStyle = "#94a3b8";
     ctx.font = "bold 9px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("MOLA Elevation (m)", pad.left, 12);
+    if (molaXOffset !== 0) {
+      ctx.fillStyle = "#fbbf24";
+      ctx.fillText(`  offset: ${molaXOffset > 0 ? "+" : ""}${molaXOffset}`, pad.left + 110, 12);
+    }
 
     // Clip to plot area
     ctx.save();
@@ -460,22 +476,24 @@ export default function SharadHiresInspector({
     ctx.rect(pad.left, pad.top, plotW, plotH);
     ctx.clip();
 
-    // Elevation line
+    // Elevation line (shifted by molaXOffset)
     ctx.beginPath();
     ctx.strokeStyle = "#38bdf8";
     ctx.lineWidth = 1.5;
     let started = false;
     for (let i = Math.max(0, iStart - 1); i <= Math.min(n - 1, iEnd + 1); i++) {
-      const e = molaProfile.elevation_m[i];
+      const si = i + molaXOffset;
+      if (si < 0 || si >= n) { started = false; continue; }
+      const e = molaProfile.elevation_m[si];
       if (e === null) { started = false; continue; }
-      const x = xOf(i);
+      const x = xOf(i); // x position is SHARAD-aligned (no offset)
       const y = yOf(e);
       if (!started) { ctx.moveTo(x, y); started = true; }
       else ctx.lineTo(x, y);
     }
     ctx.stroke();
 
-    // Cursor vertical line
+    // Cursor vertical line (always tracks SHARAD x, not shifted)
     if (cursor && !isDragging.current) {
       const cx = pad.left + ((cursor.normX - viewX.start) / (viewX.end - viewX.start)) * plotW;
       if (cx >= pad.left && cx <= pad.left + plotW) {
@@ -488,7 +506,8 @@ export default function SharadHiresInspector({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        const idx = Math.round(cursor.normX * (n - 1));
+        // Show elevation at cursor, accounting for offset
+        const idx = Math.round(cursor.normX * (n - 1)) + molaXOffset;
         if (idx >= 0 && idx < n) {
           const e = molaProfile.elevation_m[idx];
           if (e !== null) {
@@ -502,7 +521,7 @@ export default function SharadHiresInspector({
     }
 
     ctx.restore();
-  }, [molaProfile, viewX, cursor]);
+  }, [molaProfile, viewX, cursor, molaXOffset]);
 
   useEffect(() => { drawMola(); }, [drawMola]);
 
@@ -513,6 +532,51 @@ export default function SharadHiresInspector({
     observer.observe(container);
     return () => observer.disconnect();
   }, [drawMola]);
+
+  // ── Alignment marker overlay (spans both SHARAD and MOLA) ──
+  const drawOverlay = useCallback(() => {
+    const canvas = overlayCanvasRef.current;
+    const wrapper = plotsWrapperRef.current;
+    if (!canvas || !wrapper) return;
+
+    const W = wrapper.clientWidth;
+    const H = wrapper.clientHeight;
+    canvas.width = W;
+    canvas.height = H;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, W, H);
+
+    if (!cursor || isDragging.current) return;
+
+    // Compute the x pixel position based on the SHARAD canvas coordinate system
+    // The radargram canvas fills the full width of the wrapper
+    const normFrac = (cursor.normX - viewX.start) / (viewX.end - viewX.start);
+    const px = normFrac * W;
+
+    if (px < 0 || px > W) return;
+
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(px, 0);
+    ctx.lineTo(px, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }, [cursor, viewX]);
+
+  useEffect(() => { drawOverlay(); }, [drawOverlay]);
+
+  useEffect(() => {
+    const wrapper = plotsWrapperRef.current;
+    if (!wrapper) return;
+    const observer = new ResizeObserver(() => drawOverlay());
+    observer.observe(wrapper);
+    return () => observer.disconnect();
+  }, [drawOverlay]);
 
   // ── Shared zoom handler ────────────────────────────────
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -648,8 +712,47 @@ export default function SharadHiresInspector({
       }
     }
 
+    // MOLA offset drag (molaAlignMode ON, drag on MOLA panel)
+    if (molaAlignMode && !isOnRadargram && e.button === 0 && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const startX = e.clientX;
+      const startOffset = molaXOffset;
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const nSamples = molaProfile?.elevation_m.length ?? 1;
+      const visibleSpan = viewX.end - viewX.start;
+
+      isDragging.current = true;
+
+      const onMove = (ev: MouseEvent) => {
+        ev.preventDefault();
+        const dxPx = ev.clientX - startX;
+        // Convert pixel movement to trace index offset
+        const dxTraces = Math.round(-(dxPx / rect.width) * visibleSpan * nSamples);
+        const maxOffset = Math.min(5000, Math.floor(nSamples / 2));
+        setMolaXOffset(Math.max(-maxOffset, Math.min(maxOffset, startOffset + dxTraces)));
+      };
+      const onUp = () => {
+        isDragging.current = false;
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+      return;
+    }
+
     // Pan drag (move mode, middle click, shift+click)
-    if ((moveMode && !adjustMode) || e.button === 1 || (e.button === 0 && e.shiftKey)) {
+    if ((moveMode && !adjustMode && e.button === 0) || e.button === 1 || (e.button === 0 && e.shiftKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+
       const startX = e.clientX;
       const startY = e.clientY;
       const vxStart = { ...viewX };
@@ -659,6 +762,7 @@ export default function SharadHiresInspector({
       isDragging.current = true;
 
       const onMove = (ev: MouseEvent) => {
+        ev.preventDefault();
         const dxPx = ev.clientX - startX;
         const dyPx = ev.clientY - startY;
         const dxNorm = -(dxPx / rect.width) * (vxStart.end - vxStart.start);
@@ -681,9 +785,8 @@ export default function SharadHiresInspector({
       document.body.style.userSelect = "none";
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
-      e.preventDefault();
     }
-  }, [moveMode, viewX, viewY, adjustMode, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
+  }, [moveMode, viewX, viewY, adjustMode, molaAlignMode, molaXOffset, molaProfile, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
@@ -922,6 +1025,69 @@ export default function SharadHiresInspector({
             </button>
           </Section>
 
+          {/* MOLA Alignment */}
+          {molaProfile && (
+            <Section title="MOLA Align">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-400">Adjust Offset</span>
+                <MiniButton
+                  active={molaAlignMode}
+                  onClick={() => setMolaAlignMode(!molaAlignMode)}
+                >
+                  {molaAlignMode ? "ON" : "OFF"}
+                </MiniButton>
+              </div>
+              {molaAlignMode && (
+                <div className="text-[9px] text-slate-600">
+                  Drag left/right on MOLA panel to shift offset.
+                </div>
+              )}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">Offset</span>
+                  <span className={`text-[10px] font-mono ${molaXOffset !== 0 ? "text-amber-400" : "text-slate-500"}`}>
+                    {molaXOffset > 0 ? "+" : ""}{molaXOffset} traces
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setMolaXOffset(o => Math.max(-5000, o - 10))}
+                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
+                  >◀ 10</button>
+                  <button
+                    onClick={() => setMolaXOffset(o => Math.max(-5000, o - 1))}
+                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
+                  >◀</button>
+                  <input
+                    type="number"
+                    value={molaXOffset}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (!isNaN(v)) setMolaXOffset(Math.max(-5000, Math.min(5000, v)));
+                    }}
+                    className="flex-1 min-w-0 bg-[#0a0f18] border border-[#232f48] rounded px-1 py-0.5 text-[10px] text-center text-slate-300 font-mono focus:outline-none focus:border-primary/40"
+                  />
+                  <button
+                    onClick={() => setMolaXOffset(o => Math.min(5000, o + 1))}
+                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
+                  >▶</button>
+                  <button
+                    onClick={() => setMolaXOffset(o => Math.min(5000, o + 10))}
+                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
+                  >10 ▶</button>
+                </div>
+              </div>
+              {molaXOffset !== 0 && (
+                <button
+                  onClick={() => { setMolaXOffset(0); }}
+                  className="text-[9px] text-slate-500 hover:text-amber-400 transition-colors underline"
+                >
+                  Reset to zero
+                </button>
+              )}
+            </Section>
+          )}
+
           {/* Depth Conversion */}
           <Section title="Depth Conversion">
             <div className="space-y-3">
@@ -1040,57 +1206,71 @@ export default function SharadHiresInspector({
 
         {/* Main canvas area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Radargram canvas */}
-          <div ref={containerRef} className="flex-1 relative overflow-hidden bg-[#0a0f18]">
-            {loading && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                <span className="material-symbols-outlined animate-spin text-3xl text-amber-400 mb-3">
-                  progress_activity
-                </span>
-                <p className="text-xs text-slate-400">Loading radargram...</p>
-                <p className="text-[10px] text-slate-600 mt-1">
-                  {metadata ? `${metadata.rows.toLocaleString()} traces` : "Loading..."} × 667 range bins
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                <span className="material-symbols-outlined text-3xl text-red-400 mb-3">error</span>
-                <p className="text-xs text-red-400">{error}</p>
-              </div>
-            )}
-
+          {/* Plots wrapper — overlay canvas sits on top for alignment marker */}
+          <div ref={plotsWrapperRef} className="flex-1 flex flex-col relative overflow-hidden">
+            {/* Alignment marker overlay (pointer-events: none so clicks pass through) */}
             <canvas
-              ref={canvasRef}
-              className={`w-full h-full ${
-                adjustMode ? "cursor-cell" : moveMode ? "cursor-grab" : "cursor-crosshair"
-              }`}
-              onMouseMove={handleMouseMove}
-              onMouseDown={handleMouseDown}
-              onMouseLeave={() => setCursor(null)}
-              onWheel={handleWheel}
-              onClick={handleClick}
+              ref={overlayCanvasRef}
+              className="absolute inset-0 z-20 pointer-events-none"
+              style={{ width: "100%", height: "100%" }}
             />
-          </div>
 
-          {/* MOLA elevation profile panel */}
-          {molaProfile && (
-            <div
-              ref={molaContainerRef}
-              className="border-t border-border-dark bg-[#0a0f18] shrink-0"
-              style={{ height: MOLA_PANEL_HEIGHT }}
-            >
+            {/* Radargram canvas */}
+            <div ref={containerRef} className="flex-1 relative overflow-hidden bg-[#0a0f18]">
+              {loading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                  <span className="material-symbols-outlined animate-spin text-3xl text-amber-400 mb-3">
+                    progress_activity
+                  </span>
+                  <p className="text-xs text-slate-400">Loading radargram...</p>
+                  <p className="text-[10px] text-slate-600 mt-1">
+                    {metadata ? `${metadata.rows.toLocaleString()} traces` : "Loading..."} × 667 range bins
+                  </p>
+                </div>
+              )}
+
+              {error && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                  <span className="material-symbols-outlined text-3xl text-red-400 mb-3">error</span>
+                  <p className="text-xs text-red-400">{error}</p>
+                </div>
+              )}
+
               <canvas
-                ref={molaCanvasRef}
-                className={`w-full h-full ${moveMode ? "cursor-grab" : "cursor-crosshair"}`}
+                ref={canvasRef}
+                className={`w-full h-full ${
+                  adjustMode ? "cursor-cell" : moveMode ? "cursor-grab" : "cursor-crosshair"
+                }`}
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
                 onMouseLeave={() => setCursor(null)}
                 onWheel={handleWheel}
+                onClick={handleClick}
               />
             </div>
-          )}
+
+            {/* MOLA elevation profile panel */}
+            {molaProfile && (
+              <div
+                ref={molaContainerRef}
+                className="border-t border-border-dark bg-[#0a0f18] shrink-0"
+                style={{ height: MOLA_PANEL_HEIGHT }}
+              >
+                <canvas
+                  ref={molaCanvasRef}
+                  className={`w-full h-full ${molaAlignMode ? "cursor-ew-resize" : moveMode ? "cursor-grab" : "cursor-crosshair"}`}
+                  draggable={false}
+                  onDragStart={(e) => e.preventDefault()}
+                  onMouseMove={handleMouseMove}
+                  onMouseDown={handleMouseDown}
+                  onMouseLeave={() => setCursor(null)}
+                  onWheel={handleWheel}
+                />
+              </div>
+            )}
+          </div>
 
           {/* Status bar */}
           <div className="flex items-center justify-between px-3 py-1.5 border-t border-border-dark bg-[#0a0f18] text-[10px] font-mono text-slate-500">
@@ -1112,6 +1292,8 @@ export default function SharadHiresInspector({
               <span>Zoom: <span className="text-slate-300">{zoomLevel}×</span></span>
               {moveMode && <span className="text-cyan-400">MOVE</span>}
               {adjustMode && <span className="text-green-400">ADJUST{editCount > 0 ? ` (${editCount})` : ""}</span>}
+              {molaAlignMode && <span className="text-amber-400">MOLA ALIGN</span>}
+              {molaXOffset !== 0 && <span className="text-amber-300">MOLA: {molaXOffset > 0 ? "+" : ""}{molaXOffset}</span>}
             </div>
           </div>
         </div>
