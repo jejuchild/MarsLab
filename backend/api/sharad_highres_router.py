@@ -468,12 +468,15 @@ async def depth_conversion(
     epsilon_r1: float = Query(3.1, gt=0, le=20, description="Layer 1 dielectric constant"),
     epsilon_r2: float = Query(3.1, gt=0, le=20, description="Layer 2 dielectric constant"),
     boundary_m: float = Query(0.0, ge=0, le=5000, description="Boundary depth between layers (m)"),
+    surface_bin_override: int = Query(None, description="Manual surface bin (overrides auto-pick)"),
 ):
     """
     Convert delay between surface and a cursor position to depth.
 
     The surface line is used as the reference baseline.
     Δt is computed from surface bin to cursor_bin.
+    If surface_bin_override is provided, it replaces the auto-picked surface
+    (used when the user has manually adjusted the surface line).
 
     Piecewise 2-layer dielectric model:
       Layer 1: surface → boundary_m  with εr₁
@@ -483,13 +486,16 @@ async def depth_conversion(
     """
     try:
         power, total_rows = _get_power(product_id)
-        surface = _pick_surface(product_id, power)
 
         full_idx = trace_idx * downsample
         if full_idx >= total_rows:
             return JSONResponse(content={"error": "Trace index out of range"}, status_code=400)
 
-        s_bin = int(surface[full_idx])
+        if surface_bin_override is not None:
+            s_bin = surface_bin_override
+        else:
+            surface = _pick_surface(product_id, power)
+            s_bin = int(surface[full_idx])
 
         if s_bin < 0:
             return JSONResponse(content={

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 
 /* =========================================================
  * Types
@@ -57,6 +57,8 @@ export type SharadBoundaryInfo = {
  * =======================================================*/
 const DOWNSAMPLE = 50;
 const MOLA_PANEL_HEIGHT = 120;
+const ADJUST_RADIUS = 8; // traces of neighborhood influence for surface adjustment
+const HANDLE_HIT_PX = 10; // pixel radius for clicking a surface vertex
 
 /* =========================================================
  * SharadHiresInspector Component
@@ -92,6 +94,26 @@ export default function SharadHiresInspector({
   const [boundaryM, setBoundaryM] = useState(0);
   const [showBoundaryOnMap, setShowBoundaryOnMap] = useState(true);
   const [depthResult, setDepthResult] = useState<DepthResult | null>(null);
+
+  // Surface line adjustment
+  const [adjustMode, setAdjustMode] = useState(false);
+  const [surfaceOffsets, setSurfaceOffsets] = useState<Map<number, number>>(new Map());
+  const adjustDragRef = useRef<{
+    traceX: number;
+    origBin: number;
+    baseOffsets: Map<number, number>;
+  } | null>(null);
+
+  // Effective surface = auto-picked + manual offsets
+  const effectiveSurface = useMemo(() => {
+    if (surfaceOffsets.size === 0) return surface;
+    return surface.map(pt => ({
+      x: pt.x,
+      y: pt.y + Math.round(surfaceOffsets.get(pt.x) ?? 0),
+    }));
+  }, [surface, surfaceOffsets]);
+
+  const editCount = surfaceOffsets.size;
 
   // Shared X/Y view range (normalized 0..1)
   const [viewX, setViewX] = useState({ start: 0, end: 1 });
@@ -247,33 +269,55 @@ export default function SharadHiresInspector({
     const traceToX = (t: number) => ((t / nTraces - viewX.start) / (viewX.end - viewX.start)) * W;
     const binToY = (b: number) => ((b / nBins - viewY.start) / (viewY.end - viewY.start)) * H;
 
-    // Draw surface line
-    if (showSurface && surface.length > 1) {
+    // Draw surface line (uses effectiveSurface which includes manual offsets)
+    const surfToDraw = effectiveSurface;
+    if (showSurface && surfToDraw.length > 1) {
       ctx.beginPath();
-      ctx.strokeStyle = "#22c55e";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = adjustMode ? "#4ade80" : "#22c55e";
+      ctx.lineWidth = adjustMode ? 2.5 : 1.5;
+      let prevX = -Infinity;
       let moved = false;
-      for (const pt of surface) {
+      for (let i = 0; i < surfToDraw.length; i++) {
+        const pt = surfToDraw[i];
         const x = traceToX(pt.x);
         const y = binToY(pt.y);
-        if (x < -50 || x > W + 50) continue; // off-screen
-        // Break line at gaps > 5 traces
-        if (moved && surface.indexOf(pt) > 0) {
-          const prev = surface[surface.indexOf(pt) - 1];
-          if (pt.x - prev.x > 5) {
-            ctx.stroke();
-            ctx.beginPath();
-            moved = false;
-          }
+        if (x < -50 || x > W + 50) { prevX = pt.x; continue; }
+        if (moved && pt.x - prevX > 5) {
+          ctx.stroke();
+          ctx.beginPath();
+          moved = false;
         }
         if (!moved) { ctx.moveTo(x, y); moved = true; }
         else ctx.lineTo(x, y);
+        prevX = pt.x;
       }
       ctx.stroke();
+
+      // Draw adjustment handles when in adjust mode
+      if (adjustMode) {
+        for (let i = 0; i < surfToDraw.length; i++) {
+          const pt = surfToDraw[i];
+          const x = traceToX(pt.x);
+          const y = binToY(pt.y);
+          if (x < -2 || x > W + 2 || y < -2 || y > H + 2) continue;
+          const hasOffset = surfaceOffsets.has(pt.x);
+          const isActive = adjustDragRef.current?.traceX === pt.x;
+          const r = isActive ? 5 : hasOffset ? 3.5 : 2;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.fillStyle = isActive ? "#fbbf24" : hasOffset ? "#86efac" : "#22c55e";
+          ctx.fill();
+          if (isActive) {
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
     }
 
     // Draw cursor crosshair
-    if (cursor) {
+    if (cursor && !adjustDragRef.current) {
       const cx = cursor.normX;
       const cy = cursor.normY;
       const px = ((cx - viewX.start) / (viewX.end - viewX.start)) * W;
@@ -295,7 +339,7 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, surface, showSurface, viewX, viewY, cursor]);
+  }, [radargram, radargramMeta, effectiveSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -468,8 +512,74 @@ export default function SharadHiresInspector({
     }
   }, [viewX, viewY]);
 
+  // ── Surface adjustment helpers ──────────────────────────
+  const findNearestSurfaceVertex = useCallback((normX: number, normY: number): number | null => {
+    if (!radargramMeta || !containerRef.current) return null;
+    const W = containerRef.current.clientWidth;
+    const H = containerRef.current.clientHeight;
+    const nTraces = radargramMeta.n_traces;
+    const nBins = radargramMeta.n_bins;
+
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < effectiveSurface.length; i++) {
+      const pt = effectiveSurface[i];
+      const px = ((pt.x / nTraces - viewX.start) / (viewX.end - viewX.start)) * W;
+      const py = ((pt.y / nBins - viewY.start) / (viewY.end - viewY.start)) * H;
+      const cx = ((normX - viewX.start) / (viewX.end - viewX.start)) * W;
+      const cy = ((normY - viewY.start) / (viewY.end - viewY.start)) * H;
+      const dist = Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
+      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+    }
+    return bestDist <= HANDLE_HIT_PX ? bestIdx : null;
+  }, [effectiveSurface, radargramMeta, viewX, viewY]);
+
+  const applyAdjustDrag = useCallback((traceX: number, newBinY: number) => {
+    // Find the original auto-picked Y for this trace
+    const origPt = surface.find(p => p.x === traceX);
+    if (!origPt) return;
+    const delta = newBinY - origPt.y;
+
+    setSurfaceOffsets(prev => {
+      const result = new Map(adjustDragRef.current?.baseOffsets ?? prev);
+      // Apply with triangular falloff over ±ADJUST_RADIUS
+      const allTraceXs = surface.map(p => p.x);
+      for (const tx of allTraceXs) {
+        const dist = Math.abs(tx - traceX);
+        if (dist <= ADJUST_RADIUS) {
+          const weight = 1 - dist / (ADJUST_RADIUS + 1);
+          const base = (adjustDragRef.current?.baseOffsets ?? prev).get(tx) ?? 0;
+          result.set(tx, base + delta * weight);
+        }
+      }
+      return result;
+    });
+  }, [surface]);
+
   // ── Mouse handlers ─────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Surface adjustment drag start
+    if (adjustMode && e.button === 0 && !e.shiftKey && canvasRef.current === e.currentTarget) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) / rect.width;
+      const my = (e.clientY - rect.top) / rect.height;
+      const normX = viewX.start + mx * (viewX.end - viewX.start);
+      const normY = viewY.start + my * (viewY.end - viewY.start);
+
+      const vertIdx = findNearestSurfaceVertex(normX, normY);
+      if (vertIdx !== null) {
+        const pt = effectiveSurface[vertIdx];
+        adjustDragRef.current = {
+          traceX: pt.x,
+          origBin: pt.y,
+          baseOffsets: new Map(surfaceOffsets),
+        };
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // Pan drag (move mode, middle click, shift+click)
     if (moveMode || e.button === 1 || (e.button === 0 && e.shiftKey)) {
       isDragging.current = true;
       dragStart.current = { x: e.clientX, y: e.clientY };
@@ -479,7 +589,7 @@ export default function SharadHiresInspector({
       };
       e.preventDefault();
     }
-  }, [moveMode, viewX, viewY]);
+  }, [moveMode, viewX, viewY, adjustMode, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
@@ -487,38 +597,44 @@ export default function SharadHiresInspector({
     const mx = (e.clientX - rect.left) / rect.width;
     const my = (e.clientY - rect.top) / rect.height;
 
-    // Compute normalized position
     const normX = viewX.start + mx * (viewX.end - viewX.start);
     const normY = canvas === canvasRef.current
       ? viewY.start + my * (viewY.end - viewY.start)
       : 0;
     setCursor({ normX, normY });
 
-    // Dragging (move mode)
+    // Surface adjustment drag
+    if (adjustDragRef.current && radargramMeta) {
+      const newBin = Math.round(normY * radargramMeta.n_bins);
+      applyAdjustDrag(adjustDragRef.current.traceX, newBin);
+      return;
+    }
+
+    // Pan drag (move mode)
     if (isDragging.current) {
-      const parentRect = canvas.getBoundingClientRect();
       const dxPx = e.clientX - dragStart.current.x;
       const dyPx = e.clientY - dragStart.current.y;
-      const dxNorm = -(dxPx / parentRect.width) * (dragViewStart.current.xEnd - dragViewStart.current.xStart);
+      const dxNorm = -(dxPx / rect.width) * (dragViewStart.current.xEnd - dragViewStart.current.xStart);
       const newStartX = dragViewStart.current.xStart + dxNorm;
       const newEndX = dragViewStart.current.xEnd + dxNorm;
       setViewX(clampRange(newStartX, newEndX));
 
       if (canvas === canvasRef.current) {
-        const dyNorm = -(dyPx / parentRect.height) * (dragViewStart.current.yEnd - dragViewStart.current.yStart);
+        const dyNorm = -(dyPx / rect.height) * (dragViewStart.current.yEnd - dragViewStart.current.yStart);
         const newStartY = dragViewStart.current.yStart + dyNorm;
         const newEndY = dragViewStart.current.yEnd + dyNorm;
         setViewY(clampRange(newStartY, newEndY));
       }
     }
-  }, [viewX, viewY]);
+  }, [viewX, viewY, radargramMeta, applyAdjustDrag]);
 
   const handleMouseUp = useCallback(() => {
+    adjustDragRef.current = null;
     isDragging.current = false;
   }, []);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
-    if (moveMode) return;
+    if (moveMode || adjustMode) return;
     if (!canvasRef.current || !radargramMeta) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
@@ -533,13 +649,20 @@ export default function SharadHiresInspector({
     if (traceIdx < 0 || traceIdx >= radargramMeta.n_traces) return;
     if (cursorBin < 0 || cursorBin >= radargramMeta.n_bins) return;
 
+    // Find effective surface bin at this trace (includes manual offsets)
+    const effPt = effectiveSurface.find(p => p.x === traceIdx);
+    const surfOverride = effPt && surfaceOffsets.size > 0 ? effPt.y : undefined;
+
     const pid = encodeURIComponent(productId);
-    const url = `/api/sharad_highres/depth_conversion?product_id=${pid}&trace_idx=${traceIdx}&cursor_bin=${cursorBin}&downsample=${DOWNSAMPLE}&epsilon_r1=${epsilonR1}&epsilon_r2=${epsilonR2}&boundary_m=${boundaryM}`;
+    let url = `/api/sharad_highres/depth_conversion?product_id=${pid}&trace_idx=${traceIdx}&cursor_bin=${cursorBin}&downsample=${DOWNSAMPLE}&epsilon_r1=${epsilonR1}&epsilon_r2=${epsilonR2}&boundary_m=${boundaryM}`;
+    if (surfOverride !== undefined) {
+      url += `&surface_bin_override=${surfOverride}`;
+    }
     fetch(url)
       .then((r) => r.json())
       .then((data) => setDepthResult(data))
       .catch(() => setDepthResult(null));
-  }, [radargramMeta, viewX, viewY, epsilonR1, epsilonR2, boundaryM, productId, moveMode]);
+  }, [radargramMeta, viewX, viewY, epsilonR1, epsilonR2, boundaryM, productId, moveMode, adjustMode, effectiveSurface, surfaceOffsets]);
 
   // ── Cursor info ────────────────────────────────────────
   const cursorInfo = (() => {
@@ -629,6 +752,38 @@ export default function SharadHiresInspector({
               <span className="text-[10px] text-slate-300">Surface line</span>
               <span className="ml-auto w-3 h-0.5 bg-green-500 rounded" />
             </label>
+
+            {showSurface && (
+              <div className="space-y-1.5 pl-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400">Adjust</span>
+                  <div className="flex gap-1">
+                    <MiniButton
+                      active={adjustMode}
+                      onClick={() => setAdjustMode(!adjustMode)}
+                    >
+                      {adjustMode ? "ON" : "OFF"}
+                    </MiniButton>
+                  </div>
+                </div>
+                {adjustMode && (
+                  <div className="text-[9px] text-slate-600">
+                    Click a vertex on the surface line and drag vertically to adjust.
+                  </div>
+                )}
+                {editCount > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-green-400/70">{editCount} edits</span>
+                    <button
+                      onClick={() => setSurfaceOffsets(new Map())}
+                      className="text-[9px] text-slate-500 hover:text-red-400 transition-colors underline"
+                    >
+                      Reset surface line
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </Section>
 
           {/* Navigation */}
@@ -801,11 +956,13 @@ export default function SharadHiresInspector({
 
             <canvas
               ref={canvasRef}
-              className={`w-full h-full ${moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair"}`}
+              className={`w-full h-full ${
+                adjustMode ? "cursor-cell" : moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair"
+              }`}
               onMouseMove={handleMouseMove}
               onMouseDown={handleMouseDown}
               onMouseUp={handleMouseUp}
-              onMouseLeave={() => { setCursor(null); isDragging.current = false; }}
+              onMouseLeave={() => { setCursor(null); isDragging.current = false; adjustDragRef.current = null; }}
               onWheel={handleWheel}
               onClick={handleClick}
             />
@@ -824,7 +981,7 @@ export default function SharadHiresInspector({
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
                 onMouseUp={handleMouseUp}
-                onMouseLeave={() => { setCursor(null); isDragging.current = false; }}
+                onMouseLeave={() => { setCursor(null); isDragging.current = false; adjustDragRef.current = null; }}
                 onWheel={handleWheel}
               />
             </div>
@@ -849,6 +1006,7 @@ export default function SharadHiresInspector({
             <div className="flex gap-3">
               <span>Zoom: <span className="text-slate-300">{zoomLevel}×</span></span>
               {moveMode && <span className="text-cyan-400">MOVE</span>}
+              {adjustMode && <span className="text-green-400">ADJUST{editCount > 0 ? ` (${editCount})` : ""}</span>}
             </div>
           </div>
         </div>
