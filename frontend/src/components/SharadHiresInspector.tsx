@@ -107,6 +107,26 @@ export default function SharadHiresInspector({
     }));
   }, [surface, surfaceOffsets]);
 
+  // Smoothed surface for drawing (triangular kernel, radius 3)
+  const smoothedSurface = useMemo(() => {
+    const pts = effectiveSurface;
+    if (pts.length < 5) return pts;
+    const R = 3;
+    return pts.map((pt, i) => {
+      let wSum = 0, ySum = 0;
+      for (let d = -R; d <= R; d++) {
+        const j = i + d;
+        if (j < 0 || j >= pts.length) continue;
+        // Skip if there's a gap (non-consecutive traces)
+        if (Math.abs(pts[j].x - pt.x) > R + 2) continue;
+        const w = R + 1 - Math.abs(d);
+        wSum += w;
+        ySum += pts[j].y * w;
+      }
+      return { x: pt.x, y: wSum > 0 ? ySum / wSum : pt.y };
+    });
+  }, [effectiveSurface]);
+
   const editCount = surfaceOffsets.size;
 
   // Shared X/Y view range (normalized 0..1)
@@ -242,16 +262,17 @@ export default function SharadHiresInspector({
     const traceToX = (t: number) => ((t / nTraces - viewX.start) / (viewX.end - viewX.start)) * W;
     const binToY = (b: number) => ((b / nBins - viewY.start) / (viewY.end - viewY.start)) * H;
 
-    // Draw surface line
-    const surfToDraw = effectiveSurface;
-    if (showSurface && surfToDraw.length > 1) {
+    // Draw surface line (smoothed for display)
+    const lineToDraw = smoothedSurface;
+    const handlePts = effectiveSurface; // raw points for adjustment handles
+    if (showSurface && lineToDraw.length > 1) {
       ctx.beginPath();
       ctx.strokeStyle = adjustMode ? "#4ade80" : "#22c55e";
       ctx.lineWidth = adjustMode ? 2.5 : 1.5;
       let prevX = -Infinity;
       let moved = false;
-      for (let i = 0; i < surfToDraw.length; i++) {
-        const pt = surfToDraw[i];
+      for (let i = 0; i < lineToDraw.length; i++) {
+        const pt = lineToDraw[i];
         const x = traceToX(pt.x);
         const y = binToY(pt.y);
         if (x < -50 || x > W + 50) { prevX = pt.x; continue; }
@@ -266,10 +287,10 @@ export default function SharadHiresInspector({
       }
       ctx.stroke();
 
-      // Adjustment handles
+      // Adjustment handles (drawn at raw effectiveSurface positions)
       if (adjustMode) {
-        for (let i = 0; i < surfToDraw.length; i++) {
-          const pt = surfToDraw[i];
+        for (let i = 0; i < handlePts.length; i++) {
+          const pt = handlePts[i];
           const x = traceToX(pt.x);
           const y = binToY(pt.y);
           if (x < -2 || x > W + 2 || y < -2 || y > H + 2) continue;
@@ -288,16 +309,16 @@ export default function SharadHiresInspector({
         }
       }
 
-      // Boundary line (dashed, follows surface offset by boundaryBinOffset)
-      if (showBoundaryLine && boundaryBinOffset > 0 && surfToDraw.length > 1) {
+      // Boundary line (dashed, follows smoothed surface offset by boundaryBinOffset)
+      if (showBoundaryLine && boundaryBinOffset > 0 && lineToDraw.length > 1) {
         ctx.beginPath();
-        ctx.strokeStyle = "rgba(103, 232, 249, 0.7)"; // cyan-300
+        ctx.strokeStyle = "rgba(103, 232, 249, 0.7)";
         ctx.lineWidth = 1.5;
         ctx.setLineDash([6, 4]);
         let bMoved = false;
         let bPrevX = -Infinity;
-        for (let i = 0; i < surfToDraw.length; i++) {
-          const pt = surfToDraw[i];
+        for (let i = 0; i < lineToDraw.length; i++) {
+          const pt = lineToDraw[i];
           const x = traceToX(pt.x);
           const y = binToY(pt.y + boundaryBinOffset);
           if (x < -50 || x > W + 50) { bPrevX = pt.x; continue; }
@@ -314,9 +335,9 @@ export default function SharadHiresInspector({
         ctx.setLineDash([]);
 
         // Label
-        const midIdx = Math.floor(surfToDraw.length / 2);
-        const labelX = traceToX(surfToDraw[midIdx].x);
-        const labelY = binToY(surfToDraw[midIdx].y + boundaryBinOffset);
+        const midIdx = Math.floor(lineToDraw.length / 2);
+        const labelX = traceToX(lineToDraw[midIdx].x);
+        const labelY = binToY(lineToDraw[midIdx].y + boundaryBinOffset);
         if (labelX > 40 && labelX < W - 120 && labelY > 10 && labelY < H - 10) {
           ctx.font = "bold 9px monospace";
           ctx.fillStyle = "rgba(103, 232, 249, 0.85)";
@@ -349,7 +370,7 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, effectiveSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine]);
+  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine]);
 
   useEffect(() => { draw(); }, [draw]);
 
