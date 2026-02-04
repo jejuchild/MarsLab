@@ -1,9 +1,16 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import MapView from "../components/MapView";
 import Inspector from "../components/Inspector";
 import type { InspectorContext, RGBWavelengths } from "../components/Inspector";
+import SlopeAnalysis from "../components/SlopeAnalysis";
+import type { TerrainPoint } from "../components/SlopeAnalysis";
+import LineProfile from "../components/LineProfile";
+import type { ProfilePoint } from "../components/LineProfile";
 import TopBar from "../components/TopBar";
 import LayerPanel from "../components/LayerPanel";
+import type { IceScoreFilter } from "../components/LayerPanel";
+import SharadHiresInspector from "../components/SharadHiresInspector";
+import type { SharadBoundaryInfo } from "../components/SharadHiresInspector";
 import AppShell from "../components/layout/AppShell";
 
 // Default CRISM wavelengths (in micrometers)
@@ -15,9 +22,28 @@ const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
 
 export type VisibleProduct = {
   productId: string;
-  instrument: "HIRISE" | "CRISM" | "SHARAD";
+  instrument: "HIRISE" | "CRISM" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM";
   title?: string;  // HiRISE observation title (e.g., "Gullies in Arcadia Region")
 };
+
+// Custom user-uploaded dataset
+export interface CustomDataset {
+  id: string;
+  name: string;
+  bounds: { west: number; south: number; east: number; north: number };
+  crs: string;
+  crs_valid: boolean;
+  crs_warning?: string | null;
+  width: number;
+  height: number;
+  bands: number;
+  dtype: string;
+  nodata: number | null;
+  created_at: string;
+  original_filename: string;
+  visible: boolean;
+  opacity: number;  // 0-100
+}
 
 // SHARAD popup state
 export type SHARADPopup = {
@@ -29,11 +55,30 @@ export type SHARADPopup = {
   stopLon: number;
 } | null;
 
-// Browse product types for CRISM
-export type BrowseProductType = "HYD" | "ICE" | "IC2";
+// Unified overlay types - one per product at a time
+export type OverlayType =
+  | "quickview"
+  | "highres"
+  | "browse_HYD"
+  | "browse_ICE"
+  | "browse_IC2"
+  | "score_ice"
+  | "score_hyd";
+
+// Product overlay state - unified structure
+export type ProductOverlay = {
+  type: OverlayType;
+  opacity: number;  // 0-100
+};
+
+// Active overlays map: productId -> overlay state
+export type ActiveOverlays = Map<string, ProductOverlay>;
 
 // Base map layer types
 export type BaseLayerType = "MOLA" | "HRSC";
+
+// Map mode types (2D flat view vs 3D globe)
+export type MapMode = "2D" | "3D";
 
 // Bounding box type for view restriction
 export type BoundingBox = {
@@ -43,49 +88,90 @@ export type BoundingBox = {
   eastLon: number;
 } | null;
 
+// Helper to check if overlay type is a browse product
+export function isBrowseOverlay(type: OverlayType): boolean {
+  return type.startsWith("browse_");
+}
+
+// Helper to get browse type from overlay type
+export function getBrowseType(type: OverlayType): "HYD" | "ICE" | "IC2" | null {
+  if (type === "browse_HYD") return "HYD";
+  if (type === "browse_ICE") return "ICE";
+  if (type === "browse_IC2") return "IC2";
+  return null;
+}
+
+// Helper to check if overlay type is a score product
+export function isScoreOverlay(type: OverlayType): boolean {
+  return type === "score_ice" || type === "score_hyd";
+}
+
+// Helper to get score type from overlay type
+export function getScoreType(type: OverlayType): "score_ice" | "score_hyd" | null {
+  if (type === "score_ice") return "score_ice";
+  if (type === "score_hyd") return "score_hyd";
+  return null;
+}
+
 export default function MainPage() {
   // Selected footprint for Inspector
   const [selected, setSelected] = useState<InspectorContext | null>(null);
 
+  // Terrain click point for slope analysis (when clicking empty terrain)
+  const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
+
+  // Analysis mode: mutually exclusive slope / line-profile
+  type AnalysisMode = "slope" | "line" | null;
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
+
+  // Line profile state: two endpoints
+  const [linePoints, setLinePoints] = useState<ProfilePoint[]>([]);
+  const [lineProfileData, setLineProfileData] = useState<{ start: ProfilePoint; end: ProfilePoint } | null>(null);
+
   // Base layer selection
   const [baseLayer, setBaseLayer] = useState<BaseLayerType>("MOLA");
+
+  // Map mode (2D flat view vs 3D globe)
+  const [mapMode, setMapMode] = useState<MapMode>("2D");
 
   // Bounding box for view restriction
   const [viewBounds, setViewBounds] = useState<BoundingBox>(null);
 
-  // Footprint layer toggles
+  // Footprint layer toggles (visibility only - does NOT trigger loading)
   const [showCRISM, setShowCRISM] = useState(false);
   const [showHiRISE, setShowHiRISE] = useState(false);
   const [showSHARAD, setShowSHARAD] = useState(false);
+  const [showCTX, setShowCTX] = useState(false);
+  const [showSharadHighres, setShowSharadHighres] = useState(false);
 
-  // Quick View global toggles (show all quickviews for instrument)
-  const [showCRISMQuickview, setShowCRISMQuickview] = useState(false);
-  const [showHiRISEQuickview, setShowHiRISEQuickview] = useState(false);
-
-  // Browse product toggles (CRISM only)
-  const [showBrowseHYD, setShowBrowseHYD] = useState(false);
-  const [showBrowseICE, setShowBrowseICE] = useState(false);
-  const [showBrowseIC2, setShowBrowseIC2] = useState(false);
-
-  // Global overlay opacity (0-100)
-  const [overlayOpacity, setOverlayOpacity] = useState(80);
+  // Explicit footprint loading state
+  type FootprintLoadTrigger = { instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX"; timestamp: number } | null;
+  const [loadFootprintsTrigger, setLoadFootprintsTrigger] = useState<FootprintLoadTrigger>(null);
+  const [footprintsLoading, setFootprintsLoading] = useState<{ crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean }>({
+    crism: false,
+    hirise: false,
+    sharad: false,
+    sharad_highres: false,
+    ctx: false,
+  });
+  const [footprintCounts, setFootprintCounts] = useState<{
+    crism: { count: number; truncated: boolean; total: number } | null;
+    hirise: { count: number; truncated: boolean; total: number } | null;
+    sharad: { count: number; truncated: boolean; total: number } | null;
+    sharad_highres: { count: number; truncated: boolean; total: number } | null;
+    ctx: { count: number; truncated: boolean; total: number } | null;
+  }>({ crism: null, hirise: null, sharad: null, sharad_highres: null, ctx: null });
 
   // Visible products in current map view
   const [visibleProducts, setVisibleProducts] = useState<VisibleProduct[]>([]);
 
-  // Quickview overlays (toggled via eye button in LayerPanel - per-product)
-  const [quickviewOverlays, setQuickviewOverlays] = useState<string[]>([]);
-
-  // High-resolution overlays (toggled via HD button in LayerPanel/Inspector)
-  const [highResOverlays, setHighResOverlays] = useState<string[]>([]);
-
-  // Browse product overlays (product IDs with active browse overlays)
-  const [browseOverlays, setBrowseOverlays] = useState<Map<string, Set<BrowseProductType>>>(new Map());
+  // Unified active overlays - ONE overlay per product with per-product opacity
+  const [activeOverlays, setActiveOverlays] = useState<ActiveOverlays>(new Map());
 
   // Product to fly to (set when clicking product_id in LayerPanel)
   const [flyToProductId, setFlyToProductId] = useState<string | null>(null);
 
-  // Product to bring to front (for z-ordering high-res overlays)
+  // Product to bring to front (for z-ordering overlays)
   const [bringToFrontId, setBringToFrontId] = useState<string | null>(null);
 
   // CRISM RGB wavelengths
@@ -97,30 +183,106 @@ export default function MainPage() {
   // Track which products have high-res data available
   const [productsWithHighRes, setProductsWithHighRes] = useState<Set<string>>(new Set());
 
+  // Ice score filter state
+  const [iceScoreFilter, setIceScoreFilter] = useState<IceScoreFilter>({
+    enabled: false,
+    minScore: 0.3,
+    minPercent: 5,
+  });
+
+  // SHARAD High-Res Inspector — opens when a product is selected
+  const [sharadHiresProductId, setSharadHiresProductId] = useState<string | null>(null);
+  const [sharadBoundary, setSharadBoundary] = useState<SharadBoundaryInfo | null>(null);
+
+  const handleSharadBoundaryChange = useCallback((info: SharadBoundaryInfo | null) => {
+    setSharadBoundary(info);
+  }, []);
+
+  // Custom user-uploaded datasets
+  const [showCustomData, setShowCustomData] = useState(false);
+  const [customDataLoading, setCustomDataLoading] = useState(false);
+  const [customDatasets, setCustomDatasets] = useState<CustomDataset[]>([]);
+
+  // Filtered product IDs from API (null when not filtering, Set when filtering)
+  const [filteredProductIds, setFilteredProductIds] = useState<Set<string> | null>(null);
+
+  // Default opacity for new overlays
+  const DEFAULT_OPACITY = 80;
+
   // Handle visible products update from map
   const handleVisibleProductsChange = useCallback((products: VisibleProduct[]) => {
     setVisibleProducts(products);
   }, []);
 
-  // Toggle quickview overlay for a product
-  const handleToggleQuickview = useCallback((productId: string) => {
-    setQuickviewOverlays((prev) =>
-      prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
-    );
+  // Explicit footprint loading handlers
+  const handleLoadFootprints = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX") => {
+    // Auto-enable visibility when loading
+    if (instrument === "CRISM") setShowCRISM(true);
+    else if (instrument === "HIRISE") setShowHiRISE(true);
+    else if (instrument === "SHARAD") setShowSHARAD(true);
+    else if (instrument === "SHARAD_HIGHRES") setShowSharadHighres(true);
+    else if (instrument === "CTX") setShowCTX(true);
+    setLoadFootprintsTrigger({ instrument, timestamp: Date.now() });
   }, []);
 
-  // Toggle high-res overlay for a product
-  const handleToggleHighRes = useCallback((productId: string) => {
-    setHighResOverlays((prev) =>
-      prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
-    );
+  const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX", loading: boolean) => {
+    setFootprintsLoading((prev) => ({
+      ...prev,
+      [instrument.toLowerCase()]: loading,
+    }));
   }, []);
 
-  // Handle clicking product_id in LayerPanel - fly to it and bring to front
+  const handleFootprintsLoaded = useCallback((result: {
+    instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX";
+    count: number;
+    truncated: boolean;
+    total: number;
+  }) => {
+    setFootprintCounts((prev) => ({
+      ...prev,
+      [result.instrument.toLowerCase()]: {
+        count: result.count,
+        truncated: result.truncated,
+        total: result.total,
+      },
+    }));
+  }, []);
+
+  // Set overlay for a product (or clear if type is null)
+  // This enforces single-overlay-per-product rule
+  const handleSetOverlay = useCallback((productId: string, type: OverlayType | null, opacity?: number) => {
+    setActiveOverlays((prev) => {
+      const newMap = new Map(prev);
+
+      if (type === null) {
+        // Clear overlay for this product
+        newMap.delete(productId);
+      } else {
+        // Set new overlay (replaces any existing overlay for this product)
+        const existingOpacity = prev.get(productId)?.opacity ?? DEFAULT_OPACITY;
+        newMap.set(productId, {
+          type,
+          opacity: opacity ?? existingOpacity,
+        });
+      }
+
+      return newMap;
+    });
+  }, []);
+
+  // Update opacity for a product's overlay
+  const handleSetOpacity = useCallback((productId: string, opacity: number) => {
+    setActiveOverlays((prev) => {
+      const existing = prev.get(productId);
+      if (!existing) return prev;
+
+      const newMap = new Map(prev);
+      newMap.set(productId, { ...existing, opacity });
+      return newMap;
+    });
+  }, []);
+
+  // Handle clicking product_id - fly to it, select it, and bring overlay to front
   const handleSelectProduct = useCallback((product: VisibleProduct) => {
     // Open inspector
     setSelected({
@@ -128,17 +290,27 @@ export default function MainPage() {
       productId: product.productId,
       lat: 0,
       lon: 0,
-      title: product.title,  // Pass title for HiRISE observations
+      title: product.title,
     });
 
     // Fly to the product
     setFlyToProductId(product.productId);
 
-    // Bring high-res overlay to front if it exists
-    if (highResOverlays.includes(product.productId)) {
+    // Bring overlay to front if it exists
+    if (activeOverlays.has(product.productId)) {
       setBringToFrontId(product.productId);
     }
-  }, [highResOverlays]);
+  }, [activeOverlays]);
+
+  // Handle fly-to from Active Products section
+  const handleFlyToProduct = useCallback((productId: string) => {
+    setFlyToProductId(productId);
+
+    // Also bring overlay to front
+    if (activeOverlays.has(productId)) {
+      setBringToFrontId(productId);
+    }
+  }, [activeOverlays]);
 
   // Clear flyTo after it's processed
   const handleFlyToComplete = useCallback(() => {
@@ -160,59 +332,16 @@ export default function MainPage() {
     setSharadPopup(popup);
   }, []);
 
+  // Handle SHARAD High-Res footprint click - open radargram inspector
+  const handleSharadHiresClick = useCallback((productId: string) => {
+    setSharadHiresProductId(productId);
+    setSelected(null); // Close regular Inspector
+  }, []);
+
   // Deactivate all overlays
   const handleDeactivateAll = useCallback(() => {
-    setQuickviewOverlays([]);
-    setHighResOverlays([]);
-    setBrowseOverlays(new Map());
+    setActiveOverlays(new Map());
   }, []);
-
-  // Toggle browse product for a specific product
-  const handleToggleBrowseProduct = useCallback((productId: string, browseType: BrowseProductType) => {
-    setBrowseOverlays((prev) => {
-      const newMap = new Map(prev);
-      const existing = newMap.get(productId) || new Set();
-      const newSet = new Set(existing);
-
-      if (newSet.has(browseType)) {
-        newSet.delete(browseType);
-      } else {
-        newSet.add(browseType);
-      }
-
-      if (newSet.size === 0) {
-        newMap.delete(productId);
-      } else {
-        newMap.set(productId, newSet);
-      }
-
-      return newMap;
-    });
-  }, []);
-
-  // Turn on all browse products for visible CRISM products
-  const handleTurnOnAllBrowse = useCallback(() => {
-    const crismProducts = visibleProducts.filter(p => p.instrument === "CRISM");
-    const newMap = new Map(browseOverlays); // Keep existing overlays
-
-    crismProducts.forEach(p => {
-      const existing = newMap.get(p.productId) || new Set<BrowseProductType>();
-      if (showBrowseHYD) existing.add("HYD");
-      if (showBrowseICE) existing.add("ICE");
-      if (showBrowseIC2) existing.add("IC2");
-      if (existing.size > 0) {
-        newMap.set(p.productId, existing);
-      }
-    });
-
-    setBrowseOverlays(newMap);
-  }, [visibleProducts, showBrowseHYD, showBrowseICE, showBrowseIC2, browseOverlays]);
-
-  // Turn on all quickviews for visible products
-  const handleTurnOnAllQuickviews = useCallback(() => {
-    const productIds = visibleProducts.map(p => p.productId);
-    setQuickviewOverlays(productIds);
-  }, [visibleProducts]);
 
   // Check high-res availability for visible products
   useEffect(() => {
@@ -225,7 +354,6 @@ export default function MainPage() {
           const response = await fetch(`/api/exists/${instrument}/${encodeURIComponent(product.productId)}`);
           if (response.ok) {
             const data = await response.json();
-            // has_core means .img/.lbl files exist for CRISM, or .jp2/.tif for HiRISE
             if (data.has_core) {
               newHighResSet.add(product.productId);
             }
@@ -244,107 +372,321 @@ export default function MainPage() {
     }
   }, [visibleProducts]);
 
+  // Fetch filtered product IDs when ice score filter changes
+  useEffect(() => {
+    if (!iceScoreFilter.enabled) {
+      setFilteredProductIds(null);
+      return;
+    }
+
+    const fetchFilteredIds = async () => {
+      try {
+        const params = new URLSearchParams({
+          min_score: iceScoreFilter.minScore.toString(),
+          min_percent: iceScoreFilter.minPercent.toString(),
+        });
+        const response = await fetch(`/api/filter/ice?${params}`);
+        if (response.ok) {
+          const data = await response.json();
+          setFilteredProductIds(new Set(data.passing_ids));
+        }
+      } catch (e) {
+        console.error("Failed to fetch filtered IDs:", e);
+        setFilteredProductIds(null);
+      }
+    };
+
+    fetchFilteredIds();
+  }, [iceScoreFilter.enabled, iceScoreFilter.minScore, iceScoreFilter.minPercent]);
+
+  // Load custom datasets from server (triggered by Load button)
+  const handleLoadCustomData = useCallback(async () => {
+    setCustomDataLoading(true);
+    try {
+      const response = await fetch("/api/custom/datasets");
+      if (response.ok) {
+        const data = await response.json();
+        setCustomDatasets(
+          (data.datasets || []).map((d: any) => ({
+            ...d,
+            visible: true,
+            opacity: 80,
+          }))
+        );
+        // Auto-enable visibility when loading
+        setShowCustomData(true);
+      }
+    } catch (e) {
+      console.error("Failed to load custom datasets:", e);
+    } finally {
+      setCustomDataLoading(false);
+    }
+  }, []);
+
+  // Custom dataset handlers (used by LayerPanel + Inspector)
+  const handleCustomDatasetToggle = useCallback((datasetId: string, visible: boolean) => {
+    setCustomDatasets((prev) =>
+      prev.map((d) => (d.id === datasetId ? { ...d, visible } : d))
+    );
+  }, []);
+
+  const handleCustomDatasetOpacity = useCallback((datasetId: string, opacity: number) => {
+    setCustomDatasets((prev) =>
+      prev.map((d) => (d.id === datasetId ? { ...d, opacity } : d))
+    );
+  }, []);
+
+  // Handle terrain click — behavior depends on analysisMode
+  const handleTerrainClick = useCallback((lat: number, lon: number) => {
+    if (analysisMode === "line") {
+      // Line profile mode: collect up to 2 points, then reset
+      setLinePoints((prev) => {
+        if (prev.length >= 2) {
+          // Third click: reset and start new line
+          setLineProfileData(null);
+          return [{ lat, lon }];
+        }
+        const next = [...prev, { lat, lon }];
+        if (next.length === 2) {
+          // Two points collected — trigger profile computation
+          setLineProfileData({ start: next[0], end: next[1] });
+        }
+        return next;
+      });
+      return;
+    }
+    if (analysisMode === "slope") {
+      // Slope analysis mode: show slope analysis on terrain click
+      setSelected(null);
+      setTerrainPoint({ lat, lon });
+    }
+  }, [analysisMode]);
+
+  // When a product is selected, clear terrain point
+  const handleSelect = useCallback((ctx: InspectorContext | null) => {
+    setSelected(ctx);
+    if (ctx) setTerrainPoint(null);
+  }, []);
+
+  // Analysis mode toggle handler
+  const handleAnalysisModeChange = useCallback((mode: AnalysisMode) => {
+    setAnalysisMode(mode);
+    // Clear state for both modes
+    if (mode !== "slope") {
+      setTerrainPoint(null);
+    }
+    if (mode !== "line") {
+      setLinePoints([]);
+      setLineProfileData(null);
+    }
+  }, []);
+
+  // Fly to lat/lon coordinates (for search results not on map)
+  const [flyToCoords, setFlyToCoords] = useState<{ lat: number; lon: number } | null>(null);
+
+  const handleFlyToCoordsComplete = useCallback(() => {
+    setFlyToCoords(null);
+  }, []);
+
   // Handle search result selection from TopBar
-  const handleSearchSelect = useCallback((productId: string) => {
+  const handleSearchSelect = useCallback((productId: string, instrument?: string, lat?: number | null, lon?: number | null) => {
+    // First try to find the product on the map
     const product = visibleProducts.find((p) => p.productId === productId);
     if (product) {
       handleSelectProduct(product);
+      return;
+    }
+
+    // Product not on map — fly to its coordinates if available
+    if (lat != null && lon != null) {
+      setFlyToCoords({ lat, lon });
+    }
+
+    // Open appropriate panel based on instrument
+    if (instrument === "SHARAD_HIGHRES") {
+      setSharadHiresProductId(productId);
+    } else if (instrument && instrument !== "CTX") {
+      setSelected({
+        instrument: instrument as any,
+        productId,
+        lat: lat ?? 0,
+        lon: lon ?? 0,
+      });
     }
   }, [visibleProducts, handleSelectProduct]);
 
-  // All searchable items (productId and title)
-  const searchableItems = visibleProducts.map((p) => ({
-    productId: p.productId,
-    title: p.title,
-  }));
+  // Derive legacy overlay formats for MapView compatibility
+  // These will be replaced when MapView is updated to use unified format
+  const derivedOverlays = useMemo(() => {
+    const quickviewOverlays: string[] = [];
+    const highResOverlays: string[] = [];
+    const browseOverlays = new Map<string, Set<"HYD" | "ICE" | "IC2">>();
+    const scoreOverlays = new Map<string, Set<"score_ice" | "score_hyd">>();
+    const opacities = new Map<string, number>();
+
+    for (const [productId, overlay] of activeOverlays) {
+      opacities.set(productId, overlay.opacity / 100);
+
+      if (overlay.type === "quickview") {
+        quickviewOverlays.push(productId);
+      } else if (overlay.type === "highres") {
+        highResOverlays.push(productId);
+      } else if (isBrowseOverlay(overlay.type)) {
+        const browseType = getBrowseType(overlay.type);
+        if (browseType) {
+          const existing = browseOverlays.get(productId) || new Set();
+          existing.add(browseType);
+          browseOverlays.set(productId, existing);
+        }
+      } else if (isScoreOverlay(overlay.type)) {
+        const scoreType = getScoreType(overlay.type);
+        if (scoreType) {
+          const existing = scoreOverlays.get(productId) || new Set();
+          existing.add(scoreType);
+          scoreOverlays.set(productId, existing);
+        }
+      }
+    }
+
+    return { quickviewOverlays, highResOverlays, browseOverlays, scoreOverlays, opacities };
+  }, [activeOverlays]);
 
   return (
     <AppShell
       header={
         <TopBar
-          searchableItems={searchableItems}
           onSelectResult={handleSearchSelect}
         />
       }
       leftPanel={
         <LayerPanel
+          // Map mode (2D/3D)
+          mapMode={mapMode}
+          onMapModeChange={setMapMode}
           // Base layer selection
           baseLayer={baseLayer}
           onBaseLayerChange={setBaseLayer}
           // View bounds restriction
           viewBounds={viewBounds}
           onViewBoundsChange={setViewBounds}
-          // Footprint toggles
+          // Footprint toggles (visibility)
           showCRISM={showCRISM}
           showHiRISE={showHiRISE}
           showSHARAD={showSHARAD}
+          showCTX={showCTX}
+          showSharadHighres={showSharadHighres}
           onToggleCRISM={setShowCRISM}
           onToggleHiRISE={setShowHiRISE}
           onToggleSHARAD={setShowSHARAD}
-          // Quick View toggles
-          showCRISMQuickview={showCRISMQuickview}
-          showHiRISEQuickview={showHiRISEQuickview}
-          onToggleCRISMQuickview={setShowCRISMQuickview}
-          onToggleHiRISEQuickview={setShowHiRISEQuickview}
-          // Browse product toggles
-          showBrowseHYD={showBrowseHYD}
-          showBrowseICE={showBrowseICE}
-          showBrowseIC2={showBrowseIC2}
-          onToggleBrowseHYD={setShowBrowseHYD}
-          onToggleBrowseICE={setShowBrowseICE}
-          onToggleBrowseIC2={setShowBrowseIC2}
-          // Global opacity
-          overlayOpacity={overlayOpacity}
-          onOpacityChange={setOverlayOpacity}
-          // Existing props
+          onToggleSharadHighres={setShowSharadHighres}
+          onToggleCTX={setShowCTX}
+          // Explicit footprint loading
+          onLoadFootprints={handleLoadFootprints}
+          footprintsLoading={footprintsLoading}
+          footprintCounts={footprintCounts}
+          // Ice Score Filter
+          iceScoreFilter={iceScoreFilter}
+          onIceScoreFilterChange={setIceScoreFilter}
+          filteredProductIds={filteredProductIds}
+          // Product data
           visibleProducts={visibleProducts}
-          quickviewOverlays={quickviewOverlays}
-          highResOverlays={highResOverlays}
-          browseOverlays={browseOverlays}
-          onToggleQuickview={handleToggleQuickview}
-          onToggleHighRes={handleToggleHighRes}
-          onToggleBrowseProduct={handleToggleBrowseProduct}
+          activeOverlays={activeOverlays}
+          // Overlay handlers
+          onSetOverlay={handleSetOverlay}
+          onSetOpacity={handleSetOpacity}
           onSelectProduct={handleSelectProduct}
+          onFlyToProduct={handleFlyToProduct}
           onDeactivateAll={handleDeactivateAll}
-          onTurnOnAllBrowse={handleTurnOnAllBrowse}
-          onTurnOnAllQuickviews={handleTurnOnAllQuickviews}
-          productsWithHighRes={productsWithHighRes}
+          // Custom datasets
+          showCustomData={showCustomData}
+          onToggleCustomData={setShowCustomData}
+          onLoadCustomData={handleLoadCustomData}
+          customDataLoading={customDataLoading}
+          customDatasets={customDatasets}
+          onCustomDatasetToggle={handleCustomDatasetToggle}
+          // Analysis mode
+          analysisMode={analysisMode}
+          onAnalysisModeChange={handleAnalysisModeChange}
         />
       }
       rightPanel={
-        selected ? (
+        sharadHiresProductId ? (
+          <SharadHiresInspector
+            productId={sharadHiresProductId}
+            onClose={() => { setSharadHiresProductId(null); setSharadBoundary(null); }}
+            onBoundaryChange={handleSharadBoundaryChange}
+          />
+        ) : selected ? (
           <Inspector
             selected={selected}
             onClose={() => setSelected(null)}
-            isHighResActive={highResOverlays.includes(selected.productId)}
-            onToggleHighRes={() => handleToggleHighRes(selected.productId)}
+            activeOverlay={activeOverlays.get(selected.productId) || null}
+            onSetOverlay={(type) => handleSetOverlay(selected.productId, type)}
+            onSetOpacity={(opacity) => handleSetOpacity(selected.productId, opacity)}
             rgbWavelengths={rgbWavelengths}
             onRGBChange={handleRGBChange}
             hasHighResData={productsWithHighRes.has(selected.productId)}
+            customDataset={customDatasets.find((d) => d.id === selected.productId) || null}
+            onCustomDatasetOpacity={handleCustomDatasetOpacity}
+          />
+        ) : terrainPoint ? (
+          <SlopeAnalysis
+            point={terrainPoint}
+            onClose={() => setTerrainPoint(null)}
           />
         ) : null
       }
     >
       {/* Map Canvas */}
       <MapView
+        mapMode={mapMode}
         baseLayer={baseLayer}
         viewBounds={viewBounds}
-        onSelect={setSelected}
+        onSelect={handleSelect}
+        onTerrainClick={handleTerrainClick}
         showCRISM={showCRISM}
         showHiRISE={showHiRISE}
         showSHARAD={showSHARAD}
+        showSharadHighres={showSharadHighres}
+        showCTX={showCTX}
         onSharadClick={handleSharadClick}
-        quickviewOverlays={quickviewOverlays}
-        highResOverlays={highResOverlays}
-        browseOverlays={browseOverlays}
-        overlayOpacity={overlayOpacity / 100}
+        onSharadHiresClick={handleSharadHiresClick}
+        sharadBoundary={sharadBoundary}
+        onToggleOverlay={(productId, type) => handleSetOverlay(productId, type)}
+        quickviewOverlays={derivedOverlays.quickviewOverlays}
+        highResOverlays={derivedOverlays.highResOverlays}
+        browseOverlays={derivedOverlays.browseOverlays}
+        scoreOverlays={derivedOverlays.scoreOverlays}
+        overlayOpacities={derivedOverlays.opacities}
         onVisibleProductsChange={handleVisibleProductsChange}
         flyToProductId={flyToProductId}
         onFlyToComplete={handleFlyToComplete}
+        flyToCoords={flyToCoords}
+        onFlyToCoordsComplete={handleFlyToCoordsComplete}
         bringToFrontId={bringToFrontId}
         onBringToFrontComplete={handleBringToFrontComplete}
         rgbWavelengths={rgbWavelengths}
+        crismFilteredIds={filteredProductIds}
+        loadFootprintsTrigger={loadFootprintsTrigger}
+        onFootprintsLoaded={handleFootprintsLoaded}
+        onFootprintsLoading={handleFootprintsLoading}
+        showCustomData={showCustomData}
+        customDatasets={customDatasets}
+        analysisMode={analysisMode}
+        linePoints={linePoints}
       />
+
+      {/* Line Profile Popup */}
+      {lineProfileData && (
+        <LineProfile
+          startPoint={lineProfileData.start}
+          endPoint={lineProfileData.end}
+          onClose={() => {
+            setLineProfileData(null);
+            setLinePoints([]);
+          }}
+        />
+      )}
 
       {/* SHARAD Quickview Popup */}
       {sharadPopup && (
