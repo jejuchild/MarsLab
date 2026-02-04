@@ -1,6 +1,23 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { searchWithHighlight } from "../utils/search";
+
+/* =========================================================
+ * Types
+ * =======================================================*/
+type SearchResultItem = {
+  product_id: string;
+  instrument: string;
+  title?: string;
+  lat?: number | null;
+  lon?: number | null;
+};
+
+type SearchResponse = {
+  query: string;
+  results: SearchResultItem[];
+  count: number;
+  total_products: number;
+};
 
 export interface SearchableItem {
   productId: string;
@@ -9,27 +26,43 @@ export interface SearchableItem {
 
 interface TopBarProps {
   onSearch?: (query: string) => void;
-  onSelectResult?: (productId: string) => void;
+  onSelectResult?: (productId: string, instrument?: string, lat?: number | null, lon?: number | null) => void;
   searchableItems?: SearchableItem[];
 }
 
+/* =========================================================
+ * Instrument badge colors
+ * =======================================================*/
+const INSTRUMENT_COLORS: Record<string, string> = {
+  CRISM:          "text-cyan-400 bg-cyan-500/20 border-cyan-500/30",
+  HIRISE:         "text-yellow-400 bg-yellow-500/20 border-yellow-500/30",
+  SHARAD:         "text-orange-400 bg-orange-500/20 border-orange-500/30",
+  SHARAD_HIGHRES: "text-amber-400 bg-amber-500/20 border-amber-500/30",
+  CTX:            "text-pink-400 bg-pink-500/20 border-pink-500/30",
+};
+
+/* =========================================================
+ * TopBar Component
+ * =======================================================*/
 export default function TopBar({
   onSearch,
   onSelectResult,
-  searchableItems = [],
 }: TopBarProps) {
   const [query, setQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [results, setResults] = useState<SearchResultItem[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [totalProducts, setTotalProducts] = useState<number | null>(null);
+
+  // Feature memo modal
+  const [memoOpen, setMemoOpen] = useState(false);
+  const [memoText, setMemoText] = useState("");
+  const [memoStatus, setMemoStatus] = useState<"idle" | "saving" | "saved">("idle");
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Create searchable strings that include both productId and title
-  // Format: "productId|title" so we can search both but display them separately
-  const searchStrings = searchableItems.map(item =>
-    item.title ? `${item.productId}|${item.title}` : item.productId
-  );
-  const results = searchWithHighlight(searchStrings, query, 10);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -43,7 +76,6 @@ export default function TopBar({
         setShowDropdown(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -51,19 +83,53 @@ export default function TopBar({
   // Reset selected index when results change
   useEffect(() => {
     setSelectedIndex(0);
-  }, [results.length, query]);
+  }, [results.length]);
+
+  // Debounced backend search
+  const doSearch = useCallback((q: string) => {
+    // Cancel previous request
+    abortRef.current?.abort();
+
+    if (!q.trim() || q.trim().length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    fetch(`/api/search/local?q=${encodeURIComponent(q.trim())}&limit=20`, {
+      signal: controller.signal,
+    })
+      .then((res) => res.json())
+      .then((data: SearchResponse) => {
+        setResults(data.results);
+        setTotalProducts(data.total_products);
+        setSearching(false);
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") {
+          setResults([]);
+          setSearching(false);
+        }
+      });
+  }, []);
 
   const handleInputChange = (value: string) => {
     setQuery(value);
     setShowDropdown(value.trim().length > 0);
+
+    // Debounce the search
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(value), 200);
   };
 
-  const handleSelect = (item: string) => {
-    // Extract productId from "productId|title" format
-    const productId = item.split("|")[0];
-    setQuery(productId);
+  const handleSelect = (item: SearchResultItem) => {
+    setQuery(item.product_id);
     setShowDropdown(false);
-    onSelectResult?.(productId);
+    onSelectResult?.(item.product_id, item.instrument, item.lat, item.lon);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -86,13 +152,29 @@ export default function TopBar({
       case "Enter":
         e.preventDefault();
         if (results[selectedIndex]) {
-          handleSelect(results[selectedIndex].item);
+          handleSelect(results[selectedIndex]);
         }
         break;
       case "Escape":
         setShowDropdown(false);
         break;
     }
+  };
+
+  // Highlight matching substring
+  const highlightMatch = (text: string, q: string) => {
+    if (!q.trim()) return <span>{text}</span>;
+    const idx = text.toLowerCase().indexOf(q.toLowerCase());
+    if (idx === -1) return <span>{text}</span>;
+    return (
+      <>
+        <span>{text.slice(0, idx)}</span>
+        <mark className="bg-primary/30 text-primary rounded px-0.5">
+          {text.slice(idx, idx + q.length)}
+        </mark>
+        <span>{text.slice(idx + q.length)}</span>
+      </>
+    );
   };
 
   return (
@@ -121,6 +203,12 @@ export default function TopBar({
           >
             Data Download
           </Link>
+          <Link
+            to="/upload"
+            className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
+          >
+            Data Upload
+          </Link>
         </nav>
       </div>
 
@@ -129,7 +217,11 @@ export default function TopBar({
         <div className="relative w-full max-w-xl">
           <div className="flex h-9 w-full items-stretch rounded-lg bg-surface-dark">
             <div className="flex items-center justify-center pl-3 text-slate-400">
-              <span className="material-symbols-outlined text-[20px]">search</span>
+              {searching ? (
+                <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+              ) : (
+                <span className="material-symbols-outlined text-[20px]">search</span>
+              )}
             </div>
             <input
               ref={inputRef}
@@ -139,12 +231,13 @@ export default function TopBar({
               onKeyDown={handleKeyDown}
               onFocus={() => query.trim() && setShowDropdown(true)}
               className="w-full border-none bg-transparent px-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-0"
-              placeholder="Search coordinates, feature names, or product IDs..."
+              placeholder="Search product IDs across all instruments..."
             />
             {query && (
               <button
                 onClick={() => {
                   setQuery("");
+                  setResults([]);
                   setShowDropdown(false);
                   inputRef.current?.focus();
                 }}
@@ -161,14 +254,25 @@ export default function TopBar({
               ref={dropdownRef}
               className="absolute top-full left-0 right-0 z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-border-dark bg-surface-dark shadow-xl"
             >
+              {/* Result count header */}
+              <div className="px-3 py-1.5 border-b border-border-dark/50 flex justify-between">
+                <span className="text-[10px] text-slate-500">
+                  {results.length} result{results.length !== 1 ? "s" : ""}
+                </span>
+                {totalProducts && (
+                  <span className="text-[10px] text-slate-600">
+                    {totalProducts.toLocaleString()} products in database
+                  </span>
+                )}
+              </div>
+
               <div className="p-1">
-                {results.map((result, index) => {
-                  // Parse "productId|title" format
-                  const [_productId, title] = result.item.split("|");
+                {results.map((item, index) => {
+                  const colorClass = INSTRUMENT_COLORS[item.instrument] || "text-slate-400 bg-slate-500/20 border-slate-500/30";
                   return (
                     <button
-                      key={result.item}
-                      onClick={() => handleSelect(result.item)}
+                      key={`${item.instrument}-${item.product_id}`}
+                      onClick={() => handleSelect(item)}
                       onMouseEnter={() => setSelectedIndex(index)}
                       className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors ${
                         index === selectedIndex
@@ -176,33 +280,26 @@ export default function TopBar({
                           : "text-slate-300 hover:bg-white/5"
                       }`}
                     >
-                      <span className="material-symbols-outlined text-sm text-slate-400">
-                        {result.isPrefix ? "star" : "search"}
+                      {/* Instrument badge */}
+                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${colorClass}`}>
+                        {item.instrument}
                       </span>
+
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="font-mono text-sm truncate">
-                          {result.segments.map((seg, i) =>
-                            seg.highlight ? (
-                              <mark
-                                key={i}
-                                className="bg-primary/30 text-primary rounded px-0.5"
-                              >
-                                {seg.text}
-                              </mark>
-                            ) : (
-                              <span key={i}>{seg.text}</span>
-                            )
-                          )}
+                          {highlightMatch(item.product_id, query)}
                         </span>
-                        {title && (
+                        {item.title && (
                           <span className="text-[11px] text-slate-400 truncate mt-0.5">
-                            {title}
+                            {item.title}
                           </span>
                         )}
                       </div>
-                      {result.isPrefix && (
-                        <span className="ml-auto text-[10px] uppercase tracking-wider text-slate-500">
-                          prefix
+
+                      {/* Coordinates */}
+                      {item.lat != null && item.lon != null && (
+                        <span className="text-[9px] text-slate-600 font-mono shrink-0">
+                          {item.lat.toFixed(1)}°, {item.lon.toFixed(1)}°
                         </span>
                       )}
                     </button>
@@ -213,16 +310,72 @@ export default function TopBar({
           )}
 
           {/* No results message */}
-          {showDropdown && query.trim() && results.length === 0 && (
+          {showDropdown && query.trim().length >= 2 && !searching && results.length === 0 && (
             <div
               ref={dropdownRef}
               className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border border-border-dark bg-surface-dark p-4 text-center shadow-xl"
             >
-              <span className="text-sm text-slate-400">No results found for "{query}"</span>
+              <span className="text-sm text-slate-400">No products found for "{query}"</span>
             </div>
           )}
         </div>
       </div>
+
+      {/* Suggest Feature */}
+      <button
+        onClick={() => { setMemoOpen(true); setMemoStatus("idle"); }}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-slate-400 hover:text-white border border-border-dark rounded-md hover:bg-white/5 transition-colors shrink-0"
+      >
+        <span className="material-symbols-outlined text-sm">lightbulb</span>
+        Suggest Feature
+      </button>
+
+      {/* Memo modal */}
+      {memoOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
+          <div className="w-[420px] rounded-lg border border-border-dark bg-[#101622] shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-dark">
+              <span className="text-sm font-bold text-white">Suggest Feature</span>
+              <button onClick={() => setMemoOpen(false)} className="text-slate-500 hover:text-white">
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <textarea
+                autoFocus
+                rows={6}
+                value={memoText}
+                onChange={(e) => setMemoText(e.target.value)}
+                placeholder="Write feature ideas, bugs, or thoughts here..."
+                className="w-full rounded-md border border-border-dark bg-[#0a0f18] px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 resize-y"
+              />
+              <div className="flex items-center justify-between">
+                {memoStatus === "saved" ? (
+                  <span className="text-xs text-green-400">Saved.</span>
+                ) : (
+                  <span />
+                )}
+                <button
+                  disabled={!memoText.trim() || memoStatus === "saving"}
+                  onClick={() => {
+                    setMemoStatus("saving");
+                    fetch("/api/feature_memo", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ text: memoText }),
+                    })
+                      .then(() => { setMemoStatus("saved"); setMemoText(""); })
+                      .catch(() => setMemoStatus("idle"));
+                  }}
+                  className="px-4 py-1.5 text-xs font-bold uppercase rounded bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {memoStatus === "saving" ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

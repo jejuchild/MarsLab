@@ -18,6 +18,7 @@ from rasterio.enums import Resampling
 from pydantic import BaseModel
 import io
 from PIL import Image
+from datetime import datetime
 
 from api.crism.processing import make_rgb
 
@@ -271,10 +272,12 @@ def get_crism_index():
 from api.crism.router import router as crism_router
 from api.search_router import router as search_router
 from api.footprints_router import router as footprints_router
+from api.custom_router import router as custom_router
 
 app.include_router(crism_router, prefix="/crism")
 app.include_router(search_router)  # Mounts at /api/*
 app.include_router(footprints_router)  # Viewport-based footprint API
+app.include_router(custom_router)  # Custom user data upload
 
 app.mount(
     "/hirise_lbl",
@@ -283,12 +286,16 @@ app.mount(
 )
 
 from api.hirise_pixel import router as hirise_pixel_router
+from api.terrain_router import router as terrain_router
+from api.sharad_highres_router import router as sharad_highres_router
 
 app.include_router(
     hirise_pixel_router,
     prefix="/hirise",
     tags=["HiRISE"]
 )
+app.include_router(terrain_router)  # /terrain/slope_stats
+app.include_router(sharad_highres_router)  # /api/sharad_highres/*
 
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
@@ -437,4 +444,160 @@ app.mount(
     StaticFiles(directory=os.path.join(BASE_DIR, "sharad_highres")),
     name="sharad_highres",
 )
+
+# ======================================================
+# Ice/Hydration Score Filtering API
+# ======================================================
+CRISM_SCORE_DIR = os.path.join(BASE_DIR, "crism_score")
+SCORE_STATS_FILE = os.path.join(CRISM_SCORE_DIR, "score_stats.json")
+
+# Preload score stats at startup for efficiency
+_score_stats_cache = None
+
+def _load_score_stats():
+    """Load score stats from JSON file, with caching."""
+    global _score_stats_cache
+    if _score_stats_cache is None:
+        if os.path.exists(SCORE_STATS_FILE):
+            with open(SCORE_STATS_FILE, "r") as f:
+                _score_stats_cache = json.load(f)
+        else:
+            _score_stats_cache = {}
+    return _score_stats_cache
+
+# Precomputed thresholds (must match generate_score_maps.py)
+SCORE_THRESHOLDS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5]
+
+def _find_closest_threshold(value: float) -> str:
+    """Find the closest precomputed threshold (as string key)."""
+    # Find the largest threshold <= value
+    for t in reversed(SCORE_THRESHOLDS):
+        if t <= value:
+            return str(t)
+    return str(SCORE_THRESHOLDS[0])  # Default to lowest
+
+@app.get("/api/filter/ice")
+def filter_ice_score(min_score: float = 0.3, min_percent: float = 5.0):
+    """
+    Filter CRISM observations by ice score.
+
+    Returns observations where at least `min_percent`% of pixels have
+    ice_score >= `min_score`.
+
+    Args:
+        min_score: Minimum ice score threshold (default 0.3)
+        min_percent: Minimum percentage of pixels that must meet threshold (default 5%)
+
+    Returns:
+        JSON with list of passing observation IDs
+    """
+    stats = _load_score_stats()
+
+    if not stats:
+        return JSONResponse(content={"passing_ids": [], "total": 0, "passing_count": 0})
+
+    # Find closest precomputed threshold
+    threshold_key = _find_closest_threshold(min_score)
+
+    passing_ids = []
+    for obs_id, obs_stats in stats.items():
+        ice_stats = obs_stats.get("ice", {})
+        valid_pixels = ice_stats.get("valid_pixels", 0)
+
+        if valid_pixels == 0:
+            continue
+
+        threshold_counts = ice_stats.get("threshold_counts", {})
+        count_above = threshold_counts.get(threshold_key, 0)
+
+        percent = (count_above / valid_pixels) * 100
+
+        if percent >= min_percent:
+            passing_ids.append(obs_id)
+
+    return JSONResponse(content={
+        "passing_ids": passing_ids,
+        "total": len(stats),
+        "passing_count": len(passing_ids),
+        "params": {
+            "min_score": min_score,
+            "min_percent": min_percent,
+            "used_threshold": float(threshold_key)
+        }
+    })
+
+@app.get("/api/filter/hyd")
+def filter_hyd_score(min_score: float = 0.3, min_percent: float = 5.0):
+    """
+    Filter CRISM observations by hydration score.
+
+    Returns observations where at least `min_percent`% of pixels have
+    hyd_score >= `min_score`.
+    """
+    stats = _load_score_stats()
+
+    if not stats:
+        return JSONResponse(content={"passing_ids": [], "total": 0, "passing_count": 0})
+
+    threshold_key = _find_closest_threshold(min_score)
+
+    passing_ids = []
+    for obs_id, obs_stats in stats.items():
+        hyd_stats = obs_stats.get("hyd", {})
+        valid_pixels = hyd_stats.get("valid_pixels", 0)
+
+        if valid_pixels == 0:
+            continue
+
+        threshold_counts = hyd_stats.get("threshold_counts", {})
+        count_above = threshold_counts.get(threshold_key, 0)
+
+        percent = (count_above / valid_pixels) * 100
+
+        if percent >= min_percent:
+            passing_ids.append(obs_id)
+
+    return JSONResponse(content={
+        "passing_ids": passing_ids,
+        "total": len(stats),
+        "passing_count": len(passing_ids),
+        "params": {
+            "min_score": min_score,
+            "min_percent": min_percent,
+            "used_threshold": float(threshold_key)
+        }
+    })
+
+@app.get("/api/score/stats")
+def get_score_stats():
+    """
+    Get score statistics for all observations.
+    Useful for debugging and building filter UIs.
+    """
+    stats = _load_score_stats()
+    return JSONResponse(content={
+        "total_observations": len(stats),
+        "available_thresholds": SCORE_THRESHOLDS
+    })
+
+# ======================================================
+# Feature memo (developer notepad)
+# ======================================================
+MEMO_DIR = os.path.join(BASE_DIR, "private_memos")
+os.makedirs(MEMO_DIR, exist_ok=True)
+
+class FeatureMemo(BaseModel):
+    text: str
+
+@app.post("/api/feature_memo")
+def save_feature_memo(memo: FeatureMemo):
+    text = memo.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Empty memo")
+    now = datetime.now()
+    filename = now.strftime("feature_%Y%m%d_%H%M%S.txt")
+    content = f"[{now.strftime('%Y-%m-%d %H:%M')}]\n{text}\n"
+    with open(os.path.join(MEMO_DIR, filename), "w", encoding="utf-8") as f:
+        f.write(content)
+    return {"ok": True}
 
