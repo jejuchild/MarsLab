@@ -55,10 +55,6 @@ export default function TopBar({
   const [searching, setSearching] = useState(false);
   const [totalProducts, setTotalProducts] = useState<number | null>(null);
 
-  // Feature memo modal
-  const [memoOpen, setMemoOpen] = useState(false);
-  const [memoText, setMemoText] = useState("");
-  const [memoStatus, setMemoStatus] = useState<"idle" | "saving" | "saved">("idle");
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -322,60 +318,13 @@ export default function TopBar({
       </div>
 
       {/* Suggest Feature */}
-      <button
-        onClick={() => { setMemoOpen(true); setMemoStatus("idle"); }}
+      <Link
+        to="/suggestions"
         className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-slate-400 hover:text-white border border-border-dark rounded-md hover:bg-white/5 transition-colors shrink-0"
       >
         <span className="material-symbols-outlined text-sm">lightbulb</span>
         Suggest Feature
-      </button>
-
-      {/* Memo modal */}
-      {memoOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60">
-          <div className="w-[420px] rounded-lg border border-border-dark bg-[#101622] shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border-dark">
-              <span className="text-sm font-bold text-white">Suggest Feature</span>
-              <button onClick={() => setMemoOpen(false)} className="text-slate-500 hover:text-white">
-                <span className="material-symbols-outlined text-lg">close</span>
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              <textarea
-                autoFocus
-                rows={6}
-                value={memoText}
-                onChange={(e) => setMemoText(e.target.value)}
-                placeholder="Write feature ideas, bugs, or thoughts here..."
-                className="w-full rounded-md border border-border-dark bg-[#0a0f18] px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 resize-y"
-              />
-              <div className="flex items-center justify-between">
-                {memoStatus === "saved" ? (
-                  <span className="text-xs text-green-400">Saved.</span>
-                ) : (
-                  <span />
-                )}
-                <button
-                  disabled={!memoText.trim() || memoStatus === "saving"}
-                  onClick={() => {
-                    setMemoStatus("saving");
-                    fetch("/api/feature_memo", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ text: memoText }),
-                    })
-                      .then(() => { setMemoStatus("saved"); setMemoText(""); })
-                      .catch(() => setMemoStatus("idle"));
-                  }}
-                  className="px-4 py-1.5 text-xs font-bold uppercase rounded bg-primary/20 text-primary border border-primary/40 hover:bg-primary/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {memoStatus === "saving" ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </Link>
     </header>
   );
 }

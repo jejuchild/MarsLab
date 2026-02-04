@@ -288,6 +288,7 @@ app.mount(
 from api.hirise_pixel import router as hirise_pixel_router
 from api.terrain_router import router as terrain_router
 from api.sharad_highres_router import router as sharad_highres_router
+from api.suggestions_router import router as suggestions_router
 
 app.include_router(
     hirise_pixel_router,
@@ -296,6 +297,7 @@ app.include_router(
 )
 app.include_router(terrain_router)  # /terrain/slope_stats
 app.include_router(sharad_highres_router)  # /api/sharad_highres/*
+app.include_router(suggestions_router)  # /api/feature_suggestions
 
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
