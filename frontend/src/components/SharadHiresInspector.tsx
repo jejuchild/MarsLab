@@ -45,20 +45,18 @@ type MolaProfile = {
   total_distance_km: number;
 };
 
-export type SharadBoundaryInfo = {
-  lats: number[];
-  lons: number[];
-  boundaryM: number;
-  show: boolean;
-};
-
 /* =========================================================
  * Constants
  * =======================================================*/
 const DOWNSAMPLE = 50;
 const MOLA_PANEL_HEIGHT = 120;
-const ADJUST_RADIUS = 8; // traces of neighborhood influence for surface adjustment
-const HANDLE_HIT_PX = 10; // pixel radius for clicking a surface vertex
+const ADJUST_RADIUS = 8;
+const HANDLE_HIT_PX = 10;
+const DEFAULT_WIDTH = 720;
+const MIN_WIDTH = 600;
+const MAX_WIDTH_FRACTION = 0.85;
+const SPEED_OF_LIGHT = 299792458; // m/s
+const BIN_DT_SEC = 0.0375e-6;    // seconds per range bin
 
 /* =========================================================
  * SharadHiresInspector Component
@@ -66,11 +64,9 @@ const HANDLE_HIT_PX = 10; // pixel radius for clicking a surface vertex
 export default function SharadHiresInspector({
   productId,
   onClose,
-  onBoundaryChange,
 }: {
   productId: string;
   onClose: () => void;
-  onBoundaryChange?: (info: SharadBoundaryInfo | null) => void;
 }) {
   // Data state
   const [metadata, setMetadata] = useState<Metadata | null>(null);
@@ -78,7 +74,6 @@ export default function SharadHiresInspector({
   const [radargramMeta, setRadargramMeta] = useState<RadargramMeta | null>(null);
   const [surface, setSurface] = useState<SurfacePoint[]>([]);
   const [molaProfile, setMolaProfile] = useState<MolaProfile | null>(null);
-  const [trackCoords, setTrackCoords] = useState<{ lats: number[]; lons: number[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,7 +87,7 @@ export default function SharadHiresInspector({
   const [epsilonR1, setEpsilonR1] = useState(3.1);
   const [epsilonR2, setEpsilonR2] = useState(3.1);
   const [boundaryM, setBoundaryM] = useState(0);
-  const [showBoundaryOnMap, setShowBoundaryOnMap] = useState(true);
+  const [showBoundaryLine, setShowBoundaryLine] = useState(true);
   const [depthResult, setDepthResult] = useState<DepthResult | null>(null);
 
   // Surface line adjustment
@@ -104,7 +99,6 @@ export default function SharadHiresInspector({
     baseOffsets: Map<number, number>;
   } | null>(null);
 
-  // Effective surface = auto-picked + manual offsets
   const effectiveSurface = useMemo(() => {
     if (surfaceOffsets.size === 0) return surface;
     return surface.map(pt => ({
@@ -119,11 +113,12 @@ export default function SharadHiresInspector({
   const [viewX, setViewX] = useState({ start: 0, end: 1 });
   const [viewY, setViewY] = useState({ start: 0, end: 1 });
 
-  // Move mode + interaction
+  // Move mode
   const [moveMode, setMoveMode] = useState(false);
   const isDragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0 });
-  const dragViewStart = useRef({ xStart: 0, xEnd: 0, yStart: 0, yEnd: 0 });
+
+  // Panel width (resizable)
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
 
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -131,26 +126,6 @@ export default function SharadHiresInspector({
   const molaCanvasRef = useRef<HTMLCanvasElement>(null);
   const molaContainerRef = useRef<HTMLDivElement>(null);
   const [cursor, setCursor] = useState<{ normX: number; normY: number } | null>(null);
-
-  // ── Notify parent of boundary changes ──────────────────
-  useEffect(() => {
-    if (!trackCoords || !onBoundaryChange) return;
-    if (boundaryM > 0 && showBoundaryOnMap) {
-      onBoundaryChange({
-        lats: trackCoords.lats,
-        lons: trackCoords.lons,
-        boundaryM,
-        show: true,
-      });
-    } else {
-      onBoundaryChange(null);
-    }
-  }, [trackCoords, boundaryM, showBoundaryOnMap, onBoundaryChange]);
-
-  // Clean up boundary on unmount
-  useEffect(() => {
-    return () => { onBoundaryChange?.(null); };
-  }, [onBoundaryChange]);
 
   // ── Data fetching ──────────────────────────────────────
   useEffect(() => {
@@ -167,12 +142,11 @@ export default function SharadHiresInspector({
         const metaData: Metadata = await metaRes.json();
         if (!cancelled) setMetadata(metaData);
 
-        const [imgRes, rmRes, surfRes, molaRes, trackRes] = await Promise.all([
+        const [imgRes, rmRes, surfRes, molaRes] = await Promise.all([
           fetch(`/api/sharad_highres/radargram?product_id=${pid}&downsample=${DOWNSAMPLE}&log=${useLog ? 1 : 0}&pmin=${pmin}&pmax=${pmax}`),
           fetch(`/api/sharad_highres/radargram_meta?product_id=${pid}&downsample=${DOWNSAMPLE}`),
           fetch(`/api/sharad_highres/surface?product_id=${pid}&downsample=${DOWNSAMPLE}`),
           fetch(`/api/sharad_highres/mola_profile?product_id=${pid}&downsample=${DOWNSAMPLE}`),
-          fetch(`/api/sharad_highres/track?product_id=${pid}&downsample=${DOWNSAMPLE}`),
         ]);
 
         if (!imgRes.ok) throw new Error("Failed to load radargram");
@@ -190,7 +164,6 @@ export default function SharadHiresInspector({
 
         let surfData: SurfacePoint[] = [];
         let molaData: MolaProfile | null = null;
-        let trackData: { lats: number[]; lons: number[] } | null = null;
         if (surfRes.ok) {
           const sj = await surfRes.json();
           surfData = sj.surface || [];
@@ -198,16 +171,12 @@ export default function SharadHiresInspector({
         if (molaRes.ok) {
           molaData = await molaRes.json();
         }
-        if (trackRes.ok) {
-          trackData = await trackRes.json();
-        }
 
         if (!cancelled) {
           setRadargram(img);
           setRadargramMeta(rmData);
           setSurface(surfData);
           setMolaProfile(molaData);
-          setTrackCoords(trackData);
           setViewX({ start: 0, end: 1 });
           setViewY({ start: 0, end: 1 });
         }
@@ -223,7 +192,7 @@ export default function SharadHiresInspector({
   }, [productId, useLog, pmin, pmax]);
 
   // ── View helpers ──────────────────────────────────────
-  const clampRange = (start: number, end: number, minSpan = 0.01) => {
+  const clampRange = useCallback((start: number, end: number, minSpan = 0.01) => {
     let s = start, e = end;
     if (e - s < minSpan) {
       const mid = (s + e) / 2;
@@ -233,7 +202,13 @@ export default function SharadHiresInspector({
     if (s < 0) { e -= s; s = 0; }
     if (e > 1) { s -= (e - 1); e = 1; }
     return { start: Math.max(0, s), end: Math.min(1, e) };
-  };
+  }, []);
+
+  // ── Boundary bin offset from surface ────────────────────
+  const boundaryBinOffset = useMemo(() => {
+    if (boundaryM <= 0) return 0;
+    return (2 * boundaryM * Math.sqrt(epsilonR1)) / (SPEED_OF_LIGHT * BIN_DT_SEC);
+  }, [boundaryM, epsilonR1]);
 
   // ── Radargram canvas rendering ─────────────────────────
   const draw = useCallback(() => {
@@ -252,7 +227,6 @@ export default function SharadHiresInspector({
     ctx.fillStyle = "#0a0f18";
     ctx.fillRect(0, 0, W, H);
 
-    // Source rect from image (view range)
     const sx = viewX.start * radargram.width;
     const sy = viewY.start * radargram.height;
     const sw = (viewX.end - viewX.start) * radargram.width;
@@ -265,11 +239,10 @@ export default function SharadHiresInspector({
     const nTraces = radargramMeta.n_traces;
     const nBins = radargramMeta.n_bins;
 
-    // Coordinate transforms: trace/bin normalized → canvas pixel
     const traceToX = (t: number) => ((t / nTraces - viewX.start) / (viewX.end - viewX.start)) * W;
     const binToY = (b: number) => ((b / nBins - viewY.start) / (viewY.end - viewY.start)) * H;
 
-    // Draw surface line (uses effectiveSurface which includes manual offsets)
+    // Draw surface line
     const surfToDraw = effectiveSurface;
     if (showSurface && surfToDraw.length > 1) {
       ctx.beginPath();
@@ -293,7 +266,7 @@ export default function SharadHiresInspector({
       }
       ctx.stroke();
 
-      // Draw adjustment handles when in adjust mode
+      // Adjustment handles
       if (adjustMode) {
         for (let i = 0; i < surfToDraw.length; i++) {
           const pt = surfToDraw[i];
@@ -314,10 +287,47 @@ export default function SharadHiresInspector({
           }
         }
       }
+
+      // Boundary line (dashed, follows surface offset by boundaryBinOffset)
+      if (showBoundaryLine && boundaryBinOffset > 0 && surfToDraw.length > 1) {
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(103, 232, 249, 0.7)"; // cyan-300
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        let bMoved = false;
+        let bPrevX = -Infinity;
+        for (let i = 0; i < surfToDraw.length; i++) {
+          const pt = surfToDraw[i];
+          const x = traceToX(pt.x);
+          const y = binToY(pt.y + boundaryBinOffset);
+          if (x < -50 || x > W + 50) { bPrevX = pt.x; continue; }
+          if (bMoved && pt.x - bPrevX > 5) {
+            ctx.stroke();
+            ctx.beginPath();
+            bMoved = false;
+          }
+          if (!bMoved) { ctx.moveTo(x, y); bMoved = true; }
+          else ctx.lineTo(x, y);
+          bPrevX = pt.x;
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label
+        const midIdx = Math.floor(surfToDraw.length / 2);
+        const labelX = traceToX(surfToDraw[midIdx].x);
+        const labelY = binToY(surfToDraw[midIdx].y + boundaryBinOffset);
+        if (labelX > 40 && labelX < W - 120 && labelY > 10 && labelY < H - 10) {
+          ctx.font = "bold 9px monospace";
+          ctx.fillStyle = "rgba(103, 232, 249, 0.85)";
+          ctx.textAlign = "left";
+          ctx.fillText(`ε boundary Z₁=${boundaryM}m`, labelX + 6, labelY - 5);
+        }
+      }
     }
 
-    // Draw cursor crosshair
-    if (cursor && !adjustDragRef.current) {
+    // Cursor crosshair
+    if (cursor && !adjustDragRef.current && !isDragging.current) {
       const cx = cursor.normX;
       const cy = cursor.normY;
       const px = ((cx - viewX.start) / (viewX.end - viewX.start)) * W;
@@ -339,7 +349,7 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, effectiveSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets]);
+  }, [radargram, radargramMeta, effectiveSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -373,11 +383,9 @@ export default function SharadHiresInspector({
     const n = molaProfile.elevation_m.length;
     if (n === 0) return;
 
-    // Visible trace range (shared X view)
     const iStart = Math.floor(viewX.start * n);
     const iEnd = Math.ceil(viewX.end * n);
 
-    // Compute Y range from visible portion
     const visibleElevs: number[] = [];
     for (let i = iStart; i < iEnd && i < n; i++) {
       const e = molaProfile.elevation_m[i];
@@ -391,11 +399,10 @@ export default function SharadHiresInspector({
     const yMin = eMin - ePad;
     const yMax = eMax + ePad;
 
-    // Map trace index → canvas X (using shared view range)
     const xOf = (i: number) => pad.left + ((i / (n - 1) - viewX.start) / (viewX.end - viewX.start)) * plotW;
     const yOf = (v: number) => pad.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
 
-    // Grid lines & Y labels
+    // Grid
     ctx.strokeStyle = "#1a2236";
     ctx.lineWidth = 1;
     ctx.fillStyle = "#475569";
@@ -418,7 +425,7 @@ export default function SharadHiresInspector({
     ctx.textAlign = "center";
     const dStart = molaProfile.distance_km[iStart] ?? 0;
     const dEnd = molaProfile.distance_km[Math.min(iEnd, n - 1)] ?? molaProfile.total_distance_km;
-    ctx.fillText(`${dStart.toFixed(0)}–${dEnd.toFixed(0)} km along track`, pad.left + plotW / 2, H - 3);
+    ctx.fillText(`${dStart.toFixed(0)}\u2013${dEnd.toFixed(0)} km along track`, pad.left + plotW / 2, H - 3);
 
     // Title
     ctx.fillStyle = "#94a3b8";
@@ -448,7 +455,7 @@ export default function SharadHiresInspector({
     ctx.stroke();
 
     // Cursor vertical line
-    if (cursor) {
+    if (cursor && !isDragging.current) {
       const cx = pad.left + ((cursor.normX - viewX.start) / (viewX.end - viewX.start)) * plotW;
       if (cx >= pad.left && cx <= pad.left + plotW) {
         ctx.strokeStyle = "rgba(255,255,255,0.5)";
@@ -460,7 +467,6 @@ export default function SharadHiresInspector({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Show elevation at cursor
         const idx = Math.round(cursor.normX * (n - 1));
         if (idx >= 0 && idx < n) {
           const e = molaProfile.elevation_m[idx];
@@ -492,16 +498,14 @@ export default function SharadHiresInspector({
     e.preventDefault();
     const factor = e.deltaY < 0 ? 0.85 : 1 / 0.85;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const mx = (e.clientX - rect.left) / rect.width; // 0..1 within element
+    const mx = (e.clientX - rect.left) / rect.width;
 
-    // Zoom X axis: compute normalized cursor position in view range
     const normCursorX = viewX.start + mx * (viewX.end - viewX.start);
     const newSpanX = (viewX.end - viewX.start) * factor;
     const newStartX = normCursorX - mx * newSpanX;
     const newEndX = normCursorX + (1 - mx) * newSpanX;
     setViewX(clampRange(newStartX, newEndX));
 
-    // Also zoom Y if on radargram canvas
     if (e.currentTarget === canvasRef.current) {
       const my = (e.clientY - rect.top) / rect.height;
       const normCursorY = viewY.start + my * (viewY.end - viewY.start);
@@ -510,7 +514,7 @@ export default function SharadHiresInspector({
       const newEndY = normCursorY + (1 - my) * newSpanY;
       setViewY(clampRange(newStartY, newEndY));
     }
-  }, [viewX, viewY]);
+  }, [viewX, viewY, clampRange]);
 
   // ── Surface adjustment helpers ──────────────────────────
   const findNearestSurfaceVertex = useCallback((normX: number, normY: number): number | null => {
@@ -535,14 +539,12 @@ export default function SharadHiresInspector({
   }, [effectiveSurface, radargramMeta, viewX, viewY]);
 
   const applyAdjustDrag = useCallback((traceX: number, newBinY: number) => {
-    // Find the original auto-picked Y for this trace
     const origPt = surface.find(p => p.x === traceX);
     if (!origPt) return;
     const delta = newBinY - origPt.y;
 
     setSurfaceOffsets(prev => {
       const result = new Map(adjustDragRef.current?.baseOffsets ?? prev);
-      // Apply with triangular falloff over ±ADJUST_RADIUS
       const allTraceXs = surface.map(p => p.x);
       for (const tx of allTraceXs) {
         const dist = Math.abs(tx - traceX);
@@ -556,11 +558,39 @@ export default function SharadHiresInspector({
     });
   }, [surface]);
 
+  // ── Resize handle (document-level drag) ─────────────────
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      // Dragging left increases width (handle is on left edge of right panel)
+      const delta = startX - ev.clientX;
+      const maxW = Math.floor(window.innerWidth * MAX_WIDTH_FRACTION);
+      setPanelWidth(Math.max(MIN_WIDTH, Math.min(maxW, startWidth + delta)));
+    };
+
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [panelWidth]);
+
   // ── Mouse handlers ─────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const isOnRadargram = e.currentTarget === canvasRef.current;
+
     // Surface adjustment drag start
-    if (adjustMode && e.button === 0 && !e.shiftKey && canvasRef.current === e.currentTarget) {
-      const rect = canvasRef.current.getBoundingClientRect();
+    if (adjustMode && e.button === 0 && !e.shiftKey && isOnRadargram) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const mx = (e.clientX - rect.left) / rect.width;
       const my = (e.clientY - rect.top) / rect.height;
       const normX = viewX.start + mx * (viewX.end - viewX.start);
@@ -574,22 +604,65 @@ export default function SharadHiresInspector({
           origBin: pt.y,
           baseOffsets: new Map(surfaceOffsets),
         };
+
+        // Document-level listeners for adjust drag
+        const onMove = (ev: MouseEvent) => {
+          if (!adjustDragRef.current || !radargramMeta || !canvasRef.current) return;
+          const r = canvasRef.current.getBoundingClientRect();
+          const my2 = (ev.clientY - r.top) / r.height;
+          const normY2 = viewY.start + my2 * (viewY.end - viewY.start);
+          const newBin = Math.round(normY2 * radargramMeta.n_bins);
+          applyAdjustDrag(adjustDragRef.current.traceX, newBin);
+        };
+        const onUp = () => {
+          adjustDragRef.current = null;
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+
         e.preventDefault();
         return;
       }
     }
 
     // Pan drag (move mode, middle click, shift+click)
-    if (moveMode || e.button === 1 || (e.button === 0 && e.shiftKey)) {
+    if ((moveMode && !adjustMode) || e.button === 1 || (e.button === 0 && e.shiftKey)) {
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const vxStart = { ...viewX };
+      const vyStart = { ...viewY };
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+
       isDragging.current = true;
-      dragStart.current = { x: e.clientX, y: e.clientY };
-      dragViewStart.current = {
-        xStart: viewX.start, xEnd: viewX.end,
-        yStart: viewY.start, yEnd: viewY.end,
+
+      const onMove = (ev: MouseEvent) => {
+        const dxPx = ev.clientX - startX;
+        const dyPx = ev.clientY - startY;
+        const dxNorm = -(dxPx / rect.width) * (vxStart.end - vxStart.start);
+        setViewX(clampRange(vxStart.start + dxNorm, vxStart.end + dxNorm));
+
+        if (isOnRadargram) {
+          const dyNorm = -(dyPx / rect.height) * (vyStart.end - vyStart.start);
+          setViewY(clampRange(vyStart.start + dyNorm, vyStart.end + dyNorm));
+        }
       };
+      const onUp = () => {
+        isDragging.current = false;
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+
+      document.body.style.cursor = "grabbing";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
       e.preventDefault();
     }
-  }, [moveMode, viewX, viewY, adjustMode, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets]);
+  }, [moveMode, viewX, viewY, adjustMode, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
@@ -602,36 +675,7 @@ export default function SharadHiresInspector({
       ? viewY.start + my * (viewY.end - viewY.start)
       : 0;
     setCursor({ normX, normY });
-
-    // Surface adjustment drag
-    if (adjustDragRef.current && radargramMeta) {
-      const newBin = Math.round(normY * radargramMeta.n_bins);
-      applyAdjustDrag(adjustDragRef.current.traceX, newBin);
-      return;
-    }
-
-    // Pan drag (move mode)
-    if (isDragging.current) {
-      const dxPx = e.clientX - dragStart.current.x;
-      const dyPx = e.clientY - dragStart.current.y;
-      const dxNorm = -(dxPx / rect.width) * (dragViewStart.current.xEnd - dragViewStart.current.xStart);
-      const newStartX = dragViewStart.current.xStart + dxNorm;
-      const newEndX = dragViewStart.current.xEnd + dxNorm;
-      setViewX(clampRange(newStartX, newEndX));
-
-      if (canvas === canvasRef.current) {
-        const dyNorm = -(dyPx / rect.height) * (dragViewStart.current.yEnd - dragViewStart.current.yStart);
-        const newStartY = dragViewStart.current.yStart + dyNorm;
-        const newEndY = dragViewStart.current.yEnd + dyNorm;
-        setViewY(clampRange(newStartY, newEndY));
-      }
-    }
-  }, [viewX, viewY, radargramMeta, applyAdjustDrag]);
-
-  const handleMouseUp = useCallback(() => {
-    adjustDragRef.current = null;
-    isDragging.current = false;
-  }, []);
+  }, [viewX, viewY]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (moveMode || adjustMode) return;
@@ -649,7 +693,6 @@ export default function SharadHiresInspector({
     if (traceIdx < 0 || traceIdx >= radargramMeta.n_traces) return;
     if (cursorBin < 0 || cursorBin >= radargramMeta.n_bins) return;
 
-    // Find effective surface bin at this trace (includes manual offsets)
     const effPt = effectiveSurface.find(p => p.x === traceIdx);
     const surfOverride = effPt && surfaceOffsets.size > 0 ? effPt.y : undefined;
 
@@ -693,26 +736,54 @@ export default function SharadHiresInspector({
 
   // ── Render ─────────────────────────────────────────────
   return (
-    <div className="flex h-full w-[720px] flex-col border-l border-border-dark bg-surface-dark/40">
+    <div
+      className="flex h-full flex-col border-l border-border-dark bg-surface-dark/40 relative"
+      style={{ width: panelWidth }}
+    >
+      {/* Resize handle (left edge) */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+        onMouseDown={handleResizeStart}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-dark bg-[#0a0f18]">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-amber-400 text-base">radar</span>
           <h3 className="text-white text-xs font-bold uppercase tracking-wider">
-            SHARAD High-Res Radargram
+            SHARAD High-Res
           </h3>
           {metadata && (
-            <span className="text-[10px] text-slate-500 font-mono ml-2">
+            <span className="text-[10px] text-slate-500 font-mono ml-1">
               {metadata.product_id}
             </span>
           )}
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 text-slate-500 hover:text-red-400 transition-colors"
-        >
-          <span className="material-symbols-outlined text-lg">close</span>
-        </button>
+        <div className="flex items-center gap-1">
+          {/* Expand button */}
+          <button
+            onClick={() => setPanelWidth(Math.floor(window.innerWidth * MAX_WIDTH_FRACTION))}
+            className="p-1 text-slate-500 hover:text-white transition-colors"
+            title="Expand to 85% viewport"
+          >
+            <span className="material-symbols-outlined text-sm">open_in_full</span>
+          </button>
+          {/* Reset width button */}
+          <button
+            onClick={() => setPanelWidth(DEFAULT_WIDTH)}
+            className="p-1 text-slate-500 hover:text-white transition-colors"
+            title="Reset panel width"
+          >
+            <span className="material-symbols-outlined text-sm">width_normal</span>
+          </button>
+          {/* Close */}
+          <button
+            onClick={onClose}
+            className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -760,7 +831,10 @@ export default function SharadHiresInspector({
                   <div className="flex gap-1">
                     <MiniButton
                       active={adjustMode}
-                      onClick={() => setAdjustMode(!adjustMode)}
+                      onClick={() => {
+                        if (!adjustMode) { setAdjustMode(true); setMoveMode(false); }
+                        else setAdjustMode(false);
+                      }}
                     >
                       {adjustMode ? "ON" : "OFF"}
                     </MiniButton>
@@ -784,6 +858,15 @@ export default function SharadHiresInspector({
                 )}
               </div>
             )}
+
+            {boundaryM > 0 && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={showBoundaryLine} onChange={(e) => setShowBoundaryLine(e.target.checked)}
+                  className="rounded border-slate-600 bg-transparent text-cyan-500 focus:ring-cyan-500/30" />
+                <span className="text-[10px] text-slate-300">Boundary line</span>
+                <span className="ml-auto w-5 h-0 border-t border-dashed border-cyan-400" />
+              </label>
+            )}
           </Section>
 
           {/* Navigation */}
@@ -791,12 +874,24 @@ export default function SharadHiresInspector({
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400">Mode</span>
               <div className="flex gap-1">
-                <MiniButton active={!moveMode} onClick={() => setMoveMode(false)}>Query</MiniButton>
-                <MiniButton active={moveMode} onClick={() => setMoveMode(true)}>Move</MiniButton>
+                <MiniButton active={!moveMode && !adjustMode} onClick={() => { setMoveMode(false); setAdjustMode(false); }}>Query</MiniButton>
+                <MiniButton
+                  active={moveMode}
+                  onClick={() => {
+                    if (!moveMode) { setMoveMode(true); setAdjustMode(false); }
+                    else setMoveMode(false);
+                  }}
+                >
+                  Move
+                </MiniButton>
               </div>
             </div>
             <div className="text-[9px] text-slate-600">
-              {moveMode ? "Drag to pan. Scroll to zoom." : "Click for depth. Shift+drag or scroll to navigate."}
+              {adjustMode
+                ? "Adjust mode active. Drag surface vertices."
+                : moveMode
+                  ? "Drag to pan. Scroll to zoom."
+                  : "Click for depth. Shift+drag or scroll to navigate."}
             </div>
             <button
               onClick={() => { setViewX({ start: 0, end: 1 }); setViewY({ start: 0, end: 1 }); }}
@@ -806,7 +901,7 @@ export default function SharadHiresInspector({
             </button>
           </Section>
 
-          {/* Depth Conversion — Piecewise εr */}
+          {/* Depth Conversion */}
           <Section title="Depth Conversion">
             <div className="space-y-3">
               <div className="space-y-1">
@@ -847,15 +942,6 @@ export default function SharadHiresInspector({
                   <span>1.0</span><span>5.0 (rock)</span><span>10</span>
                 </div>
               </div>
-
-              {boundaryM > 0 && (
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={showBoundaryOnMap}
-                    onChange={(e) => setShowBoundaryOnMap(e.target.checked)}
-                    className="rounded border-slate-600 bg-transparent text-cyan-500 focus:ring-cyan-500/30" />
-                  <span className="text-[10px] text-slate-300">Show boundary on map</span>
-                </label>
-              )}
 
               {boundaryM === 0 && (
                 <div className="text-[8px] text-slate-600 italic">
@@ -957,12 +1043,11 @@ export default function SharadHiresInspector({
             <canvas
               ref={canvasRef}
               className={`w-full h-full ${
-                adjustMode ? "cursor-cell" : moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair"
+                adjustMode ? "cursor-cell" : moveMode ? "cursor-grab" : "cursor-crosshair"
               }`}
               onMouseMove={handleMouseMove}
               onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={() => { setCursor(null); isDragging.current = false; adjustDragRef.current = null; }}
+              onMouseLeave={() => setCursor(null)}
               onWheel={handleWheel}
               onClick={handleClick}
             />
@@ -977,11 +1062,10 @@ export default function SharadHiresInspector({
             >
               <canvas
                 ref={molaCanvasRef}
-                className={`w-full h-full ${moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair"}`}
+                className={`w-full h-full ${moveMode ? "cursor-grab" : "cursor-crosshair"}`}
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={() => { setCursor(null); isDragging.current = false; adjustDragRef.current = null; }}
+                onMouseLeave={() => setCursor(null)}
                 onWheel={handleWheel}
               />
             </div>

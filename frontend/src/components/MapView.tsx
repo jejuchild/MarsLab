@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import FootprintManager from "../utils/FootprintManager";
-import type { SharadBoundaryInfo } from "./SharadHiresInspector";
+
 
 /* ==================================================
  * Types
@@ -80,7 +80,6 @@ type MapViewProps = {
   showCTX: boolean;
   onSharadClick?: (popup: SHARADPopup) => void;
   onSharadHiresClick?: (productId: string) => void;
-  sharadBoundary?: SharadBoundaryInfo | null;
   onToggleOverlay?: (productId: string, type: "quickview" | null) => void;
   quickviewOverlays?: string[];
   highResOverlays?: string[];
@@ -330,7 +329,6 @@ export default function MapView({
   showCTX,
   onSharadClick,
   onSharadHiresClick,
-  sharadBoundary,
   onToggleOverlay,
   quickviewOverlays = [],
   highResOverlays = [],
@@ -1071,65 +1069,6 @@ export default function MapView({
     }
     viewerRef.current?.scene.requestRender();
   }, [showCTX]);
-
-  // ── SHARAD boundary polyline on map ──────────────────
-  const boundaryEntityRef = useRef<Cesium.Entity | null>(null);
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-
-    // Remove existing boundary entity
-    if (boundaryEntityRef.current) {
-      viewer.entities.remove(boundaryEntityRef.current);
-      boundaryEntityRef.current = null;
-    }
-
-    if (sharadBoundary && sharadBoundary.show && sharadBoundary.lats.length > 1) {
-      const positions = sharadBoundary.lats.map((lat, i) =>
-        Cesium.Cartesian3.fromDegrees(sharadBoundary.lons[i], lat, 0, MARS_ELLIPSOID)
-      );
-
-      boundaryEntityRef.current = viewer.entities.add({
-        polyline: {
-          positions,
-          width: 3,
-          material: new Cesium.PolylineDashMaterialProperty({
-            color: Cesium.Color.CYAN.withAlpha(0.8),
-            dashLength: 12,
-          }),
-          clampToGround: true,
-        },
-        label: {
-          text: `ε boundary Z₁ = ${sharadBoundary.boundaryM} m`,
-          font: "11px monospace",
-          fillColor: Cesium.Color.CYAN,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          pixelOffset: new Cesium.Cartesian2(0, -8),
-          showBackground: true,
-          backgroundColor: Cesium.Color.BLACK.withAlpha(0.6),
-          backgroundPadding: new Cesium.Cartesian2(6, 4),
-        },
-        position: Cesium.Cartesian3.fromDegrees(
-          sharadBoundary.lons[Math.floor(sharadBoundary.lons.length / 2)],
-          sharadBoundary.lats[Math.floor(sharadBoundary.lats.length / 2)],
-          0,
-          MARS_ELLIPSOID,
-        ),
-      });
-    }
-
-    viewer.scene.requestRender();
-
-    return () => {
-      if (boundaryEntityRef.current && viewerRef.current) {
-        viewerRef.current.entities.remove(boundaryEntityRef.current);
-        boundaryEntityRef.current = null;
-      }
-    };
-  }, [sharadBoundary]);
 
   // Note: Legacy footprint overlay hiding is no longer needed since
   // footprints are now managed by FootprintManager (viewport-based loading)

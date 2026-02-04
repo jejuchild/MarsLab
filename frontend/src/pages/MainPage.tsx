@@ -10,7 +10,6 @@ import TopBar from "../components/TopBar";
 import LayerPanel from "../components/LayerPanel";
 import type { IceScoreFilter } from "../components/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
-import type { SharadBoundaryInfo } from "../components/SharadHiresInspector";
 import AppShell from "../components/layout/AppShell";
 
 // Default CRISM wavelengths (in micrometers)
@@ -192,11 +191,6 @@ export default function MainPage() {
 
   // SHARAD High-Res Inspector — opens when a product is selected
   const [sharadHiresProductId, setSharadHiresProductId] = useState<string | null>(null);
-  const [sharadBoundary, setSharadBoundary] = useState<SharadBoundaryInfo | null>(null);
-
-  const handleSharadBoundaryChange = useCallback((info: SharadBoundaryInfo | null) => {
-    setSharadBoundary(info);
-  }, []);
 
   // Custom user-uploaded datasets
   const [showCustomData, setShowCustomData] = useState(false);
@@ -613,8 +607,7 @@ export default function MainPage() {
         sharadHiresProductId ? (
           <SharadHiresInspector
             productId={sharadHiresProductId}
-            onClose={() => { setSharadHiresProductId(null); setSharadBoundary(null); }}
-            onBoundaryChange={handleSharadBoundaryChange}
+            onClose={() => setSharadHiresProductId(null)}
           />
         ) : selected ? (
           <Inspector
@@ -651,7 +644,6 @@ export default function MainPage() {
         showCTX={showCTX}
         onSharadClick={handleSharadClick}
         onSharadHiresClick={handleSharadHiresClick}
-        sharadBoundary={sharadBoundary}
         onToggleOverlay={(productId, type) => handleSetOverlay(productId, type)}
         quickviewOverlays={derivedOverlays.quickviewOverlays}
         highResOverlays={derivedOverlays.highResOverlays}
