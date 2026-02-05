@@ -34,6 +34,7 @@ from .ode_client import (
     resolve_hirise_bundle,
     resolve_sharad_bundle,
     resolve_sharad_highres_bundle,
+    get_sharad_highres_footprint,
 )
 from .aria2_downloader import (
     download_single_file,
@@ -847,6 +848,22 @@ class DownloadManager:
                 existing_idx = i
                 break
 
+        # Fetch footprint coordinates from ODE for LineString geometry
+        footprint_coords = await get_sharad_highres_footprint(task.base_key)
+
+        # Create geometry - use LineString if we have footprint, otherwise Point
+        if footprint_coords and len(footprint_coords) >= 2:
+            geometry = {
+                "type": "LineString",
+                "coordinates": footprint_coords
+            }
+        else:
+            # Fallback to Point if no footprint available
+            geometry = {
+                "type": "Point",
+                "coordinates": [task.lon or 0, task.lat or 0]
+            }
+
         # Create new feature
         feature = {
             "type": "Feature",
@@ -856,10 +873,7 @@ class DownloadManager:
                 "dat_file": dat_file,
                 "lbl_file": lbl_file,
             },
-            "geometry": {
-                "type": "Point",
-                "coordinates": [task.lon or 0, task.lat or 0]
-            }
+            "geometry": geometry
         }
 
         if existing_idx is not None:
@@ -993,12 +1007,16 @@ def check_local_existence_detailed(product_id: str, instrument: Instrument) -> E
         else:
             missing.append("lbl")
 
+        # Both files required - partial if only one exists
+        has_any = has_dat or has_lbl
+        has_all = has_dat and has_lbl
+
         return ExistenceResult(
-            exists=has_dat and has_lbl,
-            has_core=has_dat and has_lbl,
+            exists=has_all,
+            has_core=has_any,  # True if at least one file exists (for partial detection)
             has_header=True,  # Not applicable
             has_wavelength=True,  # Not applicable
-            has_browse=True,  # Not applicable
+            has_browse=False,  # Set to False so it doesn't trigger false "partial" status
             missing_files=missing,
             existing_files=existing,
         )
