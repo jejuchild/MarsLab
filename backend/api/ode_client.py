@@ -52,6 +52,11 @@ class ODEProduct:
     ihid: Optional[str] = None  # Instrument host ID (MRO)
     iid: Optional[str] = None   # Instrument ID
     pt: Optional[str] = None    # Product type
+    # Track start/stop coordinates (for SHARAD line products)
+    start_lat: Optional[float] = None
+    start_lon: Optional[float] = None
+    stop_lat: Optional[float] = None
+    stop_lon: Optional[float] = None
 
 
 @dataclass
@@ -333,7 +338,7 @@ async def _search_ode_by_instrument(
                 f"productid={query}*&"
                 f"pt={pt}&"
                 f"output=json&"
-                f"results=p&"
+                f"results=pmf&"
                 f"limit={max_results}"
             )
             try:
@@ -357,7 +362,7 @@ async def _search_ode_by_instrument(
             f"iid=hirise&"
             f"productid={query}*&"
             f"output=json&"
-            f"results=p&"
+            f"results=pmf&"
             f"limit={max_results}"
         )
         try:
@@ -425,6 +430,21 @@ def _parse_ode_rest_response(data: Dict[str, Any], instrument: Instrument) -> Li
             if lon is None:
                 lon = _safe_float(p.get("Center_longitude") or p.get("center_longitude"))
 
+            # Extract start/stop coordinates for SHARAD track products
+            start_lat, start_lon, stop_lat, stop_lon = None, None, None, None
+            if instrument in (Instrument.SHARAD, Instrument.SHARAD_HIGHRES):
+                start_lat = _safe_float(p.get("Start_latitude") or p.get("start_latitude"))
+                start_lon = _safe_float(p.get("Start_longitude") or p.get("start_longitude"))
+                stop_lat = _safe_float(p.get("Stop_latitude") or p.get("stop_latitude"))
+                stop_lon = _safe_float(p.get("Stop_longitude") or p.get("stop_longitude"))
+
+                # If start/stop not found, try to extract from LINESTRING footprint
+                if start_lat is None and footprint:
+                    coords = _extract_linestring_endpoints(footprint)
+                    if coords:
+                        start_lon, start_lat = coords[0]
+                        stop_lon, stop_lat = coords[1]
+
             products.append(ODEProduct(
                 product_id=product_id,
                 instrument=instrument,
@@ -433,7 +453,11 @@ def _parse_ode_rest_response(data: Dict[str, Any], instrument: Instrument) -> Li
                 pdsid=p.get("pdsid"),
                 ihid=p.get("IHID"),
                 iid=p.get("IID"),
-                pt=p.get("PT")
+                pt=p.get("PT"),
+                start_lat=start_lat,
+                start_lon=start_lon,
+                stop_lat=stop_lat,
+                stop_lon=stop_lon,
             ))
 
     except Exception as e:
@@ -496,7 +520,7 @@ async def search_ode_spatial(
                         f"westernlon={westernlon}&"
                         f"easternlon={easternlon}&"
                         f"output=json&"
-                        f"results=p&"
+                        f"results=pmf&"
                         f"limit={max_results}"
                     )
 
@@ -523,7 +547,7 @@ async def search_ode_spatial(
                     f"westernlon={westernlon}&"
                     f"easternlon={easternlon}&"
                     f"output=json&"
-                    f"results=p&"
+                    f"results=pmf&"
                     f"limit={max_results}"
                 )
 
@@ -933,6 +957,133 @@ def _extract_center_lon(footprint: Any) -> Optional[float]:
     return None
 
 
+def _extract_linestring_endpoints(footprint: Any) -> Optional[List[List[float]]]:
+    """
+    Extract start and end points from a footprint geometry (for SHARAD tracks).
+
+    Args:
+        footprint: Footprint geometry (dict with coordinates or WKT string)
+
+    Returns:
+        List of [[start_lon, start_lat], [stop_lon, stop_lat]] or None
+    """
+    coords = None
+
+    # Handle WKT string
+    if isinstance(footprint, str) and "LINESTRING" in footprint.upper():
+        coords = _parse_wkt_linestring(footprint)
+
+    # Handle dict with coordinates
+    elif isinstance(footprint, dict) and "coordinates" in footprint:
+        c = footprint["coordinates"]
+        if isinstance(c, list) and len(c) >= 2 and isinstance(c[0], list):
+            coords = c
+
+    if coords and len(coords) >= 2:
+        return [coords[0], coords[-1]]  # [start, end]
+
+    return None
+
+
+def _parse_wkt_linestring(wkt: str) -> List[List[float]]:
+    """
+    Parse WKT LINESTRING into list of [lon, lat] coordinates.
+
+    Args:
+        wkt: WKT string like "LINESTRING (-165.4 51.2, -165.5 50.9, ...)"
+
+    Returns:
+        List of [lon, lat] pairs
+    """
+    import re
+
+    # Extract coordinates from LINESTRING (lon lat, lon lat, ...)
+    match = re.search(r'LINESTRING\s*\((.*)\)', wkt, re.IGNORECASE)
+    if not match:
+        return []
+
+    coords_str = match.group(1)
+    coordinates = []
+
+    for pair in coords_str.split(','):
+        parts = pair.strip().split()
+        if len(parts) >= 2:
+            try:
+                lon = float(parts[0])
+                lat = float(parts[1])
+                coordinates.append([lon, lat])
+            except ValueError:
+                continue
+
+    return coordinates
+
+
+async def get_sharad_highres_footprint(
+    product_id: str,
+    session: Optional[aiohttp.ClientSession] = None
+) -> List[List[float]]:
+    """
+    Fetch footprint coordinates for a SHARAD High-Res product from ODE.
+
+    Args:
+        product_id: SHARAD RDR product ID (e.g., R_3898101_001_SS19_700_A)
+        session: Optional aiohttp session
+
+    Returns:
+        List of [lon, lat] coordinates forming the track LineString
+    """
+    close_session = session is None
+    if session is None:
+        session = aiohttp.ClientSession()
+
+    coordinates = []
+
+    try:
+        url = (
+            f"{ODE_REST_BASE}?"
+            f"target=mars&"
+            f"ihid=mro&"
+            f"iid=sharad&"
+            f"productid={product_id}*&"
+            f"pt=RDR&"
+            f"output=json&"
+            f"results=pmf&"
+            f"limit=1"
+        )
+
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                products = data.get("ODEResults", {}).get("Products", {}).get("Product", [])
+                if isinstance(products, dict):
+                    products = [products]
+
+                if products:
+                    p = products[0]
+                    # Try Footprint_C0_geometry first (WKT LINESTRING)
+                    footprint_wkt = p.get("Footprint_C0_geometry", "")
+                    if footprint_wkt and "LINESTRING" in footprint_wkt.upper():
+                        coordinates = _parse_wkt_linestring(footprint_wkt)
+
+                    # Fallback to start/stop coordinates if WKT parsing fails
+                    if not coordinates:
+                        start_lat = _safe_float(p.get("Start_latitude"))
+                        start_lon = _safe_float(p.get("Start_longitude"))
+                        stop_lat = _safe_float(p.get("Stop_latitude"))
+                        stop_lon = _safe_float(p.get("Stop_longitude"))
+
+                        if all(v is not None for v in [start_lat, start_lon, stop_lat, stop_lon]):
+                            coordinates = [[start_lon, start_lat], [stop_lon, stop_lat]]
+
+    except Exception as e:
+        print(f"Error fetching SHARAD High-Res footprint: {e}")
+    finally:
+        if close_session:
+            await session.close()
+
+    return coordinates
+
+
 # =============================================================================
 # SHARAD Bundle Resolution
 # =============================================================================
@@ -941,6 +1092,122 @@ def _extract_center_lon(footprint: Any) -> Optional[float]:
 ODE_SHARAD_SEARCH = "https://oderest.rsl.wustl.edu/live2"
 # PDS Geosciences Node SHARAD data archive
 PDS_SHARAD_BASE = "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/thm"
+
+
+async def search_sharad_spatial(
+    minlat: float,
+    maxlat: float,
+    westernlon: float,
+    easternlon: float,
+    max_results: int = 10,
+    session: Optional[aiohttp.ClientSession] = None
+) -> List[ODEProduct]:
+    """
+    Search ODE for SHARAD USRDRV2 products within a bounding box.
+
+    Args:
+        minlat: Southern latitude boundary
+        maxlat: Northern latitude boundary
+        westernlon: Western longitude boundary
+        easternlon: Eastern longitude boundary
+        max_results: Maximum results to return
+        session: Optional aiohttp session
+
+    Returns:
+        List of SHARAD products within the bounding box
+    """
+    close_session = session is None
+    if session is None:
+        session = aiohttp.ClientSession()
+
+    products = []
+
+    try:
+        url = (
+            f"{ODE_SHARAD_SEARCH}?"
+            f"target=mars&"
+            f"ihid=mro&"
+            f"iid=sharad&"
+            f"pt=USRDRV2&"
+            f"minlat={minlat}&"
+            f"maxlat={maxlat}&"
+            f"westernlon={westernlon}&"
+            f"easternlon={easternlon}&"
+            f"output=json&"
+            f"results=pmf&"
+            f"limit={max_results}"
+        )
+
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                products = _parse_ode_rest_response(data, Instrument.SHARAD)
+
+    except Exception as e:
+        print(f"SHARAD spatial search error: {e}")
+    finally:
+        if close_session:
+            await session.close()
+
+    return products[:max_results]
+
+
+async def search_sharad_highres_spatial(
+    minlat: float,
+    maxlat: float,
+    westernlon: float,
+    easternlon: float,
+    max_results: int = 10,
+    session: Optional[aiohttp.ClientSession] = None
+) -> List[ODEProduct]:
+    """
+    Search ODE for SHARAD High-Res RDR products within a bounding box.
+
+    Args:
+        minlat: Southern latitude boundary
+        maxlat: Northern latitude boundary
+        westernlon: Western longitude boundary
+        easternlon: Eastern longitude boundary
+        max_results: Maximum results to return
+        session: Optional aiohttp session
+
+    Returns:
+        List of SHARAD High-Res products within the bounding box
+    """
+    close_session = session is None
+    if session is None:
+        session = aiohttp.ClientSession()
+
+    products = []
+
+    try:
+        url = (
+            f"{ODE_SHARAD_SEARCH}?"
+            f"target=mars&"
+            f"ihid=mro&"
+            f"iid=sharad&"
+            f"pt=RDR&"
+            f"minlat={minlat}&"
+            f"maxlat={maxlat}&"
+            f"westernlon={westernlon}&"
+            f"easternlon={easternlon}&"
+            f"output=json&"
+            f"results=pmf&"
+            f"limit={max_results}"
+        )
+
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                products = _parse_ode_rest_response(data, Instrument.SHARAD_HIGHRES)
+
+    except Exception as e:
+        print(f"SHARAD High-Res spatial search error: {e}")
+    finally:
+        if close_session:
+            await session.close()
+
+    return products[:max_results]
 
 
 async def search_sharad_products(
@@ -977,7 +1244,7 @@ async def search_sharad_products(
             f"productid={query}*&"
             f"pt=USRDRV2&"  # US Reduced Data Record V2 (quicklook)
             f"output=json&"
-            f"results=p&"
+            f"results=pmf&"
             f"limit={max_results}"
         )
 
@@ -1029,7 +1296,7 @@ async def search_sharad_highres_products(
             f"productid={query}*&"
             f"pt=RDR&"  # Italian RDR products
             f"output=json&"
-            f"results=p&"
+            f"results=pmf&"
             f"limit={max_results}"
         )
 
@@ -1139,8 +1406,7 @@ async def resolve_sharad_highres_bundle(
     1. DAT binary data file
     2. LBL label file
 
-    Italian RDR products are stored in the PDS archive at:
-    https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v2/
+    Uses ODE REST API with results=m to get the LabelURL and construct file paths.
 
     Args:
         product_id: SHARAD RDR product ID (e.g., R_5663601_001_SS19_700_A)
@@ -1156,18 +1422,7 @@ async def resolve_sharad_highres_bundle(
     bundle = SHARADHighResBundle(product_id=product_id.upper())
 
     try:
-        # Use ODE PRODUCTFILES to discover URLs
-        files = await discover_product_files(product_id, Instrument.SHARAD_HIGHRES, session)
-
-        for f in files:
-            fname_lower = f.filename.lower()
-
-            if fname_lower.endswith(".dat"):
-                bundle.dat_file = f
-            elif fname_lower.endswith(".lbl"):
-                bundle.lbl_file = f
-
-        # Extract orbit number from product ID if possible
+        # Extract orbit number from product ID
         # Format: R_OOOOOOO_SSS_TTNN_RRR_V (orbit_sequence_table_range_version)
         parts = product_id.upper().split("_")
         if len(parts) >= 2:
@@ -1176,28 +1431,46 @@ async def resolve_sharad_highres_bundle(
             except ValueError:
                 pass
 
-        # If no files found via PRODUCTFILES, construct URLs directly
-        if not bundle.dat_file:
-            pid_lower = product_id.lower()
-            dat_filename = f"{pid_lower}.dat"
-            lbl_filename = f"{pid_lower}.lbl"
+        # Use ODE REST API to get LabelURL (more reliable than PRODUCTFILES)
+        url = (
+            f"{ODE_REST_BASE}?"
+            f"target=mars&"
+            f"ihid=mro&"
+            f"iid=sharad&"
+            f"productid={product_id}*&"
+            f"pt=RDR&"
+            f"output=json&"
+            f"results=m&"
+            f"limit=1"
+        )
 
-            # Italian RDR path pattern varies, try common structure
-            # /mro/mro-m-sharad-4-rdr-v2/mrosh_1xxx/data/rdr/OOOOO/r_ooooooo_sss_ttnn_rrr_v.dat
-            if bundle.orbit_number:
-                orbit_dir = f"{(bundle.orbit_number // 1000) * 1000:05d}"
-                base_url = f"https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v2/mrosh_1001/data/rdr/{orbit_dir}"
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                products = data.get("ODEResults", {}).get("Products", {}).get("Product", [])
+                if isinstance(products, dict):
+                    products = [products]
 
-                bundle.dat_file = ODEFile(
-                    filename=dat_filename,
-                    url=f"{base_url}/{dat_filename}",
-                    file_type="Product"
-                )
-                bundle.lbl_file = ODEFile(
-                    filename=lbl_filename,
-                    url=f"{base_url}/{lbl_filename}",
-                    file_type="Label"
-                )
+                if products:
+                    p = products[0]
+                    label_url = p.get("LabelURL", "")
+
+                    if label_url:
+                        # Construct file URLs from LabelURL
+                        # LabelURL: .../r_0401101_001_ss19_700_a.lbl
+                        base_url = label_url.rsplit("/", 1)[0]
+                        pid_lower = product_id.lower()
+
+                        bundle.lbl_file = ODEFile(
+                            filename=f"{pid_lower}.lbl",
+                            url=label_url,
+                            file_type="Label"
+                        )
+                        bundle.dat_file = ODEFile(
+                            filename=f"{pid_lower}.dat",
+                            url=f"{base_url}/{pid_lower}.dat",
+                            file_type="Product"
+                        )
 
     except Exception as e:
         print(f"Error resolving SHARAD High-Res bundle: {e}")
