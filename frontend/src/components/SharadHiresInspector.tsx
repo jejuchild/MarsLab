@@ -137,8 +137,9 @@ export default function SharadHiresInspector({
   const [moveMode, setMoveMode] = useState(false);
   const isDragging = useRef(false);
 
-  // Panel width (resizable)
+  // Panel width (resizable) & collapse
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
+  const [collapsed, setCollapsed] = useState(false);
 
   // MOLA alignment offset (trace index shift)
   const [molaAlignMode, setMolaAlignMode] = useState(false);
@@ -152,6 +153,17 @@ export default function SharadHiresInspector({
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const plotsWrapperRef = useRef<HTMLDivElement>(null);
   const [cursor, setCursor] = useState<{ normX: number; normY: number } | null>(null);
+
+  // ── Escape key to close ─────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   // ── Data fetching ──────────────────────────────────────
   useEffect(() => {
@@ -861,32 +873,49 @@ export default function SharadHiresInspector({
   // ── Render ─────────────────────────────────────────────
   return (
     <div
-      className="flex h-full flex-col border-l border-border-dark bg-surface-dark/40 relative"
-      style={{ width: panelWidth }}
+      className="flex h-full flex-col border-l border-border-dark bg-surface-dark/40 relative transition-[width] duration-200"
+      style={{ width: collapsed ? 48 : panelWidth }}
     >
-      {/* Resize handle (left edge) */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
-        onMouseDown={handleResizeStart}
-      />
+      {/* Resize handle (left edge) — hidden when collapsed */}
+      {!collapsed && (
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+          onMouseDown={handleResizeStart}
+        />
+      )}
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-dark bg-[#0a0f18]">
-        <div className="flex items-center gap-2">
+      <div className={`flex items-center justify-between border-b border-border-dark bg-[#0a0f18] ${collapsed ? "px-2 py-2.5 flex-col gap-2" : "px-4 py-2.5"}`}>
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-amber-400 text-base">radar</span>
+            <h3 className="text-white text-xs font-bold uppercase tracking-wider">
+              SHARAD High-Res
+            </h3>
+            {metadata && (
+              <span className="text-[10px] text-slate-500 font-mono ml-1">
+                {metadata.product_id}
+              </span>
+            )}
+          </div>
+        )}
+        {collapsed && (
           <span className="material-symbols-outlined text-amber-400 text-base">radar</span>
-          <h3 className="text-white text-xs font-bold uppercase tracking-wider">
-            SHARAD High-Res
-          </h3>
-          {metadata && (
-            <span className="text-[10px] text-slate-500 font-mono ml-1">
-              {metadata.product_id}
+        )}
+        <div className={`flex items-center gap-1 ${collapsed ? "flex-col" : ""}`}>
+          {/* Collapse / Expand toggle */}
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="p-1 text-slate-500 hover:text-white transition-colors"
+            title={collapsed ? "Expand panel (Esc)" : "Collapse panel (Esc)"}
+          >
+            <span className="material-symbols-outlined text-sm">
+              {collapsed ? "left_panel_open" : "left_panel_close"}
             </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
+          </button>
           {/* Expand button */}
           <button
-            onClick={() => setPanelWidth(Math.floor(window.innerWidth * MAX_WIDTH_FRACTION))}
+            onClick={() => { setPanelWidth(Math.floor(window.innerWidth * MAX_WIDTH_FRACTION)); setCollapsed(false); }}
             className="p-1 text-slate-500 hover:text-white transition-colors"
             title="Expand to 85% viewport"
           >
@@ -894,9 +923,9 @@ export default function SharadHiresInspector({
           </button>
           {/* Reset width button */}
           <button
-            onClick={() => setPanelWidth(DEFAULT_WIDTH)}
+            onClick={() => { setPanelWidth(DEFAULT_WIDTH); setCollapsed(false); }}
             className="p-1 text-slate-500 hover:text-white transition-colors"
-            title="Reset panel width"
+            title="Reset to default size"
           >
             <span className="material-symbols-outlined text-sm">width_normal</span>
           </button>
@@ -904,12 +933,14 @@ export default function SharadHiresInspector({
           <button
             onClick={onClose}
             className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+            title="Close inspector"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
       </div>
 
+      {!collapsed && (
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel: controls */}
         <div className="w-64 border-r border-border-dark overflow-y-auto p-3 space-y-4 shrink-0 scrollbar-dark">
@@ -1298,6 +1329,7 @@ export default function SharadHiresInspector({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

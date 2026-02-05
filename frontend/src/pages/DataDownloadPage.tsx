@@ -262,9 +262,9 @@ function PointResultItem({
       <div className="flex items-center justify-between text-xs text-slate-400">
         <div className="flex items-center gap-2">
           <span className="bg-surface-dark px-2 py-0.5 rounded">{displayInstrument}</span>
-          {result.lat !== null && result.lon !== null && (
-            <span className="text-slate-500 font-mono text-[10px]">
-              {result.lat.toFixed(2)}°, {result.lon.toFixed(2)}°
+          {result.distance_km !== null && (
+            <span className="text-primary font-mono text-[10px] font-bold">
+              {result.distance_km.toFixed(1)} km
             </span>
           )}
         </div>
@@ -841,6 +841,17 @@ export default function DataDownloadPage() {
       }
     };
   }, []);
+
+  // Escape key to close detail panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedResult) {
+        setSelectedResult(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedResult]);
 
   // Get list of selected datasets
   const getSelectedDatasets = useCallback((): DatasetType[] => {
