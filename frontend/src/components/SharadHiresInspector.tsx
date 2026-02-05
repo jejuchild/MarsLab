@@ -148,12 +148,14 @@ export default function SharadHiresInspector({
 
   // 3D Subsurface view
   const [show3DView, setShow3DView] = useState(false);
+  const [collapse3DView, setCollapse3DView] = useState(false);
   const [traceRangeStart, setTraceRangeStart] = useState(0);
   const [traceRangeEnd, setTraceRangeEnd] = useState(100);
 
   // Draggable vertical guide lines for 3D range selection
   const [draggingLine, setDraggingLine] = useState<"start" | "end" | null>(null);
-  const lineHitZonePx = 10; // pixels for hit detection
+  const [hoveringLine, setHoveringLine] = useState<"start" | "end" | null>(null);
+  const lineHitZonePx = 12; // pixels for hit detection
 
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -950,7 +952,32 @@ export default function SharadHiresInspector({
       ? viewY.start + my * (viewY.end - viewY.start)
       : 0;
     setCursor({ normX, normY });
-  }, [viewX, viewY]);
+
+    // Detect hover over vertical guide lines for 3D range selection
+    if (show3DView && canvas === canvasRef.current && radargramMeta && !draggingLine) {
+      const rect = canvas.getBoundingClientRect();
+      const startNorm = traceRangeStart / radargramMeta.n_traces;
+      const endNorm = traceRangeEnd / radargramMeta.n_traces;
+      const startPx = ((startNorm - viewX.start) / (viewX.end - viewX.start)) * rect.width;
+      const endPx = ((endNorm - viewX.start) / (viewX.end - viewX.start)) * rect.width;
+      const clickPx = mx * rect.width;
+
+      const nearStart = Math.abs(clickPx - startPx) <= lineHitZonePx;
+      const nearEnd = Math.abs(clickPx - endPx) <= lineHitZonePx;
+
+      if (nearStart && nearEnd) {
+        setHoveringLine(Math.abs(clickPx - startPx) < Math.abs(clickPx - endPx) ? "start" : "end");
+      } else if (nearStart) {
+        setHoveringLine("start");
+      } else if (nearEnd) {
+        setHoveringLine("end");
+      } else {
+        setHoveringLine(null);
+      }
+    } else if (!draggingLine) {
+      setHoveringLine(null);
+    }
+  }, [viewX, viewY, show3DView, radargramMeta, traceRangeStart, traceRangeEnd, draggingLine]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (moveMode || adjustMode) return;
@@ -1480,20 +1507,21 @@ export default function SharadHiresInspector({
               <canvas
                 ref={canvasRef}
                 className={`w-full h-full ${
+                  hoveringLine || draggingLine ? "cursor-ew-resize" :
                   adjustMode ? "cursor-cell" : moveMode ? "cursor-grab" : "cursor-crosshair"
                 }`}
                 draggable={false}
                 onDragStart={(e) => e.preventDefault()}
                 onMouseMove={handleMouseMove}
                 onMouseDown={handleMouseDown}
-                onMouseLeave={() => setCursor(null)}
+                onMouseLeave={() => { setCursor(null); setHoveringLine(null); }}
                 onWheel={handleWheel}
                 onClick={handleClick}
               />
             </div>
 
             {/* MOLA elevation profile panel */}
-            {molaProfile && !show3DView && (
+            {molaProfile && (
               <div
                 ref={molaContainerRef}
                 className="border-t border-border-dark bg-[#0a0f18] shrink-0"
@@ -1514,17 +1542,48 @@ export default function SharadHiresInspector({
 
             {/* 3D Subsurface View Panel */}
             {show3DView && molaProfile && radargramMeta && (
-              <div className="border-t border-cyan-500/30 bg-[#0a0f18] shrink-0" style={{ height: 350 }}>
-                <Subsurface3DViewer
-                  startTrace={traceRangeStart}
-                  endTrace={traceRangeEnd}
-                  lats={radargramMeta.lats}
-                  lons={radargramMeta.lons}
-                  boundaryBinOffset={boundaryBinOffset}
-                  epsilonR={epsilonR1}
-                  molaElevations={molaProfile.elevation_m}
-                  onClose={() => setShow3DView(false)}
-                />
+              <div className="border-t border-cyan-500/30 bg-[#0a0f18] shrink-0 flex flex-col">
+                {/* Collapsible header */}
+                <div
+                  className="flex items-center justify-between px-3 py-1.5 bg-[#0d1420] cursor-pointer hover:bg-[#111927] transition-colors"
+                  onClick={() => setCollapse3DView(!collapse3DView)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-cyan-400 text-sm">
+                      {collapse3DView ? "expand_more" : "expand_less"}
+                    </span>
+                    <span className="text-[10px] text-cyan-400 font-bold uppercase">3D Subsurface View</span>
+                    <span className="text-[9px] text-slate-500">
+                      ({Math.abs(traceRangeEnd - traceRangeStart) + 1} traces)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {collapse3DView && (
+                      <span className="text-[9px] text-slate-500">Click to expand</span>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShow3DView(false); }}
+                      className="p-0.5 rounded hover:bg-[#232f48] text-slate-500 hover:text-red-400"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                </div>
+                {/* 3D Content */}
+                {!collapse3DView && (
+                  <div style={{ height: 320 }}>
+                    <Subsurface3DViewer
+                      startTrace={traceRangeStart}
+                      endTrace={traceRangeEnd}
+                      lats={radargramMeta.lats}
+                      lons={radargramMeta.lons}
+                      boundaryBinOffset={boundaryBinOffset}
+                      epsilonR={epsilonR1}
+                      molaElevations={molaProfile.elevation_m}
+                      onClose={() => setShow3DView(false)}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
