@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import Subsurface3DViewer from "./Subsurface3DViewer";
 
 /* =========================================================
  * Types
@@ -145,6 +146,11 @@ export default function SharadHiresInspector({
   const [molaAlignMode, setMolaAlignMode] = useState(false);
   const [molaXOffset, setMolaXOffset] = useState(0);
 
+  // 3D Subsurface view
+  const [show3DView, setShow3DView] = useState(false);
+  const [traceRangeStart, setTraceRangeStart] = useState(0);
+  const [traceRangeEnd, setTraceRangeEnd] = useState(100);
+
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -217,6 +223,9 @@ export default function SharadHiresInspector({
           setMolaProfile(molaData);
           setViewX({ start: 0, end: 1 });
           setViewY({ start: 0, end: 1 });
+          // Initialize trace range for 3D view (first 200 traces or all if fewer)
+          setTraceRangeStart(0);
+          setTraceRangeEnd(Math.min(199, rmData.n_traces - 1));
         }
       } catch (e: any) {
         if (!cancelled) setError(e.message || "Unknown error");
@@ -1222,6 +1231,95 @@ export default function SharadHiresInspector({
             )}
           </Section>
 
+          {/* 3D Subsurface View */}
+          {molaProfile && radargramMeta && (
+            <Section title="3D Subsurface">
+              {boundaryBinOffset > 0 ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">Enable 3D View</span>
+                    <MiniButton
+                      active={show3DView}
+                      onClick={() => setShow3DView(!show3DView)}
+                    >
+                      {show3DView ? "ON" : "OFF"}
+                    </MiniButton>
+                  </div>
+
+                  {show3DView && (
+                    <div className="space-y-2 mt-2">
+                      <div className="text-[9px] text-slate-600">
+                        Select trace range for 3D visualization
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] text-slate-400 w-10">Start</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={radargramMeta.n_traces - 1}
+                          value={traceRangeStart}
+                          onChange={(e) => {
+                            const v = Math.max(0, Math.min(radargramMeta.n_traces - 1, parseInt(e.target.value) || 0));
+                            setTraceRangeStart(v);
+                          }}
+                          className="flex-1 bg-[#0a0f18] border border-[#232f48] rounded px-2 py-1 text-[10px] text-slate-300 font-mono focus:outline-none focus:border-cyan-500/40"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] text-slate-400 w-10">End</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={radargramMeta.n_traces - 1}
+                          value={traceRangeEnd}
+                          onChange={(e) => {
+                            const v = Math.max(0, Math.min(radargramMeta.n_traces - 1, parseInt(e.target.value) || 0));
+                            setTraceRangeEnd(v);
+                          }}
+                          className="flex-1 bg-[#0a0f18] border border-[#232f48] rounded px-2 py-1 text-[10px] text-slate-300 font-mono focus:outline-none focus:border-cyan-500/40"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            // Set to visible range
+                            const start = Math.floor(viewX.start * radargramMeta.n_traces);
+                            const end = Math.ceil(viewX.end * radargramMeta.n_traces);
+                            setTraceRangeStart(start);
+                            setTraceRangeEnd(end);
+                          }}
+                          className="flex-1 px-2 py-1 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors hover:border-cyan-500/30"
+                        >
+                          Use Visible Range
+                        </button>
+                        <button
+                          onClick={() => {
+                            setTraceRangeStart(0);
+                            setTraceRangeEnd(radargramMeta.n_traces - 1);
+                          }}
+                          className="flex-1 px-2 py-1 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors hover:border-cyan-500/30"
+                        >
+                          Full Track
+                        </button>
+                      </div>
+
+                      <div className="text-[9px] text-cyan-400/70 mt-1">
+                        {traceRangeEnd - traceRangeStart + 1} traces selected
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-[9px] text-slate-600 italic">
+                  Set Boundary Z {">"} 0 in Depth Conversion to enable 3D subsurface view
+                </div>
+              )}
+            </Section>
+          )}
+
           {/* Metadata */}
           {metadata && (
             <Section title="Dataset Info">
@@ -1283,7 +1381,7 @@ export default function SharadHiresInspector({
             </div>
 
             {/* MOLA elevation profile panel */}
-            {molaProfile && (
+            {molaProfile && !show3DView && (
               <div
                 ref={molaContainerRef}
                 className="border-t border-border-dark bg-[#0a0f18] shrink-0"
@@ -1298,6 +1396,22 @@ export default function SharadHiresInspector({
                   onMouseDown={handleMouseDown}
                   onMouseLeave={() => setCursor(null)}
                   onWheel={handleWheel}
+                />
+              </div>
+            )}
+
+            {/* 3D Subsurface View Panel */}
+            {show3DView && molaProfile && radargramMeta && (
+              <div className="border-t border-cyan-500/30 bg-[#0a0f18] shrink-0" style={{ height: 350 }}>
+                <Subsurface3DViewer
+                  startTrace={traceRangeStart}
+                  endTrace={traceRangeEnd}
+                  lats={radargramMeta.lats}
+                  lons={radargramMeta.lons}
+                  boundaryBinOffset={boundaryBinOffset}
+                  epsilonR={epsilonR1}
+                  molaElevations={molaProfile.elevation_m}
+                  onClose={() => setShow3DView(false)}
                 />
               </div>
             )}

@@ -321,3 +321,141 @@ async def get_line_profile(
         return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ──────────────────────────────────────────────
+# DEM patch endpoint (for 3D terrain viewer)
+# ──────────────────────────────────────────────
+def compute_dem_patch(
+    lat0: float,
+    lon0: float,
+    radius_m: float = 5000,
+    grid_size: int = 128,
+) -> dict:
+    """
+    Extract a DEM patch centered at (lat0, lon0) with given radius.
+
+    Returns a dict with:
+      - elevations: flattened array of elevation values (row-major order)
+      - rows, cols: grid dimensions
+      - spacing_m: approximate grid spacing in meters
+      - bounds: {west, east, south, north} in degrees
+      - center_elevation_m: elevation at center point
+      - min_elevation_m, max_elevation_m: elevation range
+      - slope_mean, slope_max: slope statistics for the patch
+    """
+    ds = _get_dem()
+
+    # Centre pixel
+    row_c, col_c = ds.index(lon0, lat0)
+
+    # Pixel sizes in degrees
+    px_deg_ew = abs(ds.transform.a)
+    px_deg_ns = abs(ds.transform.e)
+
+    # Approximate metres per degree at this latitude
+    meters_per_deg_lat = (math.pi / 180.0) * MARS_MEAN_RADIUS
+    meters_per_deg_lon = meters_per_deg_lat * math.cos(math.radians(lat0))
+
+    # Pixel size in metres
+    px_m_ns = px_deg_ns * meters_per_deg_lat
+    px_m_ew = px_deg_ew * meters_per_deg_lon
+
+    # Number of pixels to cover radius
+    n_pix_ns = int(math.ceil(radius_m / px_m_ns))
+    n_pix_ew = int(math.ceil(radius_m / px_m_ew))
+
+    # Define window
+    row_start = max(0, row_c - n_pix_ns)
+    row_end = min(ds.height, row_c + n_pix_ns + 1)
+    col_start = max(0, col_c - n_pix_ew)
+    col_end = min(ds.width, col_c + n_pix_ew + 1)
+
+    window = Window(col_start, row_start, col_end - col_start, row_end - row_start)
+    elev = ds.read(1, window=window).astype(np.float64)
+
+    if ds.nodata is not None:
+        elev[elev == ds.nodata] = np.nan
+
+    # Resample to target grid size if needed
+    original_rows, original_cols = elev.shape
+    if original_rows != grid_size or original_cols != grid_size:
+        from scipy.ndimage import zoom
+        zoom_factor_y = grid_size / original_rows
+        zoom_factor_x = grid_size / original_cols
+        elev = zoom(elev, (zoom_factor_y, zoom_factor_x), order=1)  # bilinear interpolation
+
+    rows, cols = elev.shape
+
+    # Compute bounds
+    west_lon = ds.transform.c + col_start * ds.transform.a
+    north_lat = ds.transform.f + row_start * ds.transform.e
+    east_lon = ds.transform.c + col_end * ds.transform.a
+    south_lat = ds.transform.f + row_end * ds.transform.e
+
+    # Grid spacing in meters (after resampling)
+    spacing_m_ew = (radius_m * 2) / cols
+    spacing_m_ns = (radius_m * 2) / rows
+
+    # Compute slope (in degrees)
+    dz_dy, dz_dx = np.gradient(elev, spacing_m_ns, spacing_m_ew)
+    slope_rad = np.arctan(np.sqrt(dz_dx**2 + dz_dy**2))
+    slope_deg = np.degrees(slope_rad)
+
+    # Mask invalid values
+    valid_mask = ~np.isnan(elev)
+    valid_slopes = slope_deg[valid_mask]
+
+    # Statistics
+    center_row, center_col = rows // 2, cols // 2
+    center_elev = float(elev[center_row, center_col])
+    if np.isnan(center_elev):
+        center_elev = float(np.nanmean(elev))
+
+    # Replace NaN with mean for output
+    elev_clean = np.nan_to_num(elev, nan=float(np.nanmean(elev)))
+
+    return {
+        "elevations": elev_clean.flatten().tolist(),
+        "rows": rows,
+        "cols": cols,
+        "spacing_m": round((spacing_m_ew + spacing_m_ns) / 2, 2),
+        "bounds": {
+            "west": round(west_lon, 6),
+            "east": round(east_lon, 6),
+            "south": round(south_lat, 6),
+            "north": round(north_lat, 6),
+        },
+        "center": {"lat": lat0, "lon": lon0},
+        "center_elevation_m": round(center_elev, 1),
+        "min_elevation_m": round(float(np.nanmin(elev)), 1),
+        "max_elevation_m": round(float(np.nanmax(elev)), 1),
+        "elevation_range_m": round(float(np.nanmax(elev) - np.nanmin(elev)), 1),
+        "slope_mean": round(float(np.mean(valid_slopes)), 2) if len(valid_slopes) > 0 else 0,
+        "slope_max": round(float(np.max(valid_slopes)), 2) if len(valid_slopes) > 0 else 0,
+        "radius_m": radius_m,
+    }
+
+
+@router.get("/dem_patch")
+async def get_dem_patch(
+    lat: float = Query(..., description="Centre latitude (degrees)"),
+    lon: float = Query(..., description="Centre longitude (degrees)"),
+    radius_m: float = Query(5000, ge=500, le=50000, description="Patch radius (metres)"),
+    grid_size: int = Query(128, ge=32, le=512, description="Output grid size (rows/cols)"),
+):
+    """
+    Get a DEM patch for 3D terrain visualization.
+
+    Returns elevation grid data with metadata for rendering in a 3D viewer.
+    """
+    try:
+        result = compute_dem_patch(lat, lon, radius_m, grid_size)
+        return JSONResponse(content=result)
+
+    except FileNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=500)

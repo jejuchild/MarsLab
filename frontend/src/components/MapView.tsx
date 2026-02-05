@@ -116,7 +116,7 @@ type MapViewProps = {
     opacity: number;
   }>;
   // Analysis mode
-  analysisMode?: "slope" | "line" | null;
+  analysisMode?: "slope" | "slope3d" | "line" | null;
   linePoints?: Array<{ lat: number; lon: number }>;
   // View bound selection mode (drag to select rectangle)
   viewBoundSelectionMode?: boolean;
@@ -209,14 +209,37 @@ async function loadHiRISELBL(id: string): Promise<string | null> {
 async function loadCRISMLBL(id: string): Promise<string | null> {
   if (crismLBLCache.has(id)) return crismLBLCache.get(id)!;
   const CRISM_LBL_BASE = "/crism_lbl";
-  const res = await fetch(`${CRISM_LBL_BASE}/${id}.lbl`);
-  if (!res.ok) return null;
 
-  const text = await res.text();
-  if (!text.includes("IMAGE_MAP_PROJECTION")) return null;
+  // Extract base_key from product_id
+  // frt00008a1e_07_if168j_mtr3 -> frt00008a1e_07
+  // frt00008a1e_07_brcarj_mtr3 -> frt00008a1e_07
+  const baseKey = id.replace(/_(?:if|br)[0-9a-z]+_mtr3$/i, "");
 
-  crismLBLCache.set(id, text);
-  return text;
+  // Try multiple possible LBL file patterns:
+  // 1. Browse LBL: frt00008a1e_07_brcarj_mtr3.lbl (common for downloaded products)
+  // 2. Direct LBL: frt00008a1e_07.lbl (legacy pattern)
+  const patterns = [
+    `${CRISM_LBL_BASE}/${baseKey}_brcarj_mtr3.lbl`,  // Browse LBL (most common)
+    `${CRISM_LBL_BASE}/${baseKey}.lbl`,               // Direct LBL (legacy)
+    `${CRISM_LBL_BASE}/${id}.lbl`,                    // Full product ID
+  ];
+
+  for (const url of patterns) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+
+      const text = await res.text();
+      if (!text.includes("IMAGE_MAP_PROJECTION")) continue;
+
+      crismLBLCache.set(id, text);
+      return text;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 // Get cached bounds or parse from LBL

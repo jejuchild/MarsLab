@@ -3,6 +3,7 @@ import MapView from "../components/MapView";
 import Inspector from "../components/Inspector";
 import type { InspectorContext, RGBWavelengths } from "../components/Inspector";
 import SlopeAnalysis from "../components/SlopeAnalysis";
+import Slope3DViewer from "../components/Slope3DViewer";
 import type { TerrainPoint } from "../components/SlopeAnalysis";
 import LineProfile from "../components/LineProfile";
 import type { ProfilePoint } from "../components/LineProfile";
@@ -119,9 +120,12 @@ export default function MainPage() {
   // Terrain click point for slope analysis (when clicking empty terrain)
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
-  // Analysis mode: mutually exclusive slope / line-profile
-  type AnalysisMode = "slope" | "line" | null;
+  // Analysis mode: mutually exclusive slope / slope3d / line-profile
+  type AnalysisMode = "slope" | "slope3d" | "line" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
+
+  // Slope 3D analysis point (separate from regular slope terrainPoint)
+  const [slope3DPoint, setSlope3DPoint] = useState<TerrainPoint | null>(null);
 
   // Line profile state: two endpoints
   const [linePoints, setLinePoints] = useState<ProfilePoint[]>([]);
@@ -457,6 +461,11 @@ export default function MainPage() {
       setSelected(null);
       setTerrainPoint({ lat, lon });
     }
+    if (analysisMode === "slope3d") {
+      // Slope 3D analysis mode: show 3D terrain viewer on terrain click
+      setSelected(null);
+      setSlope3DPoint({ lat, lon });
+    }
   }, [analysisMode]);
 
   // When a product is selected, clear terrain point
@@ -468,9 +477,12 @@ export default function MainPage() {
   // Analysis mode toggle handler
   const handleAnalysisModeChange = useCallback((mode: AnalysisMode) => {
     setAnalysisMode(mode);
-    // Clear state for both modes
+    // Clear state for all modes
     if (mode !== "slope") {
       setTerrainPoint(null);
+    }
+    if (mode !== "slope3d") {
+      setSlope3DPoint(null);
     }
     if (mode !== "line") {
       setLinePoints([]);
@@ -645,6 +657,11 @@ export default function MainPage() {
           <SlopeAnalysis
             point={terrainPoint}
             onClose={() => setTerrainPoint(null)}
+          />
+        ) : slope3DPoint ? (
+          <Slope3DViewer
+            point={slope3DPoint}
+            onClose={() => setSlope3DPoint(null)}
           />
         ) : null
       }
