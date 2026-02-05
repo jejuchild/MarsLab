@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
   searchProducts,
   searchSpatial,
+  searchByPoint,
   startDownload,
   getDownloadStatus,
   type SearchResult,
   type DownloadTask,
   type Instrument,
   type BoundingBox,
+  type PointSearchResponse,
+  type PointSearchResult,
   formatBytes,
 } from "../api/search";
 
@@ -15,7 +19,7 @@ import {
 // Types
 // =============================================================================
 
-type SearchMode = "id" | "spatial";
+type SearchMode = "id" | "spatial" | "point";
 
 // Dataset types for selection
 type DatasetType = "crism" | "hirise" | "sharad" | "sharad_highres";
@@ -32,6 +36,12 @@ interface SpatialSearch {
   maxlat: string;  // Northern boundary
   westernlon: string;  // Western boundary
   easternlon: string;  // Eastern boundary
+}
+
+interface PointSearch {
+  lat: string;
+  lon: string;
+  radius: string;  // Search radius in degrees
 }
 
 // =============================================================================
@@ -66,6 +76,16 @@ function SearchModeToggle({
         }`}
       >
         Spatial Search
+      </button>
+      <button
+        onClick={() => onModeChange("point")}
+        className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+          mode === "point"
+            ? "bg-primary text-white"
+            : "text-slate-500 hover:text-white"
+        }`}
+      >
+        Coordinate
       </button>
     </div>
   );
@@ -185,6 +205,218 @@ function SearchResultItem({
         <span className="text-[10px] bg-surface-dark px-2 py-0.5 rounded text-slate-400">
           {result.instrument.toUpperCase()}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function PointResultItem({
+  result,
+  instrument,
+  isSelected,
+  onClick,
+  onDownload,
+  isDownloading,
+  downloadable = true,
+}: {
+  result: PointSearchResult;
+  instrument: string;
+  isSelected: boolean;
+  onClick: () => void;
+  onDownload: () => void;
+  isDownloading: boolean;
+  downloadable?: boolean;
+}) {
+  const displayInstrument = instrument === "SHARAD_HIGHRES" ? "SHARAD Hi-Res" : instrument;
+  const isComplete = result.exists;
+  const isPartial = !result.exists && (result.has_core || result.has_browse);
+
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-lg p-3 cursor-pointer transition-colors ${
+        isSelected
+          ? "bg-primary/20 border border-primary/50"
+          : "hover:bg-surface-dark border border-transparent"
+      }`}
+    >
+      <div className="flex justify-between items-start mb-1">
+        <p className="text-white font-bold font-mono text-sm uppercase">
+          {result.product_id}
+        </p>
+        {isComplete ? (
+          <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 border border-emerald-500/30">
+            <span className="material-symbols-outlined text-[10px]">check</span>
+            Local
+          </span>
+        ) : isPartial ? (
+          <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-amber-500/30">
+            Partial
+          </span>
+        ) : (
+          <span className="border border-border-dark text-[10px] px-2 py-0.5 rounded text-slate-500 font-bold uppercase">
+            Remote
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between text-xs text-slate-400">
+        <div className="flex items-center gap-2">
+          <span className="bg-surface-dark px-2 py-0.5 rounded">{displayInstrument}</span>
+          {result.lat !== null && result.lon !== null && (
+            <span className="text-slate-500 font-mono text-[10px]">
+              {result.lat.toFixed(2)}°, {result.lon.toFixed(2)}°
+            </span>
+          )}
+        </div>
+        {isSelected && downloadable && !isComplete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownload();
+            }}
+            disabled={isDownloading}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-all ${
+              isDownloading
+                ? "bg-primary/50 text-white cursor-wait"
+                : "bg-primary hover:bg-primary/80 text-white"
+            }`}
+          >
+            {isDownloading ? (
+              <>
+                <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                <span>Starting...</span>
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-xs">download</span>
+                <span>Download</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PointSearchResults({
+  results,
+  query,
+  error,
+  onDownload,
+  isDownloading,
+  downloadingProductId,
+}: {
+  results: PointSearchResponse | null;
+  query: { lat: number; lon: number } | null;
+  error?: string | null;
+  onDownload: (productId: string, instrument: string) => void;
+  isDownloading: boolean;
+  downloadingProductId: string | null;
+}) {
+  const [selectedItem, setSelectedItem] = useState<{ productId: string; instrument: string } | null>(null);
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-slate-500">
+        <div className="text-center">
+          <span className="material-symbols-outlined text-4xl mb-2 text-red-400">
+            error
+          </span>
+          <p className="text-red-400">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!results || !query) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-slate-500">
+        <div className="text-center">
+          <span className="material-symbols-outlined text-4xl mb-2">
+            location_on
+          </span>
+          <p>Enter a coordinate and search</p>
+        </div>
+      </div>
+    );
+  }
+
+  const totalCount = results.total_count;
+  const instruments: { key: keyof typeof results.results; label: string; icon: string; apiKey: string; downloadable: boolean }[] = [
+    { key: "CRISM", label: "CRISM", icon: "satellite_alt", apiKey: "crism", downloadable: true },
+    { key: "HIRISE", label: "HiRISE", icon: "photo_camera", apiKey: "hirise", downloadable: true },
+    { key: "SHARAD", label: "SHARAD", icon: "radar", apiKey: "sharad", downloadable: true },
+    { key: "SHARAD_HIGHRES", label: "SHARAD Hi-Res", icon: "science", apiKey: "sharad_highres", downloadable: true },
+  ];
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-2 border-b border-border-dark bg-surface-dark/50 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-lg">
+              location_on
+            </span>
+            <span className="text-sm font-medium text-white">
+              Coordinate Search Results
+            </span>
+          </div>
+          <span className="text-slate-400 text-sm">
+            {totalCount} dataset{totalCount !== 1 ? "s" : ""} found
+          </span>
+        </div>
+        <div className="text-xs text-slate-500 mt-1 font-mono">
+          Query: {query.lat.toFixed(4)}° lat, {results.query.lon.toFixed(4)}° lon | Radius: {results.query.radius_deg}°
+        </div>
+      </div>
+
+      {/* Results grouped by instrument */}
+      <div className="p-4 flex-1 overflow-y-auto space-y-4">
+        {totalCount === 0 ? (
+          <div className="text-center text-slate-500 py-8">
+            <span className="material-symbols-outlined text-4xl mb-2">
+              search_off
+            </span>
+            <p>No datasets found at this coordinate</p>
+            <p className="text-xs mt-1">
+              Try increasing the search radius or search a different location
+            </p>
+          </div>
+        ) : (
+          instruments.map(({ key, label, icon, apiKey, downloadable }) => {
+            const instrumentResults = results.results[key];
+            if (!instrumentResults || instrumentResults.length === 0) return null;
+
+            return (
+              <div key={key} className="bg-bg-dark rounded-lg border border-border-dark overflow-hidden">
+                <div className="px-3 py-2 border-b border-border-dark flex items-center gap-2 bg-surface-dark/50">
+                  <span className="material-symbols-outlined text-primary text-sm">{icon}</span>
+                  <span className="text-sm font-bold text-white">{label}</span>
+                  <span className="text-xs text-slate-500">({instrumentResults.length})</span>
+                  {!downloadable && (
+                    <span className="text-[9px] text-amber-400 ml-auto">Download not supported</span>
+                  )}
+                </div>
+                <div className="max-h-48 overflow-y-auto divide-y divide-border-dark/50">
+                  {instrumentResults.map((r) => (
+                    <PointResultItem
+                      key={r.product_id}
+                      result={r}
+                      instrument={key}
+                      isSelected={selectedItem?.productId === r.product_id && selectedItem?.instrument === key}
+                      onClick={() => setSelectedItem({ productId: r.product_id, instrument: key })}
+                      onDownload={() => onDownload(r.product_id, apiKey)}
+                      isDownloading={isDownloading && downloadingProductId === r.product_id}
+                      downloadable={downloadable}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -571,8 +803,15 @@ export default function DataDownloadPage() {
     westernlon: "",
     easternlon: "",
   });
+  const [pointSearch, setPointSearch] = useState<PointSearch>({
+    lat: "",
+    lon: "",
+    radius: "1",
+  });
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [pointSearchResults, setPointSearchResults] = useState<PointSearchResponse | null>(null);
+  const [pointSearchQuery, setPointSearchQuery] = useState<{ lat: number; lon: number } | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   // Dataset selection state - all enabled by default
@@ -589,6 +828,7 @@ export default function DataDownloadPage() {
   // Download state
   const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [pointDownloadingProductId, setPointDownloadingProductId] = useState<string | null>(null);
 
   // Polling interval ref
   const pollIntervalRef = useRef<number | null>(null);
@@ -611,75 +851,99 @@ export default function DataDownloadPage() {
 
   // Handle search
   const handleSearch = useCallback(async () => {
-    const selectedDatasets = getSelectedDatasets();
-
-    if (selectedDatasets.length === 0) {
-      setSearchError("Select at least one dataset to search");
-      return;
-    }
-
     setIsSearching(true);
     setSearchError(null);
     setSearchResults([]);
+    setPointSearchResults(null);
+    setPointSearchQuery(null);
 
     try {
-      if (searchMode === "id") {
-        if (!query.trim()) {
-          setSearchError("Enter a product ID to search");
+      if (searchMode === "point") {
+        // Point-based coordinate search via ODE
+        const lat = parseFloat(pointSearch.lat);
+        const lon = parseFloat(pointSearch.lon);
+        const radius = parseFloat(pointSearch.radius) || 1;
+
+        if (isNaN(lat) || isNaN(lon)) {
+          setSearchError("Enter valid latitude and longitude values");
           return;
         }
 
-        // Search each selected dataset and combine results
-        const allResults: SearchResult[] = [];
-
-        for (const dataset of selectedDatasets) {
-          try {
-            const response = await searchProducts(query.trim(), dataset as Instrument, 12);
-            allResults.push(...response.results);
-          } catch (e) {
-            console.error(`Search error for ${dataset}:`, e);
-          }
+        if (lat < -90 || lat > 90) {
+          setSearchError("Latitude must be between -90 and 90");
+          return;
         }
 
-        setSearchResults(allResults);
+        const response = await searchByPoint(lat, lon, radius);
+        setPointSearchResults(response);
+        setPointSearchQuery({ lat, lon });
       } else {
-        const minlat = parseFloat(spatialSearch.minlat);
-        const maxlat = parseFloat(spatialSearch.maxlat);
-        const westernlon = parseFloat(spatialSearch.westernlon);
-        const easternlon = parseFloat(spatialSearch.easternlon);
+        // Dataset selection only applies to ID and spatial search
+        const selectedDatasets = getSelectedDatasets();
 
-        if (isNaN(minlat) || isNaN(maxlat) || isNaN(westernlon) || isNaN(easternlon)) {
-          setSearchError("Enter valid latitude and longitude boundaries");
+        if (selectedDatasets.length === 0) {
+          setSearchError("Select at least one dataset to search");
           return;
         }
 
-        if (minlat > maxlat) {
-          setSearchError("South latitude must be less than North latitude");
-          return;
-        }
-
-        const bbox: BoundingBox = { minlat, maxlat, westernlon, easternlon };
-
-        // Search each selected dataset for spatial
-        const allResults: SearchResult[] = [];
-
-        for (const dataset of selectedDatasets) {
-          try {
-            const response = await searchSpatial(bbox, dataset as Instrument, 20);
-            allResults.push(...response.results);
-          } catch (e) {
-            console.error(`Spatial search error for ${dataset}:`, e);
+        if (searchMode === "id") {
+          if (!query.trim()) {
+            setSearchError("Enter a product ID to search");
+            return;
           }
-        }
 
-        setSearchResults(allResults);
+          // Search each selected dataset and combine results
+          const allResults: SearchResult[] = [];
+
+          for (const dataset of selectedDatasets) {
+            try {
+              const response = await searchProducts(query.trim(), dataset as Instrument, 12);
+              allResults.push(...response.results);
+            } catch (e) {
+              console.error(`Search error for ${dataset}:`, e);
+            }
+          }
+
+          setSearchResults(allResults);
+        } else {
+          const minlat = parseFloat(spatialSearch.minlat);
+          const maxlat = parseFloat(spatialSearch.maxlat);
+          const westernlon = parseFloat(spatialSearch.westernlon);
+          const easternlon = parseFloat(spatialSearch.easternlon);
+
+          if (isNaN(minlat) || isNaN(maxlat) || isNaN(westernlon) || isNaN(easternlon)) {
+            setSearchError("Enter valid latitude and longitude boundaries");
+            return;
+          }
+
+          if (minlat > maxlat) {
+            setSearchError("South latitude must be less than North latitude");
+            return;
+          }
+
+          const bbox: BoundingBox = { minlat, maxlat, westernlon, easternlon };
+
+          // Search each selected dataset for spatial
+          const allResults: SearchResult[] = [];
+
+          for (const dataset of selectedDatasets) {
+            try {
+              const response = await searchSpatial(bbox, dataset as Instrument, 20);
+              allResults.push(...response.results);
+            } catch (e) {
+              console.error(`Spatial search error for ${dataset}:`, e);
+            }
+          }
+
+          setSearchResults(allResults);
+        }
       }
     } catch (e) {
       setSearchError(e instanceof Error ? e.message : "Search failed");
     } finally {
       setIsSearching(false);
     }
-  }, [searchMode, query, spatialSearch, getSelectedDatasets]);
+  }, [searchMode, query, spatialSearch, pointSearch, getSelectedDatasets]);
 
   // Poll for download status
   const startPolling = useCallback((taskId: string) => {
@@ -698,6 +962,7 @@ export default function DataDownloadPage() {
             pollIntervalRef.current = null;
           }
           setIsDownloading(false);
+          setPointDownloadingProductId(null);
 
           // Refresh search results to update existence status
           if (task.status === "completed") {
@@ -764,6 +1029,31 @@ export default function DataDownloadPage() {
     }
   }, [selectedResult, startPolling]);
 
+  // Handle download from point search results
+  const handlePointDownload = useCallback(async (productId: string, instrument: string) => {
+    setIsDownloading(true);
+    setPointDownloadingProductId(productId);
+
+    try {
+      // Use the query coordinates for the download
+      const lat = pointSearchQuery?.lat;
+      const lon = pointSearchQuery?.lon;
+
+      const task = await startDownload(
+        productId,
+        instrument as Instrument,
+        lat,
+        lon
+      );
+      setDownloadTask(task);
+      startPolling(task.task_id);
+    } catch (e) {
+      setSearchError(e instanceof Error ? e.message : "Download failed");
+      setIsDownloading(false);
+      setPointDownloadingProductId(null);
+    }
+  }, [pointSearchQuery, startPolling]);
+
   // Handle Enter key in search
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -804,19 +1094,29 @@ export default function DataDownloadPage() {
             </a>
           </nav>
         </div>
+        {/* Suggest Feature */}
+        <Link
+          to="/suggestions"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-slate-400 hover:text-white border border-border-dark rounded-md hover:bg-white/5 transition-colors shrink-0"
+        >
+          <span className="material-symbols-outlined text-sm">lightbulb</span>
+          Suggest Feature
+        </Link>
       </header>
 
       {/* Main content - scrollable */}
       <main className="flex-1 flex flex-col overflow-auto max-w-[1600px] mx-auto w-full px-4 md:px-6 py-4 gap-4">
         {/* Search section */}
         <section className="w-full flex flex-col gap-3">
-          {/* Dataset selection */}
-          <div className="bg-surface-dark rounded-xl p-3 border border-border-dark">
-            <DatasetSelector
-              selection={datasetSelection}
-              onSelectionChange={setDatasetSelection}
-            />
-          </div>
+          {/* Dataset selection (hidden in point mode - point search checks all datasets) */}
+          {searchMode !== "point" && (
+            <div className="bg-surface-dark rounded-xl p-3 border border-border-dark">
+              <DatasetSelector
+                selection={datasetSelection}
+                onSelectionChange={setDatasetSelection}
+              />
+            </div>
+          )}
 
           {/* Search bar */}
           <div className="flex items-center gap-4">
@@ -837,7 +1137,7 @@ export default function DataDownloadPage() {
                     className="bg-transparent border-none text-white focus:ring-0 w-full text-lg placeholder:text-slate-500 font-mono focus:outline-none"
                     placeholder="Enter Product ID (e.g. frt00009312, ESP_045857_2350, S_00195401)"
                   />
-                ) : (
+                ) : searchMode === "spatial" ? (
                   <div className="flex items-center gap-3 flex-1 text-sm">
                     <div className="flex items-center gap-1">
                       <span className="text-slate-500 text-xs">S:</span>
@@ -892,6 +1192,49 @@ export default function DataDownloadPage() {
                       />
                     </div>
                   </div>
+                ) : (
+                  <div className="flex items-center gap-4 flex-1 text-sm">
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-500 text-xs">Lat:</span>
+                      <input
+                        type="text"
+                        value={pointSearch.lat}
+                        onChange={(e) =>
+                          setPointSearch((s) => ({ ...s, lat: e.target.value }))
+                        }
+                        onKeyDown={handleKeyDown}
+                        className="bg-transparent border-none text-white focus:ring-0 w-20 text-sm placeholder:text-slate-500 font-mono focus:outline-none"
+                        placeholder="18.5"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-500 text-xs">Lon:</span>
+                      <input
+                        type="text"
+                        value={pointSearch.lon}
+                        onChange={(e) =>
+                          setPointSearch((s) => ({ ...s, lon: e.target.value }))
+                        }
+                        onKeyDown={handleKeyDown}
+                        className="bg-transparent border-none text-white focus:ring-0 w-20 text-sm placeholder:text-slate-500 font-mono focus:outline-none"
+                        placeholder="77.4"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1 border-l border-border-dark pl-4">
+                      <span className="text-slate-500 text-xs">Radius:</span>
+                      <input
+                        type="text"
+                        value={pointSearch.radius}
+                        onChange={(e) =>
+                          setPointSearch((s) => ({ ...s, radius: e.target.value }))
+                        }
+                        onKeyDown={handleKeyDown}
+                        className="bg-transparent border-none text-white focus:ring-0 w-12 text-sm placeholder:text-slate-500 font-mono focus:outline-none"
+                        placeholder="1"
+                      />
+                      <span className="text-slate-500 text-xs">deg</span>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -902,7 +1245,9 @@ export default function DataDownloadPage() {
                 <div className="absolute bottom-full mb-2 right-0 w-72 p-3 bg-bg-dark border border-border-dark rounded-lg text-[10px] leading-relaxed text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                   {searchMode === "id"
                     ? "Search by CRISM, HiRISE, or SHARAD product ID. Partial matches are supported."
-                    : "Search by bounding box. S/N = latitude range (-90 to 90), W/E = longitude range (-180 to 360). Example: Arcadia Planitia = S:35, N:70, W:-130, E:150"}
+                    : searchMode === "spatial"
+                    ? "Search by bounding box. S/N = latitude range (-90 to 90), W/E = longitude range (-180 to 360). Example: Arcadia Planitia = S:35, N:70, W:-130, E:150"
+                    : "Search ODE by coordinate. Enter latitude (-90 to 90) and longitude. Radius controls the search area in degrees. Returns all CRISM, HiRISE, SHARAD, and SHARAD Hi-Res datasets in that area."}
                 </div>
               </div>
 
@@ -917,6 +1262,13 @@ export default function DataDownloadPage() {
                       progress_activity
                     </span>
                     <span>Searching...</span>
+                  </>
+                ) : searchMode === "point" ? (
+                  <>
+                    <span>SEARCH</span>
+                    <span className="material-symbols-outlined text-sm">
+                      location_on
+                    </span>
                   </>
                 ) : (
                   <>
@@ -933,49 +1285,60 @@ export default function DataDownloadPage() {
 
         {/* Results & Manifest panels */}
         <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
-          {/* Left panel - Search Results */}
-          <aside className="w-1/3 flex flex-col bg-surface-dark rounded-xl border border-border-dark overflow-hidden">
-            <div className="p-4 border-b border-border-dark flex justify-between items-center">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-                Search Results ({searchResults.length})
-              </h3>
-              <span className="material-symbols-outlined text-slate-400 cursor-pointer">
-                filter_list
-              </span>
-            </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
-              {searchError && (
-                <div className="p-4 text-red-400 text-sm">{searchError}</div>
-              )}
-              {searchResults.length === 0 && !searchError && !isSearching && (
-                <div className="p-4 text-slate-500 text-sm text-center">
-                  Enter a search query and click "SCAN ODE"
-                </div>
-              )}
-              {searchResults.map((result) => (
-                <SearchResultItem
-                  key={result.product_id}
-                  result={result}
-                  isSelected={selectedResult?.product_id === result.product_id}
-                  onClick={() => {
-                    setSelectedResult(result);
-                    // Clear download task to show new product preview
-                    if (downloadTask?.status === "completed" || downloadTask?.status === "failed") {
-                      setDownloadTask(null);
-                    }
-                  }}
-                />
-              ))}
-            </div>
+          {/* Left panel - Search Results (hidden in point mode) */}
+          {searchMode !== "point" && (
+            <aside className="w-1/3 flex flex-col bg-surface-dark rounded-xl border border-border-dark overflow-hidden">
+              <div className="p-4 border-b border-border-dark flex justify-between items-center">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                  Search Results ({searchResults.length})
+                </h3>
+                <span className="material-symbols-outlined text-slate-400 cursor-pointer">
+                  filter_list
+                </span>
+              </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-2">
+                {searchError && (
+                  <div className="p-4 text-red-400 text-sm">{searchError}</div>
+                )}
+                {searchResults.length === 0 && !searchError && !isSearching && (
+                  <div className="p-4 text-slate-500 text-sm text-center">
+                    Enter a search query and click "SCAN ODE"
+                  </div>
+                )}
+                {searchResults.map((result) => (
+                  <SearchResultItem
+                    key={result.product_id}
+                    result={result}
+                    isSelected={selectedResult?.product_id === result.product_id}
+                    onClick={() => {
+                      setSelectedResult(result);
+                      // Clear download task to show new product preview
+                      if (downloadTask?.status === "completed" || downloadTask?.status === "failed") {
+                        setDownloadTask(null);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
 
-          </aside>
+            </aside>
+          )}
 
-          {/* Right panel - Product Preview or Download Manifest */}
+          {/* Right panel - Product Preview, Download Manifest, or Point Search Results */}
           <section className="flex-1 flex flex-col bg-surface-dark rounded-xl border border-border-dark overflow-hidden">
             {downloadTask ? (
               <DownloadManifest
                 task={downloadTask}
                 onClose={() => setDownloadTask(null)}
+              />
+            ) : searchMode === "point" ? (
+              <PointSearchResults
+                results={pointSearchResults}
+                query={pointSearchQuery}
+                error={searchError}
+                onDownload={handlePointDownload}
+                isDownloading={isDownloading}
+                downloadingProductId={pointDownloadingProductId}
               />
             ) : selectedResult ? (
               <ProductPreview
