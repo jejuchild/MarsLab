@@ -1,709 +1,523 @@
 /**
- * FootprintManager - Viewport-based footprint loading with LOD and caching
+ * FootprintManager - Simple explicit footprint loading
  *
- * PERFORMANCE OPTIMIZATIONS:
- * - Batches entity operations (suspendEvents/resumeEvents)
- * - Pre-computed geometry caching
- * - Aggressive bbox rounding for better cache hits
- * - Diff-based rendering (add/remove only changed features)
- * - Parallel instrument updates
+ * DESIGN:
+ * - Footprints load ONLY when loadFootprints() is called
+ * - No camera listeners, no automatic updates
+ * - Loaded footprints are static snapshots
+ * - Reload replaces all previous footprints
  */
 
 import * as Cesium from "cesium";
-import { perf } from "./perfMonitor";
 import { getInstrumentCesiumColor, type InstrumentId } from "../config/instrumentRegistry";
+import { normalizeLonForMap } from "./coordinates";
 
-// ============================================================
-// Types
-// ============================================================
+export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX";
 
-export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD";
-export type LODType = "none" | "point" | "poly";
-export type SimplifyLevel = "low" | "mid" | "high";
+export interface LoadResult {
+  instrument: InstrumentType;
+  count: number;
+  truncated: boolean;
+  total: number;
+}
 
-export interface FootprintFeature {
-  type: "Feature";
-  properties: {
-    product_id: string;
-    instrument?: string;
-    [key: string]: any;
-  };
+interface FootprintFeature {
+  properties: { product_id: string; [key: string]: any };
   geometry: {
-    type: "Point" | "Polygon" | "LineString";
-    coordinates: number[] | number[][] | number[][][];
+    type: string;
+    coordinates: any;
   };
 }
 
-export interface FootprintResponse {
-  type: "FeatureCollection";
+interface FootprintResponse {
   features: FootprintFeature[];
   metadata: {
     truncated: boolean;
     returned: number;
     total_estimate: number;
-    lod: LODType;
-    simplify: SimplifyLevel | null;
-    bbox: [number, number, number, number];
-    instrument: string;
   };
-}
-
-export interface ViewportState {
-  bbox: [number, number, number, number];
-  cameraHeight: number;
-  lod: LODType;
-  simplify: SimplifyLevel | null;
 }
 
 export interface FootprintManagerConfig {
   viewer: Cesium.Viewer;
   ellipsoid: Cesium.Ellipsoid;
-  debounceMs?: number;
-  maxCacheSize?: number;
-  onTruncated?: (instrument: InstrumentType, returned: number, total: number) => void;
   onLoadStart?: (instrument: InstrumentType) => void;
-  onLoadEnd?: (instrument: InstrumentType, count: number) => void;
+  onLoadEnd?: (instrument: InstrumentType, result: LoadResult) => void;
   onError?: (instrument: InstrumentType, error: Error) => void;
-  onLODChange?: (lod: LODType, cameraHeight: number) => void;
 }
 
-// ============================================================
-// LOD Thresholds
-// ============================================================
-
-const LOD_THRESHOLDS = {
-  FAR: 15_000_000,
-  MID: 5_000_000,
-};
-
-const SIMPLIFY_THRESHOLDS = {
-  HIGH: 2_000_000,
-  MID: 5_000_000,
-};
-
-// ============================================================
-// Pre-computed geometry cache
-// ============================================================
-
-interface CachedGeometry {
-  centroid: { lon: number; lat: number };
-  bounds?: { west: number; south: number; east: number; north: number };
-}
-
-const geometryCache = new Map<string, CachedGeometry>();
-
-function getCachedGeometry(feature: FootprintFeature): CachedGeometry | null {
-  const id = feature.properties.product_id;
-  if (!id) return null;
-
-  const cached = geometryCache.get(id);
-  if (cached) return cached;
-
-  const geom = feature.geometry;
-  if (!geom) return null;
-
-  let result: CachedGeometry;
-
-  if (geom.type === "Point") {
-    const coords = geom.coordinates as number[];
-    result = {
-      centroid: { lon: normalizeLon(coords[0]), lat: coords[1] }
-    };
-  } else if (geom.type === "Polygon") {
-    const coords = geom.coordinates as number[][][];
-    const ring = coords[0];
-    if (!ring || ring.length === 0) return null;
-
-    const lons = ring.map((c) => normalizeLon(c[0]));
-    const lats = ring.map((c) => c[1]);
-
-    const west = Math.min(...lons);
-    const east = Math.max(...lons);
-    const south = Math.min(...lats);
-    const north = Math.max(...lats);
-
-    result = {
-      centroid: { lon: (west + east) / 2, lat: (south + north) / 2 },
-      bounds: { west, south, east, north }
-    };
-  } else {
-    return null;
-  }
-
-  geometryCache.set(id, result);
-  return result;
-}
-
-// ============================================================
-// LRU Cache
-// ============================================================
-
-class LRUCache<K, V> {
-  private cache = new Map<K, V>();
-  private maxSize: number;
-
-  constructor(maxSize: number) {
-    this.maxSize = maxSize;
-  }
-
-  get(key: K): V | undefined {
-    const value = this.cache.get(key);
-    if (value !== undefined) {
-      this.cache.delete(key);
-      this.cache.set(key, value);
-    }
-    return value;
-  }
-
-  set(key: K, value: V): void {
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    } else if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey !== undefined) {
-        this.cache.delete(firstKey);
-      }
-    }
-    this.cache.set(key, value);
-  }
-
-  has(key: K): boolean {
-    return this.cache.has(key);
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-
-  get size(): number {
-    return this.cache.size;
-  }
-}
-
-// ============================================================
-// Utility Functions
-// ============================================================
-
-function normalizeLon(lon: number): number {
-  while (lon > 180) lon -= 360;
-  while (lon < -180) lon += 360;
-  return lon;
-}
-
-function computeBboxKey(
-  instrument: InstrumentType,
-  bbox: [number, number, number, number],
-  lod: LODType,
-  simplify: SimplifyLevel | null
-): string {
-  // Round bbox for better cache hits
-  const precision = 1;
-  const roundedBbox = bbox.map((v) => v.toFixed(precision)).join(",");
-  return `${instrument}:${roundedBbox}:${lod}:${simplify || "none"}`;
-}
-
-function determineLOD(cameraHeight: number): LODType {
-  if (cameraHeight > LOD_THRESHOLDS.FAR) return "none";
-  if (cameraHeight > LOD_THRESHOLDS.MID) return "point";
-  return "poly";
-}
-
-function determineSimplify(cameraHeight: number, lod: LODType): SimplifyLevel | null {
-  if (lod !== "poly") return null;
-  if (cameraHeight < SIMPLIFY_THRESHOLDS.HIGH) return "high";
-  if (cameraHeight < SIMPLIFY_THRESHOLDS.MID) return "mid";
-  return "low";
-}
-
-// ============================================================
-// FootprintManager Class
-// ============================================================
+// Using shared normalizeLonForMap from coordinates.ts
+const normalizeLon = normalizeLonForMap;
 
 export class FootprintManager {
   private viewer: Cesium.Viewer;
   private ellipsoid: Cesium.Ellipsoid;
-  private debounceMs: number;
-  private cache: LRUCache<string, FootprintResponse>;
-
-  private abortControllers: Map<InstrumentType, AbortController> = new Map();
-  private currentFeatures: Map<InstrumentType, Map<string, FootprintFeature>> = new Map();
-  private enabled: Map<InstrumentType, boolean> = new Map();
   private entityIds: Map<InstrumentType, Set<string>> = new Map();
+  private features: Map<InstrumentType, FootprintFeature[]> = new Map();
+  private abortControllers: Map<InstrumentType, AbortController> = new Map();
+  private requestIds: Map<InstrumentType, number> = new Map(); // Track request IDs for idempotency
+  private nextRequestId = 0;
 
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  private moveEndListener: Cesium.Event.RemoveCallback | null = null;
-
-  private onTruncated?: (instrument: InstrumentType, returned: number, total: number) => void;
   private onLoadStart?: (instrument: InstrumentType) => void;
-  private onLoadEnd?: (instrument: InstrumentType, count: number) => void;
+  private onLoadEnd?: (instrument: InstrumentType, result: LoadResult) => void;
   private onError?: (instrument: InstrumentType, error: Error) => void;
-  private onLODChange?: (lod: LODType, cameraHeight: number) => void;
-
-  private currentLOD: LODType = "none";
-  private currentCameraHeight: number = Infinity;
-  private renderedLOD: Map<InstrumentType, LODType> = new Map();
-
-  /**
-   * Get Cesium color for an instrument from the registry
-   */
-  private static getInstrumentColor(instrument: InstrumentType): Cesium.Color {
-    const rgb = getInstrumentCesiumColor(instrument.toLowerCase() as InstrumentId);
-    return new Cesium.Color(rgb.r, rgb.g, rgb.b, 1.0);
-  }
 
   constructor(config: FootprintManagerConfig) {
     this.viewer = config.viewer;
     this.ellipsoid = config.ellipsoid;
-    this.debounceMs = config.debounceMs ?? 300;
-    this.cache = new LRUCache(config.maxCacheSize ?? 200);
-    this.onTruncated = config.onTruncated;
     this.onLoadStart = config.onLoadStart;
     this.onLoadEnd = config.onLoadEnd;
     this.onError = config.onError;
-    this.onLODChange = config.onLODChange;
 
-    const instruments: InstrumentType[] = ["CRISM", "HIRISE", "SHARAD"];
-    instruments.forEach((inst) => {
-      this.currentFeatures.set(inst, new Map());
-      this.enabled.set(inst, false);
-      this.entityIds.set(inst, new Set());
-    });
-
-    this.setupCameraListener();
+    // Initialize empty collections for each instrument
+    this.entityIds.set("CRISM", new Set());
+    this.entityIds.set("HIRISE", new Set());
+    this.entityIds.set("SHARAD", new Set());
+    this.entityIds.set("SHARAD_HIGHRES", new Set());
+    this.entityIds.set("CTX", new Set());
+    this.features.set("CRISM", []);
+    this.features.set("HIRISE", []);
+    this.features.set("SHARAD", []);
+    this.features.set("SHARAD_HIGHRES", []);
+    this.features.set("CTX", []);
   }
 
-  private setupCameraListener(): void {
-    this.moveEndListener = this.viewer.camera.moveEnd.addEventListener(() => {
-      this.onCameraMoveEnd();
-    });
-  }
+  /**
+   * Get current viewport bounding box using Cesium's computeViewRectangle
+   * Falls back to screen corner picking if that fails
+   */
+  private getViewportBbox(): [number, number, number, number] | null {
+    const scene = this.viewer.scene;
 
-  private onCameraMoveEnd(): void {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
+    // Try to get the view rectangle directly from Cesium
+    const viewRect = this.viewer.camera.computeViewRectangle(scene.globe.ellipsoid);
+
+    if (viewRect) {
+      const west = Cesium.Math.toDegrees(viewRect.west);
+      const south = Cesium.Math.toDegrees(viewRect.south);
+      const east = Cesium.Math.toDegrees(viewRect.east);
+      const north = Cesium.Math.toDegrees(viewRect.north);
+
+      // Cesium returns west > east when crossing antimeridian
+      const crossesAntimeridian = west > east;
+
+      // Calculate actual longitude span
+      const lonSpan = crossesAntimeridian
+        ? (180 - west) + (180 + east)  // e.g., west=150, east=-160 -> 30 + 20 = 50°
+        : (east - west);
+
+      const latSpan = north - south;
+
+      // Sanity check - if spans are too large, fallback to corner picking
+      if (lonSpan < 350 && latSpan < 170) {
+        console.log(`[FootprintManager] computeViewRectangle: [${west.toFixed(1)}, ${south.toFixed(1)}, ${east.toFixed(1)}, ${north.toFixed(1)}] (lonSpan=${lonSpan.toFixed(0)}°, crossesAM=${crossesAntimeridian})`);
+        return [west, south, east, north];
+      }
     }
 
-    this.debounceTimer = setTimeout(() => {
-      this.updateFootprints();
-    }, this.debounceMs);
+    // Fallback: pick screen corners
+    return this.getViewportBboxFromCorners();
   }
 
-  private getViewportState(): ViewportState | null {
+  /**
+   * Fallback method: compute viewport bbox by picking screen corners
+   */
+  private getViewportBboxFromCorners(): [number, number, number, number] | null {
     const camera = this.viewer.camera;
-    const cartographic = camera.positionCartographic;
-    const cameraHeight = cartographic ? cartographic.height : camera.positionWC.z;
+    const canvas = this.viewer.scene.canvas;
 
-    let viewRect = camera.computeViewRectangle(this.ellipsoid);
+    // Sample many points across the screen for better coverage
+    const samplePoints: Cesium.Cartesian2[] = [];
+    const gridSize = 5; // 5x5 grid
 
-    if (!viewRect) {
-      const canvas = this.viewer.scene.canvas;
-      const corners = [
-        new Cesium.Cartesian2(0, 0),
-        new Cesium.Cartesian2(canvas.width, 0),
-        new Cesium.Cartesian2(canvas.width, canvas.height),
-        new Cesium.Cartesian2(0, canvas.height),
-      ];
-
-      let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
-
-      for (const corner of corners) {
-        const cartesian = camera.pickEllipsoid(corner, this.ellipsoid);
-        if (cartesian) {
-          const carto = Cesium.Cartographic.fromCartesian(cartesian, this.ellipsoid);
-          west = Math.min(west, carto.longitude);
-          east = Math.max(east, carto.longitude);
-          south = Math.min(south, carto.latitude);
-          north = Math.max(north, carto.latitude);
-        }
-      }
-
-      if (west !== Infinity) {
-        viewRect = new Cesium.Rectangle(west, south, east, north);
+    for (let i = 0; i <= gridSize; i++) {
+      for (let j = 0; j <= gridSize; j++) {
+        samplePoints.push(new Cesium.Cartesian2(
+          (canvas.width * i) / gridSize,
+          (canvas.height * j) / gridSize
+        ));
       }
     }
 
-    if (!viewRect) return null;
+    const lons: number[] = [];
+    const lats: number[] = [];
 
-    const minLon = normalizeLon(Cesium.Math.toDegrees(viewRect.west));
-    const maxLon = normalizeLon(Cesium.Math.toDegrees(viewRect.east));
-    const minLat = Cesium.Math.toDegrees(viewRect.south);
-    const maxLat = Cesium.Math.toDegrees(viewRect.north);
+    for (const point of samplePoints) {
+      const cartesian = camera.pickEllipsoid(point, this.ellipsoid);
+      if (cartesian) {
+        const carto = Cesium.Cartographic.fromCartesian(cartesian, this.ellipsoid);
+        lons.push(Cesium.Math.toDegrees(carto.longitude));
+        lats.push(Cesium.Math.toDegrees(carto.latitude));
+      }
+    }
 
-    const lod = determineLOD(cameraHeight);
-    const simplify = determineSimplify(cameraHeight, lod);
+    if (lons.length < 4) {
+      // Not enough points picked - probably viewing full globe or off-planet
+      console.log("[FootprintManager] Not enough points picked, returning full globe");
+      return [-180, -90, 180, 90];
+    }
 
-    return { bbox: [minLon, minLat, maxLon, maxLat], cameraHeight, lod, simplify };
+    const south = Math.min(...lats);
+    const north = Math.max(...lats);
+
+    // Detect antimeridian crossing: if we have both high positive and low negative longitudes
+    const hasHighPositive = lons.some(lon => lon > 90);
+    const hasLowNegative = lons.some(lon => lon < -90);
+    const crossesAntimeridian = hasHighPositive && hasLowNegative;
+
+    let west: number;
+    let east: number;
+
+    if (crossesAntimeridian) {
+      // Viewport crosses antimeridian - compute west/east correctly
+      // West = minimum of positive values (left edge near +180)
+      // East = maximum of negative values (right edge near -180)
+      const positiveLons = lons.filter(lon => lon > 0);
+      const negativeLons = lons.filter(lon => lon < 0);
+
+      if (positiveLons.length > 0 && negativeLons.length > 0) {
+        west = Math.min(...positiveLons);
+        east = Math.max(...negativeLons);
+        console.log(`[FootprintManager] Antimeridian crossing detected: west=${west.toFixed(1)}, east=${east.toFixed(1)}`);
+      } else {
+        // Fallback if something went wrong
+        west = Math.min(...lons);
+        east = Math.max(...lons);
+      }
+    } else {
+      // Normal case: simple min/max
+      west = Math.min(...lons);
+      east = Math.max(...lons);
+    }
+
+    // If longitude span > 300 (and not antimeridian crossing), we're viewing most of the globe
+    const span = crossesAntimeridian ? (180 - west) + (180 + east) : (east - west);
+    if (span > 300) {
+      west = -180;
+      east = 180;
+    }
+
+    console.log(`[FootprintManager] Corner picking: [${west.toFixed(1)}, ${south.toFixed(1)}, ${east.toFixed(1)}, ${north.toFixed(1)}]`);
+    return [west, south, east, north];
   }
 
-  private async updateFootprints(): Promise<void> {
-    perf.start('footprint-update-total');
-    const viewport = this.getViewportState();
-    if (!viewport) {
-      perf.end('footprint-update-total');
-      return;
+  /**
+   * Load footprints for current viewport - EXPLICIT CALL ONLY
+   * Each call clears previous footprints and loads fresh data
+   */
+  async loadFootprints(instrument: InstrumentType): Promise<LoadResult | null> {
+    const bbox = this.getViewportBbox();
+    if (!bbox) {
+      console.warn("[FootprintManager] Cannot compute viewport");
+      return null;
     }
 
-    const { lod, cameraHeight } = viewport;
+    console.log(`[FootprintManager] Loading ${instrument} for bbox: [${bbox.map(v => v.toFixed(1)).join(", ")}]`);
 
-    if (lod !== this.currentLOD || Math.abs(cameraHeight - this.currentCameraHeight) > 50000) {
-      this.currentLOD = lod;
-      this.currentCameraHeight = cameraHeight;
-      this.onLODChange?.(lod, cameraHeight);
-    }
+    // Generate unique request ID
+    const requestId = ++this.nextRequestId;
+    this.requestIds.set(instrument, requestId);
 
-    if (lod === "none") {
-      const instruments: InstrumentType[] = ["CRISM", "HIRISE"];
-      for (const instrument of instruments) {
-        if (this.enabled.get(instrument)) {
-          this.clearInstrumentFootprints(instrument);
-        }
-      }
-      perf.end('footprint-update-total');
-      return;
-    }
+    // Cancel any pending request
+    this.abortControllers.get(instrument)?.abort();
+    const controller = new AbortController();
+    this.abortControllers.set(instrument, controller);
 
-    const instruments: InstrumentType[] = ["CRISM", "HIRISE"];
-    const promises = instruments
-      .filter((inst) => this.enabled.get(inst))
-      .map((inst) => this.updateInstrument(inst, viewport));
+    // Clear existing footprints FIRST (before async operations)
+    this.clearFootprints(instrument);
 
-    await Promise.all(promises);
-    perf.end('footprint-update-total');
-  }
+    this.onLoadStart?.(instrument);
 
-  private clearInstrumentFootprints(instrument: InstrumentType): void {
-    const viewer = this.viewer;
-    const entityIdSet = this.entityIds.get(instrument)!;
+    try {
+      const url = `/api/footprints?instrument=${instrument}&bbox=${bbox.join(",")}&limit=2000`;
+      const res = await fetch(url, { signal: controller.signal });
 
-    if (entityIdSet.size > 0) {
-      viewer.entities.suspendEvents();
-      for (const id of entityIdSet) {
-        const entity = viewer.entities.getById(id);
-        if (entity) viewer.entities.remove(entity);
-      }
-      entityIdSet.clear();
-      viewer.entities.resumeEvents();
-    }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    this.currentFeatures.get(instrument)?.clear();
-    viewer.scene.requestRender();
-  }
+      const data: FootprintResponse = await res.json();
 
-  private async updateInstrument(
-    instrument: InstrumentType,
-    viewport: ViewportState
-  ): Promise<void> {
-    const { bbox, lod, simplify } = viewport;
-    const cacheKey = computeBboxKey(instrument, bbox, lod, simplify);
-    let response = this.cache.get(cacheKey);
-
-    if (!response) {
-      const existingController = this.abortControllers.get(instrument);
-      if (existingController) {
-        existingController.abort();
+      // Check if this request is still the current one (idempotency check)
+      if (this.requestIds.get(instrument) !== requestId) {
+        console.log(`[FootprintManager] Request ${requestId} superseded, discarding results`);
+        return null;
       }
 
-      const controller = new AbortController();
-      this.abortControllers.set(instrument, controller);
+      console.log(`[FootprintManager] ${instrument}: received ${data.features.length} features`);
 
-      try {
-        this.onLoadStart?.(instrument);
+      // Store and render footprints
+      this.features.set(instrument, data.features);
+      this.renderFeatures(instrument, data.features);
 
-        const params = new URLSearchParams({
-          instrument,
-          bbox: bbox.join(","),
-          lod,
-          limit: "2000",
-        });
+      const entityCount = this.entityIds.get(instrument)?.size ?? 0;
+      console.log(`[FootprintManager] ${instrument}: created ${entityCount} entities`);
 
-        if (simplify) params.set("simplify", simplify);
+      const result: LoadResult = {
+        instrument,
+        count: data.features.length,
+        truncated: data.metadata.truncated,
+        total: data.metadata.total_estimate,
+      };
 
-        const res = await fetch(`/api/footprints?${params}`, {
-          signal: controller.signal,
-        });
+      this.onLoadEnd?.(instrument, result);
+      return result;
 
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        response = await res.json();
-        this.cache.set(cacheKey, response!);
-
-        if (response!.metadata.truncated) {
-          this.onTruncated?.(instrument, response!.metadata.returned, response!.metadata.total_estimate);
-        }
-      } catch (err: any) {
-        if (err.name === "AbortError") return;
-        this.onError?.(instrument, err);
-        return;
-      } finally {
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        console.log(`[FootprintManager] Request ${requestId} aborted`);
+        return null;
+      }
+      console.error(`[FootprintManager] Error loading ${instrument}:`, err);
+      this.onError?.(instrument, err);
+      return null;
+    } finally {
+      // Only delete controller if it's still ours (prevents race condition)
+      if (this.abortControllers.get(instrument) === controller) {
         this.abortControllers.delete(instrument);
       }
     }
-
-    if (!response) return;
-
-    this.updateRendering(instrument, response.features, viewport.lod);
-    this.onLoadEnd?.(instrument, response.features.length);
   }
 
-  private updateRendering(
-    instrument: InstrumentType,
-    features: FootprintFeature[],
-    lod: LODType
-  ): void {
-    perf.start(`render-${instrument}-${lod}`);
-    const viewer = this.viewer;
-    const currentMap = this.currentFeatures.get(instrument)!;
-    const entityIdSet = this.entityIds.get(instrument)!;
-
-    // Check LOD change
-    const previousLOD = this.renderedLOD.get(instrument);
-    const lodChanged = previousLOD !== undefined && previousLOD !== lod;
-
-    if (lodChanged) {
-      console.log(`[FootprintManager] LOD changed for ${instrument}: ${previousLOD} -> ${lod}`);
-      viewer.entities.suspendEvents();
-      for (const id of entityIdSet) {
-        const entity = viewer.entities.getById(id);
-        if (entity) viewer.entities.remove(entity);
+  /**
+   * Clear all footprints for an instrument
+   */
+  clearFootprints(instrument: InstrumentType): void {
+    const ids = this.entityIds.get(instrument);
+    if (ids && ids.size > 0) {
+      console.log(`[FootprintManager] Clearing ${ids.size} entities for ${instrument}`);
+      this.viewer.entities.suspendEvents();
+      for (const id of ids) {
+        const entity = this.viewer.entities.getById(id);
+        if (entity) this.viewer.entities.remove(entity);
       }
-      entityIdSet.clear();
-      viewer.entities.resumeEvents();
-      currentMap.clear();
+      ids.clear();
+      this.viewer.entities.resumeEvents();
+      this.viewer.scene.requestRender();
     }
+    this.features.set(instrument, []);
+  }
 
-    this.renderedLOD.set(instrument, lod);
+  /**
+   * Get loaded features for an instrument
+   */
+  getFeatures(instrument: InstrumentType): FootprintFeature[] {
+    return this.features.get(instrument) ?? [];
+  }
 
-    // Build new feature map
-    const newMap = new Map<string, FootprintFeature>();
-    for (const f of features) {
-      const id = f.properties.product_id;
-      if (id) newMap.set(id, f);
-    }
+  /**
+   * Render features as Cesium entities
+   * Passes ALL feature properties to entity for popup access
+   */
+  private renderFeatures(instrument: InstrumentType, features: FootprintFeature[]): void {
+    const ids = this.entityIds.get(instrument)!;
+    const color = this.getColor(instrument);
 
-    // Diff
-    const toRemove: string[] = [];
-    for (const id of currentMap.keys()) {
-      if (!newMap.has(id)) toRemove.push(id);
-    }
+    this.viewer.entities.suspendEvents();
 
-    const toAdd: FootprintFeature[] = [];
-    for (const [id, f] of newMap) {
-      if (!currentMap.has(id)) toAdd.push(f);
-    }
+    for (const feature of features) {
+      const productId = feature.properties?.product_id;
+      if (!productId) continue;
 
-    // Batch operations
-    viewer.entities.suspendEvents();
-
-    // Remove old entities
-    for (const id of toRemove) {
-      const entityId = `${instrument}_VP_${id}`;
-      const entity = viewer.entities.getById(entityId);
-      if (entity) viewer.entities.remove(entity);
-      entityIdSet.delete(entityId);
-
-      for (let i = 1; i < 4; i++) {
-        const splitId = `${entityId}_${i}`;
-        const splitEnt = viewer.entities.getById(splitId);
-        if (splitEnt) viewer.entities.remove(splitEnt);
-        entityIdSet.delete(splitId);
-      }
-
-      const labelId = `${instrument}_VP_LABEL_${id}`;
-      const pointId = `${instrument}_VP_POINT_${id}`;
-      const labelEnt = viewer.entities.getById(labelId);
-      const pointEnt = viewer.entities.getById(pointId);
-      if (labelEnt) viewer.entities.remove(labelEnt);
-      if (pointEnt) viewer.entities.remove(pointEnt);
-      entityIdSet.delete(labelId);
-      entityIdSet.delete(pointId);
-    }
-
-    // Add new features
-    const color = FootprintManager.getInstrumentColor(instrument);
-
-    for (const f of toAdd) {
-      const id = f.properties.product_id;
-      const geom = getCachedGeometry(f);
+      const geom = feature.geometry;
       if (!geom) continue;
 
-      const entityId = `${instrument}_VP_${id}`;
+      const entityId = `${instrument}_FP_${productId}`;
 
-      if (lod === "point") {
-        // POINT MODE: Simple point entity
-        viewer.entities.add({
+      // Pass ALL feature properties to the entity (for popup access)
+      const entityProps = { ...feature.properties, instrument };
+
+      if (geom.type === "Polygon") {
+        const ring = geom.coordinates?.[0];
+        if (!ring || ring.length === 0) continue;
+
+        // Compute bounding box
+        let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+        for (const [lon, lat] of ring) {
+          const nlon = normalizeLon(lon);
+          if (nlon < west) west = nlon;
+          if (nlon > east) east = nlon;
+          if (lat < south) south = lat;
+          if (lat > north) north = lat;
+        }
+
+        // Skip if crosses dateline (would render incorrectly)
+        if (east - west > 180) continue;
+
+        const centerLon = (west + east) / 2;
+        const centerLat = (south + north) / 2;
+
+        // Add rectangle
+        this.viewer.entities.add({
           id: entityId,
-          position: Cesium.Cartesian3.fromDegrees(geom.centroid.lon, geom.centroid.lat, 0, this.ellipsoid),
-          point: {
-            pixelSize: 6,
-            color: color.withAlpha(0.8),
-            outlineColor: Cesium.Color.BLACK,
+          rectangle: {
+            coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
+            material: color.withAlpha(0),
+            outline: true,
+            outlineColor: color,
             outlineWidth: 1,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            height: 0,
           },
-          properties: {
-            product_id: id,
-            instrument,
-            kind: "FOOTPRINT_POINT",
-          },
+          properties: entityProps,
         });
-        entityIdSet.add(entityId);
-      } else if (lod === "poly" && geom.bounds) {
-        // POLY MODE: Rectangle entities
-        const { west, south, east, north } = geom.bounds;
+        ids.add(entityId);
 
-        const width = east - west;
-        const rects: Array<{ rect: Cesium.Rectangle; suffix: string }> = [];
-
-        if (width > 180) {
-          rects.push({ rect: Cesium.Rectangle.fromDegrees(east, south, 180, north), suffix: "" });
-          rects.push({ rect: Cesium.Rectangle.fromDegrees(-180, south, west, north), suffix: "_1" });
-        } else {
-          rects.push({ rect: Cesium.Rectangle.fromDegrees(west, south, east, north), suffix: "" });
-        }
-
-        for (const { rect, suffix } of rects) {
-          const rectEntityId = entityId + suffix;
-          viewer.entities.add({
-            id: rectEntityId,
-            rectangle: {
-              coordinates: rect,
-              material: color.withAlpha(0.4),
-              outline: false,
-              height: 0,
-            },
-            properties: { product_id: id, instrument, kind: "FOOTPRINT_RECT" },
-          });
-          entityIdSet.add(rectEntityId);
-        }
-
-        // Label
-        const labelId = `${instrument}_VP_LABEL_${id}`;
-        viewer.entities.add({
+        // Add label
+        const labelId = `${instrument}_LBL_${productId}`;
+        this.viewer.entities.add({
           id: labelId,
-          position: Cesium.Cartesian3.fromDegrees(geom.centroid.lon, geom.centroid.lat, 0, this.ellipsoid),
+          position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 0, this.ellipsoid),
           label: {
-            text: id,
+            text: productId,
             font: "11px sans-serif",
             fillColor: Cesium.Color.WHITE,
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            pixelOffset: new Cesium.Cartesian2(0, -10),
-            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5e7),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5e6),
           },
-          properties: { product_id: id, instrument, kind: "FOOTPRINT_LABEL" },
+          properties: entityProps,
         });
-        entityIdSet.add(labelId);
+        ids.add(labelId);
 
-        // Center point
-        const pointId = `${instrument}_VP_POINT_${id}`;
-        viewer.entities.add({
-          id: pointId,
-          position: Cesium.Cartesian3.fromDegrees(geom.centroid.lon, geom.centroid.lat, 0, this.ellipsoid),
+      } else if (geom.type === "LineString") {
+        const coords = geom.coordinates;
+        if (!coords || coords.length < 2) continue;
+
+        // Convert coordinates to Cesium positions
+        const positions = coords.map(([lon, lat]: [number, number]) =>
+          Cesium.Cartesian3.fromDegrees(normalizeLon(lon), lat, 0, this.ellipsoid)
+        );
+
+        this.viewer.entities.add({
+          id: entityId,
+          polyline: {
+            positions,
+            width: 3,
+            material: color,
+            clampToGround: true,
+            arcType: Cesium.ArcType.GEODESIC, // Proper great circle path for polar orbits
+          },
+          properties: entityProps,
+        });
+        ids.add(entityId);
+
+        // Compute label position at geodesic midpoint
+        const startPos = positions[0];
+        const endPos = positions[positions.length - 1];
+        const midPos = Cesium.Cartesian3.midpoint(startPos, endPos, new Cesium.Cartesian3());
+
+        const labelId = `${instrument}_LBL_${productId}`;
+        this.viewer.entities.add({
+          id: labelId,
+          position: midPos,
+          label: {
+            text: productId,
+            font: "11px sans-serif",
+            fillColor: Cesium.Color.ORANGE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -5),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5e6),
+          },
+          properties: entityProps,
+        });
+        ids.add(labelId);
+
+      } else if (geom.type === "Point") {
+        const [lon, lat] = geom.coordinates;
+
+        // Skip invalid placeholder coordinates (0, 0)
+        if (lon === 0 && lat === 0) continue;
+
+        const nlon = normalizeLon(lon);
+
+        this.viewer.entities.add({
+          id: entityId,
+          position: Cesium.Cartesian3.fromDegrees(nlon, lat, 0, this.ellipsoid),
           point: {
-            pixelSize: 6,
-            color,
+            pixelSize: 8,
+            color: color.withAlpha(0.9),
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 1,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
-          properties: { product_id: id, instrument, kind: "FOOTPRINT_POINT" },
+          properties: entityProps,
         });
-        entityIdSet.add(pointId);
+        ids.add(entityId);
+
+        // Add label
+        const labelId = `${instrument}_LBL_${productId}`;
+        this.viewer.entities.add({
+          id: labelId,
+          position: Cesium.Cartesian3.fromDegrees(nlon, lat, 0, this.ellipsoid),
+          label: {
+            text: productId,
+            font: "10px sans-serif",
+            fillColor: Cesium.Color.WHITE,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -10),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3e6),
+          },
+          properties: entityProps,
+        });
+        ids.add(labelId);
       }
     }
 
-    viewer.entities.resumeEvents();
-
-    // Update current features map
-    this.currentFeatures.set(instrument, newMap);
-    viewer.scene.requestRender();
-    perf.end(`render-${instrument}-${lod}`);
-  }
-
-  setEnabled(instrument: InstrumentType, enabled: boolean): void {
-    const wasEnabled = this.enabled.get(instrument);
-    this.enabled.set(instrument, enabled);
-
-    const entityIdSet = this.entityIds.get(instrument)!;
-
-    if (!enabled) {
-      for (const id of entityIdSet) {
-        const entity = this.viewer.entities.getById(id);
-        if (entity) entity.show = false;
-      }
-    } else {
-      for (const id of entityIdSet) {
-        const entity = this.viewer.entities.getById(id);
-        if (entity) entity.show = true;
-      }
-
-      if (!wasEnabled) {
-        this.onCameraMoveEnd();
-      }
-    }
-
+    this.viewer.entities.resumeEvents();
     this.viewer.scene.requestRender();
   }
 
-  refresh(): void {
-    this.onCameraMoveEnd();
+  /**
+   * Set visibility of footprints
+   */
+  setVisible(instrument: InstrumentType, visible: boolean): void {
+    const ids = this.entityIds.get(instrument);
+    if (!ids) return;
+
+    for (const id of ids) {
+      const entity = this.viewer.entities.getById(id);
+      if (entity) entity.show = visible;
+    }
+    this.viewer.scene.requestRender();
   }
 
-  clearCache(): void {
-    this.cache.clear();
-    geometryCache.clear();
-    this.refresh();
+  /**
+   * Check if footprints are loaded
+   */
+  hasFootprints(instrument: InstrumentType): boolean {
+    return (this.entityIds.get(instrument)?.size ?? 0) > 0;
   }
 
-  getFeatures(instrument: InstrumentType): FootprintFeature[] {
-    const map = this.currentFeatures.get(instrument);
-    return map ? Array.from(map.values()) : [];
+  /**
+   * Get instrument color
+   */
+  private getColor(instrument: InstrumentType): Cesium.Color {
+    const rgb = getInstrumentCesiumColor(instrument.toLowerCase() as InstrumentId);
+    return new Cesium.Color(rgb.r, rgb.g, rgb.b, 1.0);
   }
 
-  getVisibleProductIds(instrument: InstrumentType): string[] {
-    const map = this.currentFeatures.get(instrument);
-    return map ? Array.from(map.keys()) : [];
-  }
-
-  isEnabled(instrument: InstrumentType): boolean {
-    return this.enabled.get(instrument) ?? false;
-  }
-
-  getCurrentLOD(): LODType {
-    return this.currentLOD;
-  }
-
-  getCameraHeight(): number {
-    return this.currentCameraHeight;
-  }
-
-  static getLODThresholds() {
-    return { ...LOD_THRESHOLDS };
-  }
-
+  /**
+   * Cleanup
+   */
   dispose(): void {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    if (this.moveEndListener) this.moveEndListener();
-
     for (const controller of this.abortControllers.values()) {
       controller.abort();
     }
-
-    this.viewer.entities.suspendEvents();
-    for (const [, entityIdSet] of this.entityIds) {
-      for (const id of entityIdSet) {
-        const entity = this.viewer.entities.getById(id);
-        if (entity) this.viewer.entities.remove(entity);
-      }
-      entityIdSet.clear();
-    }
-    this.viewer.entities.resumeEvents();
-
-    this.cache.clear();
-    geometryCache.clear();
+    this.clearFootprints("CRISM");
+    this.clearFootprints("HIRISE");
+    this.clearFootprints("SHARAD");
+    this.clearFootprints("SHARAD_HIGHRES");
+    this.clearFootprints("CTX");
   }
 }
 

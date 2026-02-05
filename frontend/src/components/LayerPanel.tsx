@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import type { VisibleProduct, BaseLayerType, BoundingBox, MapMode, ActiveOverlays, OverlayType, ProductOverlay, CustomDataset } from "../pages/MainPage";
+import { normalizeLonForMap, clampLatitude, parseCoordinate } from "../utils/coordinates";
 
 type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM";
 
@@ -238,20 +239,110 @@ interface LayerPanelProps {
   analysisMode?: "slope" | "line" | null;
   onAnalysisModeChange?: (mode: "slope" | "line" | null) => void;
 
+  // Fly-To navigation
+  onFlyToCoords?: (lat: number, lon: number) => void;
+
+  // View bound selection mode
+  viewBoundSelectionMode?: boolean;
+  onViewBoundSelectionModeChange?: (active: boolean) => void;
+}
+
+// Fly-To Navigation Component
+function FlyToInput({
+  onFlyToCoords,
+}: {
+  onFlyToCoords?: (lat: number, lon: number) => void;
+}) {
+  const [lat, setLat] = useState("");
+  const [lon, setLon] = useState("");
+
+  const handleFlyTo = () => {
+    const latNum = parseCoordinate(lat);
+    const lonNum = parseCoordinate(lon);
+
+    if (latNum === null || lonNum === null) return;
+
+    // Clamp latitude and normalize longitude for map display
+    const clampedLat = clampLatitude(latNum);
+    const normalizedLon = normalizeLonForMap(lonNum);
+
+    onFlyToCoords?.(clampedLat, normalizedLon);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleFlyTo();
+    }
+  };
+
+  return (
+    <div className="mt-3 pt-3 border-t border-[#232f48]">
+      <h4 className="text-[#92a4c9] text-[9px] font-bold uppercase tracking-widest mb-2">
+        Fly To Location
+      </h4>
+      <div className="flex gap-2 items-end">
+        <div className="flex-1">
+          <label className="text-[9px] text-[#6b7c9c] block mb-1">Lat (°)</label>
+          <input
+            type="number"
+            value={lat}
+            onChange={(e) => setLat(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="0"
+            className="w-full px-2 py-1 text-[11px] bg-[#0a0f18] border border-[#232f48] rounded text-white placeholder-[#4a5568] focus:border-primary focus:outline-none"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-[9px] text-[#6b7c9c] block mb-1">Lon (°)</label>
+          <input
+            type="number"
+            value={lon}
+            onChange={(e) => setLon(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="0"
+            className="w-full px-2 py-1 text-[11px] bg-[#0a0f18] border border-[#232f48] rounded text-white placeholder-[#4a5568] focus:border-primary focus:outline-none"
+          />
+        </div>
+        <button
+          onClick={handleFlyTo}
+          className="px-3 py-1 text-[10px] font-medium bg-primary/20 border border-primary/50 rounded text-primary hover:bg-primary/30 transition-colors whitespace-nowrap"
+        >
+          Fly To
+        </button>
+      </div>
+      <p className="text-[8px] text-[#6b7c9c] mt-1.5">
+        Longitude values beyond ±180° are normalized automatically
+      </p>
+    </div>
+  );
 }
 
 // View Bounds Input Component
 function ViewBoundsInput({
   viewBounds,
   onViewBoundsChange,
+  selectionMode,
+  onSelectionModeChange,
 }: {
   viewBounds: BoundingBox;
   onViewBoundsChange: (bounds: BoundingBox) => void;
+  selectionMode?: boolean;
+  onSelectionModeChange?: (active: boolean) => void;
 }) {
   const [minLat, setMinLat] = useState(viewBounds?.minLat?.toString() ?? "");
   const [maxLat, setMaxLat] = useState(viewBounds?.maxLat?.toString() ?? "");
   const [westLon, setWestLon] = useState(viewBounds?.westLon?.toString() ?? "");
   const [eastLon, setEastLon] = useState(viewBounds?.eastLon?.toString() ?? "");
+
+  // Sync local state when viewBounds changes (e.g., from map selection)
+  useEffect(() => {
+    if (viewBounds) {
+      setMinLat(viewBounds.minLat.toFixed(2));
+      setMaxLat(viewBounds.maxLat.toFixed(2));
+      setWestLon(viewBounds.westLon.toFixed(2));
+      setEastLon(viewBounds.eastLon.toFixed(2));
+    }
+  }, [viewBounds]);
 
   const handleApply = () => {
     const min = parseFloat(minLat);
@@ -272,11 +363,47 @@ function ViewBoundsInput({
     onViewBoundsChange(null);
   };
 
+  const handleSetViewBound = () => {
+    onSelectionModeChange?.(!selectionMode);
+  };
+
   return (
     <div className="mt-4 pt-3 border-t border-[#232f48]">
-      <h4 className="text-[#92a4c9] text-[9px] font-bold uppercase tracking-widest mb-2">
-        View Bounds
-      </h4>
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-[#92a4c9] text-[9px] font-bold uppercase tracking-widest">
+          View Bounds
+        </h4>
+        {viewBounds && (
+          <span className="text-[8px] px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 font-bold uppercase">
+            SET
+          </span>
+        )}
+      </div>
+
+      {/* Set View Bound Button */}
+      <button
+        onClick={handleSetViewBound}
+        className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded transition-colors mb-3 ${
+          selectionMode
+            ? "bg-amber-500/20 border border-amber-500/50 text-amber-400"
+            : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-primary/30"
+        }`}
+      >
+        <span className="material-symbols-outlined text-sm">
+          {selectionMode ? "close" : "select_all"}
+        </span>
+        <span className="text-[11px] font-medium">
+          {selectionMode ? "Cancel Selection" : "Set View Bound"}
+        </span>
+      </button>
+
+      {selectionMode && (
+        <p className="text-[9px] text-amber-400 mb-3 flex items-center gap-1">
+          <span className="material-symbols-outlined text-xs">info</span>
+          Click and drag on the map to select a region
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-[9px] text-[#6b7c9c] block mb-1">Min Lat</label>
@@ -388,6 +515,11 @@ export default function LayerPanel({
   // Analysis mode
   analysisMode = null,
   onAnalysisModeChange,
+  // Fly-To navigation
+  onFlyToCoords,
+  // View bound selection mode
+  viewBoundSelectionMode = false,
+  onViewBoundSelectionModeChange,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -564,8 +696,16 @@ export default function LayerPanel({
             </label>
           </div>
 
+          {/* Fly To */}
+          <FlyToInput onFlyToCoords={onFlyToCoords} />
+
           {/* View Bounds */}
-          <ViewBoundsInput viewBounds={viewBounds} onViewBoundsChange={onViewBoundsChange} />
+          <ViewBoundsInput
+            viewBounds={viewBounds}
+            onViewBoundsChange={onViewBoundsChange}
+            selectionMode={viewBoundSelectionMode}
+            onSelectionModeChange={onViewBoundSelectionModeChange}
+          />
         </div>
 
         {/* Footprints Section */}

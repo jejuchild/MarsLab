@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import FootprintManager from "../utils/FootprintManager";
+import { normalizeLonForMap } from "../utils/coordinates";
 
 
 /* ==================================================
@@ -117,6 +118,9 @@ type MapViewProps = {
   // Analysis mode
   analysisMode?: "slope" | "line" | null;
   linePoints?: Array<{ lat: number; lon: number }>;
+  // View bound selection mode (drag to select rectangle)
+  viewBoundSelectionMode?: boolean;
+  onViewBoundSelected?: (bounds: BoundingBox) => void;
 };
 
 /* ==================================================
@@ -156,9 +160,8 @@ function parseLBLValue(
   return m ? Number(m[1]) : null;
 }
 
-function normalizeLonTo180(lon360: number) {
-  return lon360 > 180 ? lon360 - 360 : lon360;
-}
+// Using shared coordinate utility
+const normalizeLonTo180 = normalizeLonForMap;
 
 /**
  * Extract CRISM observation ID from full product ID
@@ -354,6 +357,8 @@ export default function MapView({
   customDatasets = [],
   analysisMode = null,
   linePoints = [],
+  viewBoundSelectionMode = false,
+  onViewBoundSelected,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -432,6 +437,12 @@ export default function MapView({
   useEffect(() => {
     onFootprintsLoadingRef.current = onFootprintsLoading;
   }, [onFootprintsLoading]);
+
+  // View bound selection refs
+  const onViewBoundSelectedRef = useRef(onViewBoundSelected);
+  useEffect(() => {
+    onViewBoundSelectedRef.current = onViewBoundSelected;
+  }, [onViewBoundSelected]);
 
   const highlightRef = useRef<HighlightState>({
     key: null,
@@ -988,6 +999,151 @@ export default function MapView({
       }
     };
   }, []);
+
+  // View Bound Selection Mode - drag to draw rectangle
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !viewBoundSelectionMode) return;
+
+    // Store drag state
+    let isDragging = false;
+    let startCartographic: Cesium.Cartographic | null = null;
+    const selectionRectId = "__VIEW_BOUND_SELECTION_RECT__";
+
+    // Disable default camera controls during selection
+    const scene = viewer.scene;
+    scene.screenSpaceCameraController.enableRotate = false;
+    scene.screenSpaceCameraController.enableTranslate = false;
+    scene.screenSpaceCameraController.enableZoom = false;
+    scene.screenSpaceCameraController.enableTilt = false;
+    scene.screenSpaceCameraController.enableLook = false;
+
+    // Change cursor to crosshair
+    viewer.canvas.style.cursor = "crosshair";
+
+    const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
+
+    // Mouse down - start drag
+    handler.setInputAction(
+      (click: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+        const cartesian = viewer.camera.pickEllipsoid(click.position, MARS_ELLIPSOID);
+        if (!cartesian) return;
+
+        startCartographic = Cesium.Cartographic.fromCartesian(cartesian, MARS_ELLIPSOID);
+        isDragging = true;
+
+        // Remove existing selection rect if any
+        const existing = viewer.entities.getById(selectionRectId);
+        if (existing) viewer.entities.remove(existing);
+      },
+      Cesium.ScreenSpaceEventType.LEFT_DOWN
+    );
+
+    // Mouse move - update rectangle
+    handler.setInputAction(
+      (movement: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
+        if (!isDragging || !startCartographic) return;
+
+        const cartesian = viewer.camera.pickEllipsoid(movement.endPosition, MARS_ELLIPSOID);
+        if (!cartesian) return;
+
+        const endCartographic = Cesium.Cartographic.fromCartesian(cartesian, MARS_ELLIPSOID);
+
+        // Compute rectangle bounds
+        const west = Math.min(startCartographic.longitude, endCartographic.longitude);
+        const east = Math.max(startCartographic.longitude, endCartographic.longitude);
+        const south = Math.min(startCartographic.latitude, endCartographic.latitude);
+        const north = Math.max(startCartographic.latitude, endCartographic.latitude);
+
+        // Remove existing and add new rectangle
+        const existing = viewer.entities.getById(selectionRectId);
+        if (existing) viewer.entities.remove(existing);
+
+        viewer.entities.add({
+          id: selectionRectId,
+          rectangle: {
+            coordinates: new Cesium.Rectangle(west, south, east, north),
+            material: Cesium.Color.YELLOW.withAlpha(0.3),
+            outline: true,
+            outlineColor: Cesium.Color.YELLOW,
+            outlineWidth: 2,
+            height: 0,
+          },
+        });
+
+        scene.requestRender();
+      },
+      Cesium.ScreenSpaceEventType.MOUSE_MOVE
+    );
+
+    // Mouse up - finalize selection
+    handler.setInputAction(
+      (click: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+        if (!isDragging || !startCartographic) {
+          isDragging = false;
+          return;
+        }
+
+        const cartesian = viewer.camera.pickEllipsoid(click.position, MARS_ELLIPSOID);
+        if (!cartesian) {
+          isDragging = false;
+          return;
+        }
+
+        const endCartographic = Cesium.Cartographic.fromCartesian(cartesian, MARS_ELLIPSOID);
+
+        // Compute final bounds
+        const westRad = Math.min(startCartographic.longitude, endCartographic.longitude);
+        const eastRad = Math.max(startCartographic.longitude, endCartographic.longitude);
+        const southRad = Math.min(startCartographic.latitude, endCartographic.latitude);
+        const northRad = Math.max(startCartographic.latitude, endCartographic.latitude);
+
+        // Convert to degrees
+        const westLon = Cesium.Math.toDegrees(westRad);
+        const eastLon = Cesium.Math.toDegrees(eastRad);
+        const minLat = Cesium.Math.toDegrees(southRad);
+        const maxLat = Cesium.Math.toDegrees(northRad);
+
+        // Remove selection rectangle
+        const existing = viewer.entities.getById(selectionRectId);
+        if (existing) viewer.entities.remove(existing);
+
+        // Only call callback if the selection is meaningful (not just a click)
+        const lonSpan = eastLon - westLon;
+        const latSpan = maxLat - minLat;
+        if (lonSpan > 0.1 && latSpan > 0.1) {
+          console.log(`[ViewBoundSelection] Selected: lat=[${minLat.toFixed(2)}, ${maxLat.toFixed(2)}], lon=[${westLon.toFixed(2)}, ${eastLon.toFixed(2)}]`);
+          onViewBoundSelectedRef.current?.({ minLat, maxLat, westLon, eastLon });
+        }
+
+        isDragging = false;
+        startCartographic = null;
+        scene.requestRender();
+      },
+      Cesium.ScreenSpaceEventType.LEFT_UP
+    );
+
+    // Cleanup
+    return () => {
+      handler.destroy();
+
+      // Re-enable camera controls
+      scene.screenSpaceCameraController.enableRotate = true;
+      scene.screenSpaceCameraController.enableTranslate = true;
+      scene.screenSpaceCameraController.enableZoom = true;
+      scene.screenSpaceCameraController.enableTilt = true;
+      scene.screenSpaceCameraController.enableLook = true;
+
+      // Reset cursor
+      viewer.canvas.style.cursor = "default";
+
+      // Remove selection rectangle if still exists
+      const existing = viewer.entities.getById(selectionRectId);
+      if (existing) viewer.entities.remove(existing);
+
+      scene.requestRender();
+    };
+  }, [viewBoundSelectionMode]);
 
   // Toggle footprint visibility (does NOT load new footprints, just shows/hides existing ones)
   useEffect(() => {

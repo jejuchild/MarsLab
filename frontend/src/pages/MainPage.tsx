@@ -136,6 +136,9 @@ export default function MainPage() {
   // Bounding box for view restriction
   const [viewBounds, setViewBounds] = useState<BoundingBox>(null);
 
+  // View bound selection mode (drag to select region on map)
+  const [viewBoundSelectionMode, setViewBoundSelectionMode] = useState(false);
+
   // Footprint layer toggles (visibility only - does NOT trigger loading)
   const [showCRISM, setShowCRISM] = useState(false);
   const [showHiRISE, setShowHiRISE] = useState(false);
@@ -482,6 +485,17 @@ export default function MainPage() {
     setFlyToCoords(null);
   }, []);
 
+  // Handle fly-to from LayerPanel (Fly To Location input)
+  const handleFlyToCoords = useCallback((lat: number, lon: number) => {
+    setFlyToCoords({ lat, lon });
+  }, []);
+
+  // Handle view bound selected from map drag selection
+  const handleViewBoundSelected = useCallback((bounds: BoundingBox) => {
+    setViewBounds(bounds);
+    setViewBoundSelectionMode(false); // Exit selection mode after selection
+  }, []);
+
   // Handle search result selection from TopBar
   const handleSearchSelect = useCallback((productId: string, instrument?: string, lat?: number | null, lon?: number | null) => {
     // First try to find the product on the map
@@ -601,6 +615,11 @@ export default function MainPage() {
           // Analysis mode
           analysisMode={analysisMode}
           onAnalysisModeChange={handleAnalysisModeChange}
+          // Fly-To navigation
+          onFlyToCoords={handleFlyToCoords}
+          // View bound selection mode
+          viewBoundSelectionMode={viewBoundSelectionMode}
+          onViewBoundSelectionModeChange={setViewBoundSelectionMode}
         />
       }
       rightPanel={
@@ -666,6 +685,8 @@ export default function MainPage() {
         customDatasets={customDatasets}
         analysisMode={analysisMode}
         linePoints={linePoints}
+        viewBoundSelectionMode={viewBoundSelectionMode}
+        onViewBoundSelected={handleViewBoundSelected}
       />
 
       {/* Line Profile Popup */}
