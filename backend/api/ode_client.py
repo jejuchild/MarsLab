@@ -33,6 +33,7 @@ class Instrument(str, Enum):
     CRISM = "crism"
     HIRISE = "hirise"
     SHARAD = "sharad"
+    SHARAD_HIGHRES = "sharad_highres"
 
 
 # =============================================================================
@@ -86,6 +87,31 @@ class HiRISEBundle:
     # RED channel files
     jp2_file: Optional[ODEFile] = None
     lbl_file: Optional[ODEFile] = None
+
+
+@dataclass
+class SHARADBundle:
+    """Collection of files for a SHARAD USRDRV2 observation (quicklook)."""
+    product_id: str
+    # Quicklook thumbnail
+    thm_file: Optional[ODEFile] = None  # *_THM.JPG
+    lbl_file: Optional[ODEFile] = None  # *.LBL
+    # Geometry metadata
+    start_lat: Optional[float] = None
+    start_lon: Optional[float] = None
+    stop_lat: Optional[float] = None
+    stop_lon: Optional[float] = None
+
+
+@dataclass
+class SHARADHighResBundle:
+    """Collection of files for a SHARAD RDR (high-res) observation."""
+    product_id: str
+    # Binary data and label
+    dat_file: Optional[ODEFile] = None  # *.DAT
+    lbl_file: Optional[ODEFile] = None  # *.LBL
+    # Orbit info
+    orbit_number: Optional[int] = None
 
 
 # =============================================================================
@@ -146,14 +172,26 @@ def is_hirise_product_id(product_id: str) -> bool:
 
 def is_sharad_product_id(product_id: str) -> bool:
     """
-    Check if a string looks like a SHARAD product ID.
+    Check if a string looks like a SHARAD USRDRV2 product ID (quicklook).
 
-    SHARAD IDs typically look like:
+    SHARAD USRDRV2 IDs typically look like:
     - S_00195401_THM (radargram thumbnail)
     - s_00195401 (partial ID)
     - s_001 (partial search query)
     """
     pattern = r"^S_\d+"
+    return bool(re.match(pattern, product_id.upper()))
+
+
+def is_sharad_highres_product_id(product_id: str) -> bool:
+    """
+    Check if a string looks like a SHARAD High-Res RDR product ID.
+
+    SHARAD RDR IDs typically look like:
+    - R_5663601_001_SS19_700_A (Italian/ASI RDR format)
+    - r_5663601 (partial ID)
+    """
+    pattern = r"^R_\d+"
     return bool(re.match(pattern, product_id.upper()))
 
 
@@ -893,3 +931,278 @@ def _extract_center_lon(footprint: Any) -> Optional[float]:
                     return sum(lons) / len(lons) if lons else None
                 return _safe_float(coords[0])
     return None
+
+
+# =============================================================================
+# SHARAD Bundle Resolution
+# =============================================================================
+
+# ODE endpoints for SHARAD products
+ODE_SHARAD_SEARCH = "https://oderest.rsl.wustl.edu/live2"
+# PDS Geosciences Node SHARAD data archive
+PDS_SHARAD_BASE = "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/thm"
+
+
+async def search_sharad_products(
+    query: str,
+    max_results: int = 10,
+    session: Optional[aiohttp.ClientSession] = None
+) -> List[ODEProduct]:
+    """
+    Search ODE for SHARAD USRDRV2 products.
+
+    SHARAD USRDRV2 are quicklook radargram thumbnails (THM.JPG).
+
+    Args:
+        query: Search string (partial or full product ID)
+        max_results: Maximum number of results
+        session: Optional aiohttp session
+
+    Returns:
+        List of matching SHARAD products
+    """
+    close_session = session is None
+    if session is None:
+        session = aiohttp.ClientSession()
+
+    products = []
+
+    try:
+        # Search for USRDR (US reduced data record) products
+        url = (
+            f"{ODE_SHARAD_SEARCH}?"
+            f"target=mars&"
+            f"ihid=mro&"
+            f"iid=sharad&"
+            f"productid={query}*&"
+            f"pt=USRDRV2&"  # US Reduced Data Record V2 (quicklook)
+            f"output=json&"
+            f"results=p&"
+            f"limit={max_results}"
+        )
+
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                products = _parse_ode_rest_response(data, Instrument.SHARAD)
+
+    except Exception as e:
+        print(f"SHARAD search error: {e}")
+    finally:
+        if close_session:
+            await session.close()
+
+    return products[:max_results]
+
+
+async def search_sharad_highres_products(
+    query: str,
+    max_results: int = 10,
+    session: Optional[aiohttp.ClientSession] = None
+) -> List[ODEProduct]:
+    """
+    Search ODE for SHARAD High-Res RDR products.
+
+    SHARAD RDR are Italian/ASI pipeline products with full radargram data.
+
+    Args:
+        query: Search string (partial or full product ID)
+        max_results: Maximum number of results
+        session: Optional aiohttp session
+
+    Returns:
+        List of matching SHARAD High-Res products
+    """
+    close_session = session is None
+    if session is None:
+        session = aiohttp.ClientSession()
+
+    products = []
+
+    try:
+        # Search for RDR (Reduced Data Record) products from Italian pipeline
+        url = (
+            f"{ODE_SHARAD_SEARCH}?"
+            f"target=mars&"
+            f"ihid=mro&"
+            f"iid=sharad&"
+            f"productid={query}*&"
+            f"pt=RDR&"  # Italian RDR products
+            f"output=json&"
+            f"results=p&"
+            f"limit={max_results}"
+        )
+
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                products = _parse_ode_rest_response(data, Instrument.SHARAD_HIGHRES)
+
+    except Exception as e:
+        print(f"SHARAD High-Res search error: {e}")
+    finally:
+        if close_session:
+            await session.close()
+
+    return products[:max_results]
+
+
+async def resolve_sharad_bundle(
+    product_id: str,
+    session: Optional[aiohttp.ClientSession] = None
+) -> SHARADBundle:
+    """
+    Resolve files needed for a SHARAD USRDRV2 observation.
+
+    Given a product ID (e.g., S_00195401), discovers:
+    1. THM.JPG quicklook thumbnail
+    2. LBL label file
+
+    USRDRV2 products are stored in the PDS archive at:
+    https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/
+
+    Args:
+        product_id: SHARAD product ID (e.g., S_00195401_THM or S_00195401)
+        session: Optional aiohttp session
+
+    Returns:
+        SHARADBundle with resolved file URLs
+    """
+    close_session = session is None
+    if session is None:
+        session = aiohttp.ClientSession()
+
+    # Normalize product ID: extract base (S_XXXXXXXX)
+    pid_upper = product_id.upper()
+    if "_THM" in pid_upper:
+        base_id = pid_upper.replace("_THM", "")
+    else:
+        base_id = pid_upper
+
+    bundle = SHARADBundle(product_id=base_id)
+
+    try:
+        # Use ODE PRODUCTFILES to discover URLs
+        files = await discover_product_files(product_id, Instrument.SHARAD, session)
+
+        for f in files:
+            fname_lower = f.filename.lower()
+
+            if fname_lower.endswith("_thm.jpg") or fname_lower.endswith("thm.jpg"):
+                bundle.thm_file = f
+            elif fname_lower.endswith(".lbl"):
+                bundle.lbl_file = f
+
+        # If no files found via PRODUCTFILES, construct URLs directly
+        if not bundle.thm_file:
+            # SHARAD USRDRV2 path pattern:
+            # /mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/thm/s_00195401_thm.jpg
+            orbit = base_id.split("_")[1] if "_" in base_id else ""
+            thm_filename = f"{base_id.lower()}_thm.jpg"
+            lbl_filename = f"{base_id.lower()}_thm.lbl"
+
+            # Construct URL based on orbit number grouping
+            if orbit:
+                orbit_num = int(orbit)
+                # Files are grouped by orbit ranges
+                orbit_dir = f"{(orbit_num // 1000) * 1000:05d}_{((orbit_num // 1000) + 1) * 1000 - 1:05d}"
+                base_url = f"https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/thm/{orbit_dir}"
+
+                bundle.thm_file = ODEFile(
+                    filename=thm_filename,
+                    url=f"{base_url}/{thm_filename}",
+                    file_type="Browse"
+                )
+                bundle.lbl_file = ODEFile(
+                    filename=lbl_filename,
+                    url=f"{base_url}/{lbl_filename}",
+                    file_type="Label"
+                )
+
+    except Exception as e:
+        print(f"Error resolving SHARAD bundle: {e}")
+    finally:
+        if close_session:
+            await session.close()
+
+    return bundle
+
+
+async def resolve_sharad_highres_bundle(
+    product_id: str,
+    session: Optional[aiohttp.ClientSession] = None
+) -> SHARADHighResBundle:
+    """
+    Resolve files needed for a SHARAD High-Res RDR observation.
+
+    Given a product ID (e.g., R_5663601_001_SS19_700_A), discovers:
+    1. DAT binary data file
+    2. LBL label file
+
+    Italian RDR products are stored in the PDS archive at:
+    https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v2/
+
+    Args:
+        product_id: SHARAD RDR product ID (e.g., R_5663601_001_SS19_700_A)
+        session: Optional aiohttp session
+
+    Returns:
+        SHARADHighResBundle with resolved file URLs
+    """
+    close_session = session is None
+    if session is None:
+        session = aiohttp.ClientSession()
+
+    bundle = SHARADHighResBundle(product_id=product_id.upper())
+
+    try:
+        # Use ODE PRODUCTFILES to discover URLs
+        files = await discover_product_files(product_id, Instrument.SHARAD_HIGHRES, session)
+
+        for f in files:
+            fname_lower = f.filename.lower()
+
+            if fname_lower.endswith(".dat"):
+                bundle.dat_file = f
+            elif fname_lower.endswith(".lbl"):
+                bundle.lbl_file = f
+
+        # Extract orbit number from product ID if possible
+        # Format: R_OOOOOOO_SSS_TTNN_RRR_V (orbit_sequence_table_range_version)
+        parts = product_id.upper().split("_")
+        if len(parts) >= 2:
+            try:
+                bundle.orbit_number = int(parts[1])
+            except ValueError:
+                pass
+
+        # If no files found via PRODUCTFILES, construct URLs directly
+        if not bundle.dat_file:
+            pid_lower = product_id.lower()
+            dat_filename = f"{pid_lower}.dat"
+            lbl_filename = f"{pid_lower}.lbl"
+
+            # Italian RDR path pattern varies, try common structure
+            # /mro/mro-m-sharad-4-rdr-v2/mrosh_1xxx/data/rdr/OOOOO/r_ooooooo_sss_ttnn_rrr_v.dat
+            if bundle.orbit_number:
+                orbit_dir = f"{(bundle.orbit_number // 1000) * 1000:05d}"
+                base_url = f"https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v2/mrosh_1001/data/rdr/{orbit_dir}"
+
+                bundle.dat_file = ODEFile(
+                    filename=dat_filename,
+                    url=f"{base_url}/{dat_filename}",
+                    file_type="Product"
+                )
+                bundle.lbl_file = ODEFile(
+                    filename=lbl_filename,
+                    url=f"{base_url}/{lbl_filename}",
+                    file_type="Label"
+                )
+
+    except Exception as e:
+        print(f"Error resolving SHARAD High-Res bundle: {e}")
+    finally:
+        if close_session:
+            await session.close()
+
+    return bundle

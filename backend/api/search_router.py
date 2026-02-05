@@ -20,10 +20,13 @@ from .ode_client import (
     ODEProduct,
     search_ode_products,
     search_ode_spatial,
+    search_sharad_products,
+    search_sharad_highres_products,
     parse_crism_base_key,
     is_crism_product_id,
     is_hirise_product_id,
     is_sharad_product_id,
+    is_sharad_highres_product_id,
 )
 import json
 from pathlib import Path
@@ -39,6 +42,65 @@ router = APIRouter(prefix="/api", tags=["Search & Download"])
 
 # SHARAD index path
 SHARAD_INDEX_PATH = Path(__file__).parent.parent / "sharad_data" / "index.geojson"
+
+# All local index paths for full-database search
+_BACKEND_DIR = Path(__file__).parent.parent
+_LOCAL_INDICES = {
+    "CRISM":          _BACKEND_DIR / "crism_data"          / "index.geojson",
+    "HIRISE":         _BACKEND_DIR / "hirise_data"         / "index.geojson",
+    "SHARAD":         _BACKEND_DIR / "sharad_data"         / "index.geojson",
+    "SHARAD_HIGHRES": _BACKEND_DIR / "sharad_highres_data" / "index.geojson",
+    "CTX":            _BACKEND_DIR / "ctx_data"            / "index.geojson",
+}
+
+# Cached product list (loaded once on first search)
+_all_products_cache: list | None = None
+
+
+def _load_all_products() -> list:
+    """Load all products from all index.geojson files. Cached after first call."""
+    global _all_products_cache
+    if _all_products_cache is not None:
+        return _all_products_cache
+
+    products = []
+    for instrument, path in _LOCAL_INDICES.items():
+        if not path.exists():
+            continue
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            for feature in data.get("features", []):
+                props = feature.get("properties", {})
+                pid = props.get("product_id", "")
+                if not pid:
+                    continue
+                # Extract centroid lat/lon from geometry or properties
+                lat = props.get("center_latitude") or props.get("start_lat")
+                lon = props.get("center_longitude") or props.get("start_lon")
+                # Try geometry centroid as fallback
+                if lat is None or lon is None:
+                    geom = feature.get("geometry", {})
+                    coords = geom.get("coordinates", [])
+                    if geom.get("type") == "Polygon" and coords:
+                        ring = coords[0]
+                        lat = sum(c[1] for c in ring) / len(ring)
+                        lon = sum(c[0] for c in ring) / len(ring)
+                    elif geom.get("type") == "LineString" and coords:
+                        lat = coords[0][1]
+                        lon = coords[0][0]
+                products.append({
+                    "product_id": pid,
+                    "instrument": instrument,
+                    "title": props.get("title", ""),
+                    "lat": lat,
+                    "lon": lon,
+                })
+        except Exception:
+            continue
+
+    _all_products_cache = products
+    return products
 
 
 # =============================================================================
@@ -203,12 +265,68 @@ async def search_products(
             inst_filter = Instrument.CRISM
         elif is_hirise_product_id(q):
             inst_filter = Instrument.HIRISE
+        elif is_sharad_highres_product_id(q):
+            inst_filter = Instrument.SHARAD_HIGHRES
         elif is_sharad_product_id(q):
             inst_filter = Instrument.SHARAD
 
-    # Handle SHARAD search locally (already downloaded data)
+    # Handle SHARAD High-Res search via ODE
+    if inst_filter == Instrument.SHARAD_HIGHRES:
+        try:
+            products = await search_sharad_highres_products(q, limit)
+        except Exception as e:
+            raise HTTPException(500, f"SHARAD High-Res search failed: {e}")
+
+        results = []
+        for p in products:
+            base_key = p.product_id.upper()
+            existence = check_local_existence_detailed(p.product_id, p.instrument)
+
+            results.append(SearchResult(
+                product_id=p.product_id,
+                instrument=p.instrument.value,
+                base_key=base_key,
+                lat=p.lat,
+                lon=p.lon,
+                exists=existence.exists,
+                has_core=existence.has_core,
+                has_browse=existence.has_browse,
+                missing_files=existence.missing_files,
+            ))
+
+        return SearchResponse(
+            query=q,
+            results=results,
+            count=len(results),
+        )
+
+    # Handle SHARAD search - first check local, then ODE
     if inst_filter == Instrument.SHARAD:
+        # First check local index
         sharad_results = search_local_sharad(q, limit)
+
+        # If no local results, search ODE for USRDRV2 products
+        if not sharad_results:
+            try:
+                products = await search_sharad_products(q, limit)
+                for p in products:
+                    base_key = p.product_id.upper().replace("_THM", "")
+                    existence = check_local_existence_detailed(p.product_id, p.instrument)
+
+                    sharad_results.append(SearchResult(
+                        product_id=p.product_id,
+                        instrument=p.instrument.value,
+                        base_key=base_key,
+                        lat=p.lat,
+                        lon=p.lon,
+                        exists=existence.exists,
+                        has_core=existence.has_core,
+                        has_browse=existence.has_browse,
+                        missing_files=existence.missing_files,
+                    ))
+            except Exception as e:
+                print(f"SHARAD ODE search error: {e}")
+
         return SearchResponse(
             query=q,
             results=sharad_results,
@@ -250,6 +368,48 @@ async def search_products(
         results=results,
         count=len(results),
     )
+
+
+@router.get("/search/local")
+async def search_local_products(
+    q: str = Query(..., min_length=1, description="Search query (product ID or partial)"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum results"),
+):
+    """
+    Search ALL local products across every instrument index.
+
+    Searches CRISM, HiRISE, SHARAD, and CTX index.geojson files.
+    Returns matching products sorted by relevance (prefix match first).
+    """
+    products = _load_all_products()
+    query_upper = q.upper()
+
+    # Score and filter
+    scored = []
+    for p in products:
+        pid_upper = p["product_id"].upper()
+        title_upper = (p.get("title") or "").upper()
+        if query_upper in pid_upper or query_upper in title_upper:
+            # Score: 0 = exact, 1 = prefix, 2 = substring
+            if pid_upper == query_upper:
+                score = 0
+            elif pid_upper.startswith(query_upper):
+                score = 1
+            elif title_upper.startswith(query_upper):
+                score = 1
+            else:
+                score = 2
+            scored.append((score, p))
+
+    scored.sort(key=lambda x: (x[0], x[1]["product_id"]))
+    results = [s[1] for s in scored[:limit]]
+
+    return {
+        "query": q,
+        "results": results,
+        "count": len(results),
+        "total_products": len(products),
+    }
 
 
 @router.get("/search/spatial", response_model=SearchResponse)
@@ -367,10 +527,12 @@ async def check_exists(instrument: str, product_id: str):
     try:
         inst = Instrument(instrument.lower())
     except ValueError:
-        raise HTTPException(400, f"Invalid instrument: {instrument}")
+        raise HTTPException(400, f"Invalid instrument: {instrument}. Valid options: crism, hirise, sharad, sharad_highres")
 
     if inst == Instrument.CRISM:
         base_key = parse_crism_base_key(product_id)
+    elif inst == Instrument.SHARAD:
+        base_key = product_id.upper().replace("_THM", "")
     else:
         base_key = product_id.upper()
 
@@ -448,7 +610,7 @@ async def start_download(request: DownloadRequest):
     try:
         inst = Instrument(request.instrument.lower())
     except ValueError:
-        raise HTTPException(400, f"Invalid instrument: {request.instrument}")
+        raise HTTPException(400, f"Invalid instrument: {request.instrument}. Valid options: crism, hirise, sharad, sharad_highres")
 
     # Check detailed existence - allow downloading missing files
     existence = check_local_existence_detailed(request.product_id, inst)

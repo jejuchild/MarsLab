@@ -27,9 +27,20 @@ from .ode_client import (
     ODEFile,
     CRISMBundle,
     HiRISEBundle,
+    SHARADBundle,
+    SHARADHighResBundle,
     parse_crism_base_key,
     resolve_crism_bundle,
     resolve_hirise_bundle,
+    resolve_sharad_bundle,
+    resolve_sharad_highres_bundle,
+)
+from .aria2_downloader import (
+    download_single_file,
+    download_with_progress,
+    check_aria2_available,
+    log_failed_downloads,
+    Aria2Status,
 )
 
 
@@ -40,12 +51,26 @@ from .ode_client import (
 BASE_DIR = Path(__file__).parent.parent
 CRISM_DATA_DIR = BASE_DIR / "crism_data"
 HIRISE_DATA_DIR = BASE_DIR / "hirise_data"
+SHARAD_DATA_DIR = BASE_DIR / "sharad_data"
+SHARAD_HIGHRES_DIR = BASE_DIR / "sharad_highres"  # Note: sharad_highres not sharad_highres_data
 CRISM_QUICKVIEW_DIR = BASE_DIR / "crism_quickview"
 CRISM_BROWSE_DIR = BASE_DIR / "crism_browse"
 HIRISE_QUICKVIEW_DIR = BASE_DIR / "hirise_quickview"
+SHARAD_QUICKVIEW_DIR = BASE_DIR / "sharad_quickview"
+
+# Failed download log
+FAILED_DOWNLOADS_LOG = BASE_DIR / "logs" / "failed_downloads.log"
+
+# Check aria2 availability at module load
+_ARIA2_AVAILABLE = check_aria2_available()
+if _ARIA2_AVAILABLE:
+    print("aria2 available - using accelerated downloads")
+else:
+    print("aria2 not found - falling back to aiohttp downloads")
 
 # Ensure directories exist
-for d in [CRISM_DATA_DIR, HIRISE_DATA_DIR, CRISM_QUICKVIEW_DIR, CRISM_BROWSE_DIR, HIRISE_QUICKVIEW_DIR]:
+for d in [CRISM_DATA_DIR, HIRISE_DATA_DIR, SHARAD_DATA_DIR, SHARAD_HIGHRES_DIR,
+          CRISM_QUICKVIEW_DIR, CRISM_BROWSE_DIR, HIRISE_QUICKVIEW_DIR, SHARAD_QUICKVIEW_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 
@@ -210,9 +235,20 @@ class DownloadManager:
         if instrument == Instrument.CRISM:
             base_key = parse_crism_base_key(product_id)
             target_dir = str(CRISM_DATA_DIR / base_key)
-        else:
+        elif instrument == Instrument.HIRISE:
             base_key = product_id.upper()
             target_dir = str(HIRISE_DATA_DIR / base_key)
+        elif instrument == Instrument.SHARAD:
+            # SHARAD USRDRV2: base_key is S_XXXXXXXX
+            base_key = product_id.upper().replace("_THM", "")
+            target_dir = str(SHARAD_DATA_DIR)  # All SHARAD quicklooks in same dir
+        elif instrument == Instrument.SHARAD_HIGHRES:
+            # SHARAD RDR: base_key is full product ID
+            base_key = product_id.upper()
+            target_dir = str(SHARAD_HIGHRES_DIR)  # All RDR files in same dir
+        else:
+            base_key = product_id.upper()
+            target_dir = str(BASE_DIR / "data" / base_key)
 
         # Create task
         task = DownloadTask(
@@ -247,8 +283,14 @@ class DownloadManager:
             async with aiohttp.ClientSession() as session:
                 if task.instrument == Instrument.CRISM:
                     await self._download_crism_bundle(task, session)
-                else:
+                elif task.instrument == Instrument.HIRISE:
                     await self._download_hirise_bundle(task, session)
+                elif task.instrument == Instrument.SHARAD:
+                    await self._download_sharad_bundle(task, session)
+                elif task.instrument == Instrument.SHARAD_HIGHRES:
+                    await self._download_sharad_highres_bundle(task, session)
+                else:
+                    raise ValueError(f"Unsupported instrument: {task.instrument}")
 
             # Check completion - core files must succeed, browse files are optional
             # Browse files have "_br" in the name (e.g., frt0000a2c2_07_brtruj_mtr3.png)
@@ -469,7 +511,7 @@ class DownloadManager:
         ode_file: ODEFile,
         session: aiohttp.ClientSession,
     ):
-        """Download a single file with progress tracking."""
+        """Download a single file with progress tracking (uses aria2 if available)."""
         file_progress = task.files[file_idx]
         file_progress.status = DownloadStatus.DOWNLOADING
 
@@ -478,6 +520,29 @@ class DownloadManager:
         # Determine if this is an optional file (browse images may not exist)
         is_optional = ode_file.file_type == "Browse"
 
+        # Use aria2 for faster downloads if available
+        if _ARIA2_AVAILABLE:
+            try:
+                result = await download_single_file(
+                    url=ode_file.url,
+                    output_dir=task.target_dir,
+                    filename=ode_file.filename,
+                )
+
+                if result.status == Aria2Status.COMPLETED:
+                    file_progress.status = DownloadStatus.COMPLETED
+                    file_progress.bytes_downloaded = result.bytes_downloaded
+                    file_progress.bytes_total = result.bytes_total
+                else:
+                    file_progress.status = DownloadStatus.FAILED
+                    file_progress.error = result.error or "aria2 download failed"
+                return
+
+            except Exception as e:
+                # Fall back to aiohttp on aria2 error
+                print(f"aria2 error, falling back to aiohttp: {e}")
+
+        # Fallback: aiohttp streaming download
         try:
             # Use shorter timeout for optional files to fail fast on 404s
             timeout = aiohttp.ClientTimeout(
@@ -521,9 +586,15 @@ class DownloadManager:
         if task.instrument == Instrument.CRISM:
             index_path = CRISM_DATA_DIR / "index.geojson"
             await self._update_crism_index(task, index_path)
-        else:
+        elif task.instrument == Instrument.HIRISE:
             index_path = HIRISE_DATA_DIR / "index.geojson"
             await self._update_hirise_index(task, index_path)
+        elif task.instrument == Instrument.SHARAD:
+            index_path = SHARAD_DATA_DIR / "index.geojson"
+            await self._update_sharad_index(task, index_path)
+        elif task.instrument == Instrument.SHARAD_HIGHRES:
+            index_path = SHARAD_HIGHRES_DIR.parent / "sharad_highres_data" / "index.geojson"
+            await self._update_sharad_highres_index(task, index_path)
 
     async def _update_crism_index(self, task: DownloadTask, index_path: Path):
         """Update CRISM index.geojson with new product."""
@@ -630,6 +701,177 @@ class DownloadManager:
         async with aiofiles.open(index_path, "w") as f:
             await f.write(json.dumps(index, indent=2))
 
+    async def _download_sharad_bundle(self, task: DownloadTask, session: aiohttp.ClientSession):
+        """Download SHARAD USRDRV2 bundle files (THM quicklook + LBL)."""
+        bundle = await resolve_sharad_bundle(task.base_key, session)
+
+        files_to_download: List[ODEFile] = []
+
+        if bundle.thm_file:
+            files_to_download.append(bundle.thm_file)
+        if bundle.lbl_file:
+            files_to_download.append(bundle.lbl_file)
+
+        if not files_to_download:
+            task.status = DownloadStatus.FAILED
+            task.error = f"No files found for SHARAD product {task.base_key}"
+            return
+
+        # Create file progress entries
+        for f in files_to_download:
+            task.files.append(FileProgress(
+                filename=f.filename,
+                url=f.url,
+                bytes_total=f.size_bytes,
+            ))
+
+        task.status = DownloadStatus.DOWNLOADING
+
+        # Download files
+        for i, f in enumerate(files_to_download):
+            await self._download_file(task, i, f, session)
+
+        # Copy quicklook to SHARAD_QUICKVIEW_DIR
+        for f in task.files:
+            if f.filename.lower().endswith(".jpg") and f.status == DownloadStatus.COMPLETED:
+                src = Path(task.target_dir) / f.filename
+                dst = SHARAD_QUICKVIEW_DIR / f.filename
+                if src.exists() and not dst.exists():
+                    import shutil
+                    shutil.copy(src, dst)
+
+    async def _download_sharad_highres_bundle(self, task: DownloadTask, session: aiohttp.ClientSession):
+        """Download SHARAD High-Res RDR bundle files (DAT + LBL)."""
+        bundle = await resolve_sharad_highres_bundle(task.base_key, session)
+
+        files_to_download: List[ODEFile] = []
+
+        if bundle.dat_file:
+            files_to_download.append(bundle.dat_file)
+        if bundle.lbl_file:
+            files_to_download.append(bundle.lbl_file)
+
+        if not files_to_download:
+            task.status = DownloadStatus.FAILED
+            task.error = f"No files found for SHARAD High-Res product {task.base_key}"
+            return
+
+        # Create file progress entries
+        for f in files_to_download:
+            task.files.append(FileProgress(
+                filename=f.filename,
+                url=f.url,
+                bytes_total=f.size_bytes,
+            ))
+
+        task.status = DownloadStatus.DOWNLOADING
+
+        # Download files
+        for i, f in enumerate(files_to_download):
+            await self._download_file(task, i, f, session)
+
+    async def _update_sharad_index(self, task: DownloadTask, index_path: Path):
+        """Update SHARAD index.geojson with new product."""
+        # Load existing index
+        if index_path.exists():
+            async with aiofiles.open(index_path, "r") as f:
+                content = await f.read()
+                index = json.loads(content)
+        else:
+            index = {"type": "FeatureCollection", "features": []}
+
+        # Find quickview file
+        quickview = None
+        for f in task.files:
+            if f.filename.lower().endswith(".jpg"):
+                quickview = f"/sharad/quickview/{f.filename}"
+                break
+
+        # Check if product already exists
+        existing_idx = None
+        for i, feat in enumerate(index["features"]):
+            if feat["properties"].get("product_id") == task.base_key:
+                existing_idx = i
+                break
+
+        # Create new feature - SHARAD uses LineString geometry
+        # For now, use point geometry; actual track coordinates would come from LBL
+        feature = {
+            "type": "Feature",
+            "properties": {
+                "instrument": "SHARAD",
+                "product_id": task.base_key,
+                "quickview": quickview,
+                "start_lat": task.lat,
+                "start_lon": task.lon,
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [task.lon or 0, task.lat or 0]
+            }
+        }
+
+        if existing_idx is not None:
+            index["features"][existing_idx] = feature
+        else:
+            index["features"].append(feature)
+
+        # Write updated index
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(index_path, "w") as f:
+            await f.write(json.dumps(index, indent=2))
+
+    async def _update_sharad_highres_index(self, task: DownloadTask, index_path: Path):
+        """Update SHARAD High-Res index.geojson with new product."""
+        # Load existing index
+        if index_path.exists():
+            async with aiofiles.open(index_path, "r") as f:
+                content = await f.read()
+                index = json.loads(content)
+        else:
+            index = {"type": "FeatureCollection", "features": []}
+
+        # Find DAT file
+        dat_file = None
+        lbl_file = None
+        for f in task.files:
+            if f.filename.lower().endswith(".dat"):
+                dat_file = f.filename
+            elif f.filename.lower().endswith(".lbl"):
+                lbl_file = f.filename
+
+        # Check if product already exists
+        existing_idx = None
+        for i, feat in enumerate(index["features"]):
+            if feat["properties"].get("product_id") == task.base_key:
+                existing_idx = i
+                break
+
+        # Create new feature
+        feature = {
+            "type": "Feature",
+            "properties": {
+                "instrument": "SHARAD_HIGHRES",
+                "product_id": task.base_key,
+                "dat_file": dat_file,
+                "lbl_file": lbl_file,
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [task.lon or 0, task.lat or 0]
+            }
+        }
+
+        if existing_idx is not None:
+            index["features"][existing_idx] = feature
+        else:
+            index["features"].append(feature)
+
+        # Write updated index
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(index_path, "w") as f:
+            await f.write(json.dumps(index, indent=2))
+
 
 # =============================================================================
 # Existence Check
@@ -682,7 +924,7 @@ def check_local_existence_detailed(product_id: str, instrument: Instrument) -> E
 
     Args:
         product_id: Product identifier
-        instrument: CRISM or HiRISE
+        instrument: CRISM, HiRISE, SHARAD, or SHARAD_HIGHRES
 
     Returns:
         ExistenceResult with details about which files exist/are missing
@@ -690,12 +932,76 @@ def check_local_existence_detailed(product_id: str, instrument: Instrument) -> E
     if instrument == Instrument.CRISM:
         base_key = parse_crism_base_key(product_id)
         target_dir = CRISM_DATA_DIR / base_key
-    else:
+    elif instrument == Instrument.HIRISE:
         base_key = product_id.upper()
         target_dir = HIRISE_DATA_DIR / base_key
+    elif instrument == Instrument.SHARAD:
+        base_key = product_id.upper().replace("_THM", "")
+        target_dir = SHARAD_DATA_DIR  # SHARAD files are not in subdirectories
+    elif instrument == Instrument.SHARAD_HIGHRES:
+        base_key = product_id.upper()
+        target_dir = SHARAD_HIGHRES_DIR  # SHARAD High-Res files are not in subdirectories
+    else:
+        base_key = product_id.upper()
+        target_dir = BASE_DIR / "data" / base_key
 
     missing = []
     existing = []
+
+    # For SHARAD and SHARAD_HIGHRES, check for specific files in flat directory
+    if instrument == Instrument.SHARAD:
+        thm_file = target_dir / f"{base_key.lower()}_thm.jpg"
+        lbl_file = target_dir / f"{base_key.lower()}_thm.lbl"
+
+        has_thm = thm_file.exists() and thm_file.stat().st_size > 0
+        has_lbl = lbl_file.exists() and lbl_file.stat().st_size > 0
+
+        if has_thm:
+            existing.append("thm")
+        else:
+            missing.append("thm")
+
+        if has_lbl:
+            existing.append("lbl")
+        else:
+            missing.append("lbl")
+
+        return ExistenceResult(
+            exists=has_thm,  # THM is the main required file
+            has_core=has_thm,
+            has_header=True,  # Not applicable
+            has_wavelength=True,  # Not applicable
+            has_browse=has_thm,
+            missing_files=missing,
+            existing_files=existing,
+        )
+
+    if instrument == Instrument.SHARAD_HIGHRES:
+        dat_file = target_dir / f"{base_key.lower()}.dat"
+        lbl_file = target_dir / f"{base_key.lower()}.lbl"
+
+        has_dat = dat_file.exists() and dat_file.stat().st_size > 0
+        has_lbl = lbl_file.exists() and lbl_file.stat().st_size > 0
+
+        if has_dat:
+            existing.append("dat")
+        else:
+            missing.append("dat")
+
+        if has_lbl:
+            existing.append("lbl")
+        else:
+            missing.append("lbl")
+
+        return ExistenceResult(
+            exists=has_dat and has_lbl,
+            has_core=has_dat and has_lbl,
+            has_header=True,  # Not applicable
+            has_wavelength=True,  # Not applicable
+            has_browse=True,  # Not applicable
+            missing_files=missing,
+            existing_files=existing,
+        )
 
     if not target_dir.exists():
         if instrument == Instrument.CRISM:

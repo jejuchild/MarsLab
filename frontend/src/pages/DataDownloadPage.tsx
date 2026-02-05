@@ -17,6 +17,16 @@ import {
 
 type SearchMode = "id" | "spatial";
 
+// Dataset types for selection
+type DatasetType = "crism" | "hirise" | "sharad" | "sharad_highres";
+
+interface DatasetSelection {
+  crism: boolean;
+  hirise: boolean;
+  sharad: boolean;
+  sharad_highres: boolean;
+}
+
 interface SpatialSearch {
   minlat: string;  // Southern boundary
   maxlat: string;  // Northern boundary
@@ -57,6 +67,57 @@ function SearchModeToggle({
       >
         Spatial Search
       </button>
+    </div>
+  );
+}
+
+function DatasetSelector({
+  selection,
+  onSelectionChange,
+}: {
+  selection: DatasetSelection;
+  onSelectionChange: (selection: DatasetSelection) => void;
+}) {
+  const datasets: { key: DatasetType; label: string; icon: string }[] = [
+    { key: "crism", label: "CRISM", icon: "satellite_alt" },
+    { key: "hirise", label: "HiRISE", icon: "photo_camera" },
+    { key: "sharad", label: "SHARAD", icon: "radar" },
+    { key: "sharad_highres", label: "SHARAD Hi-Res", icon: "science" },
+  ];
+
+  const toggleDataset = (key: DatasetType) => {
+    onSelectionChange({
+      ...selection,
+      [key]: !selection[key],
+    });
+  };
+
+  const selectedCount = Object.values(selection).filter(Boolean).length;
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mr-1">
+        Datasets:
+      </span>
+      {datasets.map(({ key, label, icon }) => (
+        <button
+          key={key}
+          onClick={() => toggleDataset(key)}
+          className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all border ${
+            selection[key]
+              ? "bg-primary/20 text-primary border-primary/50"
+              : "bg-bg-dark text-slate-500 border-border-dark hover:text-white hover:border-slate-500"
+          }`}
+        >
+          <span className="material-symbols-outlined text-xs">{icon}</span>
+          {label}
+        </button>
+      ))}
+      {selectedCount === 0 && (
+        <span className="text-amber-400 text-[10px] ml-2">
+          Select at least one dataset
+        </span>
+      )}
     </div>
   );
 }
@@ -212,10 +273,13 @@ function ProductPreview({
       <div className="px-4 py-2 border-b border-border-dark bg-surface-dark/50 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-lg">
-            {result.instrument === "crism" ? "satellite_alt" : result.instrument === "sharad" ? "radar" : "photo_camera"}
+            {result.instrument === "crism" ? "satellite_alt" :
+             result.instrument === "sharad" ? "radar" :
+             result.instrument === "sharad_highres" ? "science" :
+             "photo_camera"}
           </span>
           <span className="text-sm font-medium text-white">
-            {result.instrument.toUpperCase()}
+            {result.instrument === "sharad_highres" ? "SHARAD HI-RES" : result.instrument.toUpperCase()}
           </span>
         </div>
         {isComplete ? (
@@ -288,12 +352,23 @@ function ProductPreview({
               <div className={result.has_browse ? "text-emerald-400" : "text-slate-500"}>
                 {result.has_browse ? "✓" : "○"} Quickview (.jpg)
               </div>
-              <div className="text-slate-500">
-                ○ High-res (.tif)
+              <div className={!result.missing_files.includes("lbl") ? "text-emerald-400" : "text-slate-500"}>
+                {!result.missing_files.includes("lbl") ? "✓" : "○"} Label (.lbl)
               </div>
             </div>
-          ) : (
+          ) : result.instrument === "sharad_highres" ? (
+            <div className="grid grid-cols-2 gap-1 text-xs">
+              <div className={!result.missing_files.includes("dat") ? "text-emerald-400" : "text-slate-500"}>
+                {!result.missing_files.includes("dat") ? "✓" : "○"} RDR data (.dat)
+              </div>
+              <div className={!result.missing_files.includes("lbl") ? "text-emerald-400" : "text-slate-500"}>
+                {!result.missing_files.includes("lbl") ? "✓" : "○"} Label (.lbl)
+              </div>
+            </div>
+          ) : result.instrument === "hirise" ? (
             <p className="text-xs text-slate-300">.JP2, .lbl → .tif (GDAL converted)</p>
+          ) : (
+            <p className="text-xs text-slate-300">Unknown instrument</p>
           )}
         </div>
 
@@ -500,6 +575,14 @@ export default function DataDownloadPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
 
+  // Dataset selection state - all enabled by default
+  const [datasetSelection, setDatasetSelection] = useState<DatasetSelection>({
+    crism: true,
+    hirise: true,
+    sharad: true,
+    sharad_highres: true,
+  });
+
   // Selection state
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
 
@@ -519,8 +602,22 @@ export default function DataDownloadPage() {
     };
   }, []);
 
+  // Get list of selected datasets
+  const getSelectedDatasets = useCallback((): DatasetType[] => {
+    return (Object.entries(datasetSelection) as [DatasetType, boolean][])
+      .filter(([, selected]) => selected)
+      .map(([key]) => key);
+  }, [datasetSelection]);
+
   // Handle search
   const handleSearch = useCallback(async () => {
+    const selectedDatasets = getSelectedDatasets();
+
+    if (selectedDatasets.length === 0) {
+      setSearchError("Select at least one dataset to search");
+      return;
+    }
+
     setIsSearching(true);
     setSearchError(null);
     setSearchResults([]);
@@ -531,8 +628,20 @@ export default function DataDownloadPage() {
           setSearchError("Enter a product ID to search");
           return;
         }
-        const response = await searchProducts(query.trim(), undefined, 12);
-        setSearchResults(response.results);
+
+        // Search each selected dataset and combine results
+        const allResults: SearchResult[] = [];
+
+        for (const dataset of selectedDatasets) {
+          try {
+            const response = await searchProducts(query.trim(), dataset as Instrument, 12);
+            allResults.push(...response.results);
+          } catch (e) {
+            console.error(`Search error for ${dataset}:`, e);
+          }
+        }
+
+        setSearchResults(allResults);
       } else {
         const minlat = parseFloat(spatialSearch.minlat);
         const maxlat = parseFloat(spatialSearch.maxlat);
@@ -550,15 +659,27 @@ export default function DataDownloadPage() {
         }
 
         const bbox: BoundingBox = { minlat, maxlat, westernlon, easternlon };
-        const response = await searchSpatial(bbox, undefined, 20);
-        setSearchResults(response.results);
+
+        // Search each selected dataset for spatial
+        const allResults: SearchResult[] = [];
+
+        for (const dataset of selectedDatasets) {
+          try {
+            const response = await searchSpatial(bbox, dataset as Instrument, 20);
+            allResults.push(...response.results);
+          } catch (e) {
+            console.error(`Spatial search error for ${dataset}:`, e);
+          }
+        }
+
+        setSearchResults(allResults);
       }
     } catch (e) {
       setSearchError(e instanceof Error ? e.message : "Search failed");
     } finally {
       setIsSearching(false);
     }
-  }, [searchMode, query, spatialSearch]);
+  }, [searchMode, query, spatialSearch, getSelectedDatasets]);
 
   // Poll for download status
   const startPolling = useCallback((taskId: string) => {
@@ -675,6 +796,12 @@ export default function DataDownloadPage() {
             >
               Data Download
             </a>
+            <a
+              href="/upload"
+              className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
+            >
+              Data Upload
+            </a>
           </nav>
         </div>
       </header>
@@ -682,7 +809,16 @@ export default function DataDownloadPage() {
       {/* Main content - scrollable */}
       <main className="flex-1 flex flex-col overflow-auto max-w-[1600px] mx-auto w-full px-4 md:px-6 py-4 gap-4">
         {/* Search section */}
-        <section className="w-full flex flex-col gap-4">
+        <section className="w-full flex flex-col gap-3">
+          {/* Dataset selection */}
+          <div className="bg-surface-dark rounded-xl p-3 border border-border-dark">
+            <DatasetSelector
+              selection={datasetSelection}
+              onSelectionChange={setDatasetSelection}
+            />
+          </div>
+
+          {/* Search bar */}
           <div className="flex items-center gap-4">
             <div className="flex-1 bg-surface-dark rounded-xl p-1.5 flex items-center shadow-lg border border-border-dark">
               <SearchModeToggle mode={searchMode} onModeChange={setSearchMode} />
