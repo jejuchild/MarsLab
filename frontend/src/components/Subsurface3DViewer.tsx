@@ -128,10 +128,14 @@ async function fetchDEMPatch(
     grid_size: gridSize.toString(),
   });
 
-  const res = await fetch(`/terrain/dem_patch?${params}`);
+  const url = `/terrain/dem_patch?${params}`;
+  console.log("[Subsurface3D] Fetching DEM:", url);
+
+  const res = await fetch(url);
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: "Failed to fetch DEM patch" }));
-    throw new Error(error.error || "Failed to fetch DEM patch");
+    const errorText = await res.text().catch(() => "Unknown error");
+    console.error("[Subsurface3D] DEM fetch failed:", res.status, errorText);
+    throw new Error(`DEM fetch failed (${res.status}): ${errorText.slice(0, 200)}`);
   }
 
   return res.json();
@@ -635,11 +639,14 @@ export default function Subsurface3DViewer({
     const lonExtentM = dLon * metersPerDegLon;
     const radius = Math.max(latExtentM, lonExtentM) / 2 + 2000; // Add margin
 
+    // Cap radius to backend limit (50km max)
+    const clampedRadius = Math.min(Math.max(radius, 5000), 50000);
+
     return {
       originLat: oLat,
       originLon: oLon,
       centerElev: cElev,
-      boundsRadiusM: Math.max(radius, 5000),
+      boundsRadiusM: clampedRadius,
     };
   }, [subsurfacePoints]);
 
@@ -648,9 +655,18 @@ export default function Subsurface3DViewer({
     let cancelled = false;
 
     async function loadTerrain() {
+      console.log("[Subsurface3D] Loading terrain:", {
+        subsurfacePointsCount: subsurfacePoints.length,
+        originLat,
+        originLon,
+        boundsRadiusM,
+        startTrace,
+        endTrace,
+      });
+
       if (subsurfacePoints.length === 0) {
         setLoading(false);
-        setError("No valid subsurface points in selected range");
+        setError("No valid subsurface points in selected range. Check that MOLA data exists for the selected traces.");
         return;
       }
 

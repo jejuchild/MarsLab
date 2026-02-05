@@ -346,8 +346,17 @@ def compute_dem_patch(
     """
     ds = _get_dem()
 
+    # Normalize longitude to 0-360 range (DEM uses 0-360)
+    lon0_normalized = lon0 % 360
+    if lon0_normalized < 0:
+        lon0_normalized += 360
+
     # Centre pixel
-    row_c, col_c = ds.index(lon0, lat0)
+    row_c, col_c = ds.index(lon0_normalized, lat0)
+
+    # Clamp center to valid range
+    row_c = max(0, min(ds.height - 1, row_c))
+    col_c = max(0, min(ds.width - 1, col_c))
 
     # Pixel sizes in degrees
     px_deg_ew = abs(ds.transform.a)
@@ -365,11 +374,19 @@ def compute_dem_patch(
     n_pix_ns = int(math.ceil(radius_m / px_m_ns))
     n_pix_ew = int(math.ceil(radius_m / px_m_ew))
 
-    # Define window
+    # Define window with bounds checking
     row_start = max(0, row_c - n_pix_ns)
     row_end = min(ds.height, row_c + n_pix_ns + 1)
     col_start = max(0, col_c - n_pix_ew)
     col_end = min(ds.width, col_c + n_pix_ew + 1)
+
+    # Ensure minimum window size
+    if row_end <= row_start:
+        row_start = max(0, row_c - 10)
+        row_end = min(ds.height, row_c + 10)
+    if col_end <= col_start:
+        col_start = max(0, col_c - 10)
+        col_end = min(ds.width, col_c + 10)
 
     window = Window(col_start, row_start, col_end - col_start, row_end - row_start)
     elev = ds.read(1, window=window).astype(np.float64)
@@ -406,34 +423,62 @@ def compute_dem_patch(
     valid_mask = ~np.isnan(elev)
     valid_slopes = slope_deg[valid_mask]
 
-    # Statistics
-    center_row, center_col = rows // 2, cols // 2
-    center_elev = float(elev[center_row, center_col])
-    if np.isnan(center_elev):
-        center_elev = float(np.nanmean(elev))
+    # Handle case where all values are NaN
+    if not np.any(valid_mask):
+        # Return a flat surface at 0 elevation
+        elev_clean = np.zeros_like(elev)
+        center_elev = 0.0
+        min_elev = 0.0
+        max_elev = 0.0
+        mean_slope = 0.0
+        max_slope = 0.0
+    else:
+        mean_elev = float(np.nanmean(elev))
 
-    # Replace NaN with mean for output
-    elev_clean = np.nan_to_num(elev, nan=float(np.nanmean(elev)))
+        # Statistics
+        center_row, center_col = rows // 2, cols // 2
+        center_elev = float(elev[center_row, center_col])
+        if np.isnan(center_elev):
+            center_elev = mean_elev
+
+        # Replace NaN with mean for output
+        elev_clean = np.nan_to_num(elev, nan=mean_elev)
+
+        min_elev = float(np.nanmin(elev))
+        max_elev = float(np.nanmax(elev))
+        mean_slope = float(np.mean(valid_slopes)) if len(valid_slopes) > 0 else 0.0
+        max_slope = float(np.max(valid_slopes)) if len(valid_slopes) > 0 else 0.0
+
+    # Final safety: ensure no NaN/Inf values
+    def safe_float(v, default=0.0):
+        f = float(v)
+        if np.isnan(f) or np.isinf(f):
+            return default
+        return f
+
+    # Clean elevations - replace any remaining NaN/Inf with 0
+    elev_list = elev_clean.flatten().tolist()
+    elev_list = [0.0 if (np.isnan(v) or np.isinf(v)) else v for v in elev_list]
 
     return {
-        "elevations": elev_clean.flatten().tolist(),
+        "elevations": elev_list,
         "rows": rows,
         "cols": cols,
-        "spacing_m": round((spacing_m_ew + spacing_m_ns) / 2, 2),
+        "spacing_m": round(safe_float((spacing_m_ew + spacing_m_ns) / 2), 2),
         "bounds": {
-            "west": round(west_lon, 6),
-            "east": round(east_lon, 6),
-            "south": round(south_lat, 6),
-            "north": round(north_lat, 6),
+            "west": round(safe_float(west_lon), 6),
+            "east": round(safe_float(east_lon), 6),
+            "south": round(safe_float(south_lat), 6),
+            "north": round(safe_float(north_lat), 6),
         },
-        "center": {"lat": lat0, "lon": lon0},
-        "center_elevation_m": round(center_elev, 1),
-        "min_elevation_m": round(float(np.nanmin(elev)), 1),
-        "max_elevation_m": round(float(np.nanmax(elev)), 1),
-        "elevation_range_m": round(float(np.nanmax(elev) - np.nanmin(elev)), 1),
-        "slope_mean": round(float(np.mean(valid_slopes)), 2) if len(valid_slopes) > 0 else 0,
-        "slope_max": round(float(np.max(valid_slopes)), 2) if len(valid_slopes) > 0 else 0,
-        "radius_m": radius_m,
+        "center": {"lat": safe_float(lat0), "lon": safe_float(lon0)},
+        "center_elevation_m": round(safe_float(center_elev), 1),
+        "min_elevation_m": round(safe_float(min_elev), 1),
+        "max_elevation_m": round(safe_float(max_elev), 1),
+        "elevation_range_m": round(safe_float(max_elev - min_elev), 1),
+        "slope_mean": round(safe_float(mean_slope), 2),
+        "slope_max": round(safe_float(max_slope), 2),
+        "radius_m": safe_float(radius_m),
     }
 
 
@@ -449,8 +494,31 @@ async def get_dem_patch(
 
     Returns elevation grid data with metadata for rendering in a 3D viewer.
     """
+    import json
+    print(f"[DEM_PATCH] Request: lat={lat}, lon={lon}, radius_m={radius_m}, grid_size={grid_size}")
+
+    # Check for NaN inputs
+    if math.isnan(lat) or math.isnan(lon) or math.isnan(radius_m):
+        return JSONResponse(
+            content={"error": f"Invalid input: lat={lat}, lon={lon}, radius_m={radius_m}"},
+            status_code=400
+        )
+
     try:
         result = compute_dem_patch(lat, lon, radius_m, grid_size)
+
+        # Verify result is JSON serializable
+        try:
+            json.dumps(result)
+        except (ValueError, TypeError) as e:
+            print(f"[DEM_PATCH] JSON serialization error: {e}")
+            # Find the problematic values
+            for key, val in result.items():
+                try:
+                    json.dumps({key: val})
+                except:
+                    print(f"[DEM_PATCH] Problem with key '{key}': {type(val)}")
+            raise
         return JSONResponse(content=result)
 
     except FileNotFoundError as e:
