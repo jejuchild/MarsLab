@@ -151,6 +151,10 @@ export default function SharadHiresInspector({
   const [traceRangeStart, setTraceRangeStart] = useState(0);
   const [traceRangeEnd, setTraceRangeEnd] = useState(100);
 
+  // Draggable vertical guide lines for 3D range selection
+  const [draggingLine, setDraggingLine] = useState<"start" | "end" | null>(null);
+  const lineHitZonePx = 10; // pixels for hit detection
+
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -375,7 +379,7 @@ export default function SharadHiresInspector({
     }
 
     // Cursor crosshair
-    if (cursor && !adjustDragRef.current && !isDragging.current) {
+    if (cursor && !adjustDragRef.current && !isDragging.current && !draggingLine) {
       const cx = cursor.normX;
       const cy = cursor.normY;
       const px = ((cx - viewX.start) / (viewX.end - viewX.start)) * W;
@@ -397,7 +401,71 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine]);
+
+    // 3D View: Vertical guide lines for range selection
+    if (show3DView && nTraces > 0) {
+      const startNorm = traceRangeStart / nTraces;
+      const endNorm = traceRangeEnd / nTraces;
+      const startPx = ((startNorm - viewX.start) / (viewX.end - viewX.start)) * W;
+      const endPx = ((endNorm - viewX.start) / (viewX.end - viewX.start)) * W;
+
+      // Shaded region between lines
+      if (startPx < W && endPx > 0) {
+        ctx.fillStyle = "rgba(34, 211, 238, 0.1)";
+        ctx.fillRect(Math.max(0, Math.min(startPx, endPx)), 0, Math.abs(endPx - startPx), H);
+      }
+
+      // Start line (cyan)
+      if (startPx >= -10 && startPx <= W + 10) {
+        ctx.beginPath();
+        ctx.strokeStyle = draggingLine === "start" ? "#22d3ee" : "rgba(34, 211, 238, 0.8)";
+        ctx.lineWidth = draggingLine === "start" ? 3 : 2;
+        ctx.moveTo(startPx, 0);
+        ctx.lineTo(startPx, H);
+        ctx.stroke();
+
+        // Handle indicator
+        ctx.fillStyle = draggingLine === "start" ? "#22d3ee" : "rgba(34, 211, 238, 0.9)";
+        ctx.beginPath();
+        ctx.moveTo(startPx - 6, 0);
+        ctx.lineTo(startPx + 6, 0);
+        ctx.lineTo(startPx, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        // Label
+        ctx.font = "bold 9px monospace";
+        ctx.fillStyle = "#22d3ee";
+        ctx.textAlign = "left";
+        ctx.fillText("START", startPx + 4, 24);
+      }
+
+      // End line (cyan)
+      if (endPx >= -10 && endPx <= W + 10) {
+        ctx.beginPath();
+        ctx.strokeStyle = draggingLine === "end" ? "#22d3ee" : "rgba(34, 211, 238, 0.8)";
+        ctx.lineWidth = draggingLine === "end" ? 3 : 2;
+        ctx.moveTo(endPx, 0);
+        ctx.lineTo(endPx, H);
+        ctx.stroke();
+
+        // Handle indicator
+        ctx.fillStyle = draggingLine === "end" ? "#22d3ee" : "rgba(34, 211, 238, 0.9)";
+        ctx.beginPath();
+        ctx.moveTo(endPx - 6, 0);
+        ctx.lineTo(endPx + 6, 0);
+        ctx.lineTo(endPx, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        // Label
+        ctx.font = "bold 9px monospace";
+        ctx.fillStyle = "#22d3ee";
+        ctx.textAlign = "right";
+        ctx.fillText("END", endPx - 4, 24);
+      }
+    }
+  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, show3DView, traceRangeStart, traceRangeEnd, draggingLine]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -693,6 +761,68 @@ export default function SharadHiresInspector({
   // ── Mouse handlers ─────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const isOnRadargram = e.currentTarget === canvasRef.current;
+
+    // 3D View: Vertical guide line dragging
+    if (show3DView && isOnRadargram && e.button === 0 && !e.shiftKey && !adjustMode && radargramMeta) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const mx = (e.clientX - rect.left) / rect.width;
+
+      // Check if near start or end line
+      const startNorm = traceRangeStart / radargramMeta.n_traces;
+      const endNorm = traceRangeEnd / radargramMeta.n_traces;
+      const startPx = ((startNorm - viewX.start) / (viewX.end - viewX.start)) * rect.width;
+      const endPx = ((endNorm - viewX.start) / (viewX.end - viewX.start)) * rect.width;
+      const clickPx = mx * rect.width;
+
+      const nearStart = Math.abs(clickPx - startPx) <= lineHitZonePx;
+      const nearEnd = Math.abs(clickPx - endPx) <= lineHitZonePx;
+
+      if (nearStart || nearEnd) {
+        // Prefer the closer line if both are near
+        const whichLine = nearStart && nearEnd
+          ? (Math.abs(clickPx - startPx) < Math.abs(clickPx - endPx) ? "start" : "end")
+          : (nearStart ? "start" : "end");
+
+        setDraggingLine(whichLine);
+        e.preventDefault();
+
+        const onMove = (ev: MouseEvent) => {
+          if (!canvasRef.current || !radargramMeta) return;
+          const r = canvasRef.current.getBoundingClientRect();
+          const mx2 = (ev.clientX - r.left) / r.width;
+          const normX2 = viewX.start + mx2 * (viewX.end - viewX.start);
+          const newTrace = Math.max(0, Math.min(radargramMeta.n_traces - 1, Math.round(normX2 * radargramMeta.n_traces)));
+
+          if (whichLine === "start") {
+            setTraceRangeStart(newTrace);
+          } else {
+            setTraceRangeEnd(newTrace);
+          }
+        };
+
+        const onUp = () => {
+          setDraggingLine(null);
+          // Auto-swap if start > end
+          setTraceRangeStart(prev => {
+            const end = whichLine === "end" ? traceRangeEnd : prev;
+            const start = whichLine === "start" ? prev : traceRangeStart;
+            if (start > end) {
+              setTraceRangeEnd(start);
+              return end;
+            }
+            return prev;
+          });
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          document.body.style.cursor = "";
+        };
+
+        document.body.style.cursor = "ew-resize";
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+        return;
+      }
+    }
 
     // Surface adjustment drag start
     if (adjustMode && e.button === 0 && !e.shiftKey && isOnRadargram) {
@@ -1237,7 +1367,7 @@ export default function SharadHiresInspector({
               {boundaryBinOffset > 0 ? (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400">Enable 3D View</span>
+                    <span className="text-[10px] text-slate-400">Show 3D View</span>
                     <MiniButton
                       active={show3DView}
                       onClick={() => setShow3DView(!show3DView)}
@@ -1248,66 +1378,48 @@ export default function SharadHiresInspector({
 
                   {show3DView && (
                     <div className="space-y-2 mt-2">
-                      <div className="text-[9px] text-slate-600">
-                        Select trace range for 3D visualization
+                      <div className="text-[9px] text-cyan-400/80 bg-cyan-500/10 border border-cyan-500/20 rounded p-2">
+                        Drag the <strong>START</strong> and <strong>END</strong> vertical lines on the radargram to select analysis range
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] text-slate-400 w-10">Start</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={radargramMeta.n_traces - 1}
-                          value={traceRangeStart}
-                          onChange={(e) => {
-                            const v = Math.max(0, Math.min(radargramMeta.n_traces - 1, parseInt(e.target.value) || 0));
-                            setTraceRangeStart(v);
-                          }}
-                          className="flex-1 bg-[#0a0f18] border border-[#232f48] rounded px-2 py-1 text-[10px] text-slate-300 font-mono focus:outline-none focus:border-cyan-500/40"
-                        />
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-400">Selected Range</span>
+                        <span className="text-cyan-400 font-mono">
+                          {traceRangeStart} → {traceRangeEnd}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] text-slate-400 w-10">End</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={radargramMeta.n_traces - 1}
-                          value={traceRangeEnd}
-                          onChange={(e) => {
-                            const v = Math.max(0, Math.min(radargramMeta.n_traces - 1, parseInt(e.target.value) || 0));
-                            setTraceRangeEnd(v);
-                          }}
-                          className="flex-1 bg-[#0a0f18] border border-[#232f48] rounded px-2 py-1 text-[10px] text-slate-300 font-mono focus:outline-none focus:border-cyan-500/40"
-                        />
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-400">Traces</span>
+                        <span className="text-white font-mono">
+                          {Math.abs(traceRangeEnd - traceRangeStart) + 1}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 mt-1">
                         <button
                           onClick={() => {
-                            // Set to visible range
                             const start = Math.floor(viewX.start * radargramMeta.n_traces);
-                            const end = Math.ceil(viewX.end * radargramMeta.n_traces);
-                            setTraceRangeStart(start);
-                            setTraceRangeEnd(end);
+                            const end = Math.ceil(viewX.end * radargramMeta.n_traces) - 1;
+                            setTraceRangeStart(Math.max(0, start));
+                            setTraceRangeEnd(Math.min(radargramMeta.n_traces - 1, end));
                           }}
                           className="flex-1 px-2 py-1 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors hover:border-cyan-500/30"
                         >
-                          Use Visible Range
+                          Fit to View
                         </button>
                         <button
                           onClick={() => {
-                            setTraceRangeStart(0);
-                            setTraceRangeEnd(radargramMeta.n_traces - 1);
+                            // Set to middle 20% of track
+                            const mid = Math.floor(radargramMeta.n_traces / 2);
+                            const span = Math.floor(radargramMeta.n_traces * 0.1);
+                            setTraceRangeStart(mid - span);
+                            setTraceRangeEnd(mid + span);
                           }}
                           className="flex-1 px-2 py-1 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors hover:border-cyan-500/30"
                         >
-                          Full Track
+                          Center 20%
                         </button>
-                      </div>
-
-                      <div className="text-[9px] text-cyan-400/70 mt-1">
-                        {traceRangeEnd - traceRangeStart + 1} traces selected
                       </div>
                     </div>
                   )}
