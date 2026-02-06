@@ -492,11 +492,30 @@ export default function AiAnalysisPanel({
  * Minimal markdown → HTML
  * =======================================================*/
 function renderMarkdown(md: string): string {
-  return md
-    .replace(/### (.+)/g, '<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
-    .replace(/\n{2,}/g, '<br/><br/>')
-    .replace(/\n/g, '<br/>');
+  // Process line by line to properly group consecutive <li> items into <ul> blocks
+  const lines = md.split("\n");
+  const out: string[] = [];
+  let inList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("- ")) {
+      if (!inList) { out.push("<ul>"); inList = true; }
+      const content = trimmed.slice(2)
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      out.push(`<li>${content}</li>`);
+    } else {
+      if (inList) { out.push("</ul>"); inList = false; }
+      if (trimmed.startsWith("### ")) {
+        out.push(`<h3>${trimmed.slice(4)}</h3>`);
+      } else if (trimmed === "") {
+        out.push("<br/>");
+      } else {
+        out.push(trimmed.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"));
+      }
+    }
+  }
+  if (inList) out.push("</ul>");
+
+  return out.join("\n");
 }

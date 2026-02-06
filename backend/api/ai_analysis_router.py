@@ -308,7 +308,7 @@ async def ask_gemini(req: AskRequest):
                 contents=[{"role": "user", "parts": [{"text": full_prompt}]}],
                 config={
                     "temperature": 0.3,
-                    "max_output_tokens": 2048,
+                    "max_output_tokens": 4096,
                 },
             )
 
