@@ -4,6 +4,14 @@ import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import FootprintManager from "../utils/FootprintManager";
 import { normalizeLonForMap } from "../utils/coordinates";
+import DTMHoverReadout, { type DTMHoverReadoutHandle } from "./DTMHoverReadout";
+import {
+  loadDTMElevationGrid,
+  getElevationFromGrid,
+  isWithinDTMBounds,
+  throttle,
+  type DTMElevationGrid,
+} from "../utils/dtmHover";
 
 
 /* ==================================================
@@ -472,6 +480,14 @@ export default function MapView({
   const onTerrainClickRef = useRef(onTerrainClick);
   const onFootprintsLoadedRef = useRef(onFootprintsLoaded);
   const onFootprintsLoadingRef = useRef(onFootprintsLoading);
+
+  // DTM Hover System - refs for performance (no re-renders on hover)
+  const dtmHoverReadoutRef = useRef<DTMHoverReadoutHandle>(null);
+  const dtmHoverMarkerRef = useRef<Cesium.Entity | null>(null);
+  const dtmGridCacheRef = useRef<Map<string, DTMElevationGrid>>(new Map());
+  const dtmHoverModeRef = useRef<"hover" | "click">("hover");
+  const [dtmHoverMode, setDtmHoverMode] = useState<"hover" | "click">("hover");
+  const activeDTMProductRef = useRef<string | null>(null);
 
   // Keep refs in sync with props
   useEffect(() => {
@@ -973,6 +989,15 @@ export default function MapView({
         if (instrument === "HIRISE_DTM") {
           onHiRiseDTMClickRef.current?.(productId, clickLat, clickLon);
 
+          // Load elevation grid for hover (async, non-blocking)
+          activeDTMProductRef.current = productId;
+          loadDTMElevationGrid(productId).then((grid) => {
+            if (grid) {
+              dtmGridCacheRef.current.set(productId, grid);
+              console.log(`[DTMHover] Grid loaded for ${productId}`);
+            }
+          });
+
           // Fly to footprint bounds so the DTM area is visible
           const rectEnt = viewer.entities.getById(`HIRISE_DTM_FP_${productId}`);
           if (rectEnt?.rectangle?.coordinates) {
@@ -1076,9 +1101,102 @@ export default function MapView({
       Cesium.ScreenSpaceEventType.LEFT_CLICK
     );
 
+    // ========================================
+    // DTM Hover System - Fast elevation probe
+    // ========================================
+
+    // Create persistent hover marker (billboard) - created ONCE
+    const dtmHoverMarker = viewer.entities.add({
+      id: "DTM_HOVER_MARKER",
+      position: Cesium.Cartesian3.fromDegrees(0, 0, 0),
+      billboard: {
+        image: (() => {
+          // Create a small crosshair canvas
+          const canvas = document.createElement("canvas");
+          canvas.width = 24;
+          canvas.height = 24;
+          const ctx = canvas.getContext("2d")!;
+          ctx.strokeStyle = "#f59e0b"; // amber-500
+          ctx.lineWidth = 2;
+          // Outer circle
+          ctx.beginPath();
+          ctx.arc(12, 12, 8, 0, Math.PI * 2);
+          ctx.stroke();
+          // Crosshair
+          ctx.beginPath();
+          ctx.moveTo(12, 2);
+          ctx.lineTo(12, 6);
+          ctx.moveTo(12, 18);
+          ctx.lineTo(12, 22);
+          ctx.moveTo(2, 12);
+          ctx.lineTo(6, 12);
+          ctx.moveTo(18, 12);
+          ctx.lineTo(22, 12);
+          ctx.stroke();
+          // Center dot
+          ctx.fillStyle = "#f59e0b";
+          ctx.beginPath();
+          ctx.arc(12, 12, 2, 0, Math.PI * 2);
+          ctx.fill();
+          return canvas;
+        })(),
+        scale: 1.0,
+        verticalOrigin: Cesium.VerticalOrigin.CENTER,
+        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+      show: false, // Hidden by default
+    });
+    dtmHoverMarkerRef.current = dtmHoverMarker;
+
+    // Throttled DTM hover handler (25 Hz = 40ms)
+    const dtmHoverHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    const throttledDTMHover = throttle((endPosition: Cesium.Cartesian2) => {
+      if (dtmHoverModeRef.current !== "hover") return;
+
+      const cartesian = viewer.camera.pickEllipsoid(endPosition, MARS_ELLIPSOID);
+      if (!cartesian) {
+        dtmHoverMarker.show = false;
+        dtmHoverReadoutRef.current?.hide();
+        return;
+      }
+
+      const carto = Cesium.Cartographic.fromCartesian(cartesian);
+      const lat = Cesium.Math.toDegrees(carto.latitude);
+      const lon = Cesium.Math.toDegrees(carto.longitude);
+
+      // Check if we're over any DTM footprint with a cached grid
+      const grid = dtmGridCacheRef.current.get(activeDTMProductRef.current || "");
+      if (!grid || !isWithinDTMBounds(grid, lat, lon)) {
+        dtmHoverMarker.show = false;
+        dtmHoverReadoutRef.current?.hide();
+        return;
+      }
+
+      // O(1) elevation lookup
+      const elevation = getElevationFromGrid(grid, lat, lon);
+
+      // Update marker position (no entity recreation)
+      dtmHoverMarker.position = Cesium.Cartesian3.fromDegrees(lon, lat, 0) as any;
+      dtmHoverMarker.show = true;
+
+      // Update readout (via ref, no React re-render)
+      dtmHoverReadoutRef.current?.update(lat, lon, elevation, grid.productId);
+
+      viewer.scene.requestRender();
+    }, 40);
+
+    dtmHoverHandler.setInputAction(
+      (m: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
+        throttledDTMHover(m.endPosition);
+      },
+      Cesium.ScreenSpaceEventType.MOUSE_MOVE
+    );
+
     return () => {
       hoverHandler.destroy();
       clickHandler.destroy();
+      dtmHoverHandler.destroy();
       // Dispose FootprintManager
       if (footprintManagerRef.current) {
         footprintManagerRef.current.dispose();
@@ -2670,6 +2788,23 @@ export default function MapView({
     viewer.scene.requestRender();
   }, [notedProductIds]);
 
+  // Keep DTM hover mode ref in sync with state
+  useEffect(() => {
+    dtmHoverModeRef.current = dtmHoverMode;
+  }, [dtmHoverMode]);
+
+  // Handle DTM hover mode change
+  const handleDTMHoverModeChange = useCallback((mode: "hover" | "click") => {
+    setDtmHoverMode(mode);
+    if (mode === "click") {
+      // Hide marker in click mode until clicked
+      if (dtmHoverMarkerRef.current) {
+        dtmHoverMarkerRef.current.show = false;
+      }
+      dtmHoverReadoutRef.current?.hide();
+    }
+  }, []);
+
   return (
     <>
       <div ref={ref} className="absolute inset-0" />
@@ -2692,6 +2827,13 @@ export default function MapView({
       )}
 
       {/* Footprint loading indicators moved to LayerPanel */}
+
+      {/* DTM Hover Readout - shows elevation on hover */}
+      <DTMHoverReadout
+        ref={dtmHoverReadoutRef}
+        mode={dtmHoverMode}
+        onModeChange={handleDTMHoverModeChange}
+      />
     </>
   );
 }

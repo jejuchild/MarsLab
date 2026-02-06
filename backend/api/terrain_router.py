@@ -527,3 +527,318 @@ async def get_dem_patch(
         import traceback
         traceback.print_exc()
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ──────────────────────────────────────────────
+# HiRISE DTM patch endpoint (high-resolution 3D)
+# ──────────────────────────────────────────────
+_HIRISE_DTM_DIR = os.path.join(_BACKEND_DIR, "hirise_dtm_data")
+_hirise_dtm_cache = {}  # Cache for opened DTM datasets
+
+
+def _get_hirise_dtm(product_id: str):
+    """Open (and cache) a HiRISE DTM dataset."""
+    if product_id in _hirise_dtm_cache:
+        return _hirise_dtm_cache[product_id]
+
+    # Load index to find DTM file
+    index_path = os.path.join(_HIRISE_DTM_DIR, "index.geojson")
+    if not os.path.exists(index_path):
+        raise FileNotFoundError(f"HiRISE DTM index not found: {index_path}")
+
+    import json
+    with open(index_path) as f:
+        index = json.load(f)
+
+    dtm_file = None
+    dtm_props = None
+    for feature in index.get("features", []):
+        props = feature.get("properties", {})
+        if props.get("product_id") == product_id:
+            dtm_file = props.get("dtm_file")
+            dtm_props = props
+            break
+
+    if not dtm_file:
+        raise FileNotFoundError(f"DTM not found for product: {product_id}")
+
+    dtm_path = os.path.join(_HIRISE_DTM_DIR, dtm_file)
+    if not os.path.exists(dtm_path):
+        raise FileNotFoundError(f"DTM file not found: {dtm_path}")
+
+    ds = rasterio.open(dtm_path)
+    _hirise_dtm_cache[product_id] = (ds, dtm_props)
+    return ds, dtm_props
+
+
+def compute_hirise_dtm_patch(
+    product_id: str,
+    lat0: float,
+    lon0: float,
+    radius_m: float = 500,
+    grid_size: int = 128,
+) -> dict:
+    """
+    Extract a DEM patch from HiRISE DTM centered at (lat0, lon0).
+
+    HiRISE DTM has ~1m resolution, so we can extract much smaller patches.
+
+    Returns similar structure to compute_dem_patch for compatibility.
+    """
+    from pyproj import CRS, Transformer
+
+    ds, dtm_props = _get_hirise_dtm(product_id)
+
+    # Create transformer from lat/lon to DTM CRS
+    mars_lonlat = CRS.from_proj4("+proj=longlat +a=3396190 +b=3376200 +no_defs")
+    transformer = Transformer.from_crs(mars_lonlat, ds.crs.to_wkt(), always_xy=True)
+    inv_transformer = Transformer.from_crs(ds.crs.to_wkt(), mars_lonlat, always_xy=True)
+
+    # Transform center point to DTM coordinates
+    x_center, y_center = transformer.transform(lon0, lat0)
+
+    # DTM resolution (should be ~1m)
+    px_m_x = abs(ds.transform.a)
+    px_m_y = abs(ds.transform.e)
+
+    # Number of pixels for radius
+    n_pix_x = int(math.ceil(radius_m / px_m_x))
+    n_pix_y = int(math.ceil(radius_m / px_m_y))
+
+    # Get center pixel
+    row_c, col_c = ds.index(x_center, y_center)
+
+    # Define window bounds with clamping
+    row_start = max(0, row_c - n_pix_y)
+    row_end = min(ds.height, row_c + n_pix_y + 1)
+    col_start = max(0, col_c - n_pix_x)
+    col_end = min(ds.width, col_c + n_pix_x + 1)
+
+    if row_end <= row_start or col_end <= col_start:
+        raise ValueError("Point outside DTM bounds")
+
+    window = Window(col_start, row_start, col_end - col_start, row_end - row_start)
+    elev = ds.read(1, window=window).astype(np.float64)
+
+    # Handle nodata
+    if ds.nodata is not None:
+        nodata_mask = elev == ds.nodata
+        elev[nodata_mask] = np.nan
+
+    # Also handle extreme negative values (common nodata for DTMs)
+    elev[elev < -1e30] = np.nan
+
+    # Resample to target grid size if needed
+    original_rows, original_cols = elev.shape
+    if original_rows != grid_size or original_cols != grid_size:
+        from scipy.ndimage import zoom
+        zoom_factor_y = grid_size / original_rows
+        zoom_factor_x = grid_size / original_cols
+        elev = zoom(elev, (zoom_factor_y, zoom_factor_x), order=1)
+
+    rows, cols = elev.shape
+
+    # Compute bounds in lat/lon
+    # Transform corners back to lat/lon
+    west_x = ds.transform.c + col_start * ds.transform.a
+    north_y = ds.transform.f + row_start * ds.transform.e
+    east_x = ds.transform.c + col_end * ds.transform.a
+    south_y = ds.transform.f + row_end * ds.transform.e
+
+    west_lon, north_lat = inv_transformer.transform(west_x, north_y)
+    east_lon, south_lat = inv_transformer.transform(east_x, south_y)
+
+    # Grid spacing in meters (after resampling)
+    spacing_m = (radius_m * 2) / grid_size
+
+    # Compute slope
+    dz_dy, dz_dx = np.gradient(elev, spacing_m, spacing_m)
+    slope_rad = np.arctan(np.sqrt(dz_dx**2 + dz_dy**2))
+    slope_deg = np.degrees(slope_rad)
+
+    # Statistics with NaN handling
+    valid_mask = ~np.isnan(elev)
+
+    if not np.any(valid_mask):
+        # All NaN - return flat surface
+        elev_clean = np.zeros_like(elev)
+        center_elev = 0.0
+        min_elev = 0.0
+        max_elev = 0.0
+        mean_slope = 0.0
+        max_slope = 0.0
+    else:
+        mean_elev = float(np.nanmean(elev))
+
+        center_row, center_col = rows // 2, cols // 2
+        center_elev = float(elev[center_row, center_col])
+        if np.isnan(center_elev):
+            center_elev = mean_elev
+
+        elev_clean = np.nan_to_num(elev, nan=mean_elev)
+        min_elev = float(np.nanmin(elev))
+        max_elev = float(np.nanmax(elev))
+
+        valid_slopes = slope_deg[valid_mask]
+        mean_slope = float(np.mean(valid_slopes)) if len(valid_slopes) > 0 else 0.0
+        max_slope = float(np.max(valid_slopes)) if len(valid_slopes) > 0 else 0.0
+
+    # Safe float helper
+    def safe_float(v, default=0.0):
+        f = float(v)
+        if np.isnan(f) or np.isinf(f):
+            return default
+        return f
+
+    # Clean elevations list
+    elev_list = elev_clean.flatten().tolist()
+    elev_list = [0.0 if (np.isnan(v) or np.isinf(v)) else v for v in elev_list]
+
+    return {
+        "elevations": elev_list,
+        "rows": rows,
+        "cols": cols,
+        "spacing_m": round(safe_float(spacing_m), 2),
+        "bounds": {
+            "west": round(safe_float(west_lon), 6),
+            "east": round(safe_float(east_lon), 6),
+            "south": round(safe_float(south_lat), 6),
+            "north": round(safe_float(north_lat), 6),
+        },
+        "center": {"lat": safe_float(lat0), "lon": safe_float(lon0)},
+        "center_elevation_m": round(safe_float(center_elev), 2),
+        "min_elevation_m": round(safe_float(min_elev), 2),
+        "max_elevation_m": round(safe_float(max_elev), 2),
+        "elevation_range_m": round(safe_float(max_elev - min_elev), 2),
+        "slope_mean": round(safe_float(mean_slope), 2),
+        "slope_max": round(safe_float(max_slope), 2),
+        "radius_m": safe_float(radius_m),
+        "product_id": product_id,
+        "resolution_m": round(safe_float(dtm_props.get("resolution_m", 1.0)), 2),
+    }
+
+
+@router.get("/hirise_dtm_patch")
+async def get_hirise_dtm_patch(
+    product_id: str = Query(..., description="HiRISE DTM product ID"),
+    lat: float = Query(..., description="Centre latitude (degrees)"),
+    lon: float = Query(..., description="Centre longitude (degrees)"),
+    radius_m: float = Query(500, ge=50, le=5000, description="Patch radius (metres)"),
+    grid_size: int = Query(128, ge=32, le=256, description="Output grid size (rows/cols)"),
+):
+    """
+    Get a DEM patch from HiRISE DTM for 3D terrain visualization.
+
+    HiRISE DTM has ~1m resolution, enabling detailed local terrain analysis.
+    Smaller radius values (50-500m) are recommended for best detail.
+    """
+    import json
+    print(f"[HIRISE_DTM_PATCH] Request: product_id={product_id}, lat={lat}, lon={lon}, radius_m={radius_m}")
+
+    if math.isnan(lat) or math.isnan(lon) or math.isnan(radius_m):
+        return JSONResponse(
+            content={"error": f"Invalid input: lat={lat}, lon={lon}, radius_m={radius_m}"},
+            status_code=400
+        )
+
+    try:
+        result = compute_hirise_dtm_patch(product_id, lat, lon, radius_m, grid_size)
+        return JSONResponse(content=result)
+
+    except FileNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except ValueError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@router.get("/hirise_dtm_elevation_grid")
+async def get_hirise_dtm_elevation_grid(
+    product_id: str = Query(..., description="HiRISE DTM product ID"),
+    max_size: int = Query(256, ge=64, le=512, description="Max grid dimension"),
+):
+    """
+    Get a downsampled elevation grid for fast client-side hover lookups.
+
+    Returns the full DTM extent as a grid that can be used for O(1) elevation
+    lookups on the client side. The grid is downsampled to max_size for performance.
+    """
+    from scipy.ndimage import zoom
+
+    try:
+        ds, dtm_props = _get_hirise_dtm(product_id)
+
+        # Read the full raster (HiRISE DTMs are typically not huge)
+        data = ds.read(1)
+        original_height, original_width = data.shape
+
+        # Calculate downsample factor
+        scale = min(max_size / original_height, max_size / original_width, 1.0)
+
+        if scale < 1.0:
+            # Downsample using scipy zoom (order=1 for bilinear, fast)
+            data = zoom(data, scale, order=1)
+
+        rows, cols = data.shape
+
+        # Get bounds from properties or transform
+        bounds = ds.bounds
+        west, south, east, north = bounds.left, bounds.bottom, bounds.right, bounds.top
+
+        # For Mars projected CRS, convert to lat/lon
+        from pyproj import CRS, Transformer
+
+        src_crs = ds.crs
+        if src_crs and not src_crs.is_geographic:
+            # Transform bounds to geographic
+            dst_crs = CRS.from_proj4("+proj=longlat +a=3396190 +b=3376200 +no_defs")
+            transformer = Transformer.from_crs(src_crs, dst_crs, always_xy=True)
+
+            # Transform corners
+            lon_w, lat_s = transformer.transform(bounds.left, bounds.bottom)
+            lon_e, lat_n = transformer.transform(bounds.right, bounds.top)
+
+            # Normalize longitude to -180/180
+            if lon_w > 180:
+                lon_w -= 360
+            if lon_e > 180:
+                lon_e -= 360
+
+            west, south, east, north = lon_w, lat_s, lon_e, lat_n
+
+        # Handle nodata
+        nodata = ds.nodata
+        if nodata is not None:
+            data = np.where(data == nodata, np.nan, data)
+
+        # Convert to list (flattened row-major)
+        elevations = data.flatten().tolist()
+
+        # Replace nan with None for JSON
+        elevations = [None if (e != e) else round(e, 2) for e in elevations]  # nan != nan
+
+        return JSONResponse(content={
+            "product_id": product_id,
+            "rows": rows,
+            "cols": cols,
+            "bounds": {
+                "west": round(west, 6),
+                "south": round(south, 6),
+                "east": round(east, 6),
+                "north": round(north, 6),
+            },
+            "original_size": [original_height, original_width],
+            "elevations": elevations,
+            "min_elevation": round(float(np.nanmin(data)), 2),
+            "max_elevation": round(float(np.nanmax(data)), 2),
+        })
+
+    except FileNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=500)
