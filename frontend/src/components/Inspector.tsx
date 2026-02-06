@@ -146,6 +146,7 @@ export default function Inspector({
   onCustomDatasetOpacity,
   fieldNotes = [],
   onOpenFieldNote,
+  onShow3DView,
 }: {
   selected: InspectorContext | null;
   onClose: () => void;
@@ -159,6 +160,7 @@ export default function Inspector({
   onCustomDatasetOpacity?: (id: string, opacity: number) => void;
   fieldNotes?: FieldNote[];
   onOpenFieldNote?: (productId: string, instrument: string, lat: number, lon: number) => void;
+  onShow3DView?: (productId: string, lat: number, lon: number) => void;
 }) {
   const hasNote = useMemo(
     () => selected ? fieldNotes.some(n => n.product_id === selected.productId) : false,
@@ -337,6 +339,7 @@ export default function Inspector({
   const isHiRISE = selected.instrument === "HIRISE";
   const isCRISM = selected.instrument === "CRISM";
   const isCustom = selected.instrument === "CUSTOM";
+  const isDTM = selected.instrument === "HIRISE_DTM";
 
   const handleRGBSliderChange = (channel: "r" | "g" | "b", value: number) => {
     const newRGB = { ...localRGB, [channel]: value };
@@ -408,6 +411,14 @@ export default function Inspector({
           </button>
         )}
 
+        {isDTM && (
+          <button
+            className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border-b-2 border-amber-600 bg-amber-600/5 text-white"
+          >
+            HiRISE DTM
+          </button>
+        )}
+
         <button
           onClick={onClose}
           className="flex items-center justify-center px-3 text-slate-500 hover:text-red-400 transition-colors"
@@ -454,6 +465,8 @@ export default function Inspector({
         {isCustom && customDataset && (
           <CustomMetadataTab dataset={customDataset} />
         )}
+
+        {isDTM && <MetadataTab selected={selected} />}
       </div>
 
       {/* Footer - Overlay Controls */}
@@ -579,6 +592,17 @@ export default function Inspector({
             </div>
           )}
         </div>
+        )}
+
+        {/* Show 3D View button (HiRISE DTM) */}
+        {isDTM && selected && onShow3DView && (
+          <button
+            onClick={() => onShow3DView(selected.productId, selected.lat, selected.lon)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold uppercase tracking-widest bg-amber-600/20 border border-amber-600/50 text-amber-500 hover:bg-amber-600/30 shadow-lg shadow-amber-600/10 active:scale-[0.98] transition-all"
+          >
+            <span className="material-symbols-outlined text-sm">terrain</span>
+            Show 3D View
+          </button>
         )}
 
         {/* Field Note button */}

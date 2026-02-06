@@ -1183,11 +1183,31 @@ function FieldNotesSection({
     return Array.from(tagSet).sort();
   }, [fieldNotes]);
 
-  // Filtered notes
-  const filtered = useMemo(
-    () => selectedTag ? fieldNotes.filter(n => n.tags.includes(selectedTag)) : fieldNotes,
-    [fieldNotes, selectedTag]
-  );
+  // Group notes by tag, or flat list when no tag selected
+  const grouped = useMemo(() => {
+    if (selectedTag) {
+      // Single-tag filter: one group
+      return [{ tag: selectedTag, notes: fieldNotes.filter(n => n.tags.includes(selectedTag)) }];
+    }
+    // Group by every tag; notes without tags go into "(Untagged)"
+    const map = new Map<string, FieldNote[]>();
+    const untagged: FieldNote[] = [];
+    for (const n of fieldNotes) {
+      if (n.tags.length === 0) {
+        untagged.push(n);
+      } else {
+        for (const t of n.tags) {
+          if (!map.has(t)) map.set(t, []);
+          map.get(t)!.push(n);
+        }
+      }
+    }
+    const groups = Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([tag, notes]) => ({ tag, notes }));
+    if (untagged.length > 0) groups.push({ tag: "", notes: untagged });
+    return groups;
+  }, [fieldNotes, selectedTag]);
 
   if (fieldNotes.length === 0) return null;
 
@@ -1239,42 +1259,59 @@ function FieldNotesSection({
             </div>
           )}
 
-          {/* Notes list */}
-          <div className="max-h-64 overflow-y-auto scrollbar-dark space-y-1">
-            {filtered.map(note => {
-              const instColors = INSTRUMENT_COLORS[note.instrument as InstrumentType] ?? INSTRUMENT_COLORS.CUSTOM;
-              return (
-                <button
-                  key={note.id}
-                  onClick={() => onFieldNoteClick?.(note)}
-                  className="w-full text-left p-2 rounded bg-[#0a0f18] border border-[#232f48] hover:border-amber-500/30 transition-colors space-y-1"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${instColors.bg} ${instColors.text} border ${instColors.border}`}>
-                      {note.instrument}
-                    </span>
-                    <span className="text-[10px] text-white font-mono truncate flex-1">
-                      {note.product_id}
-                    </span>
-                  </div>
-                  {note.memo && (
-                    <p className="text-[9px] text-[#6b7c9c] truncate">{note.memo}</p>
-                  )}
-                  {note.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {note.tags.map(tag => (
-                        <span
-                          key={tag}
-                          className="px-1.5 py-0.5 rounded-full text-[8px] bg-amber-500/10 text-amber-400/70 border border-amber-500/20"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+          {/* Grouped notes list */}
+          <div className="max-h-64 overflow-y-auto scrollbar-dark space-y-2">
+            {grouped.map(({ tag, notes }) => (
+              <div key={tag || "__untagged"}>
+                {/* Group header */}
+                <div className="flex items-center gap-1.5 mb-1 px-1">
+                  <span className="material-symbols-outlined text-amber-400 text-[10px]">label</span>
+                  <span className="text-[10px] font-bold text-amber-400">
+                    {tag || "Untagged"}
+                  </span>
+                  <span className="text-[9px] text-[#6b7c9c]">({notes.length})</span>
+                </div>
+                {/* Notes under this group */}
+                <div className="space-y-1 pl-1">
+                  {notes.map(note => {
+                    const instColors = INSTRUMENT_COLORS[note.instrument as InstrumentType] ?? INSTRUMENT_COLORS.CUSTOM;
+                    // In grouped view, exclude the group tag from displayed tags
+                    const otherTags = tag ? note.tags.filter(t => t !== tag) : note.tags;
+                    return (
+                      <button
+                        key={note.id}
+                        onClick={() => onFieldNoteClick?.(note)}
+                        className="w-full text-left p-2 rounded bg-[#0a0f18] border border-[#232f48] hover:border-amber-500/30 transition-colors space-y-1"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${instColors.bg} ${instColors.text} border ${instColors.border}`}>
+                            {note.instrument}
+                          </span>
+                          <span className="text-[10px] text-white font-mono truncate flex-1">
+                            {note.product_id}
+                          </span>
+                        </div>
+                        {note.memo && (
+                          <p className="text-[9px] text-[#6b7c9c] truncate">{note.memo}</p>
+                        )}
+                        {otherTags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {otherTags.map(t => (
+                              <span
+                                key={t}
+                                className="px-1.5 py-0.5 rounded-full text-[8px] bg-amber-500/10 text-amber-400/70 border border-amber-500/20"
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
