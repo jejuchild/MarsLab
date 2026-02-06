@@ -199,6 +199,7 @@ class DownloadManager:
         self.tasks: Dict[str, DownloadTask] = {}
         self._active_downloads: Dict[str, asyncio.Task] = {}
         self._progress_callbacks: Dict[str, Callable] = {}
+        self._index_lock = asyncio.Lock()  # Prevent concurrent index updates
         self._initialized = True
 
     def get_task(self, task_id: str) -> Optional[DownloadTask]:
@@ -680,108 +681,112 @@ class DownloadManager:
 
     async def _update_crism_index(self, task: DownloadTask, index_path: Path):
         """Update CRISM index.geojson with new product."""
-        # Load existing index
-        if index_path.exists():
-            async with aiofiles.open(index_path, "r") as f:
-                content = await f.read()
-                index = json.loads(content)
-        else:
-            index = {"type": "FeatureCollection", "features": []}
+        # Use lock to prevent concurrent updates corrupting the file
+        async with self._index_lock:
+            # Load existing index
+            if index_path.exists():
+                async with aiofiles.open(index_path, "r") as f:
+                    content = await f.read()
+                    index = json.loads(content)
+            else:
+                index = {"type": "FeatureCollection", "features": []}
 
-        # Find files
-        img_file = next((f.filename for f in task.files if f.filename.endswith(".img")), None)
-        lbl_file = next((f.filename for f in task.files if f.filename.endswith(".lbl")), None)
-        quicklook = next(
-            (f"/crism/quickview/{f.filename}" for f in task.files if "_brvna" in f.filename.lower()),
-            None
-        )
+            # Find files
+            img_file = next((f.filename for f in task.files if f.filename.endswith(".img")), None)
+            lbl_file = next((f.filename for f in task.files if f.filename.endswith(".lbl")), None)
+            quicklook = next(
+                (f"/crism/quickview/{f.filename}" for f in task.files if "_brvna" in f.filename.lower()),
+                None
+            )
 
-        # Check if product already exists
-        existing_idx = None
-        for i, feat in enumerate(index["features"]):
-            if feat["properties"].get("product_id", "").startswith(task.base_key):
-                existing_idx = i
-                break
+            # Check if product already exists
+            existing_idx = None
+            for i, feat in enumerate(index["features"]):
+                if feat["properties"].get("product_id", "").startswith(task.base_key):
+                    existing_idx = i
+                    break
 
-        # Create new feature
-        feature = {
-            "type": "Feature",
-            "properties": {
-                "instrument": "CRISM",
-                "product_id": img_file.replace(".img", "") if img_file else task.base_key,
-                "base_key": task.base_key,
-                "mtr3_img": img_file,
-                "mtr3_lbl": lbl_file,
-                "quicklook": quicklook,
-            },
-            "geometry": {
-                "type": "Point",
-                "coordinates": [task.lon or 0, task.lat or 0]
+            # Create new feature
+            feature = {
+                "type": "Feature",
+                "properties": {
+                    "instrument": "CRISM",
+                    "product_id": img_file.replace(".img", "") if img_file else task.base_key,
+                    "base_key": task.base_key,
+                    "mtr3_img": img_file,
+                    "mtr3_lbl": lbl_file,
+                    "quicklook": quicklook,
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [task.lon or 0, task.lat or 0]
+                }
             }
-        }
 
-        if existing_idx is not None:
-            index["features"][existing_idx] = feature
-        else:
-            index["features"].append(feature)
+            if existing_idx is not None:
+                index["features"][existing_idx] = feature
+            else:
+                index["features"].append(feature)
 
-        # Write updated index
-        async with aiofiles.open(index_path, "w") as f:
-            await f.write(json.dumps(index, indent=2))
+            # Write updated index
+            async with aiofiles.open(index_path, "w") as f:
+                await f.write(json.dumps(index, indent=2))
 
     async def _update_hirise_index(self, task: DownloadTask, index_path: Path):
         """Update HiRISE index.geojson with new product."""
-        # Load existing index
-        if index_path.exists():
-            async with aiofiles.open(index_path, "r") as f:
-                content = await f.read()
-                index = json.loads(content)
-        else:
-            index = {"type": "FeatureCollection", "features": []}
+        # Use lock to prevent concurrent updates corrupting the file
+        async with self._index_lock:
+            # Load existing index
+            if index_path.exists():
+                async with aiofiles.open(index_path, "r") as f:
+                    content = await f.read()
+                    index = json.loads(content)
+            else:
+                index = {"type": "FeatureCollection", "features": []}
 
-        # Find TIF file (converted from JP2) or JP2
-        tif_file = None
-        for f in task.files:
-            if f.filename.lower().endswith(".jp2"):
-                # Check if TIF was created
-                tif_name = f.filename.replace(".JP2", ".tif").replace(".jp2", ".tif")
-                tif_path = Path(task.target_dir) / tif_name
-                if tif_path.exists():
-                    tif_file = tif_name
-                break
+            # Find TIF file (converted from JP2) or JP2
+            tif_file = None
+            for f in task.files:
+                if f.filename.lower().endswith(".jp2"):
+                    # Check if TIF was created
+                    tif_name = f.filename.replace(".JP2", ".tif").replace(".jp2", ".tif")
+                    tif_path = Path(task.target_dir) / tif_name
+                    if tif_path.exists():
+                        tif_file = tif_name
+                    break
 
-        quicklook = f"/hirise/quickview/{task.product_id}.jpg"
+            quicklook = f"/hirise/quickview/{task.product_id}.jpg"
 
-        # Check if product already exists
-        existing_idx = None
-        for i, feat in enumerate(index["features"]):
-            if feat["properties"].get("product_id") == task.product_id:
-                existing_idx = i
-                break
+            # Check if product already exists
+            existing_idx = None
+            for i, feat in enumerate(index["features"]):
+                if feat["properties"].get("product_id") == task.product_id:
+                    existing_idx = i
+                    break
 
-        # Create new feature
-        feature = {
-            "type": "Feature",
-            "properties": {
-                "instrument": "HIRISE",
-                "product_id": task.product_id,
-                "quicklook": quicklook,
-                "red_tif": tif_file,
-            },
-            "geometry": {
-                "type": "Point",
-                "coordinates": [task.lon or 0, task.lat or 0]
+            # Create new feature
+            feature = {
+                "type": "Feature",
+                "properties": {
+                    "instrument": "HIRISE",
+                    "product_id": task.product_id,
+                    "quicklook": quicklook,
+                    "red_tif": tif_file,
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [task.lon or 0, task.lat or 0]
+                }
             }
-        }
 
-        if existing_idx is not None:
-            index["features"][existing_idx] = feature
-        else:
-            index["features"].append(feature)
+            if existing_idx is not None:
+                index["features"][existing_idx] = feature
+            else:
+                index["features"].append(feature)
 
-        # Write updated index
-        async with aiofiles.open(index_path, "w") as f:
-            await f.write(json.dumps(index, indent=2))
+            # Write updated index
+            async with aiofiles.open(index_path, "w") as f:
+                await f.write(json.dumps(index, indent=2))
 
     async def _download_sharad_bundle(self, task: DownloadTask, session: aiohttp.ClientSession):
         """Download SHARAD USRDRV2 bundle files (THM quicklook + LBL)."""
@@ -854,118 +859,122 @@ class DownloadManager:
 
     async def _update_sharad_index(self, task: DownloadTask, index_path: Path):
         """Update SHARAD index.geojson with new product."""
-        # Load existing index
-        if index_path.exists():
-            async with aiofiles.open(index_path, "r") as f:
-                content = await f.read()
-                index = json.loads(content)
-        else:
-            index = {"type": "FeatureCollection", "features": []}
+        # Use lock to prevent concurrent updates corrupting the file
+        async with self._index_lock:
+            # Load existing index
+            if index_path.exists():
+                async with aiofiles.open(index_path, "r") as f:
+                    content = await f.read()
+                    index = json.loads(content)
+            else:
+                index = {"type": "FeatureCollection", "features": []}
 
-        # Find quickview file
-        quickview = None
-        for f in task.files:
-            if f.filename.lower().endswith(".jpg"):
-                quickview = f"/sharad/quickview/{f.filename}"
-                break
+            # Find quickview file
+            quickview = None
+            for f in task.files:
+                if f.filename.lower().endswith(".jpg"):
+                    quickview = f"/sharad/quickview/{f.filename}"
+                    break
 
-        # Check if product already exists
-        existing_idx = None
-        for i, feat in enumerate(index["features"]):
-            if feat["properties"].get("product_id") == task.base_key:
-                existing_idx = i
-                break
+            # Check if product already exists
+            existing_idx = None
+            for i, feat in enumerate(index["features"]):
+                if feat["properties"].get("product_id") == task.base_key:
+                    existing_idx = i
+                    break
 
-        # Create new feature - SHARAD uses LineString geometry
-        # For now, use point geometry; actual track coordinates would come from LBL
-        feature = {
-            "type": "Feature",
-            "properties": {
-                "instrument": "SHARAD",
-                "product_id": task.base_key,
-                "quickview": quickview,
-                "start_lat": task.lat,
-                "start_lon": task.lon,
-            },
-            "geometry": {
-                "type": "Point",
-                "coordinates": [task.lon or 0, task.lat or 0]
+            # Create new feature - SHARAD uses LineString geometry
+            # For now, use point geometry; actual track coordinates would come from LBL
+            feature = {
+                "type": "Feature",
+                "properties": {
+                    "instrument": "SHARAD",
+                    "product_id": task.base_key,
+                    "quickview": quickview,
+                    "start_lat": task.lat,
+                    "start_lon": task.lon,
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [task.lon or 0, task.lat or 0]
+                }
             }
-        }
 
-        if existing_idx is not None:
-            index["features"][existing_idx] = feature
-        else:
-            index["features"].append(feature)
+            if existing_idx is not None:
+                index["features"][existing_idx] = feature
+            else:
+                index["features"].append(feature)
 
-        # Write updated index
-        index_path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiofiles.open(index_path, "w") as f:
-            await f.write(json.dumps(index, indent=2))
+            # Write updated index
+            index_path.parent.mkdir(parents=True, exist_ok=True)
+            async with aiofiles.open(index_path, "w") as f:
+                await f.write(json.dumps(index, indent=2))
 
     async def _update_sharad_highres_index(self, task: DownloadTask, index_path: Path):
         """Update SHARAD High-Res index.geojson with new product."""
-        # Load existing index
-        if index_path.exists():
-            async with aiofiles.open(index_path, "r") as f:
-                content = await f.read()
-                index = json.loads(content)
-        else:
-            index = {"type": "FeatureCollection", "features": []}
-
-        # Find DAT file
-        dat_file = None
-        lbl_file = None
-        for f in task.files:
-            if f.filename.lower().endswith(".dat"):
-                dat_file = f.filename
-            elif f.filename.lower().endswith(".lbl"):
-                lbl_file = f.filename
-
-        # Check if product already exists
-        existing_idx = None
-        for i, feat in enumerate(index["features"]):
-            if feat["properties"].get("product_id") == task.base_key:
-                existing_idx = i
-                break
-
-        # Fetch footprint coordinates from ODE for LineString geometry
+        # Fetch footprint coordinates from ODE for LineString geometry (outside lock)
         footprint_coords = await get_sharad_highres_footprint(task.base_key)
 
-        # Create geometry - use LineString if we have footprint, otherwise Point
-        if footprint_coords and len(footprint_coords) >= 2:
-            geometry = {
-                "type": "LineString",
-                "coordinates": footprint_coords
+        # Use lock to prevent concurrent updates corrupting the file
+        async with self._index_lock:
+            # Load existing index
+            if index_path.exists():
+                async with aiofiles.open(index_path, "r") as f:
+                    content = await f.read()
+                    index = json.loads(content)
+            else:
+                index = {"type": "FeatureCollection", "features": []}
+
+            # Find DAT file
+            dat_file = None
+            lbl_file = None
+            for f in task.files:
+                if f.filename.lower().endswith(".dat"):
+                    dat_file = f.filename
+                elif f.filename.lower().endswith(".lbl"):
+                    lbl_file = f.filename
+
+            # Check if product already exists
+            existing_idx = None
+            for i, feat in enumerate(index["features"]):
+                if feat["properties"].get("product_id") == task.base_key:
+                    existing_idx = i
+                    break
+
+            # Create geometry - use LineString if we have footprint, otherwise Point
+            if footprint_coords and len(footprint_coords) >= 2:
+                geometry = {
+                    "type": "LineString",
+                    "coordinates": footprint_coords
+                }
+            else:
+                # Fallback to Point if no footprint available
+                geometry = {
+                    "type": "Point",
+                    "coordinates": [task.lon or 0, task.lat or 0]
+                }
+
+            # Create new feature
+            feature = {
+                "type": "Feature",
+                "properties": {
+                    "instrument": "SHARAD_HIGHRES",
+                    "product_id": task.base_key,
+                    "dat_file": dat_file,
+                    "lbl_file": lbl_file,
+                },
+                "geometry": geometry
             }
-        else:
-            # Fallback to Point if no footprint available
-            geometry = {
-                "type": "Point",
-                "coordinates": [task.lon or 0, task.lat or 0]
-            }
 
-        # Create new feature
-        feature = {
-            "type": "Feature",
-            "properties": {
-                "instrument": "SHARAD_HIGHRES",
-                "product_id": task.base_key,
-                "dat_file": dat_file,
-                "lbl_file": lbl_file,
-            },
-            "geometry": geometry
-        }
+            if existing_idx is not None:
+                index["features"][existing_idx] = feature
+            else:
+                index["features"].append(feature)
 
-        if existing_idx is not None:
-            index["features"][existing_idx] = feature
-        else:
-            index["features"].append(feature)
-
-        # Write updated index
-        index_path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiofiles.open(index_path, "w") as f:
-            await f.write(json.dumps(index, indent=2))
+            # Write updated index
+            index_path.parent.mkdir(parents=True, exist_ok=True)
+            async with aiofiles.open(index_path, "w") as f:
+                await f.write(json.dumps(index, indent=2))
 
 
 # =============================================================================
