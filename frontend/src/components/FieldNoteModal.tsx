@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   getNotesForProduct,
   getAllTags,
@@ -33,6 +33,10 @@ export default function FieldNoteModal({
   const [tagInput, setTagInput] = useState("");
   const [allTags, setAllTags] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Load existing note + all tags
   useEffect(() => {
@@ -68,18 +72,68 @@ export default function FieldNoteModal({
       setTags(prev => [...prev, t]);
     }
     setTagInput("");
+    setShowDropdown(false);
+    setFocusedIndex(-1);
   }, [tags]);
 
   const removeTag = useCallback((tag: string) => {
     setTags(prev => prev.filter(t => t !== tag));
   }, []);
 
+  // Filtered suggestions based on input (exclude already-added)
+  const filteredSuggestions = useMemo(() => {
+    const available = allTags.filter(t => !tags.includes(t));
+    if (!tagInput.trim()) return available;
+    const lower = tagInput.toLowerCase();
+    return available.filter(t => t.toLowerCase().includes(lower));
+  }, [allTags, tags, tagInput]);
+
+  // Check if current input is a new tag (not in existing list)
+  const isNewTag = useMemo(() => {
+    const t = tagInput.trim().toLowerCase();
+    return t && !allTags.some(tag => tag.toLowerCase() === t);
+  }, [tagInput, allTags]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      addTag(tagInput);
+    if (e.key === "Escape") {
+      setShowDropdown(false);
+      setFocusedIndex(-1);
+      return;
     }
-  }, [tagInput, addTag]);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const maxIndex = filteredSuggestions.length + (isNewTag ? 0 : -1);
+      setFocusedIndex(prev => Math.min(prev + 1, maxIndex));
+      setShowDropdown(true);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setFocusedIndex(prev => Math.max(prev - 1, -1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
+        addTag(filteredSuggestions[focusedIndex]);
+      } else if (tagInput.trim()) {
+        addTag(tagInput);
+      }
+    }
+  }, [tagInput, addTag, filteredSuggestions, focusedIndex, isNewTag]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowDropdown(false);
+        setFocusedIndex(-1);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -127,9 +181,6 @@ export default function FieldNoteModal({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
-
-  // Suggested tags (exclude already-added)
-  const suggestedTags = allTags.filter(t => !tags.includes(t));
 
   return (
     <div
@@ -192,31 +243,78 @@ export default function FieldNoteModal({
                   </div>
                 )}
 
-                {/* Tag input */}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Add tag..."
-                    className="flex-1 bg-[#0a0f18] border border-[#232f48] rounded px-2.5 py-1.5 text-[11px] text-white placeholder-[#6b7c9c] focus:outline-none focus:border-amber-500/40"
-                  />
-                  <button
-                    onClick={() => addTag(tagInput)}
-                    disabled={!tagInput.trim()}
-                    className="px-2.5 py-1.5 text-[10px] font-bold rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Add
-                  </button>
+                {/* Tag input with dropdown */}
+                <div className="relative">
+                  <div className="flex gap-2">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => {
+                        setTagInput(e.target.value);
+                        setShowDropdown(true);
+                        setFocusedIndex(-1);
+                      }}
+                      onFocus={() => setShowDropdown(true)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Type to search or add tag..."
+                      className="flex-1 bg-[#0a0f18] border border-[#232f48] rounded px-2.5 py-1.5 text-[11px] text-white placeholder-[#6b7c9c] focus:outline-none focus:border-amber-500/40"
+                    />
+                    <button
+                      onClick={() => addTag(tagInput)}
+                      disabled={!tagInput.trim()}
+                      className="px-2.5 py-1.5 text-[10px] font-bold rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+
+                  {/* Dropdown */}
+                  {showDropdown && (filteredSuggestions.length > 0 || isNewTag) && (
+                    <div
+                      ref={dropdownRef}
+                      className="absolute z-10 mt-1 w-full max-h-40 overflow-y-auto bg-[#0a0f18] border border-[#232f48] rounded shadow-lg scrollbar-dark"
+                    >
+                      {/* Existing tags */}
+                      {filteredSuggestions.map((tag, idx) => (
+                        <button
+                          key={tag}
+                          onClick={() => addTag(tag)}
+                          onMouseEnter={() => setFocusedIndex(idx)}
+                          className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors ${
+                            focusedIndex === idx
+                              ? "bg-amber-500/20 text-amber-400"
+                              : "text-[#92a4c9] hover:bg-[#1a2333]"
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                      {/* Create new tag option */}
+                      {isNewTag && (
+                        <button
+                          onClick={() => addTag(tagInput)}
+                          onMouseEnter={() => setFocusedIndex(filteredSuggestions.length)}
+                          className={`w-full text-left px-3 py-1.5 text-[11px] border-t border-[#232f48] transition-colors ${
+                            focusedIndex === filteredSuggestions.length
+                              ? "bg-green-500/20 text-green-400"
+                              : "text-green-400/70 hover:bg-[#1a2333]"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[11px] mr-1 align-middle">add</span>
+                          Create "{tagInput.trim()}"
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Tag suggestions */}
-                {suggestedTags.length > 0 && (
+                {/* Quick-add existing tags (when input is empty) */}
+                {!tagInput && filteredSuggestions.length > 0 && !showDropdown && (
                   <div className="space-y-1">
-                    <span className="text-[9px] text-[#6b7c9c] uppercase">Existing tags</span>
+                    <span className="text-[9px] text-[#6b7c9c] uppercase">Quick add</span>
                     <div className="flex flex-wrap gap-1">
-                      {suggestedTags.map(tag => (
+                      {filteredSuggestions.slice(0, 8).map(tag => (
                         <button
                           key={tag}
                           onClick={() => addTag(tag)}

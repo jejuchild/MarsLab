@@ -254,6 +254,7 @@ interface LayerPanelProps {
   fieldNotes?: FieldNote[];
   showFieldNotesOnMap?: boolean;
   onToggleFieldNotesOnMap?: (v: boolean) => void;
+  onFieldNoteClick?: (note: FieldNote) => void;
 }
 
 // Fly-To Navigation Component
@@ -535,6 +536,7 @@ export default function LayerPanel({
   fieldNotes = [],
   showFieldNotesOnMap = true,
   onToggleFieldNotesOnMap,
+  onFieldNoteClick,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -1132,9 +1134,7 @@ export default function LayerPanel({
           fieldNotes={fieldNotes}
           showOnMap={showFieldNotesOnMap ?? true}
           onToggleShowOnMap={onToggleFieldNotesOnMap}
-          onSelectProduct={onSelectProduct}
-          onFlyToCoords={onFlyToCoords}
-          visibleProducts={visibleProducts}
+          onFieldNoteClick={onFieldNoteClick}
         />
 
         {/* Displayed Products Section */}
@@ -1166,16 +1166,12 @@ function FieldNotesSection({
   fieldNotes,
   showOnMap,
   onToggleShowOnMap,
-  onSelectProduct,
-  onFlyToCoords,
-  visibleProducts,
+  onFieldNoteClick,
 }: {
   fieldNotes: FieldNote[];
   showOnMap: boolean;
   onToggleShowOnMap?: (v: boolean) => void;
-  onSelectProduct?: (product: VisibleProduct) => void;
-  onFlyToCoords?: (lat: number, lon: number) => void;
-  visibleProducts: VisibleProduct[];
+  onFieldNoteClick?: (note: FieldNote) => void;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -1250,17 +1246,7 @@ function FieldNotesSection({
               return (
                 <button
                   key={note.id}
-                  onClick={() => {
-                    // Fly to location
-                    if (onFlyToCoords && (note.lat || note.lon)) {
-                      onFlyToCoords(note.lat, note.lon);
-                    }
-                    // Select product if visible
-                    const vp = visibleProducts.find(p => p.productId === note.product_id);
-                    if (vp && onSelectProduct) {
-                      onSelectProduct(vp);
-                    }
-                  }}
+                  onClick={() => onFieldNoteClick?.(note)}
                   className="w-full text-left p-2 rounded bg-[#0a0f18] border border-[#232f48] hover:border-amber-500/30 transition-colors space-y-1"
                 >
                   <div className="flex items-center gap-1.5">

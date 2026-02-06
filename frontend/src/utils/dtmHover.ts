@@ -9,7 +9,7 @@
  */
 
 // Cached elevation grid per product
-interface DTMElevationGrid {
+export interface DTMElevationGrid {
   productId: string;
   rows: number;
   cols: number;

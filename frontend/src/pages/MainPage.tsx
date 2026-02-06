@@ -228,11 +228,6 @@ export default function MainPage() {
   } | null>(null);
   const [showFieldNotesOnMap, setShowFieldNotesOnMap] = useState(true);
 
-  const notedProductIds = useMemo(
-    () => new Set(fieldNotes.map(n => n.product_id)),
-    [fieldNotes]
-  );
-
   // Default opacity for new overlays
   const DEFAULT_OPACITY = 80;
 
@@ -377,6 +372,20 @@ export default function MainPage() {
 
   const handleOpenFieldNote = useCallback((productId: string, instrument: string, lat: number, lon: number) => {
     setShowFieldNoteModal({ productId, instrument, lat, lon });
+  }, []);
+
+  // Handle field note marker click from map - fly to and open inspector
+  const handleFieldNoteClick = useCallback((note: FieldNote) => {
+    // Fly to the note location
+    setFlyToCoords({ lat: note.lat, lon: note.lon });
+
+    // Open inspector for this product
+    setSelected({
+      instrument: note.instrument as InspectorContext["instrument"],
+      productId: note.product_id,
+      lat: note.lat,
+      lon: note.lon,
+    });
   }, []);
 
   // Handle HiRISE DTM footprint click - One-click inspection flow
@@ -544,6 +553,7 @@ export default function MainPage() {
     }
     if (analysisMode === "hirise_dtm_3d" && activeDTMProduct) {
       // HiRISE DTM 3D mode: open 3D viewer at clicked point
+      setSelected(null);
       setHiRiseDTM3DPoint({ productId: activeDTMProduct, lat, lon });
     }
   }, [analysisMode, activeDTMProduct]);
@@ -722,6 +732,7 @@ export default function MainPage() {
           fieldNotes={fieldNotes}
           showFieldNotesOnMap={showFieldNotesOnMap}
           onToggleFieldNotesOnMap={setShowFieldNotesOnMap}
+          onFieldNoteClick={handleFieldNoteClick}
         />
       }
       rightPanel={
@@ -746,6 +757,10 @@ export default function MainPage() {
             onCustomDatasetOpacity={handleCustomDatasetOpacity}
             fieldNotes={fieldNotes}
             onOpenFieldNote={handleOpenFieldNote}
+            onShow3DView={(productId, lat, lon) => {
+              setSelected(null);
+              setHiRiseDTM3DPoint({ productId, lat, lon });
+            }}
           />
         ) : terrainPoint ? (
           <SlopeAnalysis
@@ -805,7 +820,8 @@ export default function MainPage() {
         linePoints={linePoints}
         viewBoundSelectionMode={viewBoundSelectionMode}
         onViewBoundSelected={handleViewBoundSelected}
-        notedProductIds={showFieldNotesOnMap ? notedProductIds : undefined}
+        fieldNotes={showFieldNotesOnMap ? fieldNotes : []}
+        onFieldNoteClick={handleFieldNoteClick}
       />
 
       {/* Line Profile Popup */}

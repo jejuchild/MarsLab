@@ -318,12 +318,12 @@ function HoverRaycast({
   mode,
 }: {
   data: DEMPatchData;
-  meshRef: React.RefObject<THREE.Mesh>;
+  meshRef: React.RefObject<THREE.Mesh | null>;
   verticalExaggeration: number;
   onHover: (info: HoverInfo | null) => void;
   mode: "hover" | "click";
 }) {
-  const { camera, gl, raycaster, pointer } = useThree();
+  const { camera, raycaster, pointer } = useThree();
   const lastHoverRef = useRef<HoverInfo | null>(null);
 
   // Throttled raycast (20 Hz for 3D - more aggressive than 2D)

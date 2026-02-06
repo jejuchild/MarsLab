@@ -12,6 +12,7 @@ import {
   throttle,
   type DTMElevationGrid,
 } from "../utils/dtmHover";
+import type { FieldNote } from "../api/fieldnotes";
 
 
 /* ==================================================
@@ -131,8 +132,10 @@ type MapViewProps = {
   // View bound selection mode (drag to select rectangle)
   viewBoundSelectionMode?: boolean;
   onViewBoundSelected?: (bounds: BoundingBox) => void;
-  // Field Notes – product IDs that have notes (show gold indicators)
-  notedProductIds?: Set<string>;
+  // Field Notes – full notes array for independent rendering
+  fieldNotes?: FieldNote[];
+  // Callback when a field note marker is clicked (opens inspector)
+  onFieldNoteClick?: (note: FieldNote) => void;
 };
 
 /* ==================================================
@@ -143,6 +146,47 @@ type MapViewProps = {
 // These values are used by NASA PDS, HiRISE, CRISM, and NASA Trek base layers
 const MARS_EQUATORIAL_RADIUS = 3396190; // meters (a = b axis)
 const MARS_POLAR_RADIUS = 3376200;      // meters (c axis)
+
+// Field note marker icon colors by instrument
+const FIELDNOTE_COLORS: Record<string, string> = {
+  CRISM: "#22d3ee",      // cyan
+  HIRISE: "#facc15",     // yellow
+  SHARAD: "#fb923c",     // orange
+  SHARAD_HIGHRES: "#fb923c",
+  CTX: "#f472b6",        // pink
+  CUSTOM: "#e879f9",     // fuchsia
+  HIRISE_DTM: "#d97706", // amber
+};
+
+// Create a canvas-based icon for field note marker
+function createFieldNoteIcon(instrument: string): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = 24;
+  canvas.height = 24;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+
+  const color = FIELDNOTE_COLORS[instrument] || "#fbbf24";
+
+  // Draw pin shape
+  ctx.beginPath();
+  ctx.arc(12, 9, 7, Math.PI, 0, false);
+  ctx.lineTo(12, 22);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Inner circle (white)
+  ctx.beginPath();
+  ctx.arc(12, 9, 3, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+
+  return canvas.toDataURL();
+}
 
 // Create a proper oblate Mars ellipsoid for accurate geospatial positioning
 // This matches the reference used by PDS products and NASA Trek base layers
@@ -433,7 +477,8 @@ export default function MapView({
   linePoints = [],
   viewBoundSelectionMode = false,
   onViewBoundSelected,
-  notedProductIds,
+  fieldNotes = [],
+  onFieldNoteClick,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -480,6 +525,8 @@ export default function MapView({
   const onTerrainClickRef = useRef(onTerrainClick);
   const onFootprintsLoadedRef = useRef(onFootprintsLoaded);
   const onFootprintsLoadingRef = useRef(onFootprintsLoading);
+  const onFieldNoteClickRef = useRef(onFieldNoteClick);
+  const fieldNotesRef = useRef(fieldNotes);
 
   // DTM Hover System - refs for performance (no re-renders on hover)
   const dtmHoverReadoutRef = useRef<DTMHoverReadoutHandle>(null);
@@ -513,6 +560,14 @@ export default function MapView({
   useEffect(() => {
     onToggleOverlayRef.current = onToggleOverlay;
   }, [onToggleOverlay]);
+
+  useEffect(() => {
+    onFieldNoteClickRef.current = onFieldNoteClick;
+  }, [onFieldNoteClick]);
+
+  useEffect(() => {
+    fieldNotesRef.current = fieldNotes;
+  }, [fieldNotes]);
 
   useEffect(() => {
     onTerrainClickRef.current = onTerrainClick;
@@ -937,6 +992,29 @@ export default function MapView({
         // PRIORITY 2: No overlay clicked, try Cesium entity picking for footprints
         const pickedList = viewer.scene.drillPick(m.position);
         console.log("[Click] Picked entities:", pickedList.length, pickedList.map((p: any) => p.id?.id || "unknown"));
+
+        // PRIORITY 2a: Check for field note markers first
+        const pickedFieldNote = pickedList.find((p: any) => {
+          if (!(p.id instanceof Cesium.Entity)) return false;
+          const type = (p.id as Cesium.Entity).properties?.type?.getValue?.();
+          return type === "fieldnote";
+        });
+
+        if (pickedFieldNote && pickedFieldNote.id instanceof Cesium.Entity) {
+          const fnEnt = pickedFieldNote.id as Cesium.Entity;
+          const noteId = fnEnt.properties?.noteId?.getValue?.();
+          const fnProductId = fnEnt.properties?.productId?.getValue?.();
+          const fnInstrument = fnEnt.properties?.instrument?.getValue?.();
+
+          console.log(`[Click] Field Note: ${noteId}, product=${fnProductId}, instrument=${fnInstrument}`);
+
+          // Find the full note data from fieldNotesRef
+          const note = fieldNotesRef.current.find(n => n.id === noteId);
+          if (note && onFieldNoteClickRef.current) {
+            onFieldNoteClickRef.current(note);
+          }
+          return;
+        }
 
         const picked = pickedList.find((p: any) => {
           if (!(p.id instanceof Cesium.Entity)) return false;
@@ -2712,14 +2790,14 @@ export default function MapView({
     viewer.scene.requestRender();
   }, [showCustomData, customDatasets]);
 
-  // ──────────── Field Note indicators ────────────
+  // ──────────── Field Note indicators (independent of layer state) ────────────
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    const PREFIX = "NOTE_IND_";
+    const PREFIX = "FIELDNOTE_";
 
-    // Remove existing note indicators
+    // Remove existing field note markers
     const toRemove: Cesium.Entity[] = [];
     for (let i = 0; i < viewer.entities.values.length; i++) {
       const ent = viewer.entities.values[i];
@@ -2727,66 +2805,51 @@ export default function MapView({
     }
     for (const ent of toRemove) viewer.entities.remove(ent);
 
-    if (!notedProductIds || notedProductIds.size === 0) {
+    if (!fieldNotes || fieldNotes.length === 0) {
       viewer.scene.requestRender();
       return;
     }
 
-    // For each noted product, find its footprint entity and place a gold star at centroid
-    for (const pid of notedProductIds) {
-      // Try different entity ID patterns used by FootprintManager
-      const prefixes = ["CRISM_FP_", "HIRISE_FP_", "SHARAD_FP_", "SHARAD_HIGHRES_FP_", "CTX_FP_", "CUSTOM_FP_", "HIRISE_DTM_FP_",
-                        "CRISM_VP_", "HIRISE_VP_", "SHARAD_VP_", "SHARAD_HIGHRES_VP_", "CTX_VP_", "CUSTOM_VP_", "HIRISE_DTM_VP_"];
-      let lat: number | null = null;
-      let lon: number | null = null;
+    // Create markers at each field note's lat/lon (works regardless of layer state)
+    for (const note of fieldNotes) {
+      // Use stored lat/lon from field note
+      const lat = note.lat;
+      const lon = note.lon;
 
-      for (const pfx of prefixes) {
-        const ent = viewer.entities.getById(`${pfx}${pid}`);
-        if (ent?.rectangle?.coordinates) {
-          const rect = ent.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle | undefined;
-          if (rect) {
-            lat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
-            lon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
-            break;
-          }
-        }
-        // For polyline entities (SHARAD), try position property
-        if (ent?.position) {
-          const pos = ent.position.getValue(Cesium.JulianDate.now());
-          if (pos) {
-            const carto = Cesium.Cartographic.fromCartesian(pos);
-            lat = Cesium.Math.toDegrees(carto.latitude);
-            lon = Cesium.Math.toDegrees(carto.longitude);
-            break;
-          }
-        }
-      }
-
-      if (lat === null || lon === null) continue;
+      // Skip if no valid coordinates
+      if (lat === 0 && lon === 0) continue;
 
       viewer.entities.add({
-        id: `${PREFIX}${pid}`,
+        id: `${PREFIX}${note.id}`,
         position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
-        point: {
-          pixelSize: 8,
-          color: Cesium.Color.GOLD,
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 1,
+        billboard: {
+          image: createFieldNoteIcon(note.instrument),
+          width: 24,
+          height: 24,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
         label: {
           text: "\u2605", // star character
-          font: "14px sans-serif",
+          font: "12px sans-serif",
           fillColor: Cesium.Color.GOLD,
-          style: Cesium.LabelStyle.FILL,
-          pixelOffset: new Cesium.Cartesian2(0, -12),
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          pixelOffset: new Cesium.Cartesian2(0, -28),
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        properties: {
+          type: "fieldnote",
+          noteId: note.id,
+          productId: note.product_id,
+          instrument: note.instrument,
         },
       });
     }
 
     viewer.scene.requestRender();
-  }, [notedProductIds]);
+  }, [fieldNotes]);
 
   // Keep DTM hover mode ref in sync with state
   useEffect(() => {
