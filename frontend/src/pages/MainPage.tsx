@@ -267,6 +267,9 @@ export default function MainPage() {
     [fieldNotes, fieldNoteActiveTag]
   );
 
+  // Coordinate grid
+  const [showGrid, setShowGrid] = useState(false);
+
   // Default opacity for new overlays
   const DEFAULT_OPACITY = 80;
 
@@ -793,6 +796,9 @@ export default function MainPage() {
           // View bound selection mode
           viewBoundSelectionMode={viewBoundSelectionMode}
           onViewBoundSelectionModeChange={setViewBoundSelectionMode}
+          // Coordinate grid
+          showGrid={showGrid}
+          onToggleGrid={setShowGrid}
           // Field Notes
           fieldNotes={fieldNotes}
           showFieldNotesOnMap={showFieldNotesOnMap}
@@ -897,6 +903,7 @@ export default function MainPage() {
         fieldNotes={showFieldNotesOnMap ? mapFieldNotes : []}
         onFieldNoteClick={handleFieldNoteClick}
         activeDTMProductId={activeDTMProduct}
+        showGrid={showGrid}
       />
 
       {/* Line Profile Popup */}

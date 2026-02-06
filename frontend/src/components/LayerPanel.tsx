@@ -250,6 +250,10 @@ interface LayerPanelProps {
   viewBoundSelectionMode?: boolean;
   onViewBoundSelectionModeChange?: (active: boolean) => void;
 
+  // Coordinate grid
+  showGrid?: boolean;
+  onToggleGrid?: (v: boolean) => void;
+
   // Field Notes
   fieldNotes?: FieldNote[];
   showFieldNotesOnMap?: boolean;
@@ -533,6 +537,9 @@ export default function LayerPanel({
   // View bound selection mode
   viewBoundSelectionMode = false,
   onViewBoundSelectionModeChange,
+  // Coordinate grid
+  showGrid = false,
+  onToggleGrid,
   // Field Notes
   fieldNotes = [],
   showFieldNotesOnMap = true,
@@ -754,6 +761,26 @@ export default function LayerPanel({
             selectionMode={viewBoundSelectionMode}
             onSelectionModeChange={onViewBoundSelectionModeChange}
           />
+
+          {/* Coordinate Grid */}
+          <label
+            className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+              showGrid
+                ? "bg-slate-500/20 border border-slate-400/50"
+                : "bg-[#1a2333] border border-[#232f48] hover:border-slate-400/30"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={showGrid}
+              onChange={(e) => onToggleGrid?.(e.target.checked)}
+              className="rounded bg-[#0a0f18] border-[#232f48] text-slate-400 focus:ring-0 focus:ring-offset-0"
+            />
+            <span className="material-symbols-outlined text-xs text-slate-400">grid_on</span>
+            <span className={`text-[11px] font-medium ${showGrid ? "text-slate-300" : "text-[#92a4c9]"}`}>
+              Coordinate Grid
+            </span>
+          </label>
         </div>
 
         {/* Footprints Section */}

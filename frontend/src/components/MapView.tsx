@@ -138,6 +138,8 @@ type MapViewProps = {
   fieldNotes?: FieldNote[];
   // Callback when a field note marker is clicked (opens inspector)
   onFieldNoteClick?: (note: FieldNote) => void;
+  // Coordinate grid overlay
+  showGrid?: boolean;
 };
 
 /* ==================================================
@@ -482,6 +484,7 @@ export default function MapView({
   onViewBoundSelected,
   fieldNotes = [],
   onFieldNoteClick,
+  showGrid = false,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -1482,13 +1485,33 @@ export default function MapView({
   }, [showCRISM]);
 
   // Explicit footprint loading - triggered by loadFootprintsTrigger prop
+  // After loading completes, ensure visibility is set correctly (fixes reload visibility bug)
   useEffect(() => {
     if (!loadFootprintsTrigger || !footprintManagerRef.current) return;
 
     const { instrument } = loadFootprintsTrigger;
+    const fm = footprintManagerRef.current;
+    let cancelled = false;
+
     console.log(`[MapView] Loading ${instrument} footprints on explicit trigger`);
 
-    footprintManagerRef.current.loadFootprints(instrument);
+    // Load footprints and then ensure visibility is set correctly
+    // This fixes the issue where reloading doesn't show footprints because
+    // the visibility effect doesn't re-run (show state unchanged)
+    (async () => {
+      const result = await fm.loadFootprints(instrument);
+      if (cancelled) return; // Effect was cleaned up, don't update
+      if (result && result.count > 0) {
+        // Re-apply visibility based on current show state
+        // The show state is always true when Load is clicked (handleLoadFootprints sets it)
+        fm.setVisible(instrument, true);
+        console.log(`[MapView] Applied visibility for ${instrument} after load (${result.count} features)`);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadFootprintsTrigger]);
 
   // Update CRISM footprint visibility when ice score filter changes
@@ -2947,6 +2970,212 @@ export default function MapView({
       dtmHoverReadoutRef.current?.hide();
     }
   }, []);
+
+  // ──────────── Coordinate Grid Overlay ────────────
+  const gridSpacingRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const GRID_PREFIX = "GRID_";
+
+    function removeAllGrid() {
+      const toRemove: Cesium.Entity[] = [];
+      for (let i = 0; i < viewer!.entities.values.length; i++) {
+        const ent = viewer!.entities.values[i];
+        if (ent.id.startsWith(GRID_PREFIX)) toRemove.push(ent);
+      }
+      for (const ent of toRemove) viewer!.entities.remove(ent);
+    }
+
+    if (!showGrid) {
+      removeAllGrid();
+      gridSpacingRef.current = null;
+      viewer.scene.requestRender();
+      return;
+    }
+
+    function getSpacing(): number {
+      const height = viewer!.camera.positionCartographic.height / 1000; // km
+      if (height > 5000) return 30;
+      if (height > 2000) return 10;
+      if (height > 500) return 5;
+      if (height > 100) return 1;
+      return 0.5;
+    }
+
+    function getViewportRect(): { west: number; south: number; east: number; north: number } | null {
+      const canvas = viewer!.scene.canvas;
+      const cam = viewer!.camera;
+      const corners = [
+        cam.pickEllipsoid(new Cesium.Cartesian2(0, 0), MARS_ELLIPSOID),
+        cam.pickEllipsoid(new Cesium.Cartesian2(canvas.width, 0), MARS_ELLIPSOID),
+        cam.pickEllipsoid(new Cesium.Cartesian2(0, canvas.height), MARS_ELLIPSOID),
+        cam.pickEllipsoid(new Cesium.Cartesian2(canvas.width, canvas.height), MARS_ELLIPSOID),
+      ];
+      let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+      let valid = 0;
+      for (const c of corners) {
+        if (!c) continue;
+        const carto = Cesium.Cartographic.fromCartesian(c, MARS_ELLIPSOID);
+        const lat = Cesium.Math.toDegrees(carto.latitude);
+        const lon = Cesium.Math.toDegrees(carto.longitude);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+        minLon = Math.min(minLon, lon);
+        maxLon = Math.max(maxLon, lon);
+        valid++;
+      }
+      if (valid < 2) return null;
+      return { west: minLon, south: minLat, east: maxLon, north: maxLat };
+    }
+
+    function rebuildGrid() {
+      const spacing = getSpacing();
+      if (spacing === gridSpacingRef.current) return;
+      gridSpacingRef.current = spacing;
+
+      removeAllGrid();
+
+      // Determine bounds
+      let south = -90, north = 90, west = -180, east = 180;
+      const pad = spacing * 2;
+      if (spacing <= 1) {
+        const vp = getViewportRect();
+        if (vp) {
+          south = Math.max(-90, Math.floor((vp.south - pad) / spacing) * spacing);
+          north = Math.min(90, Math.ceil((vp.north + pad) / spacing) * spacing);
+          west = Math.max(-180, Math.floor((vp.west - pad) / spacing) * spacing);
+          east = Math.min(180, Math.ceil((vp.east + pad) / spacing) * spacing);
+        }
+      }
+
+      const lineColor = Cesium.Color.WHITE.withAlpha(0.2);
+      const labelColor = Cesium.Color.WHITE.withAlpha(0.45);
+      const showLabels = spacing <= 5;
+      // Label interval: show a label every N grid lines to avoid clutter
+      const labelEvery = spacing <= 0.5 ? 2 : 1;
+
+      // Latitude lines (horizontal)
+      for (let lat = south; lat <= north; lat = Math.round((lat + spacing) * 1000) / 1000) {
+        const pts: number[] = [];
+        const lineWest = Math.max(west, -180);
+        const lineEast = Math.min(east, 180);
+        for (let lon = lineWest; lon <= lineEast; lon += Math.min(spacing, 5)) {
+          pts.push(lon, lat);
+        }
+        // Ensure we reach the east edge
+        if (pts.length >= 2 && pts[pts.length - 2] < lineEast) {
+          pts.push(lineEast, lat);
+        }
+        if (pts.length < 4) continue;
+
+        const positions = Cesium.Cartesian3.fromDegreesArray(pts, MARS_ELLIPSOID);
+        viewer!.entities.add({
+          id: `${GRID_PREFIX}LAT_${lat}`,
+          polyline: {
+            positions,
+            material: lineColor,
+            width: 1,
+            clampToGround: true,
+          },
+        });
+
+        // Label
+        if (showLabels && Math.round(lat / spacing) % labelEvery === 0) {
+          viewer!.entities.add({
+            id: `${GRID_PREFIX}LABEL_LAT_${lat}`,
+            position: Cesium.Cartesian3.fromDegrees(
+              Math.max(west, -179), lat, 0, MARS_ELLIPSOID
+            ),
+            label: {
+              text: `${lat.toFixed(spacing < 1 ? 1 : 0)}°`,
+              font: "11px monospace",
+              fillColor: labelColor,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              pixelOffset: new Cesium.Cartesian2(4, 0),
+              horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              scale: 1.0,
+            },
+          });
+        }
+      }
+
+      // Longitude lines (vertical)
+      for (let lon = west; lon <= east; lon = Math.round((lon + spacing) * 1000) / 1000) {
+        const pts: number[] = [];
+        const lineSouth = Math.max(south, -90);
+        const lineNorth = Math.min(north, 90);
+        for (let lat = lineSouth; lat <= lineNorth; lat += Math.min(spacing, 5)) {
+          pts.push(lon, lat);
+        }
+        if (pts.length >= 2 && pts[pts.length - 1] < lineNorth) {
+          pts.push(lon, lineNorth);
+        }
+        if (pts.length < 4) continue;
+
+        const positions = Cesium.Cartesian3.fromDegreesArray(pts, MARS_ELLIPSOID);
+        viewer!.entities.add({
+          id: `${GRID_PREFIX}LON_${lon}`,
+          polyline: {
+            positions,
+            material: lineColor,
+            width: 1,
+            clampToGround: true,
+          },
+        });
+
+        // Label
+        if (showLabels && Math.round(lon / spacing) % labelEvery === 0) {
+          viewer!.entities.add({
+            id: `${GRID_PREFIX}LABEL_LON_${lon}`,
+            position: Cesium.Cartesian3.fromDegrees(
+              lon, Math.max(south, -89), 0, MARS_ELLIPSOID
+            ),
+            label: {
+              text: `${lon.toFixed(spacing < 1 ? 1 : 0)}°`,
+              font: "11px monospace",
+              fillColor: labelColor,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              pixelOffset: new Cesium.Cartesian2(0, -4),
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              scale: 1.0,
+            },
+          });
+        }
+      }
+
+      viewer!.scene.requestRender();
+    }
+
+    // Build immediately
+    rebuildGrid();
+
+    // Rebuild on camera move (spacing may change, or viewport-clipped lines need update)
+    const removeListener = viewer.camera.moveEnd.addEventListener(() => {
+      // For coarse spacing (global), only rebuild if tier changes
+      // For fine spacing (viewport-clipped), always rebuild to cover new viewport
+      const newSpacing = getSpacing();
+      if (newSpacing !== gridSpacingRef.current || newSpacing <= 1) {
+        gridSpacingRef.current = null; // force rebuild
+        rebuildGrid();
+      }
+    });
+
+    return () => {
+      removeListener();
+      removeAllGrid();
+      gridSpacingRef.current = null;
+      viewer.scene.requestRender();
+    };
+  }, [showGrid]);
 
   return (
     <>
