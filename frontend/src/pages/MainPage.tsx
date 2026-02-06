@@ -14,6 +14,7 @@ import LayerPanel from "../components/LayerPanel";
 import type { IceScoreFilter } from "../components/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
 import FieldNoteModal from "../components/FieldNoteModal";
+import AiAnalysisPanel from "../components/AiAnalysisPanel";
 import { listFieldNotes } from "../api/fieldnotes";
 import type { FieldNote } from "../api/fieldnotes";
 import AppShell from "../components/layout/AppShell";
@@ -59,6 +60,8 @@ export type VisibleProduct = {
   productId: string;
   instrument: "HIRISE" | "CRISM" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
   title?: string;  // HiRISE observation title (e.g., "Gullies in Arcadia Region")
+  lat?: number;    // Center latitude (from footprint)
+  lon?: number;    // Center longitude (from footprint)
 };
 
 // Custom user-uploaded dataset
@@ -155,8 +158,8 @@ export default function MainPage() {
   // Terrain click point for slope analysis (when clicking empty terrain)
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
-  // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line-profile
-  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null;
+  // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line / ai_analysis
+  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Slope 3D analysis point (separate from regular slope terrainPoint)
@@ -270,6 +273,9 @@ export default function MainPage() {
   // Coordinate grid
   const [showGrid, setShowGrid] = useState(false);
 
+  // AI Analysis pin
+  const [aiAnalysisPin, setAiAnalysisPin] = useState<TerrainPoint | null>(null);
+
   // Default opacity for new overlays
   const DEFAULT_OPACITY = 80;
 
@@ -349,12 +355,12 @@ export default function MainPage() {
 
   // Handle clicking product_id - fly to it, select it, and bring overlay to front
   const handleSelectProduct = useCallback((product: VisibleProduct) => {
-    // Open inspector
+    // Open inspector with coordinates from product (if available)
     setSelected({
       instrument: product.instrument,
       productId: product.productId,
-      lat: 0,
-      lon: 0,
+      lat: product.lat ?? 0,
+      lon: product.lon ?? 0,
       title: product.title,
     });
 
@@ -616,6 +622,11 @@ export default function MainPage() {
       setSelected(null);
       setSlope3DPoint({ lat, lon });
     }
+    if (analysisMode === "ai_analysis") {
+      // AI Analysis mode: set pin and open panel
+      setSelected(null);
+      setAiAnalysisPin({ lat, lon });
+    }
   }, [analysisMode]);
 
   // When a product is selected, clear terrain point
@@ -641,6 +652,9 @@ export default function MainPage() {
     if (mode !== "line") {
       setLinePoints([]);
       setLineProfileData(null);
+    }
+    if (mode !== "ai_analysis") {
+      setAiAnalysisPin(null);
     }
   }, []);
 
@@ -857,6 +871,14 @@ export default function MainPage() {
               setActiveDTMProduct(null);
             }}
           />
+        ) : aiAnalysisPin ? (
+          <AiAnalysisPanel
+            pin={aiAnalysisPin}
+            onClose={() => {
+              setAiAnalysisPin(null);
+              setAnalysisMode(null);
+            }}
+          />
         ) : null
       }
     >
@@ -904,6 +926,7 @@ export default function MainPage() {
         onFieldNoteClick={handleFieldNoteClick}
         activeDTMProductId={activeDTMProduct}
         showGrid={showGrid}
+        aiAnalysisPin={aiAnalysisPin}
       />
 
       {/* Line Profile Popup */}

@@ -36,6 +36,8 @@ type VisibleProduct = {
   productId: string;
   instrument: InstrumentType;
   title?: string;
+  lat?: number;
+  lon?: number;
 };
 
 type RGBWavelengths = {
@@ -127,7 +129,7 @@ type MapViewProps = {
     opacity: number;
   }>;
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | null;
   // Active HiRISE DTM product for hover elevation probing
   activeDTMProductId?: string | null;
   linePoints?: Array<{ lat: number; lon: number }>;
@@ -140,6 +142,8 @@ type MapViewProps = {
   onFieldNoteClick?: (note: FieldNote) => void;
   // Coordinate grid overlay
   showGrid?: boolean;
+  // AI Analysis pin location
+  aiAnalysisPin?: { lat: number; lon: number } | null;
 };
 
 /* ==================================================
@@ -485,6 +489,7 @@ export default function MapView({
   fieldNotes = [],
   onFieldNoteClick,
   showGrid = false,
+  aiAnalysisPin = null,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -2523,6 +2528,39 @@ export default function MapView({
       const visible: VisibleProduct[] = [];
       const seen = new Set<string>();
 
+      // Helper to extract center coordinates from feature
+      const getFeatureCenter = (feature: any): { lat: number; lon: number } | null => {
+        const props = feature.properties || {};
+        // HiRISE DTM has explicit bounds in properties
+        if (props.west != null && props.east != null && props.south != null && props.north != null) {
+          return {
+            lat: (props.south + props.north) / 2,
+            lon: (props.west + props.east) / 2,
+          };
+        }
+        // Try geometry
+        const geom = feature.geometry;
+        if (!geom) return null;
+        const coords = geom.coordinates;
+        if (!coords) return null;
+
+        if (geom.type === "Point") {
+          return { lon: coords[0], lat: coords[1] };
+        } else if (geom.type === "Polygon" && coords[0]) {
+          const ring = coords[0];
+          let sumLat = 0, sumLon = 0;
+          for (const [lon, lat] of ring) {
+            sumLon += lon;
+            sumLat += lat;
+          }
+          return { lat: sumLat / ring.length, lon: sumLon / ring.length };
+        } else if (geom.type === "LineString" && coords.length > 0) {
+          const midIdx = Math.floor(coords.length / 2);
+          return { lon: coords[midIdx][0], lat: coords[midIdx][1] };
+        }
+        return null;
+      };
+
       // Get products from FootprintManager for HiRISE
       if (showHiRISE && footprintManager.hasFootprints("HIRISE")) {
         const hiriseFeatures = footprintManager.getFeatures("HIRISE");
@@ -2531,7 +2569,8 @@ export default function MapView({
           const title = feature.properties.title;
           if (pid && !seen.has(pid)) {
             seen.add(pid);
-            visible.push({ productId: pid, instrument: "HIRISE", title });
+            const center = getFeatureCenter(feature);
+            visible.push({ productId: pid, instrument: "HIRISE", title, lat: center?.lat, lon: center?.lon });
           }
         }
       }
@@ -2551,7 +2590,8 @@ export default function MapView({
               }
             }
             seen.add(pid);
-            visible.push({ productId: pid, instrument: "CRISM" });
+            const center = getFeatureCenter(feature);
+            visible.push({ productId: pid, instrument: "CRISM", lat: center?.lat, lon: center?.lon });
           }
         }
       }
@@ -2564,7 +2604,8 @@ export default function MapView({
           const title = feature.properties.title;
           if (pid && !seen.has(pid)) {
             seen.add(pid);
-            visible.push({ productId: pid, instrument: "CTX", title });
+            const center = getFeatureCenter(feature);
+            visible.push({ productId: pid, instrument: "CTX", title, lat: center?.lat, lon: center?.lon });
           }
         }
       }
@@ -2577,7 +2618,8 @@ export default function MapView({
           const title = feature.properties.title;
           if (pid && !seen.has(pid)) {
             seen.add(pid);
-            visible.push({ productId: pid, instrument: "HIRISE_DTM", title });
+            const center = getFeatureCenter(feature);
+            visible.push({ productId: pid, instrument: "HIRISE_DTM", title, lat: center?.lat, lon: center?.lon });
           }
         }
       }
@@ -2587,7 +2629,11 @@ export default function MapView({
         for (const dataset of customDatasets) {
           if (dataset.visible && !seen.has(dataset.id)) {
             seen.add(dataset.id);
-            visible.push({ productId: dataset.id, instrument: "CUSTOM", title: dataset.name });
+            const center = {
+              lat: (dataset.bounds.south + dataset.bounds.north) / 2,
+              lon: (dataset.bounds.west + dataset.bounds.east) / 2,
+            };
+            visible.push({ productId: dataset.id, instrument: "CUSTOM", title: dataset.name, lat: center.lat, lon: center.lon });
           }
         }
       }
@@ -2970,6 +3016,82 @@ export default function MapView({
       dtmHoverReadoutRef.current?.hide();
     }
   }, []);
+
+  // ──────────── AI Analysis Pin + Radius Circle ────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const PIN_ID = "AI_ANALYSIS_PIN";
+    const RADIUS_ID = "AI_ANALYSIS_RADIUS";
+
+    // Remove existing entities
+    const oldPin = viewer.entities.getById(PIN_ID);
+    if (oldPin) viewer.entities.remove(oldPin);
+    const oldRadius = viewer.entities.getById(RADIUS_ID);
+    if (oldRadius) viewer.entities.remove(oldRadius);
+
+    if (!aiAnalysisPin) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    const { lat, lon } = aiAnalysisPin;
+
+    // Pin point
+    viewer.entities.add({
+      id: PIN_ID,
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, marsEllipsoid),
+      point: {
+        pixelSize: 10,
+        color: Cesium.Color.fromCssColorString("#8b5cf6"),
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+      label: {
+        text: `AI Analysis\n${lat.toFixed(3)}°, ${lon.toFixed(3)}°`,
+        font: "11px sans-serif",
+        fillColor: Cesium.Color.fromCssColorString("#8b5cf6"),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -14),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+
+    // Radius circle (10 km default; visual only)
+    viewer.entities.add({
+      id: RADIUS_ID,
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, marsEllipsoid),
+      ellipse: {
+        semiMajorAxis: 10000,  // 10 km
+        semiMinorAxis: 10000,
+        material: Cesium.Color.fromCssColorString("#8b5cf6").withAlpha(0.12),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString("#8b5cf6").withAlpha(0.5),
+        outlineWidth: 1,
+      },
+    });
+
+    viewer.scene.requestRender();
+  }, [aiAnalysisPin]);
+
+  // Clean up AI Analysis entities when mode changes
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    if (analysisMode !== "ai_analysis") {
+      const pin = viewer.entities.getById("AI_ANALYSIS_PIN");
+      if (pin) viewer.entities.remove(pin);
+      const radius = viewer.entities.getById("AI_ANALYSIS_RADIUS");
+      if (radius) viewer.entities.remove(radius);
+      viewer.scene.requestRender();
+    }
+  }, [analysisMode]);
 
   // ──────────── Coordinate Grid Overlay ────────────
   const gridSpacingRef = useRef<number | null>(null);

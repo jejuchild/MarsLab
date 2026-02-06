@@ -240,8 +240,8 @@ interface LayerPanelProps {
   onCustomDatasetToggle?: (id: string, visible: boolean) => void;
 
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null;
-  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null) => void;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | null;
+  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | null) => void;
 
   // Fly-To navigation
   onFlyToCoords?: (lat: number, lon: number) => void;
@@ -1147,6 +1147,27 @@ export default function LayerPanel({
               )}
             </button>
 
+            {/* AI Analysis */}
+            <button
+              onClick={() => onAnalysisModeChange?.(analysisMode === "ai_analysis" ? null : "ai_analysis")}
+              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
+                analysisMode === "ai_analysis"
+                  ? "bg-violet-500/20 border border-violet-500/50 text-violet-400"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-violet-500/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">psychology</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">AI Analysis</span>
+                <p className="text-[9px] text-[#6b7c9c]">Click map to analyze area</p>
+              </div>
+              {analysisMode === "ai_analysis" && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 border border-violet-500/30 font-bold uppercase">
+                  ON
+                </span>
+              )}
+            </button>
+
           </div>
         </div>
 
@@ -1173,6 +1194,7 @@ export default function LayerPanel({
           activeOverlays={activeOverlays}
           onSetOverlay={onSetOverlay}
           onSelectProduct={onSelectProduct}
+          onFlyToProduct={onFlyToProduct}
           customDatasets={customDatasets}
           onCustomDatasetToggle={onCustomDatasetToggle}
         />
@@ -1378,6 +1400,7 @@ function DisplayedProductsSection({
   activeOverlays,
   onSetOverlay,
   onSelectProduct,
+  onFlyToProduct,
   customDatasets,
   onCustomDatasetToggle,
 }: {
@@ -1385,6 +1408,7 @@ function DisplayedProductsSection({
   activeOverlays: ActiveOverlays;
   onSetOverlay?: (productId: string, type: OverlayType | null) => void;
   onSelectProduct?: (product: VisibleProduct) => void;
+  onFlyToProduct?: (productId: string) => void;
   customDatasets?: CustomDataset[];
   onCustomDatasetToggle?: (id: string, visible: boolean) => void;
 }) {
@@ -1477,6 +1501,18 @@ function DisplayedProductsSection({
                           >
                             {product.title || product.productId}
                           </span>
+
+                          {/* Fly-to button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onFlyToProduct?.(product.productId);
+                            }}
+                            className="p-0.5 rounded transition-colors text-slate-600 hover:text-sky-400 hover:bg-sky-500/20"
+                            title={`Fly to ${product.productId}`}
+                          >
+                            <span className="material-symbols-outlined text-xs">my_location</span>
+                          </button>
 
                           {/* Visibility toggle for CUSTOM datasets */}
                           {isCustom && (
