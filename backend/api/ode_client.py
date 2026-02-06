@@ -156,9 +156,10 @@ def is_crism_product_id(product_id: str) -> bool:
     - hrl (Half Resolution Long)
     - hrs (Half Resolution Short)
     - frs (Full Resolution Short)
-    - arl (Along-track Resolution Low)
+
+    Note: arl/atl (Along-track Resolution) excluded for search focus.
     """
-    prefixes = ("frt", "hrl", "hrs", "frs", "arl", "atl")
+    prefixes = ("frt", "hrl", "hrs", "frs")
     return product_id.lower().startswith(prefixes)
 
 
@@ -267,6 +268,13 @@ async def search_ode_products(
                 if p.instrument != Instrument.CRISM or "_if" in p.product_id.lower()
             ]
 
+        # Filter HiRISE products to RED channel only
+        if not instrument or instrument == Instrument.HIRISE:
+            products = [
+                p for p in products
+                if p.instrument != Instrument.HIRISE or "_RED" in p.product_id.upper()
+            ]
+
         # Sort by relevance:
         # 1. Exact prefix match
         # 2. MTRDR products (map-projected, preferred)
@@ -326,10 +334,10 @@ async def _search_ode_by_instrument(
     products = []
 
     if instrument == Instrument.CRISM:
-        # Search for MTRDR (map-projected, preferred) and TRDR products
+        # Search for MTRDR only (map-projected)
         # MTRDR = Map-projected Targeted Reduced Data Record
-        # TRDR = Targeted Reduced Data Record (not map-projected)
-        for pt in ["MTRDR", "TRDR"]:
+        # Note: TRDR excluded for now (not map-projected)
+        for pt in ["MTRDR"]:
             url = (
                 f"{ODE_REST_BASE}?"
                 f"target=mars&"
@@ -354,7 +362,7 @@ async def _search_ode_by_instrument(
                 break
 
     else:  # HiRISE
-        # Search for RDRV11 (RDR version 1.1) products
+        # Search for RDRV11 (RDR version 1.1) products - RED channel only
         url = (
             f"{ODE_REST_BASE}?"
             f"target=mars&"
@@ -363,13 +371,15 @@ async def _search_ode_by_instrument(
             f"productid={query}*&"
             f"output=json&"
             f"results=pmf&"
-            f"limit={max_results}"
+            f"limit={max_results * 3}"  # Request more to account for filtering
         )
         try:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    products = _parse_ode_rest_response(data, instrument)
+                    all_products = _parse_ode_rest_response(data, instrument)
+                    # Filter to RED products only
+                    products = [p for p in all_products if "_RED" in p.product_id.upper()]
         except Exception as e:
             print(f"ODE REST search error for {instrument}: {e}")
 
@@ -506,9 +516,9 @@ async def search_ode_spatial(
         instruments_to_search = [instrument] if instrument else [Instrument.CRISM, Instrument.HIRISE]
 
         for inst in instruments_to_search:
-            # For CRISM, search MTRDR and TRDR product types
+            # For CRISM, search MTRDR only (map-projected)
             if inst == Instrument.CRISM:
-                for pt in ["MTRDR", "TRDR"]:
+                for pt in ["MTRDR"]:
                     url = (
                         f"{ODE_REST_BASE}?"
                         f"target=mars&"
@@ -536,19 +546,21 @@ async def search_ode_spatial(
                     if len(products) >= max_results:
                         break
             else:
-                # HiRISE
+                # HiRISE - ODE requires pt parameter for spatial queries
+                # Request more to account for RED filtering
                 url = (
                     f"{ODE_REST_BASE}?"
                     f"target=mars&"
                     f"ihid=mro&"
                     f"iid={inst.value}&"
+                    f"pt=RDRV11&"
                     f"minlat={minlat}&"
                     f"maxlat={maxlat}&"
                     f"westernlon={westernlon}&"
                     f"easternlon={easternlon}&"
                     f"output=json&"
                     f"results=pmf&"
-                    f"limit={max_results}"
+                    f"limit={max_results * 3}"
                 )
 
                 try:
@@ -556,6 +568,8 @@ async def search_ode_spatial(
                         if resp.status == 200:
                             data = await resp.json()
                             inst_products = _parse_ode_rest_response(data, inst)
+                            # Filter to RED products only
+                            inst_products = [p for p in inst_products if "_RED" in p.product_id.upper()]
                             products.extend(inst_products)
                 except Exception as e:
                     print(f"ODE spatial search error for {inst}: {e}")
@@ -1322,14 +1336,19 @@ async def resolve_sharad_bundle(
     Resolve files needed for a SHARAD USRDRV2 observation.
 
     Given a product ID (e.g., S_00195401), discovers:
-    1. THM.JPG quicklook thumbnail
-    2. LBL label file
+    1. THM.JPG quicklook thumbnail (for THM products)
+    2. TIFF browse image (for RGRAM products)
+    3. LBL label file
 
     USRDRV2 products are stored in the PDS archive at:
     https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/
 
+    Product types:
+    - S_XXXXXXXX or S_XXXXXXXX_THM: THM quicklook (browse/thm/)
+    - S_XXXXXXXX_rgram: Radargram data (browse/tiff/ for browse images)
+
     Args:
-        product_id: SHARAD product ID (e.g., S_00195401_THM or S_00195401)
+        product_id: SHARAD product ID (e.g., S_00195401_THM, S_00195401_rgram)
         session: Optional aiohttp session
 
     Returns:
@@ -1339,10 +1358,22 @@ async def resolve_sharad_bundle(
     if session is None:
         session = aiohttp.ClientSession()
 
-    # Normalize product ID: extract base (S_XXXXXXXX)
+    # Normalize product ID: extract base (S_XXXXXXXX) and detect type
+    pid_lower = product_id.lower()
     pid_upper = product_id.upper()
+    is_rgram = "_rgram" in pid_lower
+    is_sim = "_sim" in pid_lower
+    is_geom = "_geom" in pid_lower
+
+    # Extract base ID (S_XXXXXXXX)
     if "_THM" in pid_upper:
         base_id = pid_upper.replace("_THM", "")
+    elif "_RGRAM" in pid_upper:
+        base_id = pid_upper.replace("_RGRAM", "")
+    elif "_SIM" in pid_upper:
+        base_id = pid_upper.replace("_SIM", "")
+    elif "_GEOM" in pid_upper:
+        base_id = pid_upper.replace("_GEOM", "")
     else:
         base_id = pid_upper
 
@@ -1357,34 +1388,56 @@ async def resolve_sharad_bundle(
 
             if fname_lower.endswith("_thm.jpg") or fname_lower.endswith("thm.jpg"):
                 bundle.thm_file = f
+            elif fname_lower.endswith("_tiff.tif") or fname_lower.endswith(".tif"):
+                # TIFF browse image for rgram products
+                bundle.thm_file = f
             elif fname_lower.endswith(".lbl"):
                 bundle.lbl_file = f
 
         # If no files found via PRODUCTFILES, construct URLs directly
         if not bundle.thm_file:
-            # SHARAD USRDRV2 path pattern:
-            # /mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/thm/s_00195401_thm.jpg
             orbit = base_id.split("_")[1] if "_" in base_id else ""
-            thm_filename = f"{base_id.lower()}_thm.jpg"
-            lbl_filename = f"{base_id.lower()}_thm.lbl"
 
-            # Construct URL based on orbit number grouping
             if orbit:
                 orbit_num = int(orbit)
-                # Files are grouped by orbit ranges
-                orbit_dir = f"{(orbit_num // 1000) * 1000:05d}_{((orbit_num // 1000) + 1) * 1000 - 1:05d}"
-                base_url = f"https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/thm/{orbit_dir}"
+                # Files are grouped by orbit ranges (s_0195xx for orbits 195000-195999)
+                orbit_prefix = f"s_{orbit[:4]}xx"
 
-                bundle.thm_file = ODEFile(
-                    filename=thm_filename,
-                    url=f"{base_url}/{thm_filename}",
-                    file_type="Browse"
-                )
-                bundle.lbl_file = ODEFile(
-                    filename=lbl_filename,
-                    url=f"{base_url}/{lbl_filename}",
-                    file_type="Label"
-                )
+                if is_rgram:
+                    # RGRAM products use TIFF browse images
+                    # Path: /browse/tiff/s_0770xx/s_07705302_tiff.tif
+                    tiff_filename = f"{base_id.lower()}_tiff.tif"
+                    lbl_filename = f"{base_id.lower()}_tiff.lbl"
+                    base_url = f"https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/tiff/{orbit_prefix}"
+
+                    bundle.thm_file = ODEFile(
+                        filename=tiff_filename,
+                        url=f"{base_url}/{tiff_filename}",
+                        file_type="Browse"
+                    )
+                    bundle.lbl_file = ODEFile(
+                        filename=lbl_filename,
+                        url=f"{base_url}/{lbl_filename}",
+                        file_type="Label"
+                    )
+                else:
+                    # THM products (default)
+                    # Path: /browse/thm/s_0016xx/s_00168901_thm.jpg
+                    # Group directory format: s_{first4digits}xx
+                    thm_filename = f"{base_id.lower()}_thm.jpg"
+                    lbl_filename = f"{base_id.lower()}_thm.lbl"
+                    base_url = f"https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/thm/{orbit_prefix}"
+
+                    bundle.thm_file = ODEFile(
+                        filename=thm_filename,
+                        url=f"{base_url}/{thm_filename}",
+                        file_type="Browse"
+                    )
+                    bundle.lbl_file = ODEFile(
+                        filename=lbl_filename,
+                        url=f"{base_url}/{lbl_filename}",
+                        file_type="Label"
+                    )
 
     except Exception as e:
         print(f"Error resolving SHARAD bundle: {e}")
