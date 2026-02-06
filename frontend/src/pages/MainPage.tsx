@@ -1,13 +1,10 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from "react";
 import MapView from "../components/MapView";
 import Inspector from "../components/Inspector";
 import type { InspectorContext, RGBWavelengths } from "../components/Inspector";
 import SlopeAnalysis from "../components/SlopeAnalysis";
-import Slope3DViewer from "../components/Slope3DViewer";
-import HiRiseDTM3DViewer from "../components/HiRiseDTM3DViewer";
 import type { HiRiseDTMPoint } from "../components/HiRiseDTM3DViewer";
 import type { TerrainPoint } from "../components/SlopeAnalysis";
-import LineProfile from "../components/LineProfile";
 import type { ProfilePoint } from "../components/LineProfile";
 import TopBar from "../components/TopBar";
 import LayerPanel from "../components/LayerPanel";
@@ -18,6 +15,13 @@ import AiAnalysisPanel from "../components/AiAnalysisPanel";
 import { listFieldNotes } from "../api/fieldnotes";
 import type { FieldNote } from "../api/fieldnotes";
 import AppShell from "../components/layout/AppShell";
+import type { InstrumentType } from "../utils/FootprintManager";
+import type { OverlapStats } from "../utils/overlapFilter";
+
+// Lazy-loaded heavy components (Three.js / Recharts)
+const Slope3DViewer = lazy(() => import("../components/Slope3DViewer"));
+const HiRiseDTM3DViewer = lazy(() => import("../components/HiRiseDTM3DViewer"));
+const LineProfile = lazy(() => import("../components/LineProfile"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -125,6 +129,12 @@ export type BoundingBox = {
   westLon: number;
   eastLon: number;
 } | null;
+
+// Multi-Instrument Overlap Filter
+export type OverlapFilter = {
+  enabled: boolean;
+  instruments: InstrumentType[];
+};
 
 // Helper to check if overlay type is a browse product
 export function isBrowseOverlay(type: OverlayType): boolean {
@@ -242,6 +252,17 @@ export default function MainPage() {
     minScore: 0.3,
     minPercent: 5,
   });
+
+  // Multi-Instrument Overlap Filter
+  const [overlapFilter, setOverlapFilter] = useState<OverlapFilter>({
+    enabled: false,
+    instruments: [],
+  });
+  const [overlapStats, setOverlapStats] = useState<OverlapStats | null>(null);
+
+  const handleOverlapStatsChange = useCallback((stats: OverlapStats | null) => {
+    setOverlapStats(stats);
+  }, []);
 
   // SHARAD High-Res Inspector — opens when a product is selected
   const [sharadHiresProductId, setSharadHiresProductId] = useState<string | null>(null);
@@ -454,13 +475,65 @@ export default function MainPage() {
       return;
     }
 
-    // Non-DTM products: use original behavior
-    setFlyToCoords({ lat: note.lat, lon: note.lon });
+    // SHARAD_HIGHRES: open the dedicated SharadHiresInspector and fly to track
+    if (note.instrument === "SHARAD_HIGHRES") {
+      setSharadHiresProductId(note.product_id);
+      setSelected(null); // Close regular Inspector
+
+      // If note has zero coords, look up real coordinates from the index
+      if (note.lat === 0 && note.lon === 0) {
+        try {
+          const res = await fetch(`/api/footprints?instrument=SHARAD_HIGHRES&bbox=-180,-90,180,90&limit=5000&lod=poly`);
+          if (res.ok) {
+            const data = await res.json();
+            const feat = data.features?.find((f: any) => f.properties?.product_id === note.product_id);
+            if (feat?.geometry?.coordinates?.length >= 2) {
+              const coords = feat.geometry.coordinates;
+              const midIdx = Math.floor(coords.length / 2);
+              setFlyToCoords({ lat: coords[midIdx][1], lon: coords[midIdx][0] });
+              return;
+            }
+          }
+        } catch { /* fall through */ }
+      }
+      setFlyToCoords({ lat: note.lat, lon: note.lon });
+      return;
+    }
+
+    // Other non-DTM products: use original behavior
+    // If note has zero coords, try to look them up
+    let lat = note.lat;
+    let lon = note.lon;
+    if (lat === 0 && lon === 0) {
+      try {
+        const instruments = ["SHARAD", "CTX", "HIRISE", "CRISM"];
+        for (const inst of instruments) {
+          const res = await fetch(`/api/footprints?instrument=${inst}&bbox=-180,-90,180,90&limit=5000&lod=poly`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const feat = data.features?.find((f: any) => f.properties?.product_id === note.product_id);
+          if (feat?.geometry?.coordinates) {
+            const coords = feat.geometry.coordinates;
+            if (feat.geometry.type === "LineString" && coords.length >= 2) {
+              const midIdx = Math.floor(coords.length / 2);
+              lat = coords[midIdx][1];
+              lon = coords[midIdx][0];
+            } else if (feat.geometry.type === "Polygon" && coords[0]?.length >= 4) {
+              const ring = coords[0];
+              lat = ring.reduce((s: number, c: number[]) => s + c[1], 0) / ring.length;
+              lon = ring.reduce((s: number, c: number[]) => s + c[0], 0) / ring.length;
+            }
+            break;
+          }
+        }
+      } catch { /* use original coords */ }
+    }
+    setFlyToCoords({ lat, lon });
     setSelected({
       instrument: note.instrument as InspectorContext["instrument"],
       productId: note.product_id,
-      lat: note.lat,
-      lon: note.lon,
+      lat,
+      lon,
     });
   }, []);
 
@@ -819,6 +892,10 @@ export default function MainPage() {
           onToggleFieldNotesOnMap={setShowFieldNotesOnMap}
           onFieldNoteClick={handleFieldNoteClick}
           onActiveTagChange={setFieldNoteActiveTag}
+          // Overlap Filter
+          overlapFilter={overlapFilter}
+          onOverlapFilterChange={setOverlapFilter}
+          overlapStats={overlapStats}
         />
       }
       rightPanel={
@@ -827,7 +904,7 @@ export default function MainPage() {
             productId={sharadHiresProductId}
             onClose={() => setSharadHiresProductId(null)}
             fieldNotes={fieldNotes}
-            onOpenFieldNote={(pid) => setShowFieldNoteModal({ productId: pid, instrument: "SHARAD_HIGHRES", lat: 0, lon: 0 })}
+            onOpenFieldNote={(pid, lat, lon) => setShowFieldNoteModal({ productId: pid, instrument: "SHARAD_HIGHRES", lat, lon })}
           />
         ) : selected ? (
           <Inspector
@@ -858,19 +935,23 @@ export default function MainPage() {
             onClose={() => setTerrainPoint(null)}
           />
         ) : slope3DPoint ? (
-          <Slope3DViewer
-            point={slope3DPoint}
-            onClose={() => setSlope3DPoint(null)}
-          />
+          <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
+            <Slope3DViewer
+              point={slope3DPoint}
+              onClose={() => setSlope3DPoint(null)}
+            />
+          </Suspense>
         ) : hiRiseDTM3DPoint ? (
-          <HiRiseDTM3DViewer
-            point={hiRiseDTM3DPoint}
-            onClose={() => {
-              setHiRiseDTM3DPoint(null);
-              setAnalysisMode(null);
-              setActiveDTMProduct(null);
-            }}
-          />
+          <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
+            <HiRiseDTM3DViewer
+              point={hiRiseDTM3DPoint}
+              onClose={() => {
+                setHiRiseDTM3DPoint(null);
+                setAnalysisMode(null);
+                setActiveDTMProduct(null);
+              }}
+            />
+          </Suspense>
         ) : aiAnalysisPin ? (
           <AiAnalysisPanel
             pin={aiAnalysisPin}
@@ -927,18 +1008,22 @@ export default function MainPage() {
         activeDTMProductId={activeDTMProduct}
         showGrid={showGrid}
         aiAnalysisPin={aiAnalysisPin}
+        overlapFilter={overlapFilter}
+        onOverlapStatsChange={handleOverlapStatsChange}
       />
 
       {/* Line Profile Popup */}
       {lineProfileData && (
-        <LineProfile
-          startPoint={lineProfileData.start}
-          endPoint={lineProfileData.end}
-          onClose={() => {
-            setLineProfileData(null);
-            setLinePoints([]);
-          }}
-        />
+        <Suspense fallback={null}>
+          <LineProfile
+            startPoint={lineProfileData.start}
+            endPoint={lineProfileData.end}
+            onClose={() => {
+              setLineProfileData(null);
+              setLinePoints([]);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* SHARAD Quickview Popup */}

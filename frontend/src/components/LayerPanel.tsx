@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import type { VisibleProduct, BaseLayerType, BoundingBox, MapMode, ActiveOverlays, OverlayType, ProductOverlay, CustomDataset } from "../pages/MainPage";
+import type { VisibleProduct, BaseLayerType, BoundingBox, MapMode, ActiveOverlays, OverlayType, ProductOverlay, CustomDataset, OverlapFilter } from "../pages/MainPage";
 import { normalizeLonForMap, clampLatitude, parseCoordinate } from "../utils/coordinates";
 import type { FieldNote } from "../api/fieldnotes";
+import type { OverlapStats } from "../utils/overlapFilter";
 
 type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
 
@@ -27,6 +28,148 @@ const OVERLAY_LABELS: Record<OverlayType, { short: string; full: string; color: 
   score_ice: { short: "S-ICE", full: "Ice Score", color: "sky" },
   score_hyd: { short: "S-HYD", full: "Hydration Score", color: "rose" },
 };
+
+// Overlap Filter instrument options
+const OVERLAP_INSTRUMENTS: Array<{
+  id: "CRISM" | "HIRISE" | "HIRISE_DTM" | "SHARAD" | "SHARAD_HIGHRES";
+  label: string;
+  textColor: string;
+  bgColor: string;
+  borderColor: string;
+}> = [
+  { id: "CRISM", label: "CRISM", textColor: "text-cyan-400", bgColor: "bg-cyan-500/20", borderColor: "border-cyan-500/50" },
+  { id: "HIRISE", label: "HiRISE", textColor: "text-yellow-400", bgColor: "bg-yellow-500/20", borderColor: "border-yellow-500/50" },
+  { id: "HIRISE_DTM", label: "HiRISE DTM", textColor: "text-amber-500", bgColor: "bg-amber-700/20", borderColor: "border-amber-700/50" },
+  { id: "SHARAD", label: "SHARAD", textColor: "text-orange-400", bgColor: "bg-orange-500/20", borderColor: "border-orange-500/50" },
+  { id: "SHARAD_HIGHRES", label: "SHARAD High-Res", textColor: "text-orange-400", bgColor: "bg-orange-500/20", borderColor: "border-orange-500/50" },
+];
+
+// Multi-Instrument Overlap Filter Section Component
+function OverlapFilterSection({
+  filter,
+  onChange,
+  stats,
+}: {
+  filter?: OverlapFilter;
+  onChange?: (filter: OverlapFilter) => void;
+  stats?: OverlapStats | null;
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+
+  const currentFilter = filter ?? { enabled: false, instruments: [] };
+  const selectedSet = new Set(currentFilter.instruments);
+  const selectedCount = selectedSet.size;
+  const needsMore = selectedCount < 2;
+
+  const handleToggle = () => {
+    onChange?.({ ...currentFilter, enabled: !currentFilter.enabled });
+  };
+
+  const handleInstrumentToggle = (instId: typeof OVERLAP_INSTRUMENTS[number]["id"]) => {
+    const next = selectedSet.has(instId)
+      ? currentFilter.instruments.filter(i => i !== instId)
+      : [...currentFilter.instruments, instId];
+    onChange?.({ ...currentFilter, instruments: next });
+  };
+
+  return (
+    <div className="p-4 border-b border-[#232f48]">
+      {/* Header */}
+      <div
+        className="flex items-center justify-between mb-2 cursor-pointer"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+          <span className="material-symbols-outlined text-xs">
+            {isCollapsed ? "expand_more" : "expand_less"}
+          </span>
+          Overlap Filter
+        </h3>
+        <div className="flex items-center gap-2">
+          {currentFilter.enabled && stats && stats.totalChecked > 0 && (
+            <span className="text-sky-400 text-[10px] font-mono">{stats.totalPassing}/{stats.totalChecked}</span>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggle();
+            }}
+            className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase transition-colors ${
+              currentFilter.enabled
+                ? "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                : "bg-[#1a2333] text-[#6b7c9c] border border-[#232f48] hover:border-[#3a4a68]"
+            }`}
+          >
+            {currentFilter.enabled ? "ON" : "OFF"}
+          </button>
+        </div>
+      </div>
+
+      {!isCollapsed && (
+        <div className="space-y-3">
+          <p className="text-[8px] text-[#6b7c9c] leading-relaxed">
+            Show only products that spatially overlap across all selected instruments.
+          </p>
+
+          {/* Instrument checkboxes */}
+          <div className="space-y-1.5">
+            {OVERLAP_INSTRUMENTS.map(({ id, label, textColor, bgColor, borderColor }) => (
+              <label
+                key={id}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                  selectedSet.has(id)
+                    ? `${bgColor} border ${borderColor}`
+                    : "bg-[#1a2333] border border-[#232f48] hover:border-[#3a4a68]"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(id)}
+                  onChange={() => handleInstrumentToggle(id)}
+                  className="rounded bg-[#0a0f18] border-[#232f48] text-sky-500 focus:ring-0 focus:ring-offset-0 h-3 w-3"
+                />
+                <span className={`text-[10px] font-medium ${selectedSet.has(id) ? textColor : "text-[#6b7c9c]"}`}>
+                  {label}
+                </span>
+                {/* Per-instrument stats */}
+                {currentFilter.enabled && stats && (() => {
+                  const s = stats.perInstrument.get(id);
+                  return s && s.checked > 0 ? (
+                    <span className="text-[9px] text-[#6b7c9c] ml-auto font-mono">{s.passing}/{s.checked}</span>
+                  ) : null;
+                })()}
+              </label>
+            ))}
+          </div>
+
+          {/* Hint: need at least 2 instruments */}
+          {currentFilter.enabled && needsMore && (
+            <p className="text-[9px] text-yellow-400/80 flex items-center gap-1">
+              <span className="material-symbols-outlined text-xs">info</span>
+              Select at least 2 instruments
+            </p>
+          )}
+
+          {/* No overlap message */}
+          {currentFilter.enabled && !needsMore && stats && stats.totalPassing === 0 && stats.totalChecked > 0 && (
+            <p className="text-[9px] text-orange-400/80 flex items-center gap-1">
+              <span className="material-symbols-outlined text-xs">warning</span>
+              No overlapping regions found
+            </p>
+          )}
+
+          {/* No footprints loaded */}
+          {currentFilter.enabled && !needsMore && (!stats || stats.totalChecked === 0) && (
+            <p className="text-[9px] text-[#6b7c9c] flex items-center gap-1">
+              <span className="material-symbols-outlined text-xs">info</span>
+              Load footprints for selected instruments first
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Ice Score Filter state
 export interface IceScoreFilter {
@@ -260,6 +403,11 @@ interface LayerPanelProps {
   onToggleFieldNotesOnMap?: (v: boolean) => void;
   onFieldNoteClick?: (note: FieldNote) => void;
   onActiveTagChange?: (tag: string | null) => void;
+
+  // Multi-Instrument Overlap Filter
+  overlapFilter?: OverlapFilter;
+  onOverlapFilterChange?: (filter: OverlapFilter) => void;
+  overlapStats?: OverlapStats | null;
 }
 
 // Fly-To Navigation Component
@@ -546,6 +694,10 @@ export default function LayerPanel({
   onToggleFieldNotesOnMap,
   onFieldNoteClick,
   onActiveTagChange,
+  // Overlap Filter
+  overlapFilter,
+  onOverlapFilterChange,
+  overlapStats,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -1170,6 +1322,13 @@ export default function LayerPanel({
 
           </div>
         </div>
+
+        {/* Multi-Instrument Overlap Filter Section */}
+        <OverlapFilterSection
+          filter={overlapFilter}
+          onChange={onOverlapFilterChange}
+          stats={overlapStats}
+        />
 
         {/* Ice Score Filter Section */}
         <IceScoreFilterSection

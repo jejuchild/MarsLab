@@ -1,5 +1,7 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import Subsurface3DViewer from "./Subsurface3DViewer";
+import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense } from "react";
+
+// Lazy-load Three.js-based 3D viewer
+const Subsurface3DViewer = lazy(() => import("./Subsurface3DViewer"));
 import type { FieldNote } from "../api/fieldnotes";
 
 /* =========================================================
@@ -76,7 +78,7 @@ export default function SharadHiresInspector({
   productId: string;
   onClose: () => void;
   fieldNotes?: FieldNote[];
-  onOpenFieldNote?: (productId: string) => void;
+  onOpenFieldNote?: (productId: string, lat: number, lon: number) => void;
 }) {
   const hasNote = useMemo(
     () => fieldNotes.some(n => n.product_id === productId),
@@ -1086,7 +1088,11 @@ export default function SharadHiresInspector({
           {/* Field Note */}
           {onOpenFieldNote && (
             <button
-              onClick={() => onOpenFieldNote(productId)}
+              onClick={() => {
+                const midLat = metadata ? (metadata.start_lat + metadata.stop_lat) / 2 : 0;
+                const midLon = metadata ? (metadata.start_lon + metadata.stop_lon) / 2 : 0;
+                onOpenFieldNote(productId, midLat, midLon);
+              }}
               className={`p-1 transition-colors ${
                 hasNote
                   ? "text-amber-400 hover:text-amber-300"
@@ -1604,16 +1610,18 @@ export default function SharadHiresInspector({
                 {/* 3D Content */}
                 {!collapse3DView && (
                   <div style={{ height: 320 }}>
-                    <Subsurface3DViewer
-                      startTrace={traceRangeStart}
-                      endTrace={traceRangeEnd}
-                      lats={radargramMeta.lats}
-                      lons={radargramMeta.lons}
-                      boundaryBinOffset={boundaryBinOffset}
-                      epsilonR={epsilonR1}
-                      molaElevations={molaProfile.elevation_m}
-                      onClose={() => setShow3DView(false)}
-                    />
+                    <Suspense fallback={<div className="h-full flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
+                      <Subsurface3DViewer
+                        startTrace={traceRangeStart}
+                        endTrace={traceRangeEnd}
+                        lats={radargramMeta.lats}
+                        lons={radargramMeta.lons}
+                        boundaryBinOffset={boundaryBinOffset}
+                        epsilonR={epsilonR1}
+                        molaElevations={molaProfile.elevation_m}
+                        onClose={() => setShow3DView(false)}
+                      />
+                    </Suspense>
                   </div>
                 )}
               </div>

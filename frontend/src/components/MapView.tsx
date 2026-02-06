@@ -13,6 +13,8 @@ import {
   type DTMElevationGrid,
 } from "../utils/dtmHover";
 import type { FieldNote } from "../api/fieldnotes";
+import { computeOverlapFilter, type OverlapResult, type OverlapStats } from "../utils/overlapFilter";
+import type { InstrumentType as FPInstrumentType } from "../utils/FootprintManager";
 
 
 /* ==================================================
@@ -144,6 +146,9 @@ type MapViewProps = {
   showGrid?: boolean;
   // AI Analysis pin location
   aiAnalysisPin?: { lat: number; lon: number } | null;
+  // Multi-Instrument Overlap Filter
+  overlapFilter?: { enabled: boolean; instruments: string[] };
+  onOverlapStatsChange?: (stats: import("../utils/overlapFilter").OverlapStats | null) => void;
 };
 
 /* ==================================================
@@ -490,9 +495,15 @@ export default function MapView({
   onFieldNoteClick,
   showGrid = false,
   aiAnalysisPin = null,
+  overlapFilter,
+  onOverlapStatsChange,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
+
+  // Overlap filter state
+  const overlapResultRef = useRef<OverlapResult | null>(null);
+  const [footprintVersion, setFootprintVersion] = useState(0);
 
   // SHARAD entities are now managed by FootprintManager (explicit loading)
 
@@ -1474,13 +1485,35 @@ export default function MapView({
     };
   }, [viewBoundSelectionMode]);
 
+  // Helper: apply per-entity visibility for an instrument considering overlap filter
+  const applyInstrumentVisibility = useCallback((instrument: FPInstrumentType, show: boolean) => {
+    const fm = footprintManagerRef.current;
+    const viewer = viewerRef.current;
+    if (!fm || !viewer) return;
+
+    const overlapPassing = overlapResultRef.current?.get(instrument);
+    if (show && overlapPassing) {
+      // Overlap filter active: per-entity visibility
+      const features = fm.getFeatures(instrument);
+      for (const feature of features) {
+        const pid = feature.properties.product_id;
+        if (!pid) continue;
+        const visible = overlapPassing.has(pid);
+        const fpEntity = viewer.entities.getById(`${instrument}_FP_${pid}`);
+        const lblEntity = viewer.entities.getById(`${instrument}_LBL_${pid}`);
+        if (fpEntity) fpEntity.show = visible;
+        if (lblEntity) lblEntity.show = visible;
+      }
+    } else {
+      fm.setVisible(instrument, show);
+    }
+    viewer.scene.requestRender();
+  }, []);
+
   // Toggle footprint visibility (does NOT load new footprints, just shows/hides existing ones)
   useEffect(() => {
-    if (footprintManagerRef.current) {
-      footprintManagerRef.current.setVisible("HIRISE", showHiRISE);
-    }
-    viewerRef.current?.scene.requestRender();
-  }, [showHiRISE]);
+    applyInstrumentVisibility("HIRISE", showHiRISE);
+  }, [showHiRISE, applyInstrumentVisibility]);
 
   useEffect(() => {
     if (footprintManagerRef.current) {
@@ -1510,6 +1543,8 @@ export default function MapView({
         // Re-apply visibility based on current show state
         // The show state is always true when Load is clicked (handleLoadFootprints sets it)
         fm.setVisible(instrument, true);
+        // Trigger overlap filter recomputation
+        setFootprintVersion(v => v + 1);
         console.log(`[MapView] Applied visibility for ${instrument} after load (${result.count} features)`);
       }
     })();
@@ -1519,7 +1554,7 @@ export default function MapView({
     };
   }, [loadFootprintsTrigger]);
 
-  // Update CRISM footprint visibility when ice score filter changes
+  // Update CRISM footprint visibility when ice score filter or overlap filter changes
   useEffect(() => {
     const viewer = viewerRef.current;
     const footprintManager = footprintManagerRef.current;
@@ -1527,58 +1562,46 @@ export default function MapView({
 
     // Get all CRISM features
     const crismFeatures = footprintManager.getFeatures("CRISM");
+    const overlapPassingCrism = overlapResultRef.current?.get("CRISM" as FPInstrumentType);
 
     for (const feature of crismFeatures) {
       const pid = feature.properties.product_id;
       if (!pid) continue;
 
-      // Find the entity for this product (FootprintManager ID format: INSTRUMENT_FP_id, INSTRUMENT_LBL_id)
       const entity = viewer.entities.getById(`CRISM_FP_${pid}`);
       const labelEntity = viewer.entities.getById(`CRISM_LBL_${pid}`);
 
-      // If filter is active, hide products that don't pass
-      // Note: Filter uses observation IDs (e.g., "frt0001fd76") but product IDs are full names
-      // (e.g., "frt0001fd76_07_if166j_mtr3"), so we extract the observation ID for comparison
+      // Compose filters: ice score AND overlap
+      let visible = true;
       if (crismFilteredIds !== null) {
         const obsId = extractCrismObsId(pid);
-        const visible = crismFilteredIds.has(obsId);
-        if (entity) entity.show = visible;
-        if (labelEntity) labelEntity.show = visible;
-      } else {
-        // No filter active, show all
-        if (entity) entity.show = true;
-        if (labelEntity) labelEntity.show = true;
+        visible = crismFilteredIds.has(obsId);
       }
+      if (visible && overlapPassingCrism) {
+        visible = overlapPassingCrism.has(pid);
+      }
+
+      if (entity) entity.show = visible;
+      if (labelEntity) labelEntity.show = visible;
     }
 
     viewer.scene.requestRender();
   }, [crismFilteredIds, showCRISM]);
 
   useEffect(() => {
-    if (footprintManagerRef.current) {
-      footprintManagerRef.current.setVisible("SHARAD", showSHARAD);
-    }
-    viewerRef.current?.scene.requestRender();
-  }, [showSHARAD]);
+    applyInstrumentVisibility("SHARAD", showSHARAD);
+  }, [showSHARAD, applyInstrumentVisibility]);
 
   useEffect(() => {
-    if (footprintManagerRef.current) {
-      footprintManagerRef.current.setVisible("SHARAD_HIGHRES", showSharadHighres);
-    }
-    viewerRef.current?.scene.requestRender();
-  }, [showSharadHighres]);
+    applyInstrumentVisibility("SHARAD_HIGHRES", showSharadHighres);
+  }, [showSharadHighres, applyInstrumentVisibility]);
 
   useEffect(() => {
-    if (footprintManagerRef.current) {
-      footprintManagerRef.current.setVisible("CTX", showCTX);
-    }
-    viewerRef.current?.scene.requestRender();
-  }, [showCTX]);
+    applyInstrumentVisibility("CTX", showCTX);
+  }, [showCTX, applyInstrumentVisibility]);
 
   useEffect(() => {
-    if (footprintManagerRef.current) {
-      footprintManagerRef.current.setVisible("HIRISE_DTM", showHiRISEDTM);
-    }
+    applyInstrumentVisibility("HIRISE_DTM", showHiRISEDTM);
     // Also show/hide quickview overlay entities for DTM products
     const viewer = viewerRef.current;
     if (viewer) {
@@ -1590,10 +1613,107 @@ export default function MapView({
       }
       viewer.scene.requestRender();
     }
-  }, [showHiRISEDTM]);
+  }, [showHiRISEDTM, applyInstrumentVisibility]);
 
   // Note: Legacy footprint overlay hiding is no longer needed since
   // footprints are now managed by FootprintManager (viewport-based loading)
+
+  // Multi-Instrument Overlap Filter: compute and apply visibility
+  const overlapInstrumentsKey = overlapFilter?.instruments?.slice().sort().join(",") ?? "";
+  const overlapEnabled = overlapFilter?.enabled ?? false;
+
+  useEffect(() => {
+    const fm = footprintManagerRef.current;
+    const viewer = viewerRef.current;
+    if (!fm || !viewer) return;
+
+    // If filter disabled or <2 instruments, clear and restore normal visibility
+    if (!overlapEnabled || !overlapFilter?.instruments || overlapFilter.instruments.length < 2) {
+      overlapResultRef.current = null;
+      onOverlapStatsChange?.(null);
+      // Restore visibility for all instruments to match their toggle state
+      if (showCRISM) fm.setVisible("CRISM", true);
+      if (showHiRISE) fm.setVisible("HIRISE", true);
+      if (showSHARAD) fm.setVisible("SHARAD", true);
+      if (showSharadHighres) fm.setVisible("SHARAD_HIGHRES", true);
+      if (showHiRISEDTM) fm.setVisible("HIRISE_DTM", true);
+      // Re-apply CRISM ice score filter if active
+      if (crismFilteredIds !== null && showCRISM) {
+        const crismFeatures = fm.getFeatures("CRISM");
+        for (const feature of crismFeatures) {
+          const pid = feature.properties.product_id;
+          if (!pid) continue;
+          const obsId = extractCrismObsId(pid);
+          const visible = crismFilteredIds.has(obsId);
+          const fpEnt = viewer.entities.getById(`CRISM_FP_${pid}`);
+          const lblEnt = viewer.entities.getById(`CRISM_LBL_${pid}`);
+          if (fpEnt) fpEnt.show = visible;
+          if (lblEnt) lblEnt.show = visible;
+        }
+      }
+      viewer.scene.requestRender();
+      return;
+    }
+
+    // Gather features from FootprintManager for selected instruments
+    const selectedInstruments = overlapFilter.instruments as FPInstrumentType[];
+    const featuresByInstrument = new Map<FPInstrumentType, any[]>();
+    for (const inst of selectedInstruments) {
+      const features = fm.getFeatures(inst);
+      if (features.length > 0) {
+        featuresByInstrument.set(inst, features);
+      }
+    }
+
+    // Need at least 2 instruments with loaded features
+    if (featuresByInstrument.size < 2) {
+      overlapResultRef.current = null;
+      onOverlapStatsChange?.({ totalChecked: 0, totalPassing: 0, perInstrument: new Map() });
+      viewer.scene.requestRender();
+      return;
+    }
+
+    // Compute overlap
+    const { result, stats } = computeOverlapFilter(featuresByInstrument, selectedInstruments);
+    overlapResultRef.current = result;
+    onOverlapStatsChange?.(stats);
+
+    // Apply visibility for each selected instrument
+    for (const inst of selectedInstruments) {
+      const passingIds = result.get(inst);
+      const features = fm.getFeatures(inst);
+      // Check if this instrument is toggled on
+      const instrumentOn = {
+        CRISM: showCRISM,
+        HIRISE: showHiRISE,
+        SHARAD: showSHARAD,
+        SHARAD_HIGHRES: showSharadHighres,
+        CTX: showCTX,
+        HIRISE_DTM: showHiRISEDTM,
+      }[inst] ?? false;
+
+      if (!instrumentOn) continue;
+
+      for (const feature of features) {
+        const pid = feature.properties.product_id;
+        if (!pid) continue;
+        let visible = passingIds ? passingIds.has(pid) : false;
+        // Also compose with CRISM ice score filter
+        if (visible && inst === "CRISM" && crismFilteredIds !== null) {
+          const obsId = extractCrismObsId(pid);
+          visible = crismFilteredIds.has(obsId);
+        }
+        const fpEnt = viewer.entities.getById(`${inst}_FP_${pid}`);
+        const lblEnt = viewer.entities.getById(`${inst}_LBL_${pid}`);
+        if (fpEnt) fpEnt.show = visible;
+        if (lblEnt) lblEnt.show = visible;
+      }
+    }
+
+    viewer.scene.requestRender();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlapEnabled, overlapInstrumentsKey, footprintVersion, crismFilteredIds,
+      showCRISM, showHiRISE, showSHARAD, showSharadHighres, showHiRISEDTM]);
 
   // Line Profile markers and polyline
   useEffect(() => {
@@ -1781,48 +1901,166 @@ export default function MapView({
     if (!viewer) return;
 
     async function flyTo() {
-      // Determine if HiRISE or CRISM
-      const isHiRISE = flyToProductId!.startsWith("ESP_");
-      const lbl = isHiRISE
-        ? await loadHiRISELBL(flyToProductId!)
-        : await loadCRISMLBL(flyToProductId!);
-
-      if (!lbl) {
-        console.warn("[FlyTo] No LBL found for", flyToProductId);
-        onFlyToComplete?.();
-        return;
-      }
-
-      const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
-      const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
-      const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
-      const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
-
-      if (minLat == null || maxLat == null || westLon360 == null || eastLon360 == null) {
-        onFlyToComplete?.();
-        return;
-      }
-
-      const west = normalizeLonTo180(westLon360);
-      const east = normalizeLonTo180(eastLon360);
-      const south = Math.min(minLat, maxLat);
-      const north = Math.max(minLat, maxLat);
-
-      // Fly to the rectangle with some padding
-      const rect = Cesium.Rectangle.fromDegrees(west, south, east, north);
-      const padded = paddedRectangle(rect, 0.3);
-
-      // Re-check viewer after async operations
       const v = viewerRef.current;
       if (!v) return;
 
-      v.camera.flyTo({
-        destination: padded,
-        duration: 0.8,
-        complete: () => {
+      const pid = flyToProductId!;
+
+      // Try to find entity from FootprintManager (works for all instruments)
+      // Entity ID format: INSTRUMENT_FP_productId
+      const instruments = ["HIRISE", "CRISM", "CTX", "SHARAD", "SHARAD_HIGHRES", "HIRISE_DTM", "CUSTOM"];
+      let foundEntity: Cesium.Entity | null = null;
+
+      for (const inst of instruments) {
+        const entity = v.entities.getById(`${inst}_FP_${pid}`);
+        if (entity) {
+          foundEntity = entity;
+          break;
+        }
+      }
+
+      // If found entity with rectangle, fly to its bounds
+      if (foundEntity?.rectangle?.coordinates) {
+        const rectCoords = foundEntity.rectangle.coordinates.getValue(Cesium.JulianDate.now());
+        if (rectCoords) {
+          const padded = paddedRectangle(rectCoords, 0.3);
+          v.camera.flyTo({
+            destination: padded,
+            duration: 0.8,
+            complete: () => onFlyToComplete?.(),
+          });
+          return;
+        }
+      }
+
+      // If found entity with position (point/polyline), fly to its position
+      if (foundEntity?.position) {
+        const pos = foundEntity.position.getValue(Cesium.JulianDate.now());
+        if (pos) {
+          v.camera.flyTo({
+            destination: pos,
+            orientation: {
+              heading: 0,
+              pitch: Cesium.Math.toRadians(-90),
+              roll: 0,
+            },
+            complete: () => onFlyToComplete?.(),
+          });
+          return;
+        }
+      }
+
+      // If found entity with polyline, fly to its center
+      if (foundEntity?.polyline?.positions) {
+        const positions = foundEntity.polyline.positions.getValue(Cesium.JulianDate.now());
+        if (positions && positions.length > 0) {
+          const midIdx = Math.floor(positions.length / 2);
+          v.camera.flyTo({
+            destination: positions[midIdx],
+            orientation: {
+              heading: 0,
+              pitch: Cesium.Math.toRadians(-90),
+              roll: 0,
+            },
+            complete: () => onFlyToComplete?.(),
+          });
+          return;
+        }
+      }
+
+      // Fallback: try LBL-based fly-to for HiRISE/CRISM
+      const isHiRISE = pid.startsWith("ESP_") || pid.startsWith("PSP_");
+      const isCRISM = pid.toLowerCase().match(/^(frt|hrl|hrs|frs|arl|atl)/);
+
+      if (isHiRISE || isCRISM) {
+        const lbl = isHiRISE
+          ? await loadHiRISELBL(pid)
+          : await loadCRISMLBL(pid);
+
+        if (!lbl) {
+          console.warn("[FlyTo] No LBL found for", pid);
           onFlyToComplete?.();
-        },
-      });
+          return;
+        }
+
+        const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
+        const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
+        const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
+        const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
+
+        if (minLat == null || maxLat == null || westLon360 == null || eastLon360 == null) {
+          onFlyToComplete?.();
+          return;
+        }
+
+        const west = normalizeLonTo180(westLon360);
+        const east = normalizeLonTo180(eastLon360);
+        const south = Math.min(minLat, maxLat);
+        const north = Math.max(minLat, maxLat);
+
+        const rect = Cesium.Rectangle.fromDegrees(west, south, east, north);
+        const padded = paddedRectangle(rect, 0.3);
+
+        const v = viewerRef.current;
+        if (!v) return;
+
+        v.camera.flyTo({
+          destination: padded,
+          duration: 0.8,
+          complete: () => onFlyToComplete?.(),
+        });
+        return;
+      }
+
+      // Fallback: fetch coordinates from backend footprints API for any instrument
+      const fallbackInstruments = ["SHARAD_HIGHRES", "SHARAD", "HIRISE_DTM", "CTX", "HIRISE", "CRISM"];
+      for (const inst of fallbackInstruments) {
+        try {
+          const res = await fetch(`/api/footprints?instrument=${inst}&bbox=-180,-90,180,90&limit=5000&lod=poly`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const feat = data.features?.find((f: any) => f.properties?.product_id === pid);
+          if (!feat?.geometry?.coordinates) continue;
+
+          const coords = feat.geometry.coordinates;
+          if (feat.geometry.type === "LineString" && coords.length >= 2) {
+            // Fly to midpoint of the line
+            const midIdx = Math.floor(coords.length / 2);
+            const [lon, lat] = coords[midIdx];
+            const rect = Cesium.Rectangle.fromDegrees(
+              Math.min(...coords.map((c: number[]) => c[0])),
+              Math.min(...coords.map((c: number[]) => c[1])),
+              Math.max(...coords.map((c: number[]) => c[0])),
+              Math.max(...coords.map((c: number[]) => c[1]))
+            );
+            v.camera.flyTo({
+              destination: paddedRectangle(rect, 0.3),
+              duration: 0.8,
+              complete: () => onFlyToComplete?.(),
+            });
+            return;
+          } else if (feat.geometry.type === "Polygon" && coords[0]?.length >= 4) {
+            const ring = coords[0];
+            const rect = Cesium.Rectangle.fromDegrees(
+              Math.min(...ring.map((c: number[]) => c[0])),
+              Math.min(...ring.map((c: number[]) => c[1])),
+              Math.max(...ring.map((c: number[]) => c[0])),
+              Math.max(...ring.map((c: number[]) => c[1]))
+            );
+            v.camera.flyTo({
+              destination: paddedRectangle(rect, 0.3),
+              duration: 0.8,
+              complete: () => onFlyToComplete?.(),
+            });
+            return;
+          }
+        } catch {
+          // Try next instrument
+        }
+      }
+
+      console.warn("[FlyTo] Could not find entity or LBL for", pid);
+      onFlyToComplete?.();
     }
 
     flyTo();
@@ -1987,11 +2225,16 @@ export default function MapView({
         ctxTileLayersRef.current.delete(id);
         needsRender = true;
       }
-      // Hide entity overlay (CRISM/HiRISE)
+      // Hide entity overlay (CRISM/HiRISE/HiRISE DTM)
       const ent = viewer.entities.getById(`QUICKVIEW_OVERLAY_${id}`);
       if (ent) {
         ent.show = false;
         needsRender = true;
+      }
+      // Clear active DTM if this was a DTM product being hidden
+      if ((id.startsWith("DTEEC_") || id.startsWith("DTE_")) && activeDTMProductRef.current === id) {
+        activeDTMProductRef.current = null;
+        dtmHoverReadoutRef.current?.hide();
       }
       // Restore footprint fill when overlay is removed
       setFootprintTransparent(viewer, id, false);
@@ -2020,6 +2263,19 @@ export default function MapView({
         setFootprintTransparent(viewer, productId, true);
         existingIds.add(productId);
         needsRender = true;
+
+        // For HiRISE DTM, ensure elevation grid is loaded for hover
+        if (productId.startsWith("DTEEC_") || productId.startsWith("DTE_")) {
+          activeDTMProductRef.current = productId;
+          if (!dtmGridCacheRef.current.has(productId)) {
+            loadDTMElevationGrid(productId).then((grid) => {
+              if (grid) {
+                dtmGridCacheRef.current.set(productId, grid);
+                console.log(`[DTMHover] Grid loaded for ${productId} (re-enabled)`);
+              }
+            });
+          }
+        }
       } else {
         toCreate.push(productId);
       }
@@ -2120,6 +2376,17 @@ export default function MapView({
           // Make footprint fill transparent so overlay image is clearly visible
           setFootprintTransparent(v, productId, true);
           quickviewOverlayIdsRef.current.add(productId);
+
+          // For HiRISE DTM products, load elevation grid for hover readout
+          if (instrument === "HIRISE_DTM") {
+            activeDTMProductRef.current = productId;
+            loadDTMElevationGrid(productId).then((grid) => {
+              if (grid) {
+                dtmGridCacheRef.current.set(productId, grid);
+                console.log(`[DTMHover] Grid loaded for ${productId} (via quickview)`);
+              }
+            });
+          }
         }
 
         v.entities.resumeEvents();
@@ -2561,13 +2828,21 @@ export default function MapView({
         return null;
       };
 
+      // Helper: check if product passes the overlap filter
+      const overlapResult = overlapResultRef.current;
+      const passesOverlap = (inst: string, pid: string): boolean => {
+        if (!overlapResult) return true; // No filter active
+        const passing = overlapResult.get(inst as FPInstrumentType);
+        return passing ? passing.has(pid) : true; // If instrument not in filter, pass
+      };
+
       // Get products from FootprintManager for HiRISE
       if (showHiRISE && footprintManager.hasFootprints("HIRISE")) {
         const hiriseFeatures = footprintManager.getFeatures("HIRISE");
         for (const feature of hiriseFeatures) {
           const pid = feature.properties.product_id;
           const title = feature.properties.title;
-          if (pid && !seen.has(pid)) {
+          if (pid && !seen.has(pid) && passesOverlap("HIRISE", pid)) {
             seen.add(pid);
             const center = getFeatureCenter(feature);
             visible.push({ productId: pid, instrument: "HIRISE", title, lat: center?.lat, lon: center?.lon });
@@ -2581,14 +2856,13 @@ export default function MapView({
         for (const feature of crismFeatures) {
           const pid = feature.properties.product_id;
           if (pid && !seen.has(pid)) {
-            // If filter is active, only include products that pass the filter
-            // Note: Filter uses observation IDs, so extract for comparison
+            // Ice score filter
             if (crismFilteredIds !== null) {
               const obsId = extractCrismObsId(pid);
-              if (!crismFilteredIds.has(obsId)) {
-                continue;
-              }
+              if (!crismFilteredIds.has(obsId)) continue;
             }
+            // Overlap filter
+            if (!passesOverlap("CRISM", pid)) continue;
             seen.add(pid);
             const center = getFeatureCenter(feature);
             visible.push({ productId: pid, instrument: "CRISM", lat: center?.lat, lon: center?.lon });
@@ -2602,7 +2876,7 @@ export default function MapView({
         for (const feature of ctxFeatures) {
           const pid = feature.properties.product_id;
           const title = feature.properties.title;
-          if (pid && !seen.has(pid)) {
+          if (pid && !seen.has(pid) && passesOverlap("CTX", pid)) {
             seen.add(pid);
             const center = getFeatureCenter(feature);
             visible.push({ productId: pid, instrument: "CTX", title, lat: center?.lat, lon: center?.lon });
@@ -2616,7 +2890,7 @@ export default function MapView({
         for (const feature of dtmFeatures) {
           const pid = feature.properties.product_id;
           const title = feature.properties.title;
-          if (pid && !seen.has(pid)) {
+          if (pid && !seen.has(pid) && passesOverlap("HIRISE_DTM", pid)) {
             seen.add(pid);
             const center = getFeatureCenter(feature);
             visible.push({ productId: pid, instrument: "HIRISE_DTM", title, lat: center?.lat, lon: center?.lon });
@@ -2660,7 +2934,7 @@ export default function MapView({
       clearTimeout(initTimeout);
       clearInterval(interval);
     };
-  }, [showHiRISE, showCRISM, showCTX, showHiRISEDTM, showCustomData, customDatasets, onVisibleProductsChange, crismFilteredIds]);
+  }, [showHiRISE, showCRISM, showCTX, showHiRISEDTM, showCustomData, customDatasets, onVisibleProductsChange, crismFilteredIds, overlapEnabled, overlapInstrumentsKey, footprintVersion]);
 
   // PERFORMANCE OPTIMIZED: Update overlay opacity when per-product opacities change
   useEffect(() => {
@@ -3041,7 +3315,7 @@ export default function MapView({
     // Pin point
     viewer.entities.add({
       id: PIN_ID,
-      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, marsEllipsoid),
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, MARS_ELLIPSOID),
       point: {
         pixelSize: 10,
         color: Cesium.Color.fromCssColorString("#8b5cf6"),
@@ -3065,7 +3339,7 @@ export default function MapView({
     // Radius circle (10 km default; visual only)
     viewer.entities.add({
       id: RADIUS_ID,
-      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, marsEllipsoid),
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, MARS_ELLIPSOID),
       ellipse: {
         semiMajorAxis: 10000,  // 10 km
         semiMinorAxis: 10000,

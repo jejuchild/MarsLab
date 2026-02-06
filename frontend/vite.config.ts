@@ -5,6 +5,19 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Separate heavy vendor libraries into their own cached chunks
+          if (id.includes("node_modules/cesium")) return "vendor-cesium";
+          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three")) return "vendor-three";
+          if (id.includes("node_modules/recharts") || id.includes("node_modules/d3-")) return "vendor-recharts";
+        },
+      },
+    },
+  },
+
   server: {
     watch: {
       // Ignore large directories to avoid ENOSPC error
@@ -31,6 +44,7 @@ export default defineConfig({
       "/world_tiles": "http://localhost:8000",
       "/sharad_index.geojson": "http://localhost:8000",
       "/sharad": "http://localhost:8000",
+      "/terrain": "http://localhost:8000",
     },
   },
 });
