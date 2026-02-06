@@ -78,6 +78,11 @@ function CRISMQuickviewImage({ productId, instrument }: { productId: string; ins
       return;
     }
 
+    if (instrument === "HIRISE_DTM") {
+      setImgSrc(`/hirise_dtm/overlay/${productId}.png`);
+      return;
+    }
+
     // For CRISM, try multiple URL patterns
     const obsId = productId.split("_")[0]; // e.g., frt00008a1e
     const baseKey = productId.replace(/_if[0-9a-z]+_mtr3$/i, "").replace(/_br[a-z]+_mtr3$/i, ""); // e.g., frt00008a1e_07

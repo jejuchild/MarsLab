@@ -25,6 +25,36 @@ const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
   b: 1.08,
 };
 
+// Cache for HiRISE DTM index
+let hiriseDTMIndexCache: { features: Array<{ properties: { product_id: string; west: number; east: number; south: number; north: number } }> } | null = null;
+
+// Get DTM center coordinates (guaranteed to be within bounds)
+async function getDTMCenter(productId: string): Promise<{ lat: number; lon: number } | null> {
+  if (!hiriseDTMIndexCache) {
+    try {
+      const res = await fetch("/hirise_dtm_index.geojson");
+      if (res.ok) {
+        hiriseDTMIndexCache = await res.json();
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  if (!hiriseDTMIndexCache?.features) return null;
+
+  for (const feature of hiriseDTMIndexCache.features) {
+    if (feature.properties?.product_id === productId) {
+      const { west, east, south, north } = feature.properties;
+      return {
+        lat: (south + north) / 2,
+        lon: (west + east) / 2,
+      };
+    }
+  }
+  return null;
+}
+
 export type VisibleProduct = {
   productId: string;
   instrument: "HIRISE" | "CRISM" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
@@ -757,9 +787,13 @@ export default function MainPage() {
             onCustomDatasetOpacity={handleCustomDatasetOpacity}
             fieldNotes={fieldNotes}
             onOpenFieldNote={handleOpenFieldNote}
-            onShow3DView={(productId, lat, lon) => {
+            onShow3DView={async (productId, lat, lon) => {
               setSelected(null);
-              setHiRiseDTM3DPoint({ productId, lat, lon });
+              // Use DTM center to ensure point is within bounds
+              const center = await getDTMCenter(productId);
+              const safeLat = center?.lat ?? lat;
+              const safeLon = center?.lon ?? lon;
+              setHiRiseDTM3DPoint({ productId, lat: safeLat, lon: safeLon });
             }}
           />
         ) : terrainPoint ? (
@@ -775,7 +809,11 @@ export default function MainPage() {
         ) : hiRiseDTM3DPoint ? (
           <HiRiseDTM3DViewer
             point={hiRiseDTM3DPoint}
-            onClose={() => setHiRiseDTM3DPoint(null)}
+            onClose={() => {
+              setHiRiseDTM3DPoint(null);
+              setAnalysisMode(null);
+              setActiveDTMProduct(null);
+            }}
           />
         ) : null
       }
