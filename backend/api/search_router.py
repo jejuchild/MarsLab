@@ -376,15 +376,19 @@ async def search_local_products(
     limit: int = Query(20, ge=1, le=100, description="Maximum results"),
 ):
     """
-    Search ALL local products across every instrument index.
+    Search ALL local products and Mars regions.
 
-    Searches CRISM, HiRISE, SHARAD, and CTX index.geojson files.
-    Returns matching products sorted by relevance (prefix match first).
+    Searches CRISM, HiRISE, SHARAD, CTX index.geojson files plus Mars region lookup table.
+    Returns matching products/regions sorted by relevance (prefix match first).
+    Regions appear with instrument="REGION" and can be used to fly to locations.
     """
+    from .mars_regions import find_all_matching_regions
+
     products = _load_all_products()
     query_upper = q.upper()
+    query_lower = q.lower()
 
-    # Score and filter
+    # Score and filter products
     scored = []
     for p in products:
         pid_upper = p["product_id"].upper()
@@ -400,6 +404,26 @@ async def search_local_products(
             else:
                 score = 2
             scored.append((score, p))
+
+    # Search Mars regions
+    matching_regions = find_all_matching_regions(query_lower)
+    for region in matching_regions:
+        region_name_upper = region.name.upper()
+        # Score regions: prioritize exact/prefix matches
+        if region_name_upper == query_upper:
+            score = 0
+        elif region_name_upper.startswith(query_upper):
+            score = 1
+        else:
+            score = 2
+        scored.append((score, {
+            "product_id": region.name,  # Use name as ID for display
+            "instrument": "REGION",
+            "title": region.description,
+            "lat": region.lat,
+            "lon": region.lon,
+            "radius_deg": region.radius_deg,
+        }))
 
     scored.sort(key=lambda x: (x[0], x[1]["product_id"]))
     results = [s[1] for s in scored[:limit]]
@@ -672,3 +696,51 @@ async def get_download_status(task_id: str):
         raise HTTPException(404, f"Download task not found: {task_id}")
 
     return DownloadResponse(**task.to_dict())
+
+
+@router.delete("/download/{task_id}")
+async def cancel_download(task_id: str):
+    """
+    Cancel a specific download task.
+
+    Terminates the aria2 process and marks the task as failed.
+
+    ## Example
+
+    ```
+    DELETE /api/download/a1b2c3d4
+    ```
+    """
+    task = download_manager.get_task(task_id)
+
+    if not task:
+        raise HTTPException(404, f"Download task not found: {task_id}")
+
+    cancelled = await download_manager.cancel_task(task_id)
+
+    if cancelled:
+        return {"status": "cancelled", "task_id": task_id}
+    else:
+        return {"status": "not_active", "task_id": task_id, "message": "Task was not actively downloading"}
+
+
+@router.delete("/download")
+async def cancel_all_downloads():
+    """
+    Cancel all active download tasks.
+
+    Terminates all aria2 processes and marks tasks as failed.
+
+    ## Example
+
+    ```
+    DELETE /api/download
+    ```
+    """
+    cancelled_count = await download_manager.cancel_all_tasks()
+
+    return {
+        "status": "cancelled",
+        "cancelled_count": cancelled_count,
+        "message": f"Cancelled {cancelled_count} active download(s)"
+    }

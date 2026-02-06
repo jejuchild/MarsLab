@@ -671,6 +671,14 @@ export default function MainPage() {
 
   // Handle search result selection from TopBar
   const handleSearchSelect = useCallback((productId: string, instrument?: string, lat?: number | null, lon?: number | null) => {
+    // Handle REGION type - just fly to location, no inspector
+    if (instrument === "REGION") {
+      if (lat != null && lon != null) {
+        setFlyToCoords({ lat, lon });
+      }
+      return;
+    }
+
     // First try to find the product on the map
     const product = visibleProducts.find((p) => p.productId === productId);
     if (product) {

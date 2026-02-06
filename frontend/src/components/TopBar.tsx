@@ -39,6 +39,7 @@ const INSTRUMENT_COLORS: Record<string, string> = {
   SHARAD:         "text-orange-400 bg-orange-500/20 border-orange-500/30",
   SHARAD_HIGHRES: "text-amber-400 bg-amber-500/20 border-amber-500/30",
   CTX:            "text-pink-400 bg-pink-500/20 border-pink-500/30",
+  REGION:         "text-emerald-400 bg-emerald-500/20 border-emerald-500/30",
 };
 
 /* =========================================================
