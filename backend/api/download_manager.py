@@ -42,6 +42,9 @@ from .aria2_downloader import (
     check_aria2_available,
     log_failed_downloads,
     Aria2Status,
+    cancel_task as aria2_cancel_task,
+    cancel_all_tasks as aria2_cancel_all,
+    get_active_task_ids,
 )
 
 
@@ -205,6 +208,83 @@ class DownloadManager:
     def list_tasks(self) -> List[DownloadTask]:
         """List all tasks."""
         return list(self.tasks.values())
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """
+        Cancel a specific download task.
+
+        Args:
+            task_id: Task ID to cancel
+
+        Returns:
+            True if task was cancelled, False otherwise
+        """
+        task = self.tasks.get(task_id)
+        if not task:
+            return False
+
+        # Cancel the aria2 process if running
+        cancelled = await aria2_cancel_task(task_id)
+
+        # Cancel the asyncio task if running
+        async_task = self._active_downloads.get(task_id)
+        if async_task and not async_task.done():
+            async_task.cancel()
+
+        # Update task status
+        task.status = DownloadStatus.FAILED
+        task.error = "Cancelled by user"
+
+        # Remove from active downloads
+        self._active_downloads.pop(task_id, None)
+
+        return True
+
+    async def cancel_all_tasks(self) -> int:
+        """
+        Cancel all active download tasks.
+
+        Returns:
+            Number of tasks cancelled
+        """
+        cancelled_count = 0
+
+        # Get list of active task IDs
+        active_task_ids = [
+            task_id for task_id, task in self.tasks.items()
+            if task.status in (DownloadStatus.PENDING, DownloadStatus.QUEUED,
+                              DownloadStatus.DOWNLOADING, DownloadStatus.PROCESSING)
+        ]
+
+        for task_id in active_task_ids:
+            if await self.cancel_task(task_id):
+                cancelled_count += 1
+
+        # Also cancel any aria2 processes
+        await aria2_cancel_all()
+
+        return cancelled_count
+
+    def delete_task(self, task_id: str) -> bool:
+        """
+        Delete a completed/failed task from history.
+
+        Args:
+            task_id: Task ID to delete
+
+        Returns:
+            True if task was deleted, False otherwise
+        """
+        task = self.tasks.get(task_id)
+        if not task:
+            return False
+
+        # Only allow deleting completed or failed tasks
+        if task.status not in (DownloadStatus.COMPLETED, DownloadStatus.FAILED):
+            return False
+
+        del self.tasks[task_id]
+        return True
 
     async def start_download(
         self,
@@ -528,6 +608,7 @@ class DownloadManager:
                     url=ode_file.url,
                     output_dir=task.target_dir,
                     filename=ode_file.filename,
+                    task_id=task.task_id,  # Pass task_id for cancellation tracking
                 )
 
                 if result.status == Aria2Status.COMPLETED:
@@ -1041,10 +1122,24 @@ def check_local_existence_detailed(product_id: str, instrument: Instrument) -> E
     file_names = [f.name.lower() for f in files]
     file_suffixes = [f.suffix.lower() for f in files]
 
+    # Check for aria2 partial download control files (.aria2)
+    # If any .aria2 files exist, the download is incomplete
+    has_aria2_partial = any(f.suffix.lower() == ".aria2" for f in files)
+
+    # Helper to check if a file is complete (exists, non-zero size, no .aria2)
+    def is_file_complete(suffix: str) -> bool:
+        for f in files:
+            if f.suffix.lower() == suffix and f.stat().st_size > 0:
+                # Check if corresponding .aria2 file exists
+                aria2_file = f.with_suffix(f.suffix + ".aria2")
+                if not aria2_file.exists():
+                    return True
+        return False
+
     if instrument == Instrument.CRISM:
-        # Check core files (.img, .lbl)
-        has_img = ".img" in file_suffixes
-        has_lbl = ".lbl" in file_suffixes
+        # Check core files (.img, .lbl) - must be complete (no .aria2)
+        has_img = is_file_complete(".img")
+        has_lbl = is_file_complete(".lbl")
         has_core = has_img and has_lbl
 
         if has_img:
@@ -1058,28 +1153,38 @@ def check_local_existence_detailed(product_id: str, instrument: Instrument) -> E
             missing.append("lbl")
 
         # Check header file (.hdr)
-        has_header = ".hdr" in file_suffixes
+        has_header = is_file_complete(".hdr")
         if has_header:
             existing.append("hdr")
         else:
             missing.append("hdr")
 
         # Check wavelength table (.tab)
-        has_wavelength = ".tab" in file_suffixes
+        has_wavelength = is_file_complete(".tab")
         if has_wavelength:
             existing.append("tab")
         else:
             missing.append("tab")
 
-        # Check browse files (at least one _br*.png)
-        has_browse = any("_br" in name and name.endswith(".png") for name in file_names)
+        # Check browse files (at least one _br*.png that is complete)
+        has_browse = False
+        for f in files:
+            if "_br" in f.name.lower() and f.suffix.lower() == ".png" and f.stat().st_size > 0:
+                aria2_file = f.with_suffix(".png.aria2")
+                if not aria2_file.exists():
+                    has_browse = True
+                    break
         if has_browse:
             existing.append("browse")
         else:
             missing.append("browse")
 
-        # All required files must exist
-        all_exist = has_core and has_header and has_wavelength and has_browse
+        # All required files must exist and no partial downloads
+        all_exist = has_core and has_header and has_wavelength and has_browse and not has_aria2_partial
+
+        # If any aria2 partial files exist, mark as incomplete
+        if has_aria2_partial:
+            existing.append("partial")
 
         return ExistenceResult(
             exists=all_exist,
@@ -1091,10 +1196,10 @@ def check_local_existence_detailed(product_id: str, instrument: Instrument) -> E
             existing_files=existing,
         )
     else:
-        # HiRISE
-        has_jp2 = ".jp2" in file_suffixes
-        has_tif = ".tif" in file_suffixes
-        has_lbl = ".lbl" in file_suffixes
+        # HiRISE - check for complete files (no .aria2)
+        has_jp2 = is_file_complete(".jp2")
+        has_tif = is_file_complete(".tif")
+        has_lbl = is_file_complete(".lbl")
 
         has_core = (has_jp2 or has_tif) and has_lbl
 
@@ -1108,8 +1213,12 @@ def check_local_existence_detailed(product_id: str, instrument: Instrument) -> E
         else:
             missing.append("lbl")
 
+        # If any aria2 partial files exist, mark as incomplete
+        if has_aria2_partial:
+            existing.append("partial")
+
         return ExistenceResult(
-            exists=has_core,
+            exists=has_core and not has_aria2_partial,
             has_core=has_core,
             has_header=True,  # HiRISE doesn't need separate header
             has_wavelength=True,  # HiRISE doesn't need wavelength table
