@@ -1095,27 +1095,6 @@ export default function LayerPanel({
               )}
             </button>
 
-            {/* HiRISE DTM 3D View */}
-            <button
-              onClick={() => onAnalysisModeChange?.(analysisMode === "hirise_dtm_3d" ? null : "hirise_dtm_3d")}
-              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
-                analysisMode === "hirise_dtm_3d"
-                  ? "bg-amber-600/20 border border-amber-600/50 text-amber-600"
-                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-amber-600/30"
-              }`}
-            >
-              <span className="material-symbols-outlined text-sm">terrain</span>
-              <div className="flex-1">
-                <span className="text-[11px] font-medium">HiRISE DTM 3D View</span>
-                <p className="text-[9px] text-[#6b7c9c]">Click DTM footprint for 3D</p>
-              </div>
-              {analysisMode === "hirise_dtm_3d" && (
-                <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-600/20 text-amber-600 border border-amber-600/30 font-bold uppercase">
-                  ON
-                </span>
-              )}
-            </button>
-
             {/* Line Profile */}
             <button
               onClick={() => onAnalysisModeChange?.(analysisMode === "line" ? null : "line")}
