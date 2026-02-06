@@ -255,6 +255,7 @@ interface LayerPanelProps {
   showFieldNotesOnMap?: boolean;
   onToggleFieldNotesOnMap?: (v: boolean) => void;
   onFieldNoteClick?: (note: FieldNote) => void;
+  onActiveTagChange?: (tag: string | null) => void;
 }
 
 // Fly-To Navigation Component
@@ -537,6 +538,7 @@ export default function LayerPanel({
   showFieldNotesOnMap = true,
   onToggleFieldNotesOnMap,
   onFieldNoteClick,
+  onActiveTagChange,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -1135,6 +1137,7 @@ export default function LayerPanel({
           showOnMap={showFieldNotesOnMap ?? true}
           onToggleShowOnMap={onToggleFieldNotesOnMap}
           onFieldNoteClick={onFieldNoteClick}
+          onActiveTagChange={onActiveTagChange}
         />
 
         {/* Displayed Products Section */}
@@ -1167,14 +1170,26 @@ function FieldNotesSection({
   showOnMap,
   onToggleShowOnMap,
   onFieldNoteClick,
+  onActiveTagChange,
 }: {
   fieldNotes: FieldNote[];
   showOnMap: boolean;
   onToggleShowOnMap?: (v: boolean) => void;
   onFieldNoteClick?: (note: FieldNote) => void;
+  onActiveTagChange?: (tag: string | null) => void;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  const handleTagSelect = useCallback((tag: string) => {
+    const next = selectedTag === tag ? null : tag;
+    setSelectedTag(next);
+    onActiveTagChange?.(next);
+    // Auto-enable "Show on Map" when a tag is selected
+    if (next && !showOnMap) {
+      onToggleShowOnMap?.(true);
+    }
+  }, [selectedTag, onActiveTagChange, showOnMap, onToggleShowOnMap]);
 
   // All unique tags sorted
   const allTags = useMemo(() => {
@@ -1246,7 +1261,7 @@ function FieldNotesSection({
               {allTags.map(tag => (
                 <button
                   key={tag}
-                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                  onClick={() => handleTagSelect(tag)}
                   className={`px-2 py-0.5 rounded-full text-[9px] border transition-colors ${
                     selectedTag === tag
                       ? "bg-amber-500/20 text-amber-400 border-amber-500/50"

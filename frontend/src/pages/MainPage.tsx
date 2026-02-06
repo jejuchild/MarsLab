@@ -256,7 +256,16 @@ export default function MainPage() {
   const [showFieldNoteModal, setShowFieldNoteModal] = useState<{
     productId: string; instrument: string; lat: number; lon: number;
   } | null>(null);
-  const [showFieldNotesOnMap, setShowFieldNotesOnMap] = useState(true);
+  const [showFieldNotesOnMap, setShowFieldNotesOnMap] = useState(false);
+  const [fieldNoteActiveTag, setFieldNoteActiveTag] = useState<string | null>(null);
+
+  // Notes to show on map: only those matching the active tag (none if no tag selected)
+  const mapFieldNotes = useMemo(
+    () => fieldNoteActiveTag
+      ? fieldNotes.filter(n => n.tags.includes(fieldNoteActiveTag))
+      : [],
+    [fieldNotes, fieldNoteActiveTag]
+  );
 
   // Default opacity for new overlays
   const DEFAULT_OPACITY = 80;
@@ -432,16 +441,7 @@ export default function MainPage() {
         return newMap;
       });
 
-      // Activate DTM analysis mode for hover support
-      setAnalysisMode("hirise_dtm_3d");
       setActiveDTMProduct(note.product_id);
-
-      // Clear other analysis state
-      setTerrainPoint(null);
-      setSlope3DPoint(null);
-      setHiRiseDTM3DPoint(null);
-      setLinePoints([]);
-      setLineProfileData(null);
       return;
     }
 
@@ -477,18 +477,13 @@ export default function MainPage() {
       return newMap;
     });
 
-    // 3. Activate HiRISE DTM 3D analysis mode (prepares for next click)
-    setAnalysisMode("hirise_dtm_3d");
-
-    // 4. Store the active DTM product for terrain clicks
+    // 3. Store the active DTM product (for "Show 3D View" button in Inspector)
     setActiveDTMProduct(productId);
 
-    // 5. Clear other analysis state (but don't open 3D viewer yet - user clicks again for that)
+    // 4. Clear other analysis state
     setTerrainPoint(null);
     setSlope3DPoint(null);
     setHiRiseDTM3DPoint(null);
-    setLinePoints([]);
-    setLineProfileData(null);
   }, []);
 
   // Deactivate all overlays
@@ -618,12 +613,7 @@ export default function MainPage() {
       setSelected(null);
       setSlope3DPoint({ lat, lon });
     }
-    if (analysisMode === "hirise_dtm_3d" && activeDTMProduct) {
-      // HiRISE DTM 3D mode: open 3D viewer at clicked point
-      setSelected(null);
-      setHiRiseDTM3DPoint({ productId: activeDTMProduct, lat, lon });
-    }
-  }, [analysisMode, activeDTMProduct]);
+  }, [analysisMode]);
 
   // When a product is selected, clear terrain point
   const handleSelect = useCallback((ctx: InspectorContext | null) => {
@@ -808,6 +798,7 @@ export default function MainPage() {
           showFieldNotesOnMap={showFieldNotesOnMap}
           onToggleFieldNotesOnMap={setShowFieldNotesOnMap}
           onFieldNoteClick={handleFieldNoteClick}
+          onActiveTagChange={setFieldNoteActiveTag}
         />
       }
       rightPanel={
@@ -903,7 +894,7 @@ export default function MainPage() {
         linePoints={linePoints}
         viewBoundSelectionMode={viewBoundSelectionMode}
         onViewBoundSelected={handleViewBoundSelected}
-        fieldNotes={showFieldNotesOnMap ? fieldNotes : []}
+        fieldNotes={showFieldNotesOnMap ? mapFieldNotes : []}
         onFieldNoteClick={handleFieldNoteClick}
         activeDTMProductId={activeDTMProduct}
       />
