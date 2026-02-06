@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { fetchHiRISEWindow } from "../api/hirise";
+import type { OverlayType, ProductOverlay, CustomDataset } from "../pages/MainPage";
+import type { FieldNote } from "../api/fieldnotes";
 
 /* =========================================================
  * Types
  * =======================================================*/
-export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD";
+export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
 
 export type InspectorContext = {
   instrument: InstrumentType;
@@ -51,31 +53,151 @@ const DEFAULT_RGB: RGBWavelengths = {
   b: 1.08,  // Blue channel
 };
 
+// Overlay type display configuration
+const OVERLAY_CONFIG: Record<OverlayType, { label: string; color: string; icon: string }> = {
+  quickview: { label: "Quickview", color: "emerald", icon: "visibility" },
+  highres: { label: "High-Res", color: "purple", icon: "hd" },
+  browse_HYD: { label: "HYD", color: "fuchsia", icon: "water_drop" },
+  browse_ICE: { label: "ICE", color: "blue", icon: "ac_unit" },
+  browse_IC2: { label: "IC2", color: "cyan", icon: "ac_unit" },
+  score_ice: { label: "S-ICE", color: "sky", icon: "analytics" },
+  score_hyd: { label: "S-HYD", color: "rose", icon: "analytics" },
+};
+
+/* =========================================================
+ * CRISM Quickview Image Component
+ * Tries multiple URL patterns to find the quickview image
+ * =======================================================*/
+function CRISMQuickviewImage({ productId, instrument }: { productId: string; instrument: string }) {
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (instrument === "HIRISE") {
+      setImgSrc(`/hirise/quickview/${productId}.jpg`);
+      return;
+    }
+
+    // For CRISM, try multiple URL patterns
+    const obsId = productId.split("_")[0]; // e.g., frt00008a1e
+    const baseKey = productId.replace(/_if[0-9a-z]+_mtr3$/i, "").replace(/_br[a-z]+_mtr3$/i, ""); // e.g., frt00008a1e_07
+
+    const patterns = [
+      `/crism/quickview/${baseKey}.png`,                    // frt00008a1e_07.png
+      `/crism/quickview/${obsId}_VNIR.png`,                 // frt00008a1e_VNIR.png
+      `/crism/browse/${baseKey}_brvnaj_mtr3.png`,           // frt00008a1e_07_brvnaj_mtr3.png (browse dir)
+      `/crism/quickview/${baseKey}_brvnaj_mtr3.png`,        // frt00008a1e_07_brvnaj_mtr3.png (quickview dir)
+      `/crism/browse/${productId.replace(/_if[0-9a-z]+_mtr3$/i, "_brvnaj_mtr3.png")}`, // fallback browse
+    ];
+
+    // Try each pattern until one works
+    const tryPatterns = async () => {
+      for (const url of patterns) {
+        try {
+          const res = await fetch(url, { method: "HEAD" });
+          if (res.ok) {
+            setImgSrc(url);
+            setError(false);
+            return;
+          }
+        } catch {
+          continue;
+        }
+      }
+      // No pattern worked
+      setError(true);
+    };
+
+    tryPatterns();
+  }, [productId, instrument]);
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-32 bg-surface-dark text-slate-500 text-sm">
+        No quickview available
+      </div>
+    );
+  }
+
+  if (!imgSrc) {
+    return (
+      <div className="flex items-center justify-center h-32 bg-surface-dark text-slate-500">
+        <span className="material-symbols-outlined animate-spin">progress_activity</span>
+      </div>
+    );
+  }
+
+  return <img src={imgSrc} className="w-full" alt="Quickview" />;
+}
+
 /* =========================================================
  * Inspector Component
  * =======================================================*/
 export default function Inspector({
   selected,
   onClose,
-  isHighResActive = false,
-  onToggleHighRes,
+  activeOverlay,
+  onSetOverlay,
+  onSetOpacity,
   rgbWavelengths,
   onRGBChange,
   hasHighResData = true,
+  customDataset = null,
+  onCustomDatasetOpacity,
+  fieldNotes = [],
+  onOpenFieldNote,
 }: {
   selected: InspectorContext | null;
   onClose: () => void;
-  isHighResActive?: boolean;
-  onToggleHighRes?: () => void;
+  activeOverlay: ProductOverlay | null;
+  onSetOverlay: (type: OverlayType | null) => void;
+  onSetOpacity?: (opacity: number) => void;
   rgbWavelengths?: RGBWavelengths;
   onRGBChange?: (rgb: RGBWavelengths) => void;
-  hasHighResData?: boolean;  // Whether high-res data (.img/.tif) is available
+  hasHighResData?: boolean;
+  customDataset?: CustomDataset | null;
+  onCustomDatasetOpacity?: (id: string, opacity: number) => void;
+  fieldNotes?: FieldNote[];
+  onOpenFieldNote?: (productId: string, instrument: string, lat: number, lon: number) => void;
 }) {
+  const hasNote = useMemo(
+    () => selected ? fieldNotes.some(n => n.product_id === selected.productId) : false,
+    [fieldNotes, selected]
+  );
+  const noteCount = useMemo(
+    () => selected ? fieldNotes.filter(n => n.product_id === selected.productId).length : 0,
+    [fieldNotes, selected]
+  );
+
   const [hiriseTab, setHiriseTab] = useState<HiRISETabKey>("Metadata");
   const [crismTab, setCrismTab] = useState<CRISMTabKey>("Metadata");
   const [windowSize, setWindowSize] = useState(5);
   const [stats, setStats] = useState<WindowStats | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Panel width (resizable)
+  const [panelWidth, setPanelWidth] = useState(384);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      const delta = startX - ev.clientX;
+      const maxW = Math.floor(window.innerWidth * 0.6);
+      setPanelWidth(Math.max(280, Math.min(maxW, startW + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [panelWidth]);
 
   // CRISM spectrum state
   const [spectrumData, setSpectrumData] = useState<SpectrumData | null>(null);
@@ -83,6 +205,9 @@ export default function Inspector({
 
   // Local RGB state for sliders
   const [localRGB, setLocalRGB] = useState<RGBWavelengths>(rgbWavelengths || DEFAULT_RGB);
+
+  // Opacity slider expanded state
+  const [showOpacity, setShowOpacity] = useState(false);
 
   // Sync local state with props
   useEffect(() => {
@@ -211,6 +336,7 @@ export default function Inspector({
 
   const isHiRISE = selected.instrument === "HIRISE";
   const isCRISM = selected.instrument === "CRISM";
+  const isCustom = selected.instrument === "CUSTOM";
 
   const handleRGBSliderChange = (channel: "r" | "g" | "b", value: number) => {
     const newRGB = { ...localRGB, [channel]: value };
@@ -225,8 +351,23 @@ export default function Inspector({
   const hiriseTabs: HiRISETabKey[] = ["Metadata", "Pixel"];
   const crismTabs: CRISMTabKey[] = ["Metadata", "Spectrum", "Bands"];
 
+  // Available overlay types for this instrument
+  const availableOverlays: OverlayType[] = isCRISM
+    ? ["quickview", "highres", "browse_HYD", "browse_ICE", "browse_IC2", "score_ice", "score_hyd"]
+    : ["quickview", "highres"];
+
+  // Filter out highres if not available
+  const displayOverlays = availableOverlays.filter(
+    (type) => type !== "highres" || hasHighResData
+  );
+
   return (
-    <aside className="flex h-full w-96 flex-col border-l border-border-dark bg-surface-dark/40">
+    <aside className="relative flex h-full flex-col border-l border-border-dark bg-surface-dark/40" style={{ width: panelWidth }}>
+      {/* Resize handle (left edge) */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+        onMouseDown={handleResizeStart}
+      />
       {/* Tabs */}
       <div className="flex border-b border-border-dark">
         {isHiRISE &&
@@ -258,6 +399,14 @@ export default function Inspector({
               {t}
             </button>
           ))}
+
+        {isCustom && (
+          <button
+            className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest border-b-2 border-primary bg-primary/5 text-white"
+          >
+            Metadata
+          </button>
+        )}
 
         <button
           onClick={onClose}
@@ -298,40 +447,157 @@ export default function Inspector({
             rgb={localRGB}
             onChange={handleRGBSliderChange}
             onApply={handleApplyRGB}
-            isOverlayActive={isHighResActive}
+            isOverlayActive={activeOverlay?.type === "highres"}
           />
+        )}
+
+        {isCustom && customDataset && (
+          <CustomMetadataTab dataset={customDataset} />
         )}
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-border-dark bg-bg-dark p-4 space-y-2">
-        {onToggleHighRes && (
+      {/* Footer - Overlay Controls */}
+      <div className="border-t border-border-dark bg-bg-dark p-4 space-y-3">
+        {/* Custom dataset opacity control */}
+        {isCustom && customDataset && (
+          <div className="space-y-2">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              Overlay Opacity
+            </h4>
+            <div className="flex items-center gap-2 px-2 py-2 bg-[#0a0f18] rounded border border-[#232f48]">
+              <span className="text-[9px] text-[#6b7c9c] uppercase">Opacity</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={customDataset.opacity}
+                onChange={(e) => onCustomDatasetOpacity?.(customDataset.id, Number(e.target.value))}
+                className="flex-1 h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer
+                  [&::-webkit-slider-thumb]:appearance-none
+                  [&::-webkit-slider-thumb]:h-3
+                  [&::-webkit-slider-thumb]:w-3
+                  [&::-webkit-slider-thumb]:rounded-full
+                  [&::-webkit-slider-thumb]:bg-fuchsia-400
+                  [&::-webkit-slider-thumb]:cursor-pointer"
+              />
+              <span className="text-[10px] text-white font-mono w-8 text-right">
+                {customDataset.opacity}%
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Standard overlay controls for non-custom instruments */}
+        {!isCustom && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              Overlay
+            </h4>
+            {activeOverlay && (
+              <button
+                onClick={() => setShowOpacity(!showOpacity)}
+                className={`p-1 rounded transition-colors ${
+                  showOpacity ? "text-primary bg-primary/20" : "text-slate-500 hover:text-slate-300"
+                }`}
+                title="Adjust opacity"
+              >
+                <span className="material-symbols-outlined text-sm">opacity</span>
+              </button>
+            )}
+          </div>
+
+          {/* Overlay type buttons */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {displayOverlays.map((type) => {
+              const config = OVERLAY_CONFIG[type];
+              const isActive = activeOverlay?.type === type;
+              const isDisabled = type === "highres" && !hasHighResData;
+
+              return (
+                <button
+                  key={type}
+                  onClick={() => {
+                    if (isDisabled) return;
+                    onSetOverlay(isActive ? null : type);
+                  }}
+                  disabled={isDisabled}
+                  className={`flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                    isDisabled
+                      ? "bg-slate-800 text-slate-600 cursor-not-allowed"
+                      : isActive
+                      ? `bg-${config.color}-500/20 border border-${config.color}-500/50 text-${config.color}-400`
+                      : "bg-surface-dark border border-border-dark text-slate-400 hover:border-slate-500"
+                  }`}
+                  title={isDisabled ? "No high-res data available" : config.label}
+                >
+                  <span className="material-symbols-outlined text-xs">
+                    {isActive ? "check_circle" : config.icon}
+                  </span>
+                  {config.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Opacity slider */}
+          {activeOverlay && showOpacity && (
+            <div className="flex items-center gap-2 px-2 py-2 bg-[#0a0f18] rounded border border-[#232f48]">
+              <span className="text-[9px] text-[#6b7c9c] uppercase">Opacity</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={activeOverlay.opacity}
+                onChange={(e) => onSetOpacity?.(Number(e.target.value))}
+                className="flex-1 h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer
+                  [&::-webkit-slider-thumb]:appearance-none
+                  [&::-webkit-slider-thumb]:h-3
+                  [&::-webkit-slider-thumb]:w-3
+                  [&::-webkit-slider-thumb]:rounded-full
+                  [&::-webkit-slider-thumb]:bg-primary
+                  [&::-webkit-slider-thumb]:cursor-pointer"
+              />
+              <span className="text-[10px] text-white font-mono w-8 text-right">
+                {activeOverlay.opacity}%
+              </span>
+            </div>
+          )}
+
+          {/* Current overlay status */}
+          {activeOverlay && (
+            <div className="flex items-center justify-between px-2 py-1.5 bg-green-500/10 rounded border border-green-500/30">
+              <span className="text-[10px] text-green-400">
+                {OVERLAY_CONFIG[activeOverlay.type].label} overlay active
+              </span>
+              <button
+                onClick={() => onSetOverlay(null)}
+                className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+              >
+                Turn Off
+              </button>
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* Field Note button */}
+        {selected && onOpenFieldNote && (
           <button
-            onClick={hasHighResData ? onToggleHighRes : undefined}
-            disabled={!hasHighResData}
-            className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold uppercase tracking-widest transition-colors ${
-              !hasHighResData
-                ? "bg-slate-800 text-slate-600 cursor-not-allowed"
-                : isHighResActive
-                ? "bg-green-600 text-white hover:bg-green-700"
-                : "bg-surface-dark text-slate-300 hover:bg-surface-dark/80"
+            onClick={() => onOpenFieldNote(selected.productId, selected.instrument, selected.lat, selected.lon)}
+            className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold uppercase tracking-widest transition-all active:scale-[0.98] ${
+              hasNote
+                ? "bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30"
+                : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:text-amber-400 hover:border-amber-500/30"
             }`}
-            title={!hasHighResData ? "No high-res data available (browse only)" : undefined}
           >
             <span className="material-symbols-outlined text-sm">
-              {!hasHighResData ? "block" : isHighResActive ? "check_circle" : isCRISM ? "palette" : "hd"}
+              {hasNote ? "description" : "note_add"}
             </span>
-            {!hasHighResData
-              ? "No High-Res Data (Browse Only)"
-              : isHighResActive
-              ? isCRISM
-                ? "RGB Overlay Active"
-                : "High-Res Overlay Active"
-              : isCRISM
-              ? "Overlay RGB on Map"
-              : "Overlay High-Resolution on Map"}
+            {hasNote ? `Field Notes (${noteCount})` : "Add Field Note"}
           </button>
         )}
+
         <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all">
           <span className="material-symbols-outlined text-sm">ios_share</span>
           Export Statistics
@@ -754,17 +1020,7 @@ function MetadataTab({ selected }: { selected: InspectorContext }) {
           Quickview
         </h4>
         <div className="overflow-hidden rounded-lg border border-border-dark">
-          <img
-            src={
-              selected.instrument === "HIRISE"
-                ? `/hirise/quickview/${selected.productId}.jpg`
-                : selected.productId.includes("_brcarj_")
-                  ? `/crism/quickview/${selected.productId.split("_")[0]}_VNIR.png`
-                  : `/crism/quickview/${selected.productId.replace(/_if[0-9a-z]+_mtr3$/i, "_brvnaj_mtr3.png")}`
-            }
-            className="w-full"
-            alt="Quickview"
-          />
+          <CRISMQuickviewImage productId={selected.productId} instrument={selected.instrument} />
         </div>
       </div>
     </div>
@@ -927,6 +1183,87 @@ function Histogram({
         <span>{Math.round(binEdges[Math.floor(binEdges.length / 2)])}</span>
         <span>{Math.round(binEdges[Math.floor((binEdges.length * 3) / 4)])}</span>
         <span>{Math.round(binEdges[binEdges.length - 1])}</span>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+ * Custom Dataset Metadata Tab
+ * =======================================================*/
+function CustomMetadataTab({ dataset }: { dataset: CustomDataset }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="material-symbols-outlined text-fuchsia-400">upload_file</span>
+        <span className="text-sm font-bold">Custom Dataset</span>
+      </div>
+
+      <div className="rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 p-3">
+        <span className="text-[10px] uppercase text-fuchsia-400/70 block mb-1">Name</span>
+        <span className="text-sm text-white font-medium">{dataset.name}</span>
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-border-dark bg-bg-dark/60 p-4">
+        <div className="flex justify-between">
+          <span className="text-[10px] uppercase text-slate-500">Dataset ID</span>
+          <span className="font-mono text-xs">{dataset.id}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[10px] uppercase text-slate-500">CRS</span>
+          <span className="font-mono text-xs">{dataset.crs}</span>
+        </div>
+        {dataset.crs_warning && (
+          <div className="text-[10px] text-amber-400 bg-amber-500/10 rounded p-2 border border-amber-500/30">
+            {dataset.crs_warning}
+          </div>
+        )}
+        <div className="flex justify-between">
+          <span className="text-[10px] uppercase text-slate-500">Dimensions</span>
+          <span className="font-mono text-xs">{dataset.width} x {dataset.height}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[10px] uppercase text-slate-500">Bands</span>
+          <span className="font-mono text-xs">{dataset.bands}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[10px] uppercase text-slate-500">Data Type</span>
+          <span className="font-mono text-xs">{dataset.dtype}</span>
+        </div>
+        {dataset.nodata !== null && (
+          <div className="flex justify-between">
+            <span className="text-[10px] uppercase text-slate-500">NoData</span>
+            <span className="font-mono text-xs">{dataset.nodata}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-border-dark bg-bg-dark/60 p-4">
+        <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">
+          Geographic Bounds
+        </h4>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <span className="text-[9px] text-slate-500 block">West</span>
+            <span className="font-mono text-xs">{dataset.bounds.west.toFixed(4)}&deg;</span>
+          </div>
+          <div>
+            <span className="text-[9px] text-slate-500 block">East</span>
+            <span className="font-mono text-xs">{dataset.bounds.east.toFixed(4)}&deg;</span>
+          </div>
+          <div>
+            <span className="text-[9px] text-slate-500 block">South</span>
+            <span className="font-mono text-xs">{dataset.bounds.south.toFixed(4)}&deg;</span>
+          </div>
+          <div>
+            <span className="text-[9px] text-slate-500 block">North</span>
+            <span className="font-mono text-xs">{dataset.bounds.north.toFixed(4)}&deg;</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-[9px] text-slate-500">
+        Uploaded: {new Date(dataset.created_at).toLocaleString()}
       </div>
     </div>
   );

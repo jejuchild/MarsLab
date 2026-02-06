@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import type { VisibleProduct, BaseLayerType, BoundingBox, MapMode, ActiveOverlays, OverlayType, ProductOverlay, CustomDataset } from "../pages/MainPage";
 import { normalizeLonForMap, clampLatitude, parseCoordinate } from "../utils/coordinates";
+import type { FieldNote } from "../api/fieldnotes";
 
-type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM";
+type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
 
 /**
  * Extract CRISM observation ID from full product ID
@@ -194,21 +195,24 @@ interface LayerPanelProps {
   showSHARAD: boolean;
   showSharadHighres: boolean;
   showCTX: boolean;
+  showHiRISEDTM?: boolean;
   onToggleCRISM: (v: boolean) => void;
   onToggleHiRISE: (v: boolean) => void;
   onToggleSHARAD: (v: boolean) => void;
   onToggleSharadHighres: (v: boolean) => void;
   onToggleCTX: (v: boolean) => void;
+  onToggleHiRISEDTM?: (v: boolean) => void;
 
   // Explicit footprint loading
-  onLoadFootprints?: (instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX") => void;
-  footprintsLoading?: { crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean };
+  onLoadFootprints?: (instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM") => void;
+  footprintsLoading?: { crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean; hirise_dtm: boolean };
   footprintCounts?: {
     crism: { count: number; truncated: boolean; total: number } | null;
     hirise: { count: number; truncated: boolean; total: number } | null;
     sharad: { count: number; truncated: boolean; total: number } | null;
     sharad_highres: { count: number; truncated: boolean; total: number } | null;
     ctx: { count: number; truncated: boolean; total: number } | null;
+    hirise_dtm: { count: number; truncated: boolean; total: number } | null;
   };
 
   // Ice Score Filter
@@ -236,8 +240,8 @@ interface LayerPanelProps {
   onCustomDatasetToggle?: (id: string, visible: boolean) => void;
 
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "line" | null;
-  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "line" | null) => void;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null;
+  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null) => void;
 
   // Fly-To navigation
   onFlyToCoords?: (lat: number, lon: number) => void;
@@ -245,6 +249,11 @@ interface LayerPanelProps {
   // View bound selection mode
   viewBoundSelectionMode?: boolean;
   onViewBoundSelectionModeChange?: (active: boolean) => void;
+
+  // Field Notes
+  fieldNotes?: FieldNote[];
+  showFieldNotesOnMap?: boolean;
+  onToggleFieldNotesOnMap?: (v: boolean) => void;
 }
 
 // Fly-To Navigation Component
@@ -483,15 +492,17 @@ export default function LayerPanel({
   showSHARAD,
   showSharadHighres,
   showCTX,
+  showHiRISEDTM = false,
   onToggleCRISM,
   onToggleHiRISE,
   onToggleSHARAD,
   onToggleSharadHighres,
   onToggleCTX,
+  onToggleHiRISEDTM,
   // Explicit footprint loading
   onLoadFootprints,
-  footprintsLoading = { crism: false, hirise: false, sharad: false, sharad_highres: false, ctx: false },
-  footprintCounts = { crism: null, hirise: null, sharad: null, sharad_highres: null, ctx: null },
+  footprintsLoading = { crism: false, hirise: false, sharad: false, sharad_highres: false, ctx: false, hirise_dtm: false },
+  footprintCounts = { crism: null, hirise: null, sharad: null, sharad_highres: null, ctx: null, hirise_dtm: null },
   // Ice Score Filter
   iceScoreFilter,
   onIceScoreFilterChange,
@@ -520,6 +531,10 @@ export default function LayerPanel({
   // View bound selection mode
   viewBoundSelectionMode = false,
   onViewBoundSelectionModeChange,
+  // Field Notes
+  fieldNotes = [],
+  showFieldNotesOnMap = true,
+  onToggleFieldNotesOnMap,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -539,6 +554,30 @@ export default function LayerPanel({
       // Ignore localStorage errors
     }
   }, [isCollapsed]);
+
+  // Panel width (resizable)
+  const [panelWidth, setPanelWidth] = useState(320);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      const delta = ev.clientX - startX;
+      const maxW = Math.floor(window.innerWidth * 0.5);
+      setPanelWidth(Math.max(200, Math.min(maxW, startW + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [panelWidth]);
 
   // Count active overlays
   const totalActiveOverlays = activeOverlays.size;
@@ -601,7 +640,12 @@ export default function LayerPanel({
 
   // Expanded state - full panel
   return (
-    <div className="flex h-full w-80 flex-col border-r border-[#232f48] bg-[#101622] transition-all duration-300 ease-in-out">
+    <div className="relative flex h-full flex-col border-r border-[#232f48] bg-[#101622]" style={{ width: panelWidth }}>
+      {/* Resize handle (right edge) */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+        onMouseDown={handleResizeStart}
+      />
       {/* Header */}
       <div className="p-4 border-b border-[#232f48]">
         <div className="flex items-center justify-between mb-1">
@@ -959,6 +1003,47 @@ export default function LayerPanel({
                 )}
               </button>
             </div>
+
+            {/* HiRISE DTM Row */}
+            <div className="flex items-center gap-2">
+              <label
+                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors flex-1 ${
+                  showHiRISEDTM
+                    ? "bg-amber-700/20 border border-amber-700/50"
+                    : "bg-[#1a2333] border border-[#232f48] hover:border-amber-700/30"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={showHiRISEDTM}
+                  onChange={(e) => onToggleHiRISEDTM?.(e.target.checked)}
+                  className="rounded bg-[#0a0f18] border-[#232f48] text-amber-600 focus:ring-0 focus:ring-offset-0"
+                />
+                <span className="text-[11px] font-medium text-amber-600">HiRISE DTM</span>
+                {footprintCounts.hirise_dtm && (
+                  <span className="text-[9px] text-amber-600/70 ml-auto">
+                    {footprintCounts.hirise_dtm.count}{footprintCounts.hirise_dtm.truncated && `/${footprintCounts.hirise_dtm.total}`}
+                  </span>
+                )}
+              </label>
+              <button
+                onClick={() => onLoadFootprints?.("HIRISE_DTM")}
+                disabled={footprintsLoading.hirise_dtm}
+                className={`px-2 py-2 rounded text-[10px] font-medium transition-colors whitespace-nowrap ${
+                  footprintsLoading.hirise_dtm
+                    ? "bg-amber-700/10 text-amber-600/50 border border-amber-700/20 cursor-wait"
+                    : "bg-amber-700/20 text-amber-600 border border-amber-700/30 hover:bg-amber-700/30"
+                }`}
+              >
+                {footprintsLoading.hirise_dtm ? (
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                  </span>
+                ) : (
+                  "Load"
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1010,6 +1095,27 @@ export default function LayerPanel({
               )}
             </button>
 
+            {/* HiRISE DTM 3D View */}
+            <button
+              onClick={() => onAnalysisModeChange?.(analysisMode === "hirise_dtm_3d" ? null : "hirise_dtm_3d")}
+              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
+                analysisMode === "hirise_dtm_3d"
+                  ? "bg-amber-600/20 border border-amber-600/50 text-amber-600"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-amber-600/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">terrain</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">HiRISE DTM 3D View</span>
+                <p className="text-[9px] text-[#6b7c9c]">Click DTM footprint for 3D</p>
+              </div>
+              {analysisMode === "hirise_dtm_3d" && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-600/20 text-amber-600 border border-amber-600/30 font-bold uppercase">
+                  ON
+                </span>
+              )}
+            </button>
+
             {/* Line Profile */}
             <button
               onClick={() => onAnalysisModeChange?.(analysisMode === "line" ? null : "line")}
@@ -1042,6 +1148,16 @@ export default function LayerPanel({
           totalLoaded={visibleProducts.filter(p => p.instrument === "CRISM").length}
         />
 
+        {/* Field Notes Section */}
+        <FieldNotesSection
+          fieldNotes={fieldNotes}
+          showOnMap={showFieldNotesOnMap ?? true}
+          onToggleShowOnMap={onToggleFieldNotesOnMap}
+          onSelectProduct={onSelectProduct}
+          onFlyToCoords={onFlyToCoords}
+          visibleProducts={visibleProducts}
+        />
+
         {/* Displayed Products Section */}
         <DisplayedProductsSection
           visibleProducts={visibleProducts}
@@ -1066,6 +1182,141 @@ export default function LayerPanel({
   );
 }
 
+// Field Notes Section Component
+function FieldNotesSection({
+  fieldNotes,
+  showOnMap,
+  onToggleShowOnMap,
+  onSelectProduct,
+  onFlyToCoords,
+  visibleProducts,
+}: {
+  fieldNotes: FieldNote[];
+  showOnMap: boolean;
+  onToggleShowOnMap?: (v: boolean) => void;
+  onSelectProduct?: (product: VisibleProduct) => void;
+  onFlyToCoords?: (lat: number, lon: number) => void;
+  visibleProducts: VisibleProduct[];
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+
+  // All unique tags sorted
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    fieldNotes.forEach(n => n.tags.forEach(t => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [fieldNotes]);
+
+  // Filtered notes
+  const filtered = useMemo(
+    () => selectedTag ? fieldNotes.filter(n => n.tags.includes(selectedTag)) : fieldNotes,
+    [fieldNotes, selectedTag]
+  );
+
+  if (fieldNotes.length === 0) return null;
+
+  return (
+    <div className="p-4 border-b border-[#232f48]">
+      {/* Header */}
+      <div
+        className="flex items-center justify-between mb-2 cursor-pointer"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+          <span className="material-symbols-outlined text-xs">
+            {isCollapsed ? "expand_more" : "expand_less"}
+          </span>
+          Field Notes
+        </h3>
+        <span className="text-amber-400 text-[10px] font-mono">{fieldNotes.length}</span>
+      </div>
+
+      {!isCollapsed && (
+        <div className="space-y-3">
+          {/* Show on Map toggle */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showOnMap}
+              onChange={(e) => onToggleShowOnMap?.(e.target.checked)}
+              className="accent-amber-400 w-3 h-3"
+            />
+            <span className="text-[10px] text-[#92a4c9]">Show on Map</span>
+          </label>
+
+          {/* Tag filter pills */}
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto scrollbar-dark">
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                  className={`px-2 py-0.5 rounded-full text-[9px] border transition-colors ${
+                    selectedTag === tag
+                      ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
+                      : "bg-[#1a2333] text-[#92a4c9] border-[#232f48] hover:border-amber-500/30 hover:text-amber-400"
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Notes list */}
+          <div className="max-h-64 overflow-y-auto scrollbar-dark space-y-1">
+            {filtered.map(note => {
+              const instColors = INSTRUMENT_COLORS[note.instrument as InstrumentType] ?? INSTRUMENT_COLORS.CUSTOM;
+              return (
+                <button
+                  key={note.id}
+                  onClick={() => {
+                    // Fly to location
+                    if (onFlyToCoords && (note.lat || note.lon)) {
+                      onFlyToCoords(note.lat, note.lon);
+                    }
+                    // Select product if visible
+                    const vp = visibleProducts.find(p => p.productId === note.product_id);
+                    if (vp && onSelectProduct) {
+                      onSelectProduct(vp);
+                    }
+                  }}
+                  className="w-full text-left p-2 rounded bg-[#0a0f18] border border-[#232f48] hover:border-amber-500/30 transition-colors space-y-1"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${instColors.bg} ${instColors.text} border ${instColors.border}`}>
+                      {note.instrument}
+                    </span>
+                    <span className="text-[10px] text-white font-mono truncate flex-1">
+                      {note.product_id}
+                    </span>
+                  </div>
+                  {note.memo && (
+                    <p className="text-[9px] text-[#6b7c9c] truncate">{note.memo}</p>
+                  )}
+                  {note.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {note.tags.map(tag => (
+                        <span
+                          key={tag}
+                          className="px-1.5 py-0.5 rounded-full text-[8px] bg-amber-500/10 text-amber-400/70 border border-amber-500/20"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Instrument colors for badges
 const INSTRUMENT_COLORS: Record<InstrumentType, { bg: string; text: string; border: string }> = {
   CRISM: { bg: "bg-cyan-500/20", text: "text-cyan-400", border: "border-cyan-500/30" },
@@ -1074,6 +1325,7 @@ const INSTRUMENT_COLORS: Record<InstrumentType, { bg: string; text: string; bord
   SHARAD_HIGHRES: { bg: "bg-orange-500/20", text: "text-orange-400", border: "border-orange-500/30" },
   CTX: { bg: "bg-pink-500/20", text: "text-pink-400", border: "border-pink-500/30" },
   CUSTOM: { bg: "bg-fuchsia-500/20", text: "text-fuchsia-400", border: "border-fuchsia-500/30" },
+  HIRISE_DTM: { bg: "bg-amber-700/20", text: "text-amber-600", border: "border-amber-700/30" },
 };
 
 // Displayed Products Section Component
@@ -1103,6 +1355,7 @@ function DisplayedProductsSection({
       SHARAD_HIGHRES: [],
       CTX: [],
       CUSTOM: [],
+      HIRISE_DTM: [],
     };
     for (const product of visibleProducts) {
       if (product.instrument in groups) {
@@ -1294,6 +1547,7 @@ function ActiveProductsSection({
       SHARAD_HIGHRES: [],
       CTX: [],
       CUSTOM: [],
+      HIRISE_DTM: [],
     };
     for (const product of activeProducts) {
       if (product.instrument in groups) {

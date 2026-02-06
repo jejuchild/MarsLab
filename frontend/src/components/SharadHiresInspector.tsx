@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import Subsurface3DViewer from "./Subsurface3DViewer";
+import type { FieldNote } from "../api/fieldnotes";
 
 /* =========================================================
  * Types
@@ -10,6 +11,10 @@ type Metadata = {
   range_bins: number;
   lat_range: [number, number];
   lon_range: [number, number];
+  start_lat: number;
+  start_lon: number;
+  stop_lat: number;
+  stop_lon: number;
   alt_range_km: [number, number];
   display: { recommended_downsample: number };
 };
@@ -65,10 +70,19 @@ const BIN_DT_SEC = 0.0375e-6;    // seconds per range bin
 export default function SharadHiresInspector({
   productId,
   onClose,
+  fieldNotes = [],
+  onOpenFieldNote,
 }: {
   productId: string;
   onClose: () => void;
+  fieldNotes?: FieldNote[];
+  onOpenFieldNote?: (productId: string) => void;
 }) {
+  const hasNote = useMemo(
+    () => fieldNotes.some(n => n.product_id === productId),
+    [fieldNotes, productId]
+  );
+
   // Data state
   const [metadata, setMetadata] = useState<Metadata | null>(null);
   const [radargram, setRadargram] = useState<HTMLImageElement | null>(null);
@@ -1069,6 +1083,22 @@ export default function SharadHiresInspector({
           <span className="material-symbols-outlined text-amber-400 text-base">radar</span>
         )}
         <div className={`flex items-center gap-1 ${collapsed ? "flex-col" : ""}`}>
+          {/* Field Note */}
+          {onOpenFieldNote && (
+            <button
+              onClick={() => onOpenFieldNote(productId)}
+              className={`p-1 transition-colors ${
+                hasNote
+                  ? "text-amber-400 hover:text-amber-300"
+                  : "text-slate-500 hover:text-amber-400"
+              }`}
+              title={hasNote ? "Edit field note" : "Add field note"}
+            >
+              <span className="material-symbols-outlined text-sm">
+                {hasNote ? "description" : "note_add"}
+              </span>
+            </button>
+          )}
           {/* Collapse / Expand toggle */}
           <button
             onClick={() => setCollapsed(c => !c)}
@@ -1464,8 +1494,10 @@ export default function SharadHiresInspector({
             <Section title="Dataset Info">
               <InfoRow label="Traces" value={metadata.rows.toLocaleString()} />
               <InfoRow label="Range bins" value={String(metadata.range_bins)} />
-              <InfoRow label="Lat range" value={`${metadata.lat_range[0].toFixed(1)}° – ${metadata.lat_range[1].toFixed(1)}°`} />
-              <InfoRow label="Lon range" value={`${metadata.lon_range[0].toFixed(1)}° – ${metadata.lon_range[1].toFixed(1)}°`} />
+              <InfoRow label="Start Lon" value={`${metadata.start_lon.toFixed(4)}°`} />
+              <InfoRow label="Start Lat" value={`${metadata.start_lat.toFixed(4)}°`} />
+              <InfoRow label="Stop Lon" value={`${metadata.stop_lon.toFixed(4)}°`} />
+              <InfoRow label="Stop Lat" value={`${metadata.stop_lat.toFixed(4)}°`} />
               <InfoRow label="Alt range" value={`${metadata.alt_range_km[0].toFixed(0)} – ${metadata.alt_range_km[1].toFixed(0)} km`} />
               <InfoRow label="Downsample" value={`${DOWNSAMPLE}×`} />
             </Section>

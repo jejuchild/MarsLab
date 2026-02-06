@@ -11,7 +11,7 @@ import { normalizeLonForMap } from "../utils/coordinates";
  * ==================================================*/
 type LatLon = { lat: number; lon: number };
 
-export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM";
+export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
 
 export type InspectorContext = {
   instrument: InstrumentType;
@@ -59,7 +59,7 @@ type SHARADPopup = {
 } | null;
 
 // Explicit loading applies to all instruments
-type ExplicitLoadInstrument = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX";
+type ExplicitLoadInstrument = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM";
 
 // Footprint load result for UI feedback
 type FootprintLoadResult = {
@@ -79,8 +79,10 @@ type MapViewProps = {
   showSHARAD: boolean;
   showSharadHighres: boolean;
   showCTX: boolean;
+  showHiRISEDTM?: boolean;
   onSharadClick?: (popup: SHARADPopup) => void;
   onSharadHiresClick?: (productId: string) => void;
+  onHiRiseDTMClick?: (productId: string, lat: number, lon: number) => void;
   onToggleOverlay?: (productId: string, type: "quickview" | null) => void;
   quickviewOverlays?: string[];
   highResOverlays?: string[];
@@ -116,11 +118,13 @@ type MapViewProps = {
     opacity: number;
   }>;
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "line" | null;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null;
   linePoints?: Array<{ lat: number; lon: number }>;
   // View bound selection mode (drag to select rectangle)
   viewBoundSelectionMode?: boolean;
   onViewBoundSelected?: (bounds: BoundingBox) => void;
+  // Field Notes – product IDs that have notes (show gold indicators)
+  notedProductIds?: Set<string>;
 };
 
 /* ==================================================
@@ -242,10 +246,47 @@ async function loadCRISMLBL(id: string): Promise<string | null> {
   return null;
 }
 
+// Cache for HiRISE DTM index
+let hiriseDTMIndexCache: any = null;
+
 // Get cached bounds or parse from LBL
 async function getProductBounds(productId: string): Promise<ProductBounds | null> {
   if (boundsCache.has(productId)) {
     return boundsCache.get(productId)!;
+  }
+
+  // Check for HiRISE DTM products (start with DTEEC_ or DTE_)
+  const isHiRISEDTM = productId.startsWith("DTEEC_") || productId.startsWith("DTE_");
+
+  if (isHiRISEDTM) {
+    // Load bounds from HiRISE DTM index
+    if (!hiriseDTMIndexCache) {
+      try {
+        const res = await fetch("/hirise_dtm_index.geojson");
+        if (res.ok) {
+          hiriseDTMIndexCache = await res.json();
+        }
+      } catch {
+        return null;
+      }
+    }
+
+    if (hiriseDTMIndexCache?.features) {
+      for (const feature of hiriseDTMIndexCache.features) {
+        if (feature.properties?.product_id === productId) {
+          const props = feature.properties;
+          const bounds: ProductBounds = {
+            west: props.west,
+            east: props.east,
+            south: props.south,
+            north: props.north,
+          };
+          boundsCache.set(productId, bounds);
+          return bounds;
+        }
+      }
+    }
+    return null;
   }
 
   const isHiRISE = productId.startsWith("ESP_");
@@ -353,8 +394,10 @@ export default function MapView({
   showSHARAD,
   showSharadHighres,
   showCTX,
+  showHiRISEDTM = false,
   onSharadClick,
   onSharadHiresClick,
+  onHiRiseDTMClick,
   onToggleOverlay,
   quickviewOverlays = [],
   highResOverlays = [],
@@ -382,6 +425,7 @@ export default function MapView({
   linePoints = [],
   viewBoundSelectionMode = false,
   onViewBoundSelected,
+  notedProductIds,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -423,6 +467,7 @@ export default function MapView({
   const highResOverlaysRef = useRef<string[]>(highResOverlays);
   const onSharadClickRef = useRef(onSharadClick);
   const onSharadHiresClickRef = useRef(onSharadHiresClick);
+  const onHiRiseDTMClickRef = useRef(onHiRiseDTMClick);
   const onToggleOverlayRef = useRef(onToggleOverlay);
   const onTerrainClickRef = useRef(onTerrainClick);
   const onFootprintsLoadedRef = useRef(onFootprintsLoaded);
@@ -444,6 +489,10 @@ export default function MapView({
   useEffect(() => {
     onSharadHiresClickRef.current = onSharadHiresClick;
   }, [onSharadHiresClick]);
+
+  useEffect(() => {
+    onHiRiseDTMClickRef.current = onHiRiseDTMClick;
+  }, [onHiRiseDTMClick]);
 
   useEffect(() => {
     onToggleOverlayRef.current = onToggleOverlay;
@@ -920,6 +969,21 @@ export default function MapView({
           return;
         }
 
+        // Handle HIRISE_DTM - open 3D viewer and fly to footprint
+        if (instrument === "HIRISE_DTM") {
+          onHiRiseDTMClickRef.current?.(productId, clickLat, clickLon);
+
+          // Fly to footprint bounds so the DTM area is visible
+          const rectEnt = viewer.entities.getById(`HIRISE_DTM_FP_${productId}`);
+          if (rectEnt?.rectangle?.coordinates) {
+            const rect = rectEnt.rectangle.coordinates.getValue(
+              Cesium.JulianDate.now()
+            ) as Cesium.Rectangle;
+            viewer.camera.flyTo({ destination: paddedRectangle(rect, 0.5), duration: 0.6 });
+          }
+          return;
+        }
+
         // Handle SHARAD separately - show popup instead of Inspector
         if (instrument === "SHARAD") {
           const startLat = p?.start_lat?.getValue?.() ?? 0;
@@ -1248,6 +1312,13 @@ export default function MapView({
     }
     viewerRef.current?.scene.requestRender();
   }, [showCTX]);
+
+  useEffect(() => {
+    if (footprintManagerRef.current) {
+      footprintManagerRef.current.setVisible("HIRISE_DTM", showHiRISEDTM);
+    }
+    viewerRef.current?.scene.requestRender();
+  }, [showHiRISEDTM]);
 
   // Note: Legacy footprint overlay hiding is no longer needed since
   // footprints are now managed by FootprintManager (viewport-based loading)
@@ -1712,7 +1783,7 @@ export default function MapView({
       needsRender = true;
     }
 
-    // Create CRISM/HiRISE image overlays (async)
+    // Create CRISM/HiRISE/HiRISE DTM image overlays (async)
     if (imageToCreate.length > 0) {
       // Pre-fetch bounds in parallel for faster creation
       Promise.all(imageToCreate.map(async (productId) => {
@@ -1721,19 +1792,27 @@ export default function MapView({
           if (!bounds || !viewerRef.current) return null;
 
           const isHiRISE = productId.startsWith("ESP_");
+          const isHiRISEDTM = productId.startsWith("DTEEC_") || productId.startsWith("DTE_");
 
           // Derive quickview URL
           let imageUrl: string;
-          if (isHiRISE) {
+          let instrument: "HIRISE" | "CRISM" | "HIRISE_DTM" = "CRISM";
+
+          if (isHiRISEDTM) {
+            imageUrl = `/hirise_dtm/overlay/${productId}.png`;
+            instrument = "HIRISE_DTM";
+          } else if (isHiRISE) {
             imageUrl = `/hirise/quickview/${productId}.png`;
+            instrument = "HIRISE";
           } else if (productId.includes("_brcarj_")) {
             const baseObsId = productId.split("_")[0];
             imageUrl = `/crism/quickview/${baseObsId}_VNIR.png`;
           } else {
-            imageUrl = `/crism/quickview/${productId.replace(/_if[0-9a-z]+_mtr3$/i, "_brvnaj_mtr3")}.png`;
+            // Browse files are in /crism/browse/
+            imageUrl = `/crism/browse/${productId.replace(/_if[0-9a-z]+_mtr3$/i, "_brvnaj_mtr3")}.png`;
           }
 
-          return { productId, bounds, imageUrl, isHiRISE };
+          return { productId, bounds, imageUrl, instrument };
         } catch {
           return null;
         }
@@ -1746,7 +1825,7 @@ export default function MapView({
 
         for (const result of results) {
           if (!result) continue;
-          const { productId, bounds, imageUrl, isHiRISE } = result;
+          const { productId, bounds, imageUrl, instrument } = result;
 
           v.entities.add({
             id: `QUICKVIEW_OVERLAY_${productId}`,
@@ -1761,7 +1840,7 @@ export default function MapView({
             },
             properties: {
               product_id: productId,
-              instrument: isHiRISE ? "HIRISE" : "CRISM",
+              instrument: instrument,
               kind: "OVERLAY",
             },
           });
@@ -2514,6 +2593,82 @@ export default function MapView({
 
     viewer.scene.requestRender();
   }, [showCustomData, customDatasets]);
+
+  // ──────────── Field Note indicators ────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const PREFIX = "NOTE_IND_";
+
+    // Remove existing note indicators
+    const toRemove: Cesium.Entity[] = [];
+    for (let i = 0; i < viewer.entities.values.length; i++) {
+      const ent = viewer.entities.values[i];
+      if (ent.id.startsWith(PREFIX)) toRemove.push(ent);
+    }
+    for (const ent of toRemove) viewer.entities.remove(ent);
+
+    if (!notedProductIds || notedProductIds.size === 0) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    // For each noted product, find its footprint entity and place a gold star at centroid
+    for (const pid of notedProductIds) {
+      // Try different entity ID patterns used by FootprintManager
+      const prefixes = ["CRISM_FP_", "HIRISE_FP_", "SHARAD_FP_", "SHARAD_HIGHRES_FP_", "CTX_FP_", "CUSTOM_FP_", "HIRISE_DTM_FP_",
+                        "CRISM_VP_", "HIRISE_VP_", "SHARAD_VP_", "SHARAD_HIGHRES_VP_", "CTX_VP_", "CUSTOM_VP_", "HIRISE_DTM_VP_"];
+      let lat: number | null = null;
+      let lon: number | null = null;
+
+      for (const pfx of prefixes) {
+        const ent = viewer.entities.getById(`${pfx}${pid}`);
+        if (ent?.rectangle?.coordinates) {
+          const rect = ent.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle | undefined;
+          if (rect) {
+            lat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
+            lon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
+            break;
+          }
+        }
+        // For polyline entities (SHARAD), try position property
+        if (ent?.position) {
+          const pos = ent.position.getValue(Cesium.JulianDate.now());
+          if (pos) {
+            const carto = Cesium.Cartographic.fromCartesian(pos);
+            lat = Cesium.Math.toDegrees(carto.latitude);
+            lon = Cesium.Math.toDegrees(carto.longitude);
+            break;
+          }
+        }
+      }
+
+      if (lat === null || lon === null) continue;
+
+      viewer.entities.add({
+        id: `${PREFIX}${pid}`,
+        position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+        point: {
+          pixelSize: 8,
+          color: Cesium.Color.GOLD,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 1,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text: "\u2605", // star character
+          font: "14px sans-serif",
+          fillColor: Cesium.Color.GOLD,
+          style: Cesium.LabelStyle.FILL,
+          pixelOffset: new Cesium.Cartesian2(0, -12),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    }
+
+    viewer.scene.requestRender();
+  }, [notedProductIds]);
 
   return (
     <>

@@ -355,6 +355,10 @@ async def get_metadata(
             "sample_interval_us": SHARAD_SAMPLE_INTERVAL_US,
             "lat_range": [float(geom["lat"].min()), float(geom["lat"].max())],
             "lon_range": [float(lons180.min()), float(lons180.max())],
+            "start_lat": float(geom["lat"][0]),
+            "start_lon": float(lons180[0]),
+            "stop_lat": float(geom["lat"][-1]),
+            "stop_lon": float(lons180[-1]),
             "alt_range_km": [float(geom["alt"].min()), float(geom["alt"].max())],
             "display": {
                 "recommended_log": True,

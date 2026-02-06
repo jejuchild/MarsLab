@@ -56,6 +56,7 @@ app.mount(
 HIRISE_DATA_DIR = os.path.join(BASE_DIR, "hirise_data")
 CRISM_DATA_DIR = os.path.join(BASE_DIR, "crism_data")
 SHARAD_DATA_DIR = os.path.join(BASE_DIR, "sharad_data")
+HIRISE_DTM_DIR = os.path.join(BASE_DIR, "hirise_dtm_data")
 TILE_SIZE = 256
 MAX_ZOOM = 8
 
@@ -273,11 +274,15 @@ from api.crism.router import router as crism_router
 from api.search_router import router as search_router
 from api.footprints_router import router as footprints_router
 from api.custom_router import router as custom_router
+from api.point_search import router as point_search_router
+from api.ai_search import router as ai_search_router
 
 app.include_router(crism_router, prefix="/crism")
 app.include_router(search_router)  # Mounts at /api/*
 app.include_router(footprints_router)  # Viewport-based footprint API
 app.include_router(custom_router)  # Custom user data upload
+app.include_router(point_search_router)  # Point-based coordinate search
+app.include_router(ai_search_router)  # AI-assisted natural language search
 
 app.mount(
     "/hirise_lbl",
@@ -289,6 +294,7 @@ from api.hirise_pixel import router as hirise_pixel_router
 from api.terrain_router import router as terrain_router
 from api.sharad_highres_router import router as sharad_highres_router
 from api.suggestions_router import router as suggestions_router
+from api.fieldnotes_router import router as fieldnotes_router
 
 app.include_router(
     hirise_pixel_router,
@@ -298,6 +304,7 @@ app.include_router(
 app.include_router(terrain_router)  # /terrain/slope_stats
 app.include_router(sharad_highres_router)  # /api/sharad_highres/*
 app.include_router(suggestions_router)  # /api/feature_suggestions
+app.include_router(fieldnotes_router)  # /api/fieldnotes
 
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
@@ -446,6 +453,206 @@ app.mount(
     StaticFiles(directory=os.path.join(BASE_DIR, "sharad_highres")),
     name="sharad_highres",
 )
+
+# ======================================================
+# HiRISE DTM endpoints
+# ======================================================
+@app.get("/hirise_dtm_index.geojson")
+def get_hirise_dtm_index():
+    """Serve HiRISE DTM index.geojson."""
+    path = os.path.join(HIRISE_DTM_DIR, "index.geojson")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="HiRISE DTM index.geojson not found")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return JSONResponse(content=data)
+
+
+# HiRISE DTM overlay cache
+HIRISE_DTM_OVERLAY_CACHE_DIR = os.path.join(OVERLAY_CACHE_DIR, "hirise_dtm")
+os.makedirs(HIRISE_DTM_OVERLAY_CACHE_DIR, exist_ok=True)
+
+
+@app.get("/hirise_dtm/overlay/{product_id}.png")
+def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
+    """
+    Serve HiRISE DTM orthoimage as overlay PNG with transparent background.
+    Reads the JP2 orthoimage and generates a transparent PNG.
+    """
+    from pyproj import CRS, Transformer
+
+    # Check cache first
+    cache_file = os.path.join(HIRISE_DTM_OVERLAY_CACHE_DIR, f"{product_id}_{max_size}.png")
+    if os.path.exists(cache_file):
+        with open(cache_file, "rb") as f:
+            return Response(f.read(), media_type="image/png")
+
+    # Find matching orthoimage
+    index_path = os.path.join(HIRISE_DTM_DIR, "index.geojson")
+    if not os.path.exists(index_path):
+        raise HTTPException(status_code=404, detail="HiRISE DTM index not found")
+
+    with open(index_path, "r", encoding="utf-8") as f:
+        index = json.load(f)
+
+    ortho_file = None
+    for feature in index.get("features", []):
+        props = feature.get("properties", {})
+        if props.get("product_id") == product_id:
+            ortho_file = props.get("ortho_file")
+            break
+
+    if not ortho_file:
+        raise HTTPException(status_code=404, detail=f"Orthoimage not found for: {product_id}")
+
+    ortho_path = os.path.join(HIRISE_DTM_DIR, ortho_file)
+    if not os.path.exists(ortho_path):
+        raise HTTPException(status_code=404, detail=f"Orthoimage file not found: {ortho_file}")
+
+    try:
+        ds = rasterio.open(ortho_path)
+
+        # Calculate downsampling factor
+        scale = max(ds.width, ds.height) / max_size
+        if scale < 1:
+            scale = 1
+
+        out_width = int(ds.width / scale)
+        out_height = int(ds.height / scale)
+
+        # Read with resampling
+        data = ds.read(
+            1,
+            out_shape=(out_height, out_width),
+            resampling=Resampling.bilinear
+        )
+        ds.close()
+
+        # Normalize to 0-255 (adjust based on data range)
+        p2, p98 = np.percentile(data[data > 0], [2, 98]) if np.any(data > 0) else (0, 255)
+        if p98 > p2:
+            data_norm = np.clip((data - p2) / (p98 - p2) * 255, 0, 255).astype(np.uint8)
+        else:
+            data_norm = np.clip(data, 0, 255).astype(np.uint8)
+
+        # Create RGBA image with transparency for black pixels
+        rgba = np.zeros((out_height, out_width, 4), dtype=np.uint8)
+        rgba[:, :, 0] = data_norm  # R
+        rgba[:, :, 1] = data_norm  # G
+        rgba[:, :, 2] = data_norm  # B
+        # Alpha: 255 for non-zero pixels, 0 for black
+        rgba[:, :, 3] = np.where(data_norm > 5, 255, 0)
+
+        # Encode as PNG
+        ok, png = cv2.imencode(".png", cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA))
+        if not ok:
+            raise HTTPException(status_code=500, detail="Failed to encode PNG")
+
+        png_bytes = png.tobytes()
+
+        # Save to cache
+        with open(cache_file, "wb") as f:
+            f.write(png_bytes)
+
+        return Response(png_bytes, media_type="image/png")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/hirise_dtm/elevation/{product_id}")
+def get_hirise_dtm_elevation(
+    product_id: str,
+    lat: float,
+    lon: float,
+    radius: float = 0.01
+):
+    """
+    Get elevation data from HiRISE DTM at a specific location.
+    Returns elevation value and statistics within radius.
+    """
+    from pyproj import CRS, Transformer
+
+    # Find DTM file
+    index_path = os.path.join(HIRISE_DTM_DIR, "index.geojson")
+    if not os.path.exists(index_path):
+        raise HTTPException(status_code=404, detail="HiRISE DTM index not found")
+
+    with open(index_path, "r", encoding="utf-8") as f:
+        index = json.load(f)
+
+    dtm_file = None
+    for feature in index.get("features", []):
+        props = feature.get("properties", {})
+        if props.get("product_id") == product_id:
+            dtm_file = props.get("dtm_file")
+            break
+
+    if not dtm_file:
+        raise HTTPException(status_code=404, detail=f"DTM not found for: {product_id}")
+
+    dtm_path = os.path.join(HIRISE_DTM_DIR, dtm_file)
+    if not os.path.exists(dtm_path):
+        raise HTTPException(status_code=404, detail=f"DTM file not found: {dtm_file}")
+
+    try:
+        ds = rasterio.open(dtm_path)
+
+        # Transform lat/lon to DTM CRS
+        mars_lonlat = CRS.from_proj4("+proj=longlat +a=3396190 +b=3376200 +no_defs")
+        transformer = Transformer.from_crs(mars_lonlat, ds.crs.to_wkt(), always_xy=True)
+
+        x, y = transformer.transform(lon, lat)
+
+        # Get pixel coordinates
+        row, col = ds.index(x, y)
+
+        # Check bounds
+        if row < 0 or row >= ds.height or col < 0 or col >= ds.width:
+            ds.close()
+            raise HTTPException(status_code=400, detail="Location outside DTM bounds")
+
+        # Read single value
+        elevation = ds.read(1, window=rasterio.windows.Window(col, row, 1, 1))[0, 0]
+
+        # Read a small patch for stats
+        patch_size = 50
+        row_start = max(0, row - patch_size // 2)
+        col_start = max(0, col - patch_size // 2)
+        row_end = min(ds.height, row + patch_size // 2)
+        col_end = min(ds.width, col + patch_size // 2)
+
+        patch = ds.read(1, window=rasterio.windows.Window(
+            col_start, row_start,
+            col_end - col_start, row_end - row_start
+        ))
+
+        # Filter out nodata
+        nodata = ds.nodata
+        if nodata is not None:
+            valid = patch[patch != nodata]
+        else:
+            valid = patch[np.isfinite(patch)]
+
+        ds.close()
+
+        return JSONResponse(content={
+            "product_id": product_id,
+            "lat": lat,
+            "lon": lon,
+            "elevation_m": float(elevation) if np.isfinite(elevation) else None,
+            "patch_stats": {
+                "min_m": float(np.min(valid)) if len(valid) > 0 else None,
+                "max_m": float(np.max(valid)) if len(valid) > 0 else None,
+                "mean_m": float(np.mean(valid)) if len(valid) > 0 else None,
+                "std_m": float(np.std(valid)) if len(valid) > 0 else None,
+            }
+        })
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ======================================================
 # Ice/Hydration Score Filtering API

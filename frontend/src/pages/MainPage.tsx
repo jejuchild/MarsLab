@@ -4,6 +4,8 @@ import Inspector from "../components/Inspector";
 import type { InspectorContext, RGBWavelengths } from "../components/Inspector";
 import SlopeAnalysis from "../components/SlopeAnalysis";
 import Slope3DViewer from "../components/Slope3DViewer";
+import HiRiseDTM3DViewer from "../components/HiRiseDTM3DViewer";
+import type { HiRiseDTMPoint } from "../components/HiRiseDTM3DViewer";
 import type { TerrainPoint } from "../components/SlopeAnalysis";
 import LineProfile from "../components/LineProfile";
 import type { ProfilePoint } from "../components/LineProfile";
@@ -11,6 +13,9 @@ import TopBar from "../components/TopBar";
 import LayerPanel from "../components/LayerPanel";
 import type { IceScoreFilter } from "../components/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
+import FieldNoteModal from "../components/FieldNoteModal";
+import { listFieldNotes } from "../api/fieldnotes";
+import type { FieldNote } from "../api/fieldnotes";
 import AppShell from "../components/layout/AppShell";
 
 // Default CRISM wavelengths (in micrometers)
@@ -22,7 +27,7 @@ const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
 
 export type VisibleProduct = {
   productId: string;
-  instrument: "HIRISE" | "CRISM" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM";
+  instrument: "HIRISE" | "CRISM" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
   title?: string;  // HiRISE observation title (e.g., "Gullies in Arcadia Region")
 };
 
@@ -120,12 +125,15 @@ export default function MainPage() {
   // Terrain click point for slope analysis (when clicking empty terrain)
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
-  // Analysis mode: mutually exclusive slope / slope3d / line-profile
-  type AnalysisMode = "slope" | "slope3d" | "line" | null;
+  // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line-profile
+  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Slope 3D analysis point (separate from regular slope terrainPoint)
   const [slope3DPoint, setSlope3DPoint] = useState<TerrainPoint | null>(null);
+
+  // HiRISE DTM 3D analysis point (requires product_id + lat/lon)
+  const [hiRiseDTM3DPoint, setHiRiseDTM3DPoint] = useState<HiRiseDTMPoint | null>(null);
 
   // Line profile state: two endpoints
   const [linePoints, setLinePoints] = useState<ProfilePoint[]>([]);
@@ -149,16 +157,18 @@ export default function MainPage() {
   const [showSHARAD, setShowSHARAD] = useState(false);
   const [showCTX, setShowCTX] = useState(false);
   const [showSharadHighres, setShowSharadHighres] = useState(false);
+  const [showHiRISEDTM, setShowHiRISEDTM] = useState(false);
 
   // Explicit footprint loading state
-  type FootprintLoadTrigger = { instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX"; timestamp: number } | null;
+  type FootprintLoadTrigger = { instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM"; timestamp: number } | null;
   const [loadFootprintsTrigger, setLoadFootprintsTrigger] = useState<FootprintLoadTrigger>(null);
-  const [footprintsLoading, setFootprintsLoading] = useState<{ crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean }>({
+  const [footprintsLoading, setFootprintsLoading] = useState<{ crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean; hirise_dtm: boolean }>({
     crism: false,
     hirise: false,
     sharad: false,
     sharad_highres: false,
     ctx: false,
+    hirise_dtm: false,
   });
   const [footprintCounts, setFootprintCounts] = useState<{
     crism: { count: number; truncated: boolean; total: number } | null;
@@ -166,7 +176,8 @@ export default function MainPage() {
     sharad: { count: number; truncated: boolean; total: number } | null;
     sharad_highres: { count: number; truncated: boolean; total: number } | null;
     ctx: { count: number; truncated: boolean; total: number } | null;
-  }>({ crism: null, hirise: null, sharad: null, sharad_highres: null, ctx: null });
+    hirise_dtm: { count: number; truncated: boolean; total: number } | null;
+  }>({ crism: null, hirise: null, sharad: null, sharad_highres: null, ctx: null, hirise_dtm: null });
 
   // Visible products in current map view
   const [visibleProducts, setVisibleProducts] = useState<VisibleProduct[]>([]);
@@ -207,6 +218,18 @@ export default function MainPage() {
   // Filtered product IDs from API (null when not filtering, Set when filtering)
   const [filteredProductIds, setFilteredProductIds] = useState<Set<string> | null>(null);
 
+  // Field Notes state
+  const [fieldNotes, setFieldNotes] = useState<FieldNote[]>([]);
+  const [showFieldNoteModal, setShowFieldNoteModal] = useState<{
+    productId: string; instrument: string; lat: number; lon: number;
+  } | null>(null);
+  const [showFieldNotesOnMap, setShowFieldNotesOnMap] = useState(true);
+
+  const notedProductIds = useMemo(
+    () => new Set(fieldNotes.map(n => n.product_id)),
+    [fieldNotes]
+  );
+
   // Default opacity for new overlays
   const DEFAULT_OPACITY = 80;
 
@@ -216,17 +239,18 @@ export default function MainPage() {
   }, []);
 
   // Explicit footprint loading handlers
-  const handleLoadFootprints = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX") => {
+  const handleLoadFootprints = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM") => {
     // Auto-enable visibility when loading
     if (instrument === "CRISM") setShowCRISM(true);
     else if (instrument === "HIRISE") setShowHiRISE(true);
     else if (instrument === "SHARAD") setShowSHARAD(true);
     else if (instrument === "SHARAD_HIGHRES") setShowSharadHighres(true);
     else if (instrument === "CTX") setShowCTX(true);
+    else if (instrument === "HIRISE_DTM") setShowHiRISEDTM(true);
     setLoadFootprintsTrigger({ instrument, timestamp: Date.now() });
   }, []);
 
-  const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX", loading: boolean) => {
+  const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM", loading: boolean) => {
     setFootprintsLoading((prev) => ({
       ...prev,
       [instrument.toLowerCase()]: loading,
@@ -234,7 +258,7 @@ export default function MainPage() {
   }, []);
 
   const handleFootprintsLoaded = useCallback((result: {
-    instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX";
+    instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM";
     count: number;
     truncated: boolean;
     total: number;
@@ -338,6 +362,27 @@ export default function MainPage() {
     setSharadHiresProductId(productId);
     setSelected(null); // Close regular Inspector
   }, []);
+
+  // Field Notes handlers
+  useEffect(() => {
+    listFieldNotes().then(setFieldNotes).catch(console.error);
+  }, []);
+
+  const refreshFieldNotes = useCallback(() => {
+    listFieldNotes().then(setFieldNotes).catch(console.error);
+  }, []);
+
+  const handleOpenFieldNote = useCallback((productId: string, instrument: string, lat: number, lon: number) => {
+    setShowFieldNoteModal({ productId, instrument, lat, lon });
+  }, []);
+
+  // Handle HiRISE DTM footprint click in 3D mode
+  const handleHiRiseDTMClick = useCallback((productId: string, lat: number, lon: number) => {
+    if (analysisMode === "hirise_dtm_3d") {
+      setHiRiseDTM3DPoint({ productId, lat, lon });
+      setSelected(null); // Close regular Inspector
+    }
+  }, [analysisMode]);
 
   // Deactivate all overlays
   const handleDeactivateAll = useCallback(() => {
@@ -484,6 +529,9 @@ export default function MainPage() {
     if (mode !== "slope3d") {
       setSlope3DPoint(null);
     }
+    if (mode !== "hirise_dtm_3d") {
+      setHiRiseDTM3DPoint(null);
+    }
     if (mode !== "line") {
       setLinePoints([]);
       setLineProfileData(null);
@@ -595,11 +643,13 @@ export default function MainPage() {
           showSHARAD={showSHARAD}
           showCTX={showCTX}
           showSharadHighres={showSharadHighres}
+          showHiRISEDTM={showHiRISEDTM}
           onToggleCRISM={setShowCRISM}
           onToggleHiRISE={setShowHiRISE}
           onToggleSHARAD={setShowSHARAD}
           onToggleSharadHighres={setShowSharadHighres}
           onToggleCTX={setShowCTX}
+          onToggleHiRISEDTM={setShowHiRISEDTM}
           // Explicit footprint loading
           onLoadFootprints={handleLoadFootprints}
           footprintsLoading={footprintsLoading}
@@ -632,6 +682,10 @@ export default function MainPage() {
           // View bound selection mode
           viewBoundSelectionMode={viewBoundSelectionMode}
           onViewBoundSelectionModeChange={setViewBoundSelectionMode}
+          // Field Notes
+          fieldNotes={fieldNotes}
+          showFieldNotesOnMap={showFieldNotesOnMap}
+          onToggleFieldNotesOnMap={setShowFieldNotesOnMap}
         />
       }
       rightPanel={
@@ -639,6 +693,8 @@ export default function MainPage() {
           <SharadHiresInspector
             productId={sharadHiresProductId}
             onClose={() => setSharadHiresProductId(null)}
+            fieldNotes={fieldNotes}
+            onOpenFieldNote={(pid) => setShowFieldNoteModal({ productId: pid, instrument: "SHARAD_HIGHRES", lat: 0, lon: 0 })}
           />
         ) : selected ? (
           <Inspector
@@ -652,6 +708,8 @@ export default function MainPage() {
             hasHighResData={productsWithHighRes.has(selected.productId)}
             customDataset={customDatasets.find((d) => d.id === selected.productId) || null}
             onCustomDatasetOpacity={handleCustomDatasetOpacity}
+            fieldNotes={fieldNotes}
+            onOpenFieldNote={handleOpenFieldNote}
           />
         ) : terrainPoint ? (
           <SlopeAnalysis
@@ -662,6 +720,11 @@ export default function MainPage() {
           <Slope3DViewer
             point={slope3DPoint}
             onClose={() => setSlope3DPoint(null)}
+          />
+        ) : hiRiseDTM3DPoint ? (
+          <HiRiseDTM3DViewer
+            point={hiRiseDTM3DPoint}
+            onClose={() => setHiRiseDTM3DPoint(null)}
           />
         ) : null
       }
@@ -678,8 +741,10 @@ export default function MainPage() {
         showSHARAD={showSHARAD}
         showSharadHighres={showSharadHighres}
         showCTX={showCTX}
+        showHiRISEDTM={showHiRISEDTM}
         onSharadClick={handleSharadClick}
         onSharadHiresClick={handleSharadHiresClick}
+        onHiRiseDTMClick={handleHiRiseDTMClick}
         onToggleOverlay={(productId, type) => handleSetOverlay(productId, type)}
         quickviewOverlays={derivedOverlays.quickviewOverlays}
         highResOverlays={derivedOverlays.highResOverlays}
@@ -704,6 +769,7 @@ export default function MainPage() {
         linePoints={linePoints}
         viewBoundSelectionMode={viewBoundSelectionMode}
         onViewBoundSelected={handleViewBoundSelected}
+        notedProductIds={showFieldNotesOnMap ? notedProductIds : undefined}
       />
 
       {/* Line Profile Popup */}
@@ -766,6 +832,18 @@ export default function MainPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Field Note Modal */}
+      {showFieldNoteModal && (
+        <FieldNoteModal
+          productId={showFieldNoteModal.productId}
+          instrument={showFieldNoteModal.instrument}
+          lat={showFieldNoteModal.lat}
+          lon={showFieldNoteModal.lon}
+          onClose={() => setShowFieldNoteModal(null)}
+          onNoteSaved={refreshFieldNotes}
+        />
       )}
     </AppShell>
   );
