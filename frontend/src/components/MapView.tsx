@@ -128,6 +128,8 @@ type MapViewProps = {
   }>;
   // Analysis mode
   analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | null;
+  // Active HiRISE DTM product for hover elevation probing
+  activeDTMProductId?: string | null;
   linePoints?: Array<{ lat: number; lon: number }>;
   // View bound selection mode (drag to select rectangle)
   viewBoundSelectionMode?: boolean;
@@ -474,6 +476,7 @@ export default function MapView({
   showCustomData = false,
   customDatasets = [],
   analysisMode = null,
+  activeDTMProductId = null,
   linePoints = [],
   viewBoundSelectionMode = false,
   onViewBoundSelected,
@@ -498,7 +501,8 @@ export default function MapView({
   // footprint fill from tinting the overlay image.
   const setFootprintTransparent = useCallback((viewer: Cesium.Viewer, productId: string, transparent: boolean) => {
     const isHiRISE = productId.startsWith("ESP_");
-    const instrument = isHiRISE ? "HIRISE" : "CRISM";
+    const isHiRISEDTM = productId.startsWith("DTEEC_") || productId.startsWith("DTE_");
+    const instrument = isHiRISEDTM ? "HIRISE_DTM" : isHiRISE ? "HIRISE" : "CRISM";
     // Try FootprintManager ID
     const fpEnt = viewer.entities.getById(`${instrument}_FP_${productId}`);
     if (fpEnt?.rectangle) {
@@ -507,7 +511,8 @@ export default function MapView({
           Cesium.Color.TRANSPARENT
         );
       } else {
-        const color = isHiRISE ? Cesium.Color.YELLOW : Cesium.Color.CYAN;
+        const color = isHiRISEDTM ? Cesium.Color.fromCssColorString("#d97706")
+          : isHiRISE ? Cesium.Color.YELLOW : Cesium.Color.CYAN;
         fpEnt.rectangle.material = new Cesium.ColorMaterialProperty(
           color.withAlpha(0.4)
         );
@@ -1513,7 +1518,17 @@ export default function MapView({
     if (footprintManagerRef.current) {
       footprintManagerRef.current.setVisible("HIRISE_DTM", showHiRISEDTM);
     }
-    viewerRef.current?.scene.requestRender();
+    // Also show/hide quickview overlay entities for DTM products
+    const viewer = viewerRef.current;
+    if (viewer) {
+      for (const id of quickviewOverlayIdsRef.current) {
+        if (id.startsWith("DTEEC_") || id.startsWith("DTE_")) {
+          const ent = viewer.entities.getById(`QUICKVIEW_OVERLAY_${id}`);
+          if (ent) ent.show = showHiRISEDTM;
+        }
+      }
+      viewer.scene.requestRender();
+    }
   }, [showHiRISEDTM]);
 
   // Note: Legacy footprint overlay hiding is no longer needed since
@@ -2855,6 +2870,25 @@ export default function MapView({
   useEffect(() => {
     dtmHoverModeRef.current = dtmHoverMode;
   }, [dtmHoverMode]);
+
+  // Sync activeDTMProductId prop with ref and load elevation grid
+  useEffect(() => {
+    if (activeDTMProductId) {
+      activeDTMProductRef.current = activeDTMProductId;
+
+      // Load elevation grid if not already cached
+      if (!dtmGridCacheRef.current.has(activeDTMProductId)) {
+        loadDTMElevationGrid(activeDTMProductId).then((grid) => {
+          if (grid) {
+            dtmGridCacheRef.current.set(activeDTMProductId, grid);
+            console.log(`[DTMHover] Grid loaded for ${activeDTMProductId} (via prop)`);
+          }
+        });
+      }
+    } else {
+      activeDTMProductRef.current = null;
+    }
+  }, [activeDTMProductId]);
 
   // Handle DTM hover mode change
   const handleDTMHoverModeChange = useCallback((mode: "hover" | "click") => {

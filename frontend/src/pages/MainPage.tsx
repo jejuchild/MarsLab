@@ -405,11 +405,48 @@ export default function MainPage() {
   }, []);
 
   // Handle field note marker click from map - fly to and open inspector
-  const handleFieldNoteClick = useCallback((note: FieldNote) => {
-    // Fly to the note location
-    setFlyToCoords({ lat: note.lat, lon: note.lon });
+  const handleFieldNoteClick = useCallback(async (note: FieldNote) => {
+    // For HiRISE DTM, use DTM center (stored note coords may be offset)
+    if (note.instrument === "HIRISE_DTM") {
+      const center = await getDTMCenter(note.product_id);
+      const lat = center?.lat ?? note.lat;
+      const lon = center?.lon ?? note.lon;
 
-    // Open inspector for this product
+      // Fly to DTM center
+      setFlyToCoords({ lat, lon });
+
+      // Open inspector
+      setSelected({
+        instrument: "HIRISE_DTM",
+        productId: note.product_id,
+        lat,
+        lon,
+      });
+
+      // Enable quickview overlay (same as handleHiRiseDTMClick)
+      setActiveOverlays((prev) => {
+        const newMap = new Map(prev);
+        if (!newMap.has(note.product_id)) {
+          newMap.set(note.product_id, { type: "quickview", opacity: 80 });
+        }
+        return newMap;
+      });
+
+      // Activate DTM analysis mode for hover support
+      setAnalysisMode("hirise_dtm_3d");
+      setActiveDTMProduct(note.product_id);
+
+      // Clear other analysis state
+      setTerrainPoint(null);
+      setSlope3DPoint(null);
+      setHiRiseDTM3DPoint(null);
+      setLinePoints([]);
+      setLineProfileData(null);
+      return;
+    }
+
+    // Non-DTM products: use original behavior
+    setFlyToCoords({ lat: note.lat, lon: note.lon });
     setSelected({
       instrument: note.instrument as InspectorContext["instrument"],
       productId: note.product_id,
@@ -860,6 +897,7 @@ export default function MainPage() {
         onViewBoundSelected={handleViewBoundSelected}
         fieldNotes={showFieldNotesOnMap ? fieldNotes : []}
         onFieldNoteClick={handleFieldNoteClick}
+        activeDTMProductId={activeDTMProduct}
       />
 
       {/* Line Profile Popup */}
