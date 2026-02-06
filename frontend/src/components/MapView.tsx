@@ -3078,7 +3078,6 @@ export default function MapView({
             positions,
             material: lineColor,
             width: 1,
-            clampToGround: true,
           },
         });
 
@@ -3125,7 +3124,6 @@ export default function MapView({
             positions,
             material: lineColor,
             width: 1,
-            clampToGround: true,
           },
         });
 
