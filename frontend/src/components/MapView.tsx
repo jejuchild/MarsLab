@@ -982,11 +982,23 @@ export default function MapView({
 
           console.log(`[Click] Overlay: ${instrument} ${productId}`);
 
+          // Compute footprint center for accurate lat/lon
+          let overlayLat = clickLat;
+          let overlayLon = clickLon;
+          const fpInst = productId.startsWith("DTEEC_") || productId.startsWith("DTE_") ? "HIRISE_DTM"
+            : productId.startsWith("ESP_") ? "HIRISE" : "CRISM";
+          const fpEnt = viewer.entities.getById(`${fpInst}_FP_${productId}`);
+          if (fpEnt?.rectangle?.coordinates) {
+            const fpRect = fpEnt.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle;
+            overlayLat = Cesium.Math.toDegrees((fpRect.south + fpRect.north) / 2);
+            overlayLon = Cesium.Math.toDegrees((fpRect.west + fpRect.east) / 2);
+          }
+
           onSelect({
             instrument,
             productId,
-            lat: clickLat,
-            lon: clickLon,
+            lat: overlayLat,
+            lon: overlayLon,
             pixelLine,
             pixelSample,
           });
@@ -1045,14 +1057,23 @@ export default function MapView({
 
         // Handle CUSTOM datasets - fly to bounds
         if (instrument === "CUSTOM") {
+          let customLat = clickLat;
+          let customLon = clickLon;
+          const customRectEnt = viewer.entities.getById(`CUSTOM_FP_${productId}`);
+          if (customRectEnt?.rectangle?.coordinates) {
+            const cr = customRectEnt.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle;
+            customLat = Cesium.Math.toDegrees((cr.south + cr.north) / 2);
+            customLon = Cesium.Math.toDegrees((cr.west + cr.east) / 2);
+          }
+
           onSelect({
             instrument: "CUSTOM",
             productId,
-            lat: clickLat,
-            lon: clickLon,
+            lat: customLat,
+            lon: customLon,
           });
 
-          const rectEnt = viewer.entities.getById(`CUSTOM_FP_${productId}`);
+          const rectEnt = customRectEnt || viewer.entities.getById(`CUSTOM_FP_${productId}`);
           if (rectEnt?.rectangle?.coordinates) {
             const rect = rectEnt.rectangle.coordinates.getValue(
               Cesium.JulianDate.now()
@@ -1070,7 +1091,20 @@ export default function MapView({
 
         // Handle HIRISE_DTM - open 3D viewer and fly to footprint
         if (instrument === "HIRISE_DTM") {
-          onHiRiseDTMClickRef.current?.(productId, clickLat, clickLon);
+          // Compute footprint center for accurate coordinates
+          let dtmLat = clickLat;
+          let dtmLon = clickLon;
+          const dtmRectEnt = viewer.entities.getById(`HIRISE_DTM_FP_${productId}`);
+          if (dtmRectEnt?.rectangle?.coordinates) {
+            const rect = dtmRectEnt.rectangle.coordinates.getValue(
+              Cesium.JulianDate.now()
+            ) as Cesium.Rectangle;
+            dtmLat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
+            dtmLon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
+            viewer.camera.flyTo({ destination: paddedRectangle(rect, 0.5), duration: 0.6 });
+          }
+
+          onHiRiseDTMClickRef.current?.(productId, dtmLat, dtmLon);
 
           // Load elevation grid for hover (async, non-blocking)
           activeDTMProductRef.current = productId;
@@ -1080,15 +1114,6 @@ export default function MapView({
               console.log(`[DTMHover] Grid loaded for ${productId}`);
             }
           });
-
-          // Fly to footprint bounds so the DTM area is visible
-          const rectEnt = viewer.entities.getById(`HIRISE_DTM_FP_${productId}`);
-          if (rectEnt?.rectangle?.coordinates) {
-            const rect = rectEnt.rectangle.coordinates.getValue(
-              Cesium.JulianDate.now()
-            ) as Cesium.Rectangle;
-            viewer.camera.flyTo({ destination: paddedRectangle(rect, 0.5), duration: 0.6 });
-          }
           return;
         }
 
@@ -1126,18 +1151,26 @@ export default function MapView({
           return;
         }
 
-        onSelect({
-          instrument,
-          productId,
-          lat: clickLat,
-          lon: clickLon,
-        });
-
-        // Fly to footprint (FootprintManager uses INSTRUMENT_FP_productId format)
+        // Compute footprint center for accurate lat/lon (click position can be offset)
         const rectEntId = `${instrument}_FP_${productId}`;
         console.log("[Click] Looking for rectangle entity:", rectEntId);
         const rectEnt = viewer.entities.getById(rectEntId);
         console.log("[Click] Rectangle entity found:", !!rectEnt);
+
+        let selectLat = clickLat;
+        let selectLon = clickLon;
+        if (rectEnt?.rectangle?.coordinates) {
+          const rect = rectEnt.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle;
+          selectLat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
+          selectLon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
+        }
+
+        onSelect({
+          instrument,
+          productId,
+          lat: selectLat,
+          lon: selectLon,
+        });
 
         if (rectEnt?.rectangle?.coordinates) {
           const rect = rectEnt.rectangle.coordinates.getValue(
@@ -2513,6 +2546,19 @@ export default function MapView({
         }
       }
 
+      // Get products from FootprintManager for HiRISE DTM
+      if (showHiRISEDTM && footprintManager.hasFootprints("HIRISE_DTM")) {
+        const dtmFeatures = footprintManager.getFeatures("HIRISE_DTM");
+        for (const feature of dtmFeatures) {
+          const pid = feature.properties.product_id;
+          const title = feature.properties.title;
+          if (pid && !seen.has(pid)) {
+            seen.add(pid);
+            visible.push({ productId: pid, instrument: "HIRISE_DTM", title });
+          }
+        }
+      }
+
       // Include custom datasets that are loaded and visible
       if (showCustomData) {
         for (const dataset of customDatasets) {
@@ -2545,7 +2591,7 @@ export default function MapView({
       clearTimeout(initTimeout);
       clearInterval(interval);
     };
-  }, [showHiRISE, showCRISM, showCTX, showCustomData, customDatasets, onVisibleProductsChange, crismFilteredIds]);
+  }, [showHiRISE, showCRISM, showCTX, showHiRISEDTM, showCustomData, customDatasets, onVisibleProductsChange, crismFilteredIds]);
 
   // PERFORMANCE OPTIMIZED: Update overlay opacity when per-product opacities change
   useEffect(() => {
