@@ -39,6 +39,8 @@ from .agent_tasks import (
     synthesize_results,
     recommend_site,
 )
+from .mars_climate import climate_analysis_for_region
+from .thermal_inertia import thermal_inertia_analysis_for_region
 from .science_context import get_context_for_agent, get_region_context_by_name
 
 logger = logging.getLogger(__name__)
@@ -95,6 +97,7 @@ class AgentSession:
     all_results: Dict[str, TaskResult] = field(default_factory=dict)
     narrative: str = ""
     synthesis: Optional[Dict[str, Any]] = None
+    figures: Optional[List[Dict[str, Any]]] = None
     error: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -127,6 +130,7 @@ class AgentSession:
             "steps": [s.to_dict() for s in self.steps],
             "narrative": self.narrative,
             "synthesis": self.synthesis,
+            "figures": self.figures,
             "error": self.error,
             "created_at": self.created_at,
         }
@@ -219,6 +223,12 @@ def _save_session(session: AgentSession):
 
     record = session.to_dict()
     record["steps"] = step_records
+    # Strip base64 image data from figures to keep JSON file small
+    if record.get("figures"):
+        record["figures"] = [
+            {k: v for k, v in fig.items() if k != "base64"}
+            for fig in record["figures"]
+        ]
     if session.bbox:
         record["bbox"] = {
             "min_lat": session.bbox.min_lat,
@@ -652,6 +662,52 @@ async def _tool_recommend(session: "AgentSession", params: dict):
     return result, f"Found {len(candidates)} candidate sites but no clear primary recommendation."
 
 
+async def _tool_climate(session: "AgentSession", params: dict):
+    """Analyze Mars climate conditions for the target region."""
+    if not session.bbox:
+        return TaskResult(task_type="climate", success=False, error="No bbox"), "No region defined"
+    data = climate_analysis_for_region(
+        session.bbox.min_lat, session.bbox.max_lat,
+        session.bbox.min_lon, session.bbox.max_lon,
+    )
+    result = TaskResult(
+        task_type="climate",
+        success=data.get("success", True),
+        data=data,
+        summary=data.get("climate_summary", "Climate analysis complete"),
+    )
+    session.all_results["climate"] = result
+    return result, data.get("climate_summary", "Climate analysis complete")
+
+
+async def _tool_thermal_inertia(session: "AgentSession", params: dict):
+    """Analyze TES thermal inertia for the target region."""
+    if not session.bbox:
+        return TaskResult(task_type="thermal_inertia", success=False, error="No bbox"), "No region defined"
+    # Determine if ice signal present from previous results
+    has_ice = False
+    mineral_r = session.all_results.get("mineral")
+    if mineral_r and mineral_r.success:
+        has_ice = mineral_r.data.get("high_ice_count", 0) > 0
+    sub_r = session.all_results.get("subsurface")
+    if sub_r and sub_r.success:
+        has_ice = has_ice or sub_r.data.get("subsurface_detections", 0) > 0
+
+    data = thermal_inertia_analysis_for_region(
+        session.bbox.min_lat, session.bbox.max_lat,
+        session.bbox.min_lon, session.bbox.max_lon,
+        has_ice_signal=has_ice,
+    )
+    result = TaskResult(
+        task_type="thermal_inertia",
+        success=data.get("available", False),
+        data=data,
+        summary=data.get("ti_explanation", "Thermal inertia analysis complete"),
+    )
+    session.all_results["thermal_inertia"] = result
+    return result, data.get("ti_explanation", "TI analysis complete")
+
+
 # Tool registry — maps name → {description, params, executor}
 AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
     "resolve_region": {
@@ -704,6 +760,16 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
         "params": {},
         "executor": _tool_recommend,
     },
+    "analyze_climate": {
+        "description": "Analyze Mars climate conditions (temperature, dust, wind, frost) for the target region.",
+        "params": {},
+        "executor": _tool_climate,
+    },
+    "analyze_thermal_inertia": {
+        "description": "Analyze TES thermal inertia to assess surface consolidation and ice-cemented regolith.",
+        "params": {},
+        "executor": _tool_thermal_inertia,
+    },
     "finish": {
         "description": "Call when analysis is complete. Provide summary and recommendation.",
         "params": {"summary": "str — brief findings summary", "recommendation": "str — STRONG_CANDIDATE, PROMISING_WITH_CAVEATS, REQUIRES_FURTHER_INVESTIGATION, or LOW_PRIORITY"},
@@ -713,7 +779,10 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
 
 
 def _build_react_prompt(objective: str, session: "AgentSession", history: list) -> str:
-    """Build the per-turn prompt with full history."""
+    """Build the per-turn prompt with full history.
+
+    Ends with 'Thought:' prefix to force Llama into the correct format.
+    """
     parts = [f"Objective: {objective}"]
     if session.region_name and session.bbox:
         b = session.bbox
@@ -728,10 +797,12 @@ def _build_react_prompt(objective: str, session: "AgentSession", history: list) 
         parts.append("")
 
     parts.append(f"--- Turn {len(history) + 1} ---")
+    # End with "Thought:" to prime Llama to continue in the correct format
+    parts.append("Thought:")
     return "\n".join(parts)
 
 
-def _parse_react_output(text: str) -> tuple:
+def _parse_react_output(text: str, session: "AgentSession" = None) -> tuple:
     """Extract Thought and Action from Llama ReAct output.
 
     Handles common LLM format variations:
@@ -740,11 +811,16 @@ def _parse_react_output(text: str) -> tuple:
     - Mixed casing: thought:, THOUGHT:, Thought:
     - Single-quoted JSON
     - Missing Action: label (fallback: any JSON with "tool" key)
+    - Completely unstructured text (fallback: NL intent inference)
     """
     thought = ""
     action = {}
 
-    logger.debug(f"Parsing ReAct output ({len(text)} chars): {text[:300]}...")
+    logger.info(f"Parsing ReAct output ({len(text)} chars): {text[:500]}...")
+
+    if not text or not text.strip():
+        logger.warning("Empty Llama response — nothing to parse")
+        return "", {}
 
     # Normalize: strip markdown bold markers
     normalized = re.sub(r'\*\*', '', text)
@@ -762,13 +838,17 @@ def _parse_react_output(text: str) -> tuple:
             thought = m.group(1).strip()
             break
 
-    # If no thought label found, use everything before the first JSON
+    # The prompt now ends with "Thought:" so Llama continues directly.
+    # If no Thought:/Action: labels found, the text before the first JSON
+    # IS the thought (Llama continued after our "Thought:" prefix).
     if not thought:
         first_brace = normalized.find('{')
         if first_brace > 0:
             thought = normalized[:first_brace].strip()
-            # Clean up any trailing label like "Action:"
             thought = re.sub(r'[Aa]ction\s*:\s*$', '', thought).strip()
+        elif '{' not in normalized:
+            # No JSON at all — entire text is the thought (conversational response)
+            thought = normalized.strip()[:300]
 
     # Extract Action JSON
     # 1. Try standard: Action: { ... }
@@ -780,6 +860,13 @@ def _parse_react_output(text: str) -> tuple:
     # 2. Fallback: find ANY JSON with a "tool" key anywhere in the output
     if not action or "tool" not in action:
         action = _find_tool_json(normalized)
+
+    # 3. Last resort: infer tool from natural language
+    if (not action or "tool" not in action) and session:
+        logger.info("No structured action found — attempting NL inference")
+        action = _infer_tool_from_text(normalized, session)
+        if action and "tool" in action:
+            logger.info(f"NL inference produced tool: {action['tool']}")
 
     if not action or "tool" not in action:
         logger.warning(f"Failed to parse action from Llama output: {text[:500]}")
@@ -841,6 +928,65 @@ def _find_tool_json(text: str) -> dict:
     return {}
 
 
+def _infer_tool_from_text(text: str, session: "AgentSession") -> dict:
+    """Last-resort: infer a tool call from natural language when Llama
+    ignores the structured format entirely.
+
+    This handles cases where Llama responds conversationally like:
+    'I'll start by looking up the region...' or
+    'Let me search for CRISM data in this area.'
+    """
+    t = text.lower()
+
+    # Detect region resolution intent
+    if any(kw in t for kw in ["resolve", "look up", "find the region", "locate", "identify the region", "bounding box"]):
+        region = session.region_name or "target region"
+        return {"tool": "resolve_region", "params": {"region_name": region}}
+
+    # Detect instrument search intent
+    for inst in ["crism", "hirise", "sharad_highres", "sharad", "ctx", "hirise_dtm"]:
+        if inst.replace("_", " ") in t or inst in t:
+            if any(kw in t for kw in ["search", "find", "look for", "check", "query", "available", "data"]):
+                return {"tool": "search_products", "params": {"instrument": inst.upper()}}
+
+    # Detect download intent
+    if any(kw in t for kw in ["download", "fetch", "retrieve", "get the data", "acquire"]):
+        return {"tool": "download_products", "params": {}}
+
+    # Detect analysis intents
+    if any(kw in t for kw in ["slope", "terrain", "landing", "rover feasibility", "engineering"]):
+        return {"tool": "analyze_slope", "params": {}}
+    if any(kw in t for kw in ["subsurface", "radar", "sharad analysis", "ice depth", "reflector"]):
+        return {"tool": "analyze_subsurface", "params": {}}
+    if any(kw in t for kw in ["mineral", "spectral", "crism analysis", "hydration", "ice signature"]):
+        return {"tool": "analyze_minerals", "params": {}}
+    if any(kw in t for kw in ["cnn", "classifier", "classification", "24 mineral"]):
+        return {"tool": "classify_minerals_cnn", "params": {}}
+    if any(kw in t for kw in ["dielectric", "permittivity", "ice vs rock"]):
+        return {"tool": "estimate_dielectric", "params": {}}
+    if any(kw in t for kw in ["climate", "temperature", "dust", "wind", "frost"]):
+        return {"tool": "analyze_climate", "params": {}}
+    if any(kw in t for kw in ["thermal inertia", "surface consolidation", "tes"]):
+        return {"tool": "analyze_thermal_inertia", "params": {}}
+    if any(kw in t for kw in ["recommend", "optimal site", "best location", "landing site"]):
+        return {"tool": "recommend_site", "params": {}}
+    if any(kw in t for kw in ["local data", "locally available", "check what we have", "check_local"]):
+        return {"tool": "check_local_data", "params": {}}
+    if any(kw in t for kw in ["finish", "conclude", "final assessment", "done", "complete"]):
+        return {"tool": "finish", "params": {"summary": text[:200], "recommendation": "REQUIRES_FURTHER_INVESTIGATION"}}
+
+    # If session has no bbox yet, default to resolving region
+    if not session.bbox:
+        region = session.region_name or "target region"
+        return {"tool": "resolve_region", "params": {"region_name": region}}
+
+    # If no searches done yet, default to CRISM search
+    if not any(k.startswith("search_") for k in session.all_results):
+        return {"tool": "search_products", "params": {"instrument": "CRISM"}}
+
+    return {}
+
+
 # =============================================================================
 # Plan Generation (used by rule-based fallback)
 # =============================================================================
@@ -849,7 +995,7 @@ PLAN_SYSTEM_PROMPT = """You are a Mars science mission planner AI. Given a user'
 generate an execution plan as a JSON array of steps.
 
 Each step must have:
-- "type": one of "search", "check_data", "download", "slope", "subsurface", "mineral", "mineral_cnn", "dielectric", "synthesize"
+- "type": one of "search", "check_data", "download", "slope", "subsurface", "mineral", "mineral_cnn", "dielectric", "climate", "thermal_inertia", "synthesize"
 - "description": human-readable description
 - "instrument": instrument name if applicable (CRISM, HIRISE, SHARAD, SHARAD_HIGHRES, CTX, HIRISE_DTM)
 
@@ -1014,14 +1160,24 @@ def _generate_plan_rules(objective: str) -> Dict[str, Any]:
             "description": "Run 1D CNN-Attention mineral classification on CRISM TRR3 data",
         })
 
-    # 5. Recommend best site
+    # 5. Climate + Thermal Inertia (always run for comprehensive assessment)
+    steps.append({
+        "type": "climate",
+        "description": "Analyze Mars climate conditions (temperature, dust, wind, frost)",
+    })
+    steps.append({
+        "type": "thermal_inertia",
+        "description": "Analyze TES thermal inertia for surface consolidation and ice indicators",
+    })
+
+    # 6. Recommend best site
     if any(kw in obj_lower for kw in ["rover", "landing", "site", "traverse", "location", "where", "best"]):
         steps.append({
             "type": "recommend",
             "description": "Cross-reference all data to identify the optimal rover site",
         })
 
-    # 6. Synthesize
+    # 7. Synthesize
     steps.append({
         "type": "synthesize",
         "description": "Combine all analyses into a comprehensive assessment",
@@ -1358,7 +1514,37 @@ def _generate_narrative_fallback(session: AgentSession) -> str:
             )
         parts.append("")
 
-    # ── 5. Landing Site Decision ──
+    # ── 5. Climate Constraints ──
+    clim = synthesis.get("climate", {})
+    if clim:
+        parts.append("### Climate Constraints")
+        summary = clim.get("climate_summary", "")
+        clim_score = clim.get("climate_score", 0)
+        if summary:
+            parts.append(summary)
+        parts.append(f"Climate score: **{clim_score}/10**.")
+        annual = clim.get("annual_stats", {})
+        if annual:
+            frost = annual.get("frost_max_probability", 0)
+            if frost > 0.5:
+                parts.append(
+                    f"⚠ Significant CO2 frost risk ({frost:.0%}) — "
+                    f"seasonal operations may be limited."
+                )
+        parts.append("")
+
+    # ── 6. Thermal Inertia ──
+    ti = synthesis.get("thermal_inertia", {})
+    if ti:
+        parts.append("### Thermal Inertia (TES)")
+        explanation = ti.get("ti_explanation", "")
+        if explanation:
+            parts.append(explanation)
+        ti_score = ti.get("ti_score", 0)
+        parts.append(f"Thermal inertia score: **{ti_score}/10**.")
+        parts.append("")
+
+    # ── 7. Landing Site Decision ──
     rec_data = synthesis.get("recommended_site", {})
     primary = rec_data.get("primary_site") or rec_data.get("best_site")
     secondary = rec_data.get("secondary_site")
@@ -1518,7 +1704,7 @@ async def run_agent(
             await think_task
 
             # 3. Parse output → thought + action
-            thought, action = _parse_react_output(full_response)
+            thought, action = _parse_react_output(full_response, session=session)
             yield {"event": "thought_end", "data": {
                 "thought": thought, "iteration": iteration,
             }}
@@ -1760,6 +1946,16 @@ async def run_agent(
             )
             session.synthesis = synth_result.data
             session.all_results["synthesize"] = synth_result
+
+        # ── Generate evidence figures ──
+        try:
+            from .agentic_router import generate_evidence_figures
+            figures_data = generate_evidence_figures(session)
+            if figures_data.get("figures"):
+                session.figures = figures_data["figures"]
+                yield {"event": "figures", "data": figures_data}
+        except Exception as e:
+            logger.warning(f"Evidence figure generation failed (react): {e}")
 
         # ── Generate narrative report ──
         session.status = "synthesizing"
@@ -2085,6 +2281,14 @@ async def _run_agent_rules(
                     step.result = result
                     session.all_results["recommend"] = result
 
+                elif step.type == "climate":
+                    _, _ = await _tool_climate(session, {})
+                    step.result = session.all_results.get("climate")
+
+                elif step.type == "thermal_inertia":
+                    _, _ = await _tool_thermal_inertia(session, {})
+                    step.result = session.all_results.get("thermal_inertia")
+
                 elif step.type == "synthesize":
                     region_ctx = None
                     if session.region_name:
@@ -2114,6 +2318,16 @@ async def _run_agent_rules(
                 )
                 logger.error(f"Step {step.type} failed: {e}")
                 yield {"event": "step_failed", "data": step.to_dict()}
+
+        # ── Phase 2.5: Generate evidence figures ──────────
+        try:
+            from .agentic_router import generate_evidence_figures
+            figures_data = generate_evidence_figures(session)
+            if figures_data.get("figures"):
+                session.figures = figures_data["figures"]
+                yield {"event": "figures", "data": figures_data}
+        except Exception as e:
+            logger.warning(f"Evidence figure generation failed (rules): {e}")
 
         # ── Phase 3: Generate Narrative ────────────────
         session.status = "synthesizing"
