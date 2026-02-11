@@ -101,6 +101,7 @@ def surface_temperature_k(lat_deg: float, ls_deg: float, elevation_m: float = 0.
     diurnal = 60.0 * math.cos(lat_r) ** 2 + 20.0
 
     # Clamp above CO2 frost point
+    t_base = max(t_base, CO2_FROST_POINT_K)
     t_max = max(t_base + diurnal / 2, CO2_FROST_POINT_K)
     t_min = max(t_base - diurnal / 2, CO2_FROST_POINT_K)
 
@@ -127,7 +128,6 @@ def dust_opacity(lat_deg: float, ls_deg: float) -> dict:
     Returns dict with tau_mean, tau_peak, storm_risk (str).
     """
     lat_r = math.radians(lat_deg)
-    ls_r = math.radians(ls_deg)
 
     # Background dust: higher near equator, lower at poles
     tau_bg = 0.25 + 0.15 * math.cos(lat_r) ** 2
@@ -173,7 +173,6 @@ def wind_speed(lat_deg: float, ls_deg: float) -> dict:
     Returns dict with mean_ms, gust_ms, wind_hazard (str).
     """
     lat_r = math.radians(lat_deg)
-    ls_r = math.radians(ls_deg)
 
     # Base wind from Hadley circulation: stronger near equator
     base_wind = 4.0 + 2.0 * math.cos(lat_r)
