@@ -22,7 +22,7 @@ import type { InstrumentType as FPInstrumentType } from "../utils/FootprintManag
  * ==================================================*/
 type LatLon = { lat: number; lon: number };
 
-export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
+export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM" | "CRISM_TRR3";
 
 export type InspectorContext = {
   instrument: InstrumentType;
@@ -32,6 +32,8 @@ export type InspectorContext = {
   // CRISM pixel coordinates for spectrum (optional)
   pixelLine?: number;
   pixelSample?: number;
+  // Product title (e.g., HiRISE observation title)
+  title?: string;
 };
 
 type VisibleProduct = {
@@ -72,7 +74,7 @@ type SHARADPopup = {
 } | null;
 
 // Explicit loading applies to all instruments
-type ExplicitLoadInstrument = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM";
+type ExplicitLoadInstrument = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
 
 // Footprint load result for UI feedback
 type FootprintLoadResult = {
@@ -93,9 +95,10 @@ type MapViewProps = {
   showSharadHighres: boolean;
   showCTX: boolean;
   showHiRISEDTM?: boolean;
+  showCRISM_TRR3?: boolean;
   onSharadClick?: (popup: SHARADPopup) => void;
   onSharadHiresClick?: (productId: string) => void;
-  onHiRiseDTMClick?: (productId: string, lat: number, lon: number) => void;
+  onHiRiseDTMClick?: (productId: string, lat: number, lon: number, title?: string) => void;
   onToggleOverlay?: (productId: string, type: "quickview" | null) => void;
   quickviewOverlays?: string[];
   highResOverlays?: string[];
@@ -131,7 +134,7 @@ type MapViewProps = {
     opacity: number;
   }>;
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | null;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | null;
   // Active HiRISE DTM product for hover elevation probing
   activeDTMProductId?: string | null;
   linePoints?: Array<{ lat: number; lon: number }>;
@@ -148,7 +151,14 @@ type MapViewProps = {
   aiAnalysisPin?: { lat: number; lon: number } | null;
   // Multi-Instrument Overlap Filter
   overlapFilter?: { enabled: boolean; instruments: string[] };
-  onOverlapStatsChange?: (stats: import("../utils/overlapFilter").OverlapStats | null) => void;
+  onOverlapStatsChange?: (stats: OverlapStats | null) => void;
+  // Temporary highlight after fly-to (from deep-link)
+  highlightProductId?: string | null;
+  onHighlightComplete?: () => void;
+  // Keep inspected product's footprint visible even when layer is off
+  inspectedProductId?: string | null;
+  // SHARAD radargram trace pin — show clicked radargram location on map
+  sharadTracePin?: { lat: number; lon: number } | null;
 };
 
 /* ==================================================
@@ -171,8 +181,12 @@ const FIELDNOTE_COLORS: Record<string, string> = {
   HIRISE_DTM: "#d97706", // amber
 };
 
-// Create a canvas-based icon for field note marker
+// Create a canvas-based icon for field note marker (cached per instrument)
+const _fieldNoteIconCache = new Map<string, string>();
 function createFieldNoteIcon(instrument: string): string {
+  const cached = _fieldNoteIconCache.get(instrument);
+  if (cached) return cached;
+
   const canvas = document.createElement("canvas");
   canvas.width = 24;
   canvas.height = 24;
@@ -198,7 +212,9 @@ function createFieldNoteIcon(instrument: string): string {
   ctx.fillStyle = "#fff";
   ctx.fill();
 
-  return canvas.toDataURL();
+  const dataUrl = canvas.toDataURL();
+  _fieldNoteIconCache.set(instrument, dataUrl);
+  return dataUrl;
 }
 
 // Create a proper oblate Mars ellipsoid for accurate geospatial positioning
@@ -320,8 +336,8 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
     return boundsCache.get(productId)!;
   }
 
-  // Check for HiRISE DTM products (start with DTEEC_ or DTE_)
-  const isHiRISEDTM = productId.startsWith("DTEEC_") || productId.startsWith("DTE_");
+  // Check for HiRISE DTM products (start with DTE, e.g. DTEEC_, DTEED_)
+  const isHiRISEDTM = productId.startsWith("DTE");
 
   if (isHiRISEDTM) {
     // Load bounds from HiRISE DTM index
@@ -460,6 +476,7 @@ export default function MapView({
   showSharadHighres,
   showCTX,
   showHiRISEDTM = false,
+  showCRISM_TRR3 = false,
   onSharadClick,
   onSharadHiresClick,
   onHiRiseDTMClick,
@@ -497,12 +514,17 @@ export default function MapView({
   aiAnalysisPin = null,
   overlapFilter,
   onOverlapStatsChange,
+  highlightProductId,
+  onHighlightComplete,
+  inspectedProductId,
+  sharadTracePin = null,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
 
   // Overlap filter state
   const overlapResultRef = useRef<OverlapResult | null>(null);
+  const inspectedProductIdRef = useRef<string | null>(null);
   const [footprintVersion, setFootprintVersion] = useState(0);
 
   // SHARAD entities are now managed by FootprintManager (explicit loading)
@@ -520,8 +542,9 @@ export default function MapView({
   // footprint fill from tinting the overlay image.
   const setFootprintTransparent = useCallback((viewer: Cesium.Viewer, productId: string, transparent: boolean) => {
     const isHiRISE = productId.startsWith("ESP_");
-    const isHiRISEDTM = productId.startsWith("DTEEC_") || productId.startsWith("DTE_");
-    const instrument = isHiRISEDTM ? "HIRISE_DTM" : isHiRISE ? "HIRISE" : "CRISM";
+    const isHiRISEDTM = productId.startsWith("DTE");
+    const isTRR3 = /^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(productId);
+    const instrument = isHiRISEDTM ? "HIRISE_DTM" : isHiRISE ? "HIRISE" : isTRR3 ? "CRISM_TRR3" : "CRISM";
     // Try FootprintManager ID
     const fpEnt = viewer.entities.getById(`${instrument}_FP_${productId}`);
     if (fpEnt?.rectangle) {
@@ -531,7 +554,9 @@ export default function MapView({
         );
       } else {
         const color = isHiRISEDTM ? Cesium.Color.fromCssColorString("#d97706")
-          : isHiRISE ? Cesium.Color.YELLOW : Cesium.Color.CYAN;
+          : isHiRISE ? Cesium.Color.YELLOW
+          : isTRR3 ? Cesium.Color.fromCssColorString("#00CED1")
+          : Cesium.Color.CYAN;
         fpEnt.rectangle.material = new Cesium.ColorMaterialProperty(
           color.withAlpha(0.4)
         );
@@ -559,6 +584,7 @@ export default function MapView({
   const dtmHoverModeRef = useRef<"hover" | "click">("hover");
   const [dtmHoverMode, setDtmHoverMode] = useState<"hover" | "click">("hover");
   const activeDTMProductRef = useRef<string | null>(null);
+  const showHiRISEDTMRef = useRef(showHiRISEDTM);
 
   // Keep refs in sync with props
   useEffect(() => {
@@ -568,6 +594,10 @@ export default function MapView({
   useEffect(() => {
     highResOverlaysRef.current = highResOverlays;
   }, [highResOverlays]);
+
+  useEffect(() => {
+    showHiRISEDTMRef.current = showHiRISEDTM;
+  }, [showHiRISEDTM]);
 
   useEffect(() => {
     onSharadClickRef.current = onSharadClick;
@@ -719,6 +749,152 @@ export default function MapView({
 
     const hoverHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 
+    // Throttled drillPick + highlight logic (expensive operations at 50ms intervals)
+    let lastPickPosition: Cesium.Cartesian2 | null = null;
+    const throttledPick = throttle((endPosition: Cesium.Cartesian2, hoverLat: number, hoverLon: number) => {
+      // Check if hovering over an overlay and change cursor
+      let isOverOverlay = false;
+      const allOverlayIds = [...highResOverlaysRef.current, ...quickviewOverlaysRef.current];
+      for (const productId of allOverlayIds) {
+        const overlayEnt = viewer.entities.getById(`HIGHRES_OVERLAY_${productId}`) ||
+                           viewer.entities.getById(`QUICKVIEW_OVERLAY_${productId}`);
+        if (overlayEnt?.rectangle?.coordinates) {
+          const rect = overlayEnt.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle;
+          const west = Cesium.Math.toDegrees(rect.west);
+          const east = Cesium.Math.toDegrees(rect.east);
+          const south = Cesium.Math.toDegrees(rect.south);
+          const north = Cesium.Math.toDegrees(rect.north);
+          if (hoverLon >= west && hoverLon <= east && hoverLat >= south && hoverLat <= north) {
+            isOverOverlay = true;
+            break;
+          }
+        }
+      }
+      viewer.canvas.style.cursor = isOverOverlay ? "crosshair" : "default";
+
+      const picked = viewer.scene
+        .drillPick(endPosition)
+        .find((x: any) => x?.id instanceof Cesium.Entity);
+
+      const pickedEnt = picked?.id as Cesium.Entity | undefined;
+      const hs = highlightRef.current;
+
+      const clearHighlight = () => {
+        if (hs.rectEnt?.rectangle) {
+          hs.rectEnt.rectangle.material = hs.origRectMaterial;
+          if (hs.origOutlineColor && hs.rectEnt.rectangle.outlineColor) {
+            hs.rectEnt.rectangle.outlineColor = new Cesium.ConstantProperty(
+              hs.origOutlineColor
+            ) as any;
+          }
+        }
+        if (hs.labelEnt?.label && typeof hs.origLabelScale === "number") {
+          (hs.labelEnt.label.scale as any) = hs.origLabelScale;
+        }
+        if (hs.pointEnt?.point && typeof hs.origPointSize === "number") {
+          (hs.pointEnt.point.pixelSize as any) = hs.origPointSize;
+        }
+
+        hs.key = null;
+        hs.rectEnt = null;
+        hs.labelEnt = null;
+        hs.pointEnt = null;
+        hs.origRectMaterial = null;
+        hs.origOutlineColor = undefined;
+        hs.origLabelScale = undefined;
+        hs.origPointSize = undefined;
+      };
+
+      if (pickedEnt) {
+        const inst = getEntityInstrument(pickedEnt);
+        const pid = getEntityProductId(pickedEnt);
+
+        if (inst && pid) {
+          const key = `${inst}:${pid}`;
+          if (hs.key === key) return;
+
+          let rectFallback: Cesium.Entity | null = null;
+          if (inst === "CUSTOM") {
+            rectFallback = viewer.entities.getById(`CUSTOM_FP_${pid}`) || null;
+          } else {
+            rectFallback =
+              viewer.entities.getById(`${inst}_VP_${pid}`) ||
+              viewer.entities.getById(`${inst}_VP_${pid}_1`) ||
+              viewer.entities.getById(`${inst}_VP_${pid}_2`) ||
+              viewer.entities.getById(`${inst}_VP_${pid}_3`) ||
+              viewer.entities.getById(`${inst === "HIRISE" ? "HIRISE" : "CRISM"}_${pid}_0`) ||
+              viewer.entities.getById(`${inst === "HIRISE" ? "HIRISE" : "CRISM"}_${pid}_1`) ||
+              null;
+          }
+
+          const rectTarget =
+            rectFallback && (rectFallback as any).rectangle ? rectFallback : null;
+
+          const labelEnt = inst === "CUSTOM"
+            ? viewer.entities.getById(`CUSTOM_LABEL_${pid}`) || null
+            : viewer.entities.getById(`${inst}_VP_LABEL_${pid}`) ||
+              viewer.entities.getById(`${inst}_LABEL_${pid}`) || null;
+          const pointEnt = inst === "CUSTOM"
+            ? null
+            : viewer.entities.getById(`${inst}_VP_POINT_${pid}`) ||
+              viewer.entities.getById(`${inst}_POINT_${pid}`) || null;
+
+          clearHighlight();
+
+          if (rectTarget?.rectangle) {
+            hs.key = key;
+
+            hs.rectEnt = rectTarget;
+            hs.origRectMaterial = rectTarget.rectangle.material;
+
+            const ocAny: any = rectTarget.rectangle.outlineColor;
+            const ocVal =
+              ocAny?.getValue?.(Cesium.JulianDate.now()) ??
+              (ocAny instanceof Cesium.Color ? ocAny : undefined);
+            if (ocVal instanceof Cesium.Color) {
+              hs.origOutlineColor = ocVal;
+            }
+
+            rectTarget.rectangle.material =
+              inst === "HIRISE"
+                ? HILITE_RECT_MATERIAL_HIRISE
+                : inst === "CUSTOM"
+                  ? HILITE_RECT_MATERIAL_CUSTOM
+                  : HILITE_RECT_MATERIAL_CRISM;
+
+            rectTarget.rectangle.outlineColor = new Cesium.ConstantProperty(
+              Cesium.Color.WHITE
+            ) as any;
+
+            if (labelEnt?.label) {
+              hs.labelEnt = labelEnt;
+              const cur = (labelEnt.label.scale as any);
+              hs.origLabelScale = typeof cur === "number" ? cur : 1.0;
+              (labelEnt.label.scale as any) = 1.2;
+            }
+
+            if (pointEnt?.point) {
+              hs.pointEnt = pointEnt;
+              const cur = (pointEnt.point.pixelSize as any);
+              hs.origPointSize = typeof cur === "number" ? cur : 6;
+              (pointEnt.point.pixelSize as any) = (hs.origPointSize ?? 6) + 2;
+            }
+
+            onHoverProductRef.current?.(pid);
+
+            viewer.scene.requestRender();
+            return;
+          }
+        }
+      }
+
+      if (hs.rectEnt || hs.labelEnt || hs.pointEnt) {
+        clearHighlight();
+        onHoverProductRef.current?.(null);
+        viewer.scene.requestRender();
+      }
+    }, 50); // 50ms throttle = max 20 picks/sec (was unlimited)
+
     hoverHandler.setInputAction(
       (m: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
         const p = viewer.camera.pickEllipsoid(m.endPosition, MARS_ELLIPSOID);
@@ -728,154 +904,9 @@ export default function MapView({
         const hoverLon = Cesium.Math.toDegrees(c.longitude);
         setHover({ lat: hoverLat, lon: hoverLon });
 
-        // Check if hovering over an overlay and change cursor
-        let isOverOverlay = false;
-        const allOverlayIds = [...highResOverlaysRef.current, ...quickviewOverlaysRef.current];
-        for (const productId of allOverlayIds) {
-          const overlayEnt = viewer.entities.getById(`HIGHRES_OVERLAY_${productId}`) ||
-                             viewer.entities.getById(`QUICKVIEW_OVERLAY_${productId}`);
-          if (overlayEnt?.rectangle?.coordinates) {
-            const rect = overlayEnt.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle;
-            const west = Cesium.Math.toDegrees(rect.west);
-            const east = Cesium.Math.toDegrees(rect.east);
-            const south = Cesium.Math.toDegrees(rect.south);
-            const north = Cesium.Math.toDegrees(rect.north);
-            if (hoverLon >= west && hoverLon <= east && hoverLat >= south && hoverLat <= north) {
-              isOverOverlay = true;
-              break;
-            }
-          }
-        }
-        viewer.canvas.style.cursor = isOverOverlay ? "crosshair" : "default";
-
-        const picked = viewer.scene
-          .drillPick(m.endPosition)
-          .find((x: any) => x?.id instanceof Cesium.Entity);
-
-        const pickedEnt = picked?.id as Cesium.Entity | undefined;
-        const hs = highlightRef.current;
-
-        const clearHighlight = () => {
-          if (hs.rectEnt?.rectangle) {
-            hs.rectEnt.rectangle.material = hs.origRectMaterial;
-            if (hs.origOutlineColor && hs.rectEnt.rectangle.outlineColor) {
-              hs.rectEnt.rectangle.outlineColor = new Cesium.ConstantProperty(
-                hs.origOutlineColor
-              ) as any;
-            }
-          }
-          if (hs.labelEnt?.label && typeof hs.origLabelScale === "number") {
-            (hs.labelEnt.label.scale as any) = hs.origLabelScale;
-          }
-          if (hs.pointEnt?.point && typeof hs.origPointSize === "number") {
-            (hs.pointEnt.point.pixelSize as any) = hs.origPointSize;
-          }
-
-          hs.key = null;
-          hs.rectEnt = null;
-          hs.labelEnt = null;
-          hs.pointEnt = null;
-          hs.origRectMaterial = null;
-          hs.origOutlineColor = undefined;
-          hs.origLabelScale = undefined;
-          hs.origPointSize = undefined;
-        };
-
-        if (pickedEnt) {
-          const inst = getEntityInstrument(pickedEnt);
-          const pid = getEntityProductId(pickedEnt);
-
-          if (inst && pid) {
-            const key = `${inst}:${pid}`;
-
-            // ✅ 같은 대상이면 재적용 금지 (무한 scale 누적 버그 근본 차단)
-            if (hs.key === key) return;
-
-            // Try FootprintManager entity IDs first, then legacy IDs
-            let rectFallback: Cesium.Entity | null = null;
-            if (inst === "CUSTOM") {
-              rectFallback = viewer.entities.getById(`CUSTOM_FP_${pid}`) || null;
-            } else {
-              rectFallback =
-                viewer.entities.getById(`${inst}_VP_${pid}`) ||  // FootprintManager ID
-                viewer.entities.getById(`${inst}_VP_${pid}_1`) ||
-                viewer.entities.getById(`${inst}_VP_${pid}_2`) ||
-                viewer.entities.getById(`${inst}_VP_${pid}_3`) ||
-                viewer.entities.getById(`${inst === "HIRISE" ? "HIRISE" : "CRISM"}_${pid}_0`) ||  // Legacy ID
-                viewer.entities.getById(`${inst === "HIRISE" ? "HIRISE" : "CRISM"}_${pid}_1`) ||
-                null;
-            }
-
-            const rectTarget =
-              rectFallback && (rectFallback as any).rectangle ? rectFallback : null;
-
-            // Try FootprintManager entity IDs first, then legacy IDs
-            const labelEnt = inst === "CUSTOM"
-              ? viewer.entities.getById(`CUSTOM_LABEL_${pid}`) || null
-              : viewer.entities.getById(`${inst}_VP_LABEL_${pid}`) ||
-                viewer.entities.getById(`${inst}_LABEL_${pid}`) || null;
-            const pointEnt = inst === "CUSTOM"
-              ? null
-              : viewer.entities.getById(`${inst}_VP_POINT_${pid}`) ||
-                viewer.entities.getById(`${inst}_POINT_${pid}`) || null;
-
-            clearHighlight();
-
-            if (rectTarget?.rectangle) {
-              hs.key = key;
-
-              hs.rectEnt = rectTarget;
-              hs.origRectMaterial = rectTarget.rectangle.material;
-
-              const ocAny: any = rectTarget.rectangle.outlineColor;
-              const ocVal =
-                ocAny?.getValue?.(Cesium.JulianDate.now()) ??
-                (ocAny instanceof Cesium.Color ? ocAny : undefined);
-              if (ocVal instanceof Cesium.Color) {
-                hs.origOutlineColor = ocVal;
-              }
-
-              rectTarget.rectangle.material =
-                inst === "HIRISE"
-                  ? HILITE_RECT_MATERIAL_HIRISE
-                  : inst === "CUSTOM"
-                    ? HILITE_RECT_MATERIAL_CUSTOM
-                    : HILITE_RECT_MATERIAL_CRISM;
-
-              rectTarget.rectangle.outlineColor = new Cesium.ConstantProperty(
-                Cesium.Color.WHITE
-              ) as any;
-
-              // ✅ label scale은 "곱하기"가 아니라 "고정값"으로 (누적 방지)
-              if (labelEnt?.label) {
-                hs.labelEnt = labelEnt;
-                const cur = (labelEnt.label.scale as any);
-                hs.origLabelScale = typeof cur === "number" ? cur : 1.0;
-                (labelEnt.label.scale as any) = 1.2; // <- 고정
-              }
-
-              if (pointEnt?.point) {
-                hs.pointEnt = pointEnt;
-                const cur = (pointEnt.point.pixelSize as any);
-                hs.origPointSize = typeof cur === "number" ? cur : 6;
-                (pointEnt.point.pixelSize as any) = (hs.origPointSize ?? 6) + 2;
-              }
-
-              // Notify parent of hovered product (bidirectional sync)
-              onHoverProductRef.current?.(pid);
-
-              viewer.scene.requestRender();
-              return;
-            }
-          }
-        }
-
-        if (hs.rectEnt || hs.labelEnt || hs.pointEnt) {
-          clearHighlight();
-          // Clear hovered product when moving away
-          onHoverProductRef.current?.(null);
-          viewer.scene.requestRender();
-        }
+        // Throttle the expensive drillPick + highlight operations
+        lastPickPosition = m.endPosition.clone();
+        throttledPick(lastPickPosition, hoverLat, hoverLon);
       },
       Cesium.ScreenSpaceEventType.MOUSE_MOVE
     );
@@ -1004,7 +1035,7 @@ export default function MapView({
           // Compute footprint center for accurate lat/lon
           let overlayLat = clickLat;
           let overlayLon = clickLon;
-          const fpInst = productId.startsWith("DTEEC_") || productId.startsWith("DTE_") ? "HIRISE_DTM"
+          const fpInst = productId.startsWith("DTE") ? "HIRISE_DTM"
             : productId.startsWith("ESP_") ? "HIRISE" : "CRISM";
           const fpEnt = viewer.entities.getById(`${fpInst}_FP_${productId}`);
           if (fpEnt?.rectangle?.coordinates) {
@@ -1013,6 +1044,7 @@ export default function MapView({
             overlayLon = Cesium.Math.toDegrees((fpRect.west + fpRect.east) / 2);
           }
 
+          const overlayTitle = fpEnt?.properties?.title?.getValue?.() as string | undefined;
           onSelect({
             instrument,
             productId,
@@ -1020,6 +1052,7 @@ export default function MapView({
             lon: overlayLon,
             pixelLine,
             pixelSample,
+            title: overlayTitle,
           });
 
           return; // Don't process further - overlay click handled
@@ -1123,7 +1156,8 @@ export default function MapView({
             viewer.camera.flyTo({ destination: paddedRectangle(rect, 0.5), duration: 0.6 });
           }
 
-          onHiRiseDTMClickRef.current?.(productId, dtmLat, dtmLon);
+          const dtmTitle = dtmRectEnt?.properties?.title?.getValue?.() as string | undefined;
+          onHiRiseDTMClickRef.current?.(productId, dtmLat, dtmLon, dtmTitle);
 
           // Load elevation grid for hover (async, non-blocking)
           activeDTMProductRef.current = productId;
@@ -1202,8 +1236,8 @@ export default function MapView({
             destination: dest,
             duration: 0.6,
           });
-        } else {
-          // Fallback: load LBL directly to get bounds for fly-to
+        } else if (instrument === "HIRISE" || instrument === "CRISM") {
+          // Fallback: load LBL directly to get bounds for fly-to (HIRISE/CRISM only)
           console.log("[Click] No rectangle entity found, loading LBL for fly-to:", productId);
           const isHiRISE = instrument === "HIRISE";
           const lbl = isHiRISE
@@ -1485,7 +1519,11 @@ export default function MapView({
     };
   }, [viewBoundSelectionMode]);
 
+  // Keep inspected product ref in sync
+  inspectedProductIdRef.current = inspectedProductId ?? null;
+
   // Helper: apply per-entity visibility for an instrument considering overlap filter
+  // Always force-shows the inspected product's footprint regardless of visibility/filter state
   const applyInstrumentVisibility = useCallback((instrument: FPInstrumentType, show: boolean) => {
     const fm = footprintManagerRef.current;
     const viewer = viewerRef.current;
@@ -1507,6 +1545,18 @@ export default function MapView({
     } else {
       fm.setVisible(instrument, show);
     }
+
+    // Force-show inspected product's footprint regardless of layer/filter state
+    const ipid = inspectedProductIdRef.current;
+    if (ipid) {
+      const fpEntity = viewer.entities.getById(`${instrument}_FP_${ipid}`);
+      if (fpEntity) {
+        fpEntity.show = true;
+        const lblEntity = viewer.entities.getById(`${instrument}_LBL_${ipid}`);
+        if (lblEntity) lblEntity.show = true;
+      }
+    }
+
     viewer.scene.requestRender();
   }, []);
 
@@ -1585,6 +1635,17 @@ export default function MapView({
       if (labelEntity) labelEntity.show = visible;
     }
 
+    // Force-show inspected product's CRISM footprint
+    const ipid = inspectedProductIdRef.current;
+    if (ipid) {
+      const fpEnt = viewer.entities.getById(`CRISM_FP_${ipid}`);
+      if (fpEnt) {
+        fpEnt.show = true;
+        const lblEnt = viewer.entities.getById(`CRISM_LBL_${ipid}`);
+        if (lblEnt) lblEnt.show = true;
+      }
+    }
+
     viewer.scene.requestRender();
   }, [crismFilteredIds, showCRISM]);
 
@@ -1601,12 +1662,16 @@ export default function MapView({
   }, [showCTX, applyInstrumentVisibility]);
 
   useEffect(() => {
+    applyInstrumentVisibility("CRISM_TRR3", showCRISM_TRR3);
+  }, [showCRISM_TRR3, applyInstrumentVisibility]);
+
+  useEffect(() => {
     applyInstrumentVisibility("HIRISE_DTM", showHiRISEDTM);
     // Also show/hide quickview overlay entities for DTM products
     const viewer = viewerRef.current;
     if (viewer) {
       for (const id of quickviewOverlayIdsRef.current) {
-        if (id.startsWith("DTEEC_") || id.startsWith("DTE_")) {
+        if (id.startsWith("DTE")) {
           const ent = viewer.entities.getById(`QUICKVIEW_OVERLAY_${id}`);
           if (ent) ent.show = showHiRISEDTM;
         }
@@ -1615,11 +1680,28 @@ export default function MapView({
     }
   }, [showHiRISEDTM, applyInstrumentVisibility]);
 
+  // Force-show the inspected product's footprint when inspector selection changes
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !inspectedProductId) return;
+
+    const instruments = ["HIRISE", "CRISM", "CTX", "SHARAD", "SHARAD_HIGHRES", "HIRISE_DTM", "CRISM_TRR3"];
+    for (const inst of instruments) {
+      const fpEntity = viewer.entities.getById(`${inst}_FP_${inspectedProductId}`);
+      if (fpEntity) {
+        fpEntity.show = true;
+        const lblEntity = viewer.entities.getById(`${inst}_LBL_${inspectedProductId}`);
+        if (lblEntity) lblEntity.show = true;
+        break;
+      }
+    }
+    viewer.scene.requestRender();
+  }, [inspectedProductId]);
+
   // Note: Legacy footprint overlay hiding is no longer needed since
   // footprints are now managed by FootprintManager (viewport-based loading)
 
   // Multi-Instrument Overlap Filter: compute and apply visibility
-  const overlapInstrumentsKey = overlapFilter?.instruments?.slice().sort().join(",") ?? "";
   const overlapEnabled = overlapFilter?.enabled ?? false;
 
   useEffect(() => {
@@ -1627,8 +1709,8 @@ export default function MapView({
     const viewer = viewerRef.current;
     if (!fm || !viewer) return;
 
-    // If filter disabled or <2 instruments, clear and restore normal visibility
-    if (!overlapEnabled || !overlapFilter?.instruments || overlapFilter.instruments.length < 2) {
+    // If filter disabled, clear and restore normal visibility
+    if (!overlapEnabled) {
       overlapResultRef.current = null;
       onOverlapStatsChange?.(null);
       // Restore visibility for all instruments to match their toggle state
@@ -1636,6 +1718,7 @@ export default function MapView({
       if (showHiRISE) fm.setVisible("HIRISE", true);
       if (showSHARAD) fm.setVisible("SHARAD", true);
       if (showSharadHighres) fm.setVisible("SHARAD_HIGHRES", true);
+      if (showCTX) fm.setVisible("CTX", true);
       if (showHiRISEDTM) fm.setVisible("HIRISE_DTM", true);
       // Re-apply CRISM ice score filter if active
       if (crismFilteredIds !== null && showCRISM) {
@@ -1655,18 +1738,19 @@ export default function MapView({
       return;
     }
 
-    // Gather features from FootprintManager for selected instruments
-    const selectedInstruments = overlapFilter.instruments as FPInstrumentType[];
+    // Auto-detect all instruments with loaded features
+    const allInstruments: FPInstrumentType[] = ["CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES", "CTX", "HIRISE_DTM", "CRISM_TRR3"];
     const featuresByInstrument = new Map<FPInstrumentType, any[]>();
-    for (const inst of selectedInstruments) {
+    for (const inst of allInstruments) {
       const features = fm.getFeatures(inst);
       if (features.length > 0) {
         featuresByInstrument.set(inst, features);
       }
     }
+    const selectedInstruments = Array.from(featuresByInstrument.keys());
 
     // Need at least 2 instruments with loaded features
-    if (featuresByInstrument.size < 2) {
+    if (selectedInstruments.length < 2) {
       overlapResultRef.current = null;
       onOverlapStatsChange?.({ totalChecked: 0, totalPassing: 0, perInstrument: new Map() });
       viewer.scene.requestRender();
@@ -1712,8 +1796,8 @@ export default function MapView({
 
     viewer.scene.requestRender();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overlapEnabled, overlapInstrumentsKey, footprintVersion, crismFilteredIds,
-      showCRISM, showHiRISE, showSHARAD, showSharadHighres, showHiRISEDTM]);
+  }, [overlapEnabled, footprintVersion, crismFilteredIds,
+      showCRISM, showHiRISE, showSHARAD, showSharadHighres, showCTX, showHiRISEDTM]);
 
   // Line Profile markers and polyline
   useEffect(() => {
@@ -1970,7 +2054,7 @@ export default function MapView({
 
       // Fallback: try LBL-based fly-to for HiRISE/CRISM
       const isHiRISE = pid.startsWith("ESP_") || pid.startsWith("PSP_");
-      const isCRISM = pid.toLowerCase().match(/^(frt|hrl|hrs|frs|arl|atl)/);
+      const isCRISM = pid.toLowerCase().match(/^(frt|hrl|hrs|frs)/);
 
       if (isHiRISE || isCRISM) {
         const lbl = isHiRISE
@@ -2026,7 +2110,7 @@ export default function MapView({
           if (feat.geometry.type === "LineString" && coords.length >= 2) {
             // Fly to midpoint of the line
             const midIdx = Math.floor(coords.length / 2);
-            const [lon, lat] = coords[midIdx];
+            const [_lon, _lat] = coords[midIdx];
             const rect = Cesium.Rectangle.fromDegrees(
               Math.min(...coords.map((c: number[]) => c[0])),
               Math.min(...coords.map((c: number[]) => c[1])),
@@ -2080,6 +2164,75 @@ export default function MapView({
 
     onFlyToCoordsComplete?.();
   }, [flyToCoords, onFlyToCoordsComplete]);
+
+  // Temporarily highlight a product after fly-to (deep-link from DataDownloadPage)
+  useEffect(() => {
+    if (!highlightProductId) return;
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const pid = highlightProductId;
+    const instruments = ["HIRISE", "CRISM", "CTX", "SHARAD", "SHARAD_HIGHRES", "HIRISE_DTM", "CUSTOM"];
+    let entity: Cesium.Entity | null = null;
+
+    for (const inst of instruments) {
+      const e = viewer.entities.getById(`${inst}_FP_${pid}`);
+      if (e) { entity = e; break; }
+    }
+
+    if (!entity) {
+      onHighlightComplete?.();
+      return;
+    }
+
+    // Save original material
+    const origMaterial = entity.rectangle?.material;
+    const origOutline = entity.rectangle?.outlineColor;
+    const origOutlineWidth = entity.rectangle?.outlineWidth;
+
+    // Apply bright highlight
+    if (entity.rectangle) {
+      entity.rectangle.material = new Cesium.ColorMaterialProperty(
+        Cesium.Color.MAGENTA.withAlpha(0.7)
+      ) as any;
+      entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE) as any;
+      entity.rectangle.outlineWidth = new Cesium.ConstantProperty(3) as any;
+    }
+    // Also handle polyline entities (SHARAD)
+    if (entity.polyline) {
+      const origPolyMaterial = entity.polyline.material;
+      const origPolyWidth = entity.polyline.width;
+      entity.polyline.material = new Cesium.ColorMaterialProperty(Cesium.Color.MAGENTA) as any;
+      entity.polyline.width = new Cesium.ConstantProperty(5) as any;
+
+      viewer.scene.requestRender();
+
+      const timer = setTimeout(() => {
+        if (entity?.polyline) {
+          entity.polyline.material = origPolyMaterial as any;
+          entity.polyline.width = origPolyWidth as any;
+        }
+        viewer.scene.requestRender();
+        onHighlightComplete?.();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+
+    viewer.scene.requestRender();
+
+    // Restore after 3 seconds
+    const timer = setTimeout(() => {
+      if (entity?.rectangle) {
+        entity.rectangle.material = origMaterial as any;
+        entity.rectangle.outlineColor = origOutline as any;
+        entity.rectangle.outlineWidth = origOutlineWidth as any;
+      }
+      viewer.scene.requestRender();
+      onHighlightComplete?.();
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [highlightProductId, onHighlightComplete]);
 
   // Bring high-res overlay to front when bringToFrontId changes
   useEffect(() => {
@@ -2232,7 +2385,7 @@ export default function MapView({
         needsRender = true;
       }
       // Clear active DTM if this was a DTM product being hidden
-      if ((id.startsWith("DTEEC_") || id.startsWith("DTE_")) && activeDTMProductRef.current === id) {
+      if (id.startsWith("DTE") && activeDTMProductRef.current === id) {
         activeDTMProductRef.current = null;
         dtmHoverReadoutRef.current?.hide();
       }
@@ -2258,14 +2411,15 @@ export default function MapView({
 
       const existingEnt = viewer.entities.getById(`QUICKVIEW_OVERLAY_${productId}`);
       if (existingEnt) {
-        // Entity exists but was hidden - just show it
-        existingEnt.show = true;
+        // Entity exists but was hidden - show it (but respect DTM layer toggle)
+        const isDTM = productId.startsWith("DTE");
+        existingEnt.show = isDTM ? showHiRISEDTM : true;
         setFootprintTransparent(viewer, productId, true);
         existingIds.add(productId);
         needsRender = true;
 
         // For HiRISE DTM, ensure elevation grid is loaded for hover
-        if (productId.startsWith("DTEEC_") || productId.startsWith("DTE_")) {
+        if (isDTM) {
           activeDTMProductRef.current = productId;
           if (!dtmGridCacheRef.current.has(productId)) {
             loadDTMElevationGrid(productId).then((grid) => {
@@ -2320,11 +2474,13 @@ export default function MapView({
           if (!bounds || !viewerRef.current) return null;
 
           const isHiRISE = productId.startsWith("ESP_");
-          const isHiRISEDTM = productId.startsWith("DTEEC_") || productId.startsWith("DTE_");
+          const isHiRISEDTM = productId.startsWith("DTE");
+          // TRR3 IDs: {type}{hex}_{nn} (no _mtr3 suffix), e.g. frs0005bad3_01
+          const isTRR3 = /^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(productId);
 
           // Derive quickview URL
           let imageUrl: string;
-          let instrument: "HIRISE" | "CRISM" | "HIRISE_DTM" = "CRISM";
+          let instrument: "HIRISE" | "CRISM" | "HIRISE_DTM" | "CRISM_TRR3" = "CRISM";
 
           if (isHiRISEDTM) {
             imageUrl = `/hirise_dtm/overlay/${productId}.png`;
@@ -2332,6 +2488,9 @@ export default function MapView({
           } else if (isHiRISE) {
             imageUrl = `/hirise/quickview/${productId}.png`;
             instrument = "HIRISE";
+          } else if (isTRR3) {
+            imageUrl = `/api/mineral-cnn/quickview/${productId}`;
+            instrument = "CRISM_TRR3";
           } else if (productId.includes("_brcarj_")) {
             const baseObsId = productId.split("_")[0];
             imageUrl = `/crism/quickview/${baseObsId}_VNIR.png`;
@@ -2355,8 +2514,10 @@ export default function MapView({
           if (!result) continue;
           const { productId, bounds, imageUrl, instrument } = result;
 
+          const isDTM = instrument === "HIRISE_DTM";
           v.entities.add({
             id: `QUICKVIEW_OVERLAY_${productId}`,
+            show: isDTM ? showHiRISEDTMRef.current : true,
             rectangle: {
               coordinates: Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north),
               material: new Cesium.ImageMaterialProperty({
@@ -2898,6 +3059,19 @@ export default function MapView({
         }
       }
 
+      // Get products from FootprintManager for CRISM TRR3
+      if (showCRISM_TRR3 && footprintManager.hasFootprints("CRISM_TRR3")) {
+        const trr3Features = footprintManager.getFeatures("CRISM_TRR3");
+        for (const feature of trr3Features) {
+          const pid = feature.properties.product_id;
+          if (pid && !seen.has(pid) && passesOverlap("CRISM_TRR3", pid)) {
+            seen.add(pid);
+            const center = getFeatureCenter(feature);
+            visible.push({ productId: pid, instrument: "CRISM_TRR3", lat: center?.lat, lon: center?.lon });
+          }
+        }
+      }
+
       // Include custom datasets that are loaded and visible
       if (showCustomData) {
         for (const dataset of customDatasets) {
@@ -2934,7 +3108,7 @@ export default function MapView({
       clearTimeout(initTimeout);
       clearInterval(interval);
     };
-  }, [showHiRISE, showCRISM, showCTX, showHiRISEDTM, showCustomData, customDatasets, onVisibleProductsChange, crismFilteredIds, overlapEnabled, overlapInstrumentsKey, footprintVersion]);
+  }, [showHiRISE, showCRISM, showCTX, showHiRISEDTM, showCRISM_TRR3, showCustomData, customDatasets, onVisibleProductsChange, crismFilteredIds, overlapEnabled, footprintVersion]);
 
   // PERFORMANCE OPTIMIZED: Update overlay opacity when per-product opacities change
   useEffect(() => {
@@ -3200,30 +3374,19 @@ export default function MapView({
     if (!viewer) return;
 
     const PREFIX = "FIELDNOTE_";
+    let cancelled = false;
 
-    // Remove existing field note markers
-    const toRemove: Cesium.Entity[] = [];
-    for (let i = 0; i < viewer.entities.values.length; i++) {
-      const ent = viewer.entities.values[i];
-      if (ent.id.startsWith(PREFIX)) toRemove.push(ent);
-    }
-    for (const ent of toRemove) viewer.entities.remove(ent);
+    // Helper to add a field note marker
+    const addFieldNoteMarker = (
+      v: Cesium.Viewer,
+      note: { id: string; product_id: string; instrument: string },
+      lat: number,
+      lon: number
+    ) => {
+      // Check if already exists
+      if (v.entities.getById(`${PREFIX}${note.id}`)) return;
 
-    if (!fieldNotes || fieldNotes.length === 0) {
-      viewer.scene.requestRender();
-      return;
-    }
-
-    // Create markers at each field note's lat/lon (works regardless of layer state)
-    for (const note of fieldNotes) {
-      // Use stored lat/lon from field note
-      const lat = note.lat;
-      const lon = note.lon;
-
-      // Skip if no valid coordinates
-      if (lat === 0 && lon === 0) continue;
-
-      viewer.entities.add({
+      v.entities.add({
         id: `${PREFIX}${note.id}`,
         position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
         billboard: {
@@ -3250,9 +3413,109 @@ export default function MapView({
           instrument: note.instrument,
         },
       });
+    };
+
+    // Remove existing field note markers
+    const toRemove: Cesium.Entity[] = [];
+    for (let i = 0; i < viewer.entities.values.length; i++) {
+      const ent = viewer.entities.values[i];
+      if (ent.id.startsWith(PREFIX)) toRemove.push(ent);
+    }
+    for (const ent of toRemove) viewer.entities.remove(ent);
+
+    if (!fieldNotes || fieldNotes.length === 0) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    // Collect notes that need coordinate lookup
+    const notesNeedingCoords: typeof fieldNotes = [];
+
+    // Create markers at each field note's lat/lon (works regardless of layer state)
+    for (const note of fieldNotes) {
+      const lat = note.lat;
+      const lon = note.lon;
+
+      // If coordinates are 0,0, we need to look them up
+      if (lat === 0 && lon === 0) {
+        notesNeedingCoords.push(note);
+        continue;
+      }
+
+      addFieldNoteMarker(viewer, note, lat, lon);
+    }
+
+    // Fetch coordinates for notes with 0,0 coords (async)
+    if (notesNeedingCoords.length > 0) {
+      // Group by instrument to minimize API calls
+      const byInstrument = new Map<string, typeof fieldNotes>();
+      for (const note of notesNeedingCoords) {
+        const inst = note.instrument;
+        if (!byInstrument.has(inst)) byInstrument.set(inst, []);
+        byInstrument.get(inst)!.push(note);
+      }
+
+      // Fetch footprints for each instrument
+      for (const [instrument, notes] of byInstrument) {
+        (async () => {
+          try {
+            const res = await fetch(
+              `/api/footprints?instrument=${instrument}&bbox=-180,-90,180,90&limit=5000&lod=poly`
+            );
+            if (!res.ok || cancelled) return;
+
+            const data = await res.json();
+            if (cancelled) return;
+
+            const v = viewerRef.current;
+            if (!v) return;
+
+            for (const note of notes) {
+              const feat = data.features?.find(
+                (f: any) => f.properties?.product_id === note.product_id
+              );
+              if (!feat?.geometry?.coordinates) continue;
+
+              let lat = 0, lon = 0;
+              const geom = feat.geometry;
+
+              if (geom.type === "LineString" && geom.coordinates.length >= 2) {
+                // For LineStrings (SHARAD tracks), use midpoint
+                const midIdx = Math.floor(geom.coordinates.length / 2);
+                lon = geom.coordinates[midIdx][0];
+                lat = geom.coordinates[midIdx][1];
+              } else if (geom.type === "Polygon" && geom.coordinates[0]?.length > 0) {
+                // For Polygons, compute centroid
+                const ring = geom.coordinates[0];
+                let sumLat = 0, sumLon = 0;
+                for (const [plon, plat] of ring) {
+                  sumLon += plon;
+                  sumLat += plat;
+                }
+                lon = sumLon / ring.length;
+                lat = sumLat / ring.length;
+              } else if (geom.type === "Point") {
+                lon = geom.coordinates[0];
+                lat = geom.coordinates[1];
+              }
+
+              if (lat !== 0 || lon !== 0) {
+                addFieldNoteMarker(v, note, lat, lon);
+                v.scene.requestRender();
+              }
+            }
+          } catch (err) {
+            console.warn(`[FieldNotes] Failed to fetch coords for ${instrument}:`, err);
+          }
+        })();
+      }
     }
 
     viewer.scene.requestRender();
+
+    return () => {
+      cancelled = true;
+    };
   }, [fieldNotes]);
 
   // Keep DTM hover mode ref in sync with state
@@ -3366,6 +3629,47 @@ export default function MapView({
       viewer.scene.requestRender();
     }
   }, [analysisMode]);
+
+  // ──────────── SHARAD Trace Pin ────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const TRACE_PIN_ID = "SHARAD_TRACE_PIN";
+    const old = viewer.entities.getById(TRACE_PIN_ID);
+    if (old) viewer.entities.remove(old);
+
+    if (!sharadTracePin) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    const { lat, lon } = sharadTracePin;
+    viewer.entities.add({
+      id: TRACE_PIN_ID,
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, MARS_ELLIPSOID),
+      point: {
+        pixelSize: 10,
+        color: Cesium.Color.fromCssColorString("#f59e0b"),
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 2,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+      label: {
+        text: `${lat.toFixed(3)}°, ${lon.toFixed(3)}°`,
+        font: "bold 11px monospace",
+        fillColor: Cesium.Color.fromCssColorString("#f59e0b"),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -12),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+
+    viewer.scene.requestRender();
+  }, [sharadTracePin]);
 
   // ──────────── Coordinate Grid Overlay ────────────
   const gridSpacingRef = useRef<number | null>(null);
@@ -3593,6 +3897,43 @@ export default function MapView({
       )}
 
       {/* Footprint loading indicators moved to LayerPanel */}
+
+      {/* Score Overlay Legend */}
+      {scoreOverlays.size > 0 && (
+        <div className="absolute bottom-6 right-6 rounded-lg border border-border-dark bg-bg-dark/90 p-3 backdrop-blur-md">
+          {/* Determine which score types are active */}
+          {(() => {
+            const activeTypes = new Set<ScoreProductType>();
+            scoreOverlays.forEach((types) => types.forEach((t) => activeTypes.add(t)));
+            return (
+              <div className="space-y-2">
+                <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
+                  {activeTypes.has("score_ice") && activeTypes.has("score_hyd")
+                    ? "Ice / Hydration Score"
+                    : activeTypes.has("score_ice")
+                    ? "Ice Score"
+                    : "Hydration Score"}
+                </div>
+                {/* Gradient bar */}
+                <div
+                  className="h-2.5 w-40 rounded-sm border border-white/10"
+                  style={{
+                    background: "linear-gradient(to right, #ffffff 0%, #808080 25%, #000000 50%, #5a0000 75%, #b40000 100%)",
+                  }}
+                />
+                {/* Tick labels */}
+                <div className="flex justify-between text-[8px] font-mono text-slate-400 w-40">
+                  <span>0</span>
+                  <span>0.5</span>
+                  <span>1.0</span>
+                  <span>1.5</span>
+                  <span>2.0</span>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* DTM Hover Readout - shows elevation on hover */}
       <DTMHoverReadout

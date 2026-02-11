@@ -3,8 +3,16 @@
  * Replaces hardcoded instrument-specific logic across the frontend.
  */
 
-export type InstrumentId = 'crism' | 'hirise' | 'sharad';
+export type InstrumentId = 'crism' | 'hirise' | 'sharad' | 'sharad_highres' | 'ctx' | 'hirise_dtm' | 'crism_trr3';
 export type GeometryType = 'Polygon' | 'LineString' | 'Point';
+export type InstrumentGroupId = 'spectral' | 'imaging' | 'radar';
+
+export interface InstrumentGroup {
+  id: InstrumentGroupId;
+  displayName: string;
+  icon: string;
+  instruments: InstrumentId[];
+}
 
 export interface InstrumentConfig {
   /** Unique identifier (lowercase) */
@@ -13,6 +21,10 @@ export interface InstrumentConfig {
   name: string;
   /** Full display name */
   displayName: string;
+  /** Sub-label shown in hierarchy tree (e.g. "MTRDR", "Images", "DTM") */
+  subLabel: string;
+  /** Parent group */
+  group: InstrumentGroupId;
   /** GeoJSON geometry type */
   geometryType: GeometryType;
   /** Hex color for map rendering */
@@ -41,6 +53,15 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 }
 
 /**
+ * Instrument groups for hierarchical display
+ */
+export const INSTRUMENT_GROUPS: InstrumentGroup[] = [
+  { id: 'spectral', displayName: 'Spectrum',  icon: 'science',       instruments: ['crism', 'crism_trr3'] },
+  { id: 'imaging',  displayName: 'Imagery',   icon: 'photo_camera',  instruments: ['hirise', 'hirise_dtm', 'ctx'] },
+  { id: 'radar',    displayName: 'Radar',     icon: 'radar',         instruments: ['sharad', 'sharad_highres'] },
+];
+
+/**
  * All registered instruments
  */
 export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
@@ -48,6 +69,8 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     id: 'crism',
     name: 'CRISM',
     displayName: 'Compact Reconnaissance Imaging Spectrometer for Mars',
+    subLabel: 'CRISM MTRDR',
+    group: 'spectral',
     geometryType: 'Polygon',
     color: '#00FFFF',
     cesiumColor: hexToRgb('#00FFFF'),
@@ -59,6 +82,8 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     id: 'hirise',
     name: 'HiRISE',
     displayName: 'High Resolution Imaging Science Experiment',
+    subLabel: 'HiRISE JP2',
+    group: 'imaging',
     geometryType: 'Polygon',
     color: '#FFFF00',
     cesiumColor: hexToRgb('#FFFF00'),
@@ -70,11 +95,65 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     id: 'sharad',
     name: 'SHARAD',
     displayName: 'SHAllow RADar',
+    subLabel: 'THM',
+    group: 'radar',
     geometryType: 'LineString',
     color: '#FFA500',
     cesiumColor: hexToRgb('#FFA500'),
     productIdPattern: /^S_[0-9]+/i,
     supportsSpectrum: false,
+    supportsRgb: false,
+  },
+  sharad_highres: {
+    id: 'sharad_highres',
+    name: 'SHARAD_HIGHRES',
+    displayName: 'SHARAD High-Resolution RDR',
+    subLabel: 'RDR',
+    group: 'radar',
+    geometryType: 'LineString',
+    color: '#FFD700',
+    cesiumColor: hexToRgb('#FFD700'),
+    productIdPattern: /^R_[0-9]+/i,
+    supportsSpectrum: false,
+    supportsRgb: false,
+  },
+  ctx: {
+    id: 'ctx',
+    name: 'CTX',
+    displayName: 'Context Camera (MRO)',
+    subLabel: 'CTX',
+    group: 'imaging',
+    geometryType: 'Polygon',
+    color: '#FF69B4',
+    cesiumColor: hexToRgb('#FF69B4'),
+    productIdPattern: /.*CTX.*|^b[0-9]+_|^curiosity_ctx|^olympus_mons|^DEM_1m_|^InSight|^JEZ_ctx|^West_Candor/i,
+    supportsSpectrum: false,
+    supportsRgb: false,
+  },
+  hirise_dtm: {
+    id: 'hirise_dtm',
+    name: 'HIRISE_DTM',
+    displayName: 'HiRISE Digital Terrain Model',
+    subLabel: 'HiRISE DTM',
+    group: 'imaging',
+    geometryType: 'Polygon',
+    color: '#8B4513',
+    cesiumColor: hexToRgb('#8B4513'),
+    productIdPattern: /^DTE.*|^DTEEC.*/i,
+    supportsSpectrum: false,
+    supportsRgb: false,
+  },
+  crism_trr3: {
+    id: 'crism_trr3',
+    name: 'CRISM_TRR3',
+    displayName: 'CRISM Targeted Reduced Data Record v3',
+    subLabel: 'CRISM TRDR',
+    group: 'spectral',
+    geometryType: 'Polygon',
+    color: '#00CED1',
+    cesiumColor: hexToRgb('#00CED1'),
+    productIdPattern: /^(frt|hrl|hrs|frs)[0-9a-f]+_[0-9]+/i,
+    supportsSpectrum: true,
     supportsRgb: false,
   },
 };

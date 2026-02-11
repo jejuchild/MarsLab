@@ -14,11 +14,13 @@ This module handles:
 
 import re
 import asyncio
+import hashlib
 import aiohttp
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from enum import Enum
 import xml.etree.ElementTree as ET
+from cachetools import TTLCache
 
 
 # =============================================================================
@@ -26,6 +28,19 @@ import xml.etree.ElementTree as ET
 # =============================================================================
 
 ODE_REST_BASE = "https://oderest.rsl.wustl.edu/live2"
+
+# =============================================================================
+# Phase 2b: ODE Response Cache (5-minute TTL, 256 entries)
+# =============================================================================
+_ode_cache: TTLCache = TTLCache(maxsize=256, ttl=300)
+
+
+def _cache_key(*args) -> str:
+    """Create a stable cache key from query parameters."""
+    raw = "|".join(str(a) for a in args)
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
 ODE_PRODUCTFILES_BASE = "https://ode.rsl.wustl.edu/mars/productfiles.aspx"
 
 # Instrument types we support
@@ -34,6 +49,7 @@ class Instrument(str, Enum):
     HIRISE = "hirise"
     SHARAD = "sharad"
     SHARAD_HIGHRES = "sharad_highres"
+    HIRISE_DTM = "hirise_dtm"
 
 
 # =============================================================================
@@ -117,6 +133,9 @@ class SHARADHighResBundle:
     lbl_file: Optional[ODEFile] = None  # *.LBL
     # Orbit info
     orbit_number: Optional[int] = None
+    # Cluttergram (surface clutter simulation)
+    clutter_img: Optional[ODEFile] = None  # s_XXXXXXXX_sim.img
+    clutter_xml: Optional[ODEFile] = None  # s_XXXXXXXX_sim.xml
 
 
 # =============================================================================
@@ -147,6 +166,20 @@ def parse_crism_base_key(product_id: str) -> str:
     return product_id.lower()
 
 
+# Allowed CRISM observation types for science analysis.
+# Excludes mapping/survey modes (MSP, MSV, MSW) and calibration (ATO, ATU, EPF)
+# which have lower spectral resolution and are not useful for mineral identification.
+CRISM_TARGETED_PREFIXES = ("frt", "hrl", "hrs", "frs")
+
+
+def is_crism_targeted(product_id: str) -> bool:
+    """Check if a CRISM product is a targeted observation (FRT/HRL/HRS/FRS).
+
+    Excludes multi-spectral mapping (MSP/MSV/MSW) and calibration types.
+    """
+    return product_id.lower().startswith(CRISM_TARGETED_PREFIXES)
+
+
 def is_crism_product_id(product_id: str) -> bool:
     """
     Check if a string looks like a CRISM product ID.
@@ -157,10 +190,9 @@ def is_crism_product_id(product_id: str) -> bool:
     - hrs (Half Resolution Short)
     - frs (Full Resolution Short)
 
-    Note: arl/atl (Along-track Resolution) excluded for search focus.
+    Note: Mapping types (MSP/MSV/MSW) and calibration (ATO/ATU/EPF) excluded.
     """
-    prefixes = ("frt", "hrl", "hrs", "frs")
-    return product_id.lower().startswith(prefixes)
+    return product_id.lower().startswith(CRISM_TARGETED_PREFIXES)
 
 
 def is_hirise_product_id(product_id: str) -> bool:
@@ -201,6 +233,19 @@ def is_sharad_highres_product_id(product_id: str) -> bool:
     return bool(re.match(pattern, product_id.upper()))
 
 
+def is_hirise_dtm_product_id(product_id: str) -> bool:
+    """
+    Check if a string looks like a HiRISE DTM product ID.
+
+    HiRISE DTM IDs typically look like:
+    - DTEEC_060706_2195_060416_2195_A01
+    - DTEED_...
+    - DTE_ (partial search query)
+    """
+    upper = product_id.upper()
+    return upper.startswith("DTE") or upper.startswith("DTEEC")
+
+
 # =============================================================================
 # ODE REST API Queries
 # =============================================================================
@@ -234,6 +279,11 @@ async def search_ode_products(
     Returns:
         List of matching ODE products
     """
+    # Phase 2b: check cache first
+    ck = _cache_key("search_products", query, instrument, max_results)
+    if ck in _ode_cache:
+        return _ode_cache[ck]
+
     close_session = session is None
     if session is None:
         session = aiohttp.ClientSession()
@@ -261,11 +311,12 @@ async def search_ode_products(
             )
             products.extend(inst_products)
 
-        # Filter CRISM products to I/F reflectance data (_if) only
+        # Filter CRISM: targeted observations (FRT/HRL/HRS/FRS) + I/F data only
         if not instrument or instrument == Instrument.CRISM:
             products = [
                 p for p in products
-                if p.instrument != Instrument.CRISM or "_if" in p.product_id.lower()
+                if p.instrument != Instrument.CRISM
+                or (is_crism_targeted(p.product_id) and "_if" in p.product_id.lower())
             ]
 
         # Filter HiRISE products to RED channel only
@@ -304,7 +355,11 @@ async def search_ode_products(
             return (match_score, type_score, pid_lower)
 
         products.sort(key=sort_key)
-        return products[:max_results]
+        result = products[:max_results]
+
+        # Cache successful result
+        _ode_cache[ck] = result
+        return result
 
     finally:
         if close_session:
@@ -506,6 +561,11 @@ async def search_ode_spatial(
     Returns:
         List of products within the bounding box
     """
+    # Phase 2b: check cache first
+    ck = _cache_key("search_spatial", minlat, maxlat, westernlon, easternlon, instrument, max_results)
+    if ck in _ode_cache:
+        return _ode_cache[ck]
+
     close_session = session is None
     if session is None:
         session = aiohttp.ClientSession()
@@ -574,10 +634,12 @@ async def search_ode_spatial(
                 except Exception as e:
                     print(f"ODE spatial search error for {inst}: {e}")
 
-        # Filter CRISM products to I/F reflectance data (_if) only
+        # Filter CRISM: targeted observations (FRT/HRL/HRS/FRS) + I/F data only
+        # Excludes mapping/survey types (MSP, MSV, MSW) which have low spectral resolution
         products = [
             p for p in products
-            if p.instrument != Instrument.CRISM or "_if" in p.product_id.lower()
+            if p.instrument != Instrument.CRISM
+            or (is_crism_targeted(p.product_id) and "_if" in p.product_id.lower())
         ]
 
         # Sort: MTRDR before TRDR
@@ -587,7 +649,11 @@ async def search_ode_spatial(
             p.product_id.lower()
         ))
 
-        return products[:max_results]
+        result = products[:max_results]
+
+        # Cache successful result
+        _ode_cache[ck] = result
+        return result
 
     finally:
         if close_session:
@@ -1524,6 +1590,47 @@ async def resolve_sharad_highres_bundle(
                             url=f"{base_url}/{pid_lower}.dat",
                             file_type="Product"
                         )
+
+        # Also resolve cluttergram (surface clutter simulation)
+        obs_id = parts[1] if len(parts) >= 2 else ""
+        if obs_id:
+            sim_id = obs_id.zfill(8)
+            sim_url = (
+                f"{ODE_REST_BASE}?"
+                f"target=mars&ihid=mro&iid=sharad&"
+                f"productid=s_{sim_id}_sim*&output=json&results=pfm&limit=5"
+            )
+            try:
+                async with session.get(sim_url, timeout=aiohttp.ClientTimeout(total=30)) as sim_resp:
+                    if sim_resp.status == 200:
+                        sim_data = await sim_resp.json()
+                        sim_products_container = sim_data.get("ODEResults", {}).get("Products", {})
+                        if isinstance(sim_products_container, dict):
+                            sim_products = sim_products_container.get("Product", [])
+                            if isinstance(sim_products, dict):
+                                sim_products = [sim_products]
+                            if sim_products:
+                                sim_files = sim_products[0].get("Product_files", {}).get("Product_file", [])
+                                if isinstance(sim_files, dict):
+                                    sim_files = [sim_files]
+                                for sf in sim_files:
+                                    fname = sf.get("FileName", "").upper()
+                                    surl = sf.get("URL", "")
+                                    if fname.endswith("_SIM.IMG"):
+                                        bundle.clutter_img = ODEFile(
+                                            filename=fname.lower(),
+                                            url=surl,
+                                            file_type="Product",
+                                            size_bytes=int(sf.get("KBytes", 0)) * 1024,
+                                        )
+                                    elif fname.endswith("_SIM.XML"):
+                                        bundle.clutter_xml = ODEFile(
+                                            filename=fname.lower(),
+                                            url=surl,
+                                            file_type="Label",
+                                        )
+            except Exception as e2:
+                print(f"Warning: Could not resolve cluttergram: {e2}")
 
     except Exception as e:
         print(f"Error resolving SHARAD High-Res bundle: {e}")
