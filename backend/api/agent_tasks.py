@@ -502,7 +502,7 @@ def slope_analysis(
 
 # Physics constants for SHARAD depth conversion
 _SPEED_OF_LIGHT = 299_792_458.0          # m/s
-_SHARAD_DT_US   = 1.0 / 20.0 * 0.75     # ~0.0375 µs per range-bin
+_SHARAD_DT_US   = 3.0 / 80.0             # 0.0375 µs per range-bin (1/26.67 MHz ADC)
 _ICE_EPSILON    = 3.15                    # pure water-ice εr
 
 def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
@@ -587,6 +587,7 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
             n_bins = power.shape[1]
             sub_detect_count = 0
             depth_estimates: List[float] = []
+            subsurface_picks: List[Dict[str, Any]] = []
 
             # Sample every 10th valid trace for speed
             valid_indices = np.where(valid_surface)[0]
@@ -613,6 +614,12 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
                     v_ice = _SPEED_OF_LIGHT / np.sqrt(_ICE_EPSILON)
                     depth_m = v_ice * dt_s / 2.0
                     depth_estimates.append(float(depth_m))
+                    subsurface_picks.append({
+                        "trace_idx": int(idx),
+                        "bin_idx": search_lo + peak_idx,
+                        "depth_m": round(float(depth_m), 1),
+                        "snr": round(float(snr), 2),
+                    })
 
             detection_pct = round(sub_detect_count / len(sampled) * 100, 1) if sampled.size > 0 else 0
 
@@ -632,6 +639,8 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
                     "epsilon_r": _ICE_EPSILON,
                 }
                 subsurface_detections += 1
+            if subsurface_picks:
+                track_info["subsurface_picks"] = subsurface_picks
 
         except Exception as e:
             logger.warning(f"SHARAD analysis failed for {pid}: {e}")
@@ -1268,6 +1277,28 @@ def synthesize_results(
             "interpretation": diel.get("interpretation", ""),
         }
 
+    # Climate analysis (MCD parametric model)
+    if "climate" in all_results and all_results["climate"].success:
+        clim = all_results["climate"].data
+        synthesis["climate"] = {
+            "climate_score": clim.get("climate_score", 0),
+            "climate_summary": clim.get("climate_summary", ""),
+            "annual_stats": clim.get("annual_stats", {}),
+            "elevation_m": clim.get("elevation_m", 0),
+        }
+
+    # Thermal inertia analysis (TES)
+    if "thermal_inertia" in all_results and all_results["thermal_inertia"].success:
+        ti = all_results["thermal_inertia"].data
+        synthesis["thermal_inertia"] = {
+            "ti_score": ti.get("ti_score", 0),
+            "ti_explanation": ti.get("ti_explanation", ""),
+            "ti_median": ti.get("ti_median"),
+            "ti_mean": ti.get("ti_mean"),
+            "classification": ti.get("classification", ""),
+            "distribution_pct": ti.get("distribution_pct", {}),
+        }
+
     # Site recommendation (if available)
     if "recommend" in all_results and all_results["recommend"].success:
         synthesis["recommended_site"] = all_results["recommend"].data
@@ -1277,39 +1308,40 @@ def synthesize_results(
     synthesis["cross_instrument"] = cross
 
     # ── Composite scoring (max ~95, never 100) ──
-    # Science potential drives initial score; slope is a final filter.
+    # Rebalanced weights:
+    #   SHARAD 0-18, CRISM 0-18, CNN 0-5, Dielectric 0-5,
+    #   Cross-inst 0-13, Engineering 0-22, Data 0-9,
+    #   Climate 0-10, Thermal Inertia 0-10  → max 110, capped at 95
     score = 0
     strengths = []
     uncertainties = []
 
-    # SHARAD subsurface (0-20) — direct ice evidence, depth-weighted
-    # Shallow ice (<10 m) = high value, deep ice (>80 m) = negligible
+    # SHARAD subsurface (0-18) — direct ice evidence, depth-weighted
     sub_cov = synthesis["subsurface_coverage"]
     n_detections = sub_cov.get("subsurface_detections", 0)
     depth_summary = sub_cov.get("depth_summary", {})
     median_depth = depth_summary.get("median_depth_m")
 
     if n_detections >= 1:
-        # Base score for detection, then scale by depth accessibility
         if median_depth is not None:
             try:
                 d = float(median_depth)
             except (TypeError, ValueError):
-                d = 50.0  # fallback
+                d = 50.0
             if d <= 10:
-                depth_score = 20 if n_detections >= 2 else 16
+                depth_score = 18 if n_detections >= 2 else 14
                 strengths.append(
                     f"Shallow subsurface ice detected at ~{d:.0f} m depth "
                     f"({n_detections} track(s)) — accessible for extraction"
                 )
             elif d <= 30:
-                depth_score = 14 if n_detections >= 2 else 10
+                depth_score = 12 if n_detections >= 2 else 9
                 strengths.append(
                     f"Subsurface reflector at ~{d:.0f} m depth ({n_detections} track(s)) "
                     f"— moderate drilling required"
                 )
             elif d <= 80:
-                depth_score = 6
+                depth_score = 5
                 uncertainties.append(
                     f"Subsurface reflector at ~{d:.0f} m depth — deep, "
                     f"significant drilling infrastructure required"
@@ -1321,23 +1353,22 @@ def synthesize_results(
                     f"for practical ice extraction"
                 )
         else:
-            # Detection but no depth estimate
-            depth_score = 10 if n_detections >= 2 else 7
+            depth_score = 9 if n_detections >= 2 else 6
             strengths.append(f"SHARAD subsurface reflector detected ({n_detections} track(s)), depth unknown")
         score += depth_score
     elif sub_cov.get("analyzed_count", 0) > 0:
-        score += 4
+        score += 3
         uncertainties.append("SHARAD radargrams analyzed but no subsurface reflectors detected")
     else:
         uncertainties.append("No SHARAD radargram data available for direct subsurface analysis")
 
-    # CRISM ice/hydration (0-20) — indirect/proxy evidence
+    # CRISM ice/hydration (0-18) — indirect/proxy evidence
     ice_count = synthesis["mineral_signatures"].get("high_ice_count", 0)
     if ice_count >= 3:
-        score += 20
+        score += 18
         strengths.append(f"Strong CRISM spectral ice signatures ({ice_count} products above threshold)")
     elif ice_count >= 1:
-        score += 12
+        score += 10
         strengths.append(f"CRISM ice signatures present ({ice_count} product(s))")
     else:
         uncertainties.append("No significant CRISM ice signatures detected")
@@ -1362,26 +1393,26 @@ def synthesize_results(
         else:
             strengths.append(f"Dielectric constant εr={eps} measured ({interp})")
 
-    # Cross-instrument consistency (0-15)
+    # Cross-instrument consistency (0-13)
     consistency = cross.get("evidence_consistency", "insufficient_data")
     if consistency == "consistent":
-        score += 15
+        score += 13
         strengths.append("SHARAD and CRISM ice evidence spatially consistent")
     elif consistency == "partial":
-        score += 8
+        score += 7
     elif consistency in ("sharad_only", "crism_only"):
-        score += 5
+        score += 4
         uncertainties.append(f"Ice evidence from single instrument only ({consistency.replace('_', ' ')})")
     else:
         uncertainties.append("No cross-instrument corroboration available")
 
-    # Engineering feasibility (0-25) — final filter, not driver
+    # Engineering feasibility (0-22) — final filter, not driver
     safety = synthesis["engineering_feasibility"].get("safety", "UNKNOWN")
     if safety == "FAVORABLE":
-        score += 25
+        score += 22
         strengths.append("Terrain engineering assessment: FAVORABLE (majority below 5 deg)")
     elif safety == "MARGINAL":
-        score += 12
+        score += 10
         uncertainties.append("Terrain is marginal — some zones exceed 5 deg slope threshold")
     elif safety == "UNFAVORABLE":
         score += 3
@@ -1389,16 +1420,47 @@ def synthesize_results(
     else:
         uncertainties.append("Slope data unavailable for engineering assessment")
 
-    # Data confidence (0-12) — de-emphasized
+    # Data confidence (0-9) — de-emphasized
     total = synthesis["total_products_found"]
     if total >= 20:
-        score += 12
+        score += 9
     elif total >= 10:
-        score += 8
+        score += 6
     elif total >= 5:
-        score += 4
+        score += 3
     else:
         uncertainties.append(f"Low data coverage ({total} products) limits confidence")
+
+    # Climate assessment (0-10) — NEW
+    clim_data = synthesis.get("climate", {})
+    if clim_data:
+        clim_score = clim_data.get("climate_score", 0)
+        score += clim_score
+        clim_summary = clim_data.get("climate_summary", "")
+        if clim_score >= 8:
+            strengths.append(f"Favorable climate conditions: {clim_summary}")
+        elif clim_score >= 5:
+            strengths.append(f"Acceptable climate: {clim_summary}")
+        elif clim_score > 0:
+            uncertainties.append(f"Climate challenges: {clim_summary}")
+        else:
+            uncertainties.append(f"Harsh climate conditions: {clim_summary}")
+
+    # Thermal inertia (0-10) — NEW
+    ti_data = synthesis.get("thermal_inertia", {})
+    if ti_data:
+        ti_score = ti_data.get("ti_score", 0)
+        score += ti_score
+        ti_expl = ti_data.get("ti_explanation", "")
+        if ti_score >= 8:
+            strengths.append(ti_expl)
+        elif ti_score >= 4:
+            strengths.append(ti_expl)
+        elif ti_score > 0:
+            uncertainties.append(ti_expl)
+        # Score 0 with explanation means unfavorable
+        elif ti_expl:
+            uncertainties.append(ti_expl)
 
     # Cap at 95 — always leave room for uncertainty
     score = min(score, 95)

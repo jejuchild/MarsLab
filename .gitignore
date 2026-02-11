@@ -33,6 +33,9 @@ frontend/node_modules/
 # Large binary files
 *.img
 *.IMG
+*.npy
+backend/mineral_cnn_data/
+backend/mineral_cnn_results/
 
 # Logs
 *.log
