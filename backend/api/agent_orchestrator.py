@@ -344,6 +344,7 @@ async def _call_ollama(prompt: str, system: str = "", temperature: float = 0.3) 
             "options": {
                 "temperature": temperature,
                 "num_predict": 2048,
+                "num_ctx": 16384,
             },
         }
 
@@ -383,6 +384,7 @@ async def _call_ollama_streaming(
             "options": {
                 "temperature": temperature,
                 "num_predict": 2048,
+                "num_ctx": 16384,
             },
         }
 
@@ -781,19 +783,33 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
 def _build_react_prompt(objective: str, session: "AgentSession", history: list) -> str:
     """Build the per-turn prompt with full history.
 
+    Truncates long observations and drops old turns to stay within context limits.
     Ends with 'Thought:' prefix to force Llama into the correct format.
     """
+    MAX_OBS_CHARS = 800       # Truncate verbose observations (search results, etc.)
+    MAX_HISTORY_TURNS = 10    # Keep last N turns to avoid context overflow
+
     parts = [f"Objective: {objective}"]
     if session.region_name and session.bbox:
         b = session.bbox
         parts.append(f"Region: {session.region_name} (lat {b.min_lat:.1f}–{b.max_lat:.1f}, lon {b.min_lon:.1f}–{b.max_lon:.1f})")
     parts.append("")
 
-    for i, entry in enumerate(history, 1):
+    # Keep only the most recent turns if history is long
+    display_history = history
+    if len(history) > MAX_HISTORY_TURNS:
+        parts.append(f"[... {len(history) - MAX_HISTORY_TURNS} earlier turns omitted ...]")
+        parts.append("")
+        display_history = history[-MAX_HISTORY_TURNS:]
+
+    for i, entry in enumerate(display_history, len(history) - len(display_history) + 1):
+        obs = entry.get('observation', '')
+        if len(obs) > MAX_OBS_CHARS:
+            obs = obs[:MAX_OBS_CHARS] + f" ... [truncated, {len(obs)} chars total]"
         parts.append(f"--- Turn {i} ---")
         parts.append(f"Thought: {entry['thought']}")
         parts.append(f"Action: {json.dumps(entry['action'])}")
-        parts.append(f"Observation: {entry['observation']}")
+        parts.append(f"Observation: {obs}")
         parts.append("")
 
     parts.append(f"--- Turn {len(history) + 1} ---")
@@ -1672,7 +1688,6 @@ async def run_agent(
 
         history: List[Dict[str, Any]] = []
         iteration = 0
-        consecutive_errors = 0
 
         while iteration < MAX_ITERATIONS:
             iteration += 1
@@ -1709,53 +1724,42 @@ async def run_agent(
                 "thought": thought, "iteration": iteration,
             }}
 
-            # Handle empty/malformed output
+            # Handle empty/malformed output — never retry, always force-execute.
+            # Llama 3.3 often ignores the Thought/Action format entirely.
+            # The NL inference fallback should catch most cases, but if even
+            # that fails, deterministically pick the next logical tool.
             if not action or "tool" not in action:
-                consecutive_errors += 1
-                # Give progressively more specific hints
-                if consecutive_errors == 1:
-                    observation = (
-                        "Error: Could not parse your action. Remember the format:\n"
-                        "Thought: your reasoning here\n"
-                        'Action: {"tool": "resolve_region", "params": {"region_name": "Jezero Crater"}}\n'
-                        "Try again with this exact format."
-                    )
-                elif consecutive_errors == 2:
-                    # Suggest a specific action based on context
-                    if not session.bbox:
-                        suggestion = '{"tool": "resolve_region", "params": {"region_name": "' + (session.region_name or "the target region") + '"}}'
-                    elif not any(k.startswith("search_") for k in session.all_results):
-                        suggestion = '{"tool": "search_products", "params": {"instrument": "CRISM"}}'
-                    else:
-                        suggestion = '{"tool": "analyze_subsurface", "params": {}}'
-                    observation = (
-                        f"Error: Still could not parse. Output ONLY this:\n"
-                        f"Thought: Proceeding with analysis.\n"
-                        f"Action: {suggestion}"
-                    )
+                logger.warning(
+                    f"Parse failed (iter {iteration}) — force-executing next logical action. "
+                    f"Raw response: {full_response[:200]}"
+                )
+                if not session.bbox:
+                    action = {"tool": "resolve_region", "params": {
+                        "region_name": session.region_name or "target region"
+                    }}
+                    thought = thought or f"Resolving {session.region_name or 'target region'} coordinates."
+                elif len([k for k in session.all_results if k.startswith("search_")]) < 6:
+                    all_instruments = ["CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES", "CTX", "HIRISE_DTM"]
+                    searched = {k.replace("search_", "") for k in session.all_results if k.startswith("search_")}
+                    next_inst = next((i for i in all_instruments if i not in searched), "CRISM")
+                    action = {"tool": "search_products", "params": {"instrument": next_inst}}
+                    thought = thought or f"Searching for {next_inst} data in the region."
+                elif "subsurface" not in session.all_results:
+                    action = {"tool": "analyze_subsurface", "params": {}}
+                    thought = thought or "Analyzing SHARAD radar data for subsurface ice."
+                elif "mineral" not in session.all_results:
+                    action = {"tool": "analyze_minerals", "params": {}}
+                    thought = thought or "Analyzing CRISM spectral data for minerals."
+                elif "slope" not in session.all_results:
+                    action = {"tool": "analyze_slope", "params": {}}
+                    thought = thought or "Analyzing terrain slope for landing feasibility."
                 else:
-                    observation = (
-                        "Error: Parse failed 3 times. The agent will auto-recover "
-                        "by running standard searches and analyses."
-                    )
-                history.append({
-                    "thought": thought or "(no thought parsed)",
-                    "action": {"tool": "parse_error"},
-                    "observation": observation,
-                })
-                yield {"event": "action_complete", "data": {
-                    "tool": "parse_error", "observation": observation,
-                    "success": False, "iteration": iteration,
-                }}
-                if consecutive_errors >= 3:
-                    logger.warning(
-                        "Too many consecutive parse errors — "
-                        "will auto-recover with fallback searches"
-                    )
-                    break
-                continue
+                    action = {"tool": "finish", "params": {
+                        "summary": "Completed multi-instrument analysis.",
+                        "recommendation": "REQUIRES_FURTHER_INVESTIGATION",
+                    }}
+                    thought = thought or "Analysis complete. Generating final assessment."
 
-            consecutive_errors = 0
             tool_name = action.get("tool", "")
             params = action.get("params", {})
 
