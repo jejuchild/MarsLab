@@ -54,14 +54,14 @@ const DEFAULT_RGB: RGBWavelengths = {
 };
 
 // Overlay type display configuration
-const OVERLAY_CONFIG: Record<OverlayType, { label: string; color: string; icon: string }> = {
-  quickview: { label: "Quickview", color: "emerald", icon: "visibility" },
-  highres: { label: "High-Res", color: "purple", icon: "hd" },
-  browse_HYD: { label: "HYD", color: "fuchsia", icon: "water_drop" },
-  browse_ICE: { label: "ICE", color: "blue", icon: "ac_unit" },
-  browse_IC2: { label: "IC2", color: "cyan", icon: "ac_unit" },
-  score_ice: { label: "S-ICE", color: "sky", icon: "analytics" },
-  score_hyd: { label: "S-HYD", color: "rose", icon: "analytics" },
+const OVERLAY_CONFIG: Record<OverlayType, { label: string; activeClass: string; icon: string }> = {
+  quickview: { label: "Quickview", activeClass: "bg-emerald-500/20 border border-emerald-500/50 text-emerald-400", icon: "visibility" },
+  highres: { label: "High-Res", activeClass: "bg-purple-500/20 border border-purple-500/50 text-purple-400", icon: "hd" },
+  browse_HYD: { label: "HYD", activeClass: "bg-fuchsia-500/20 border border-fuchsia-500/50 text-fuchsia-400", icon: "water_drop" },
+  browse_ICE: { label: "ICE", activeClass: "bg-blue-500/20 border border-blue-500/50 text-blue-400", icon: "ac_unit" },
+  browse_IC2: { label: "IC2", activeClass: "bg-cyan-500/20 border border-cyan-500/50 text-cyan-400", icon: "ac_unit" },
+  score_ice: { label: "S-ICE", activeClass: "bg-sky-500/20 border border-sky-500/50 text-sky-400", icon: "analytics" },
+  score_hyd: { label: "S-HYD", activeClass: "bg-rose-500/20 border border-rose-500/50 text-rose-400", icon: "analytics" },
 };
 
 /* =========================================================
@@ -138,6 +138,8 @@ function CRISMQuickviewImage({ productId, instrument }: { productId: string; ins
 /* =========================================================
  * Inspector Component
  * =======================================================*/
+type RecentProduct = { productId: string; instrument: InstrumentType; lat: number; lon: number; title?: string };
+
 export default function Inspector({
   selected,
   onClose,
@@ -152,6 +154,11 @@ export default function Inspector({
   fieldNotes = [],
   onOpenFieldNote,
   onShow3DView,
+  onFindRelated,
+  recentProducts = [],
+  onSelectRecent,
+  onDownloadProduct,
+  isMobile = false,
 }: {
   selected: InspectorContext | null;
   onClose: () => void;
@@ -166,6 +173,11 @@ export default function Inspector({
   fieldNotes?: FieldNote[];
   onOpenFieldNote?: (productId: string, instrument: string, lat: number, lon: number) => void;
   onShow3DView?: (productId: string, lat: number, lon: number) => void;
+  onFindRelated?: (productId: string, instrument: string) => void;
+  recentProducts?: RecentProduct[];
+  onSelectRecent?: (product: RecentProduct) => void;
+  onDownloadProduct?: (productId: string, instrument: string) => void;
+  isMobile?: boolean;
 }) {
   const hasNote = useMemo(
     () => selected ? fieldNotes.some(n => n.product_id === selected.productId) : false,
@@ -342,7 +354,7 @@ export default function Inspector({
   if (!selected) return null;
 
   const isHiRISE = selected.instrument === "HIRISE";
-  const isCRISM = selected.instrument === "CRISM";
+  const isCRISM = selected.instrument === "CRISM" || selected.instrument === "CRISM_TRR3";
   const isCustom = selected.instrument === "CUSTOM";
   const isDTM = selected.instrument === "HIRISE_DTM";
 
@@ -370,12 +382,17 @@ export default function Inspector({
   );
 
   return (
-    <aside className="relative flex h-full flex-col border-l border-border-dark bg-surface-dark/40" style={{ width: panelWidth }}>
-      {/* Resize handle (left edge) */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
-        onMouseDown={handleResizeStart}
-      />
+    <aside
+      className={`relative flex flex-col bg-surface-dark/40 ${isMobile ? 'w-full' : 'h-full border-l border-border-dark'}`}
+      style={isMobile ? undefined : { width: panelWidth }}
+    >
+      {/* Resize handle (left edge) - desktop only */}
+      {!isMobile && (
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+          onMouseDown={handleResizeStart}
+        />
+      )}
       {/* Tabs */}
       <div className="flex border-b border-border-dark">
         {isHiRISE &&
@@ -431,6 +448,26 @@ export default function Inspector({
           <span className="material-symbols-outlined text-lg">close</span>
         </button>
       </div>
+
+      {/* Recent Products Chip Bar */}
+      {recentProducts.length > 1 && onSelectRecent && (
+        <div className="flex gap-1.5 px-3 py-2 border-b border-border-dark overflow-x-auto scrollbar-dark">
+          {recentProducts.map((p) => (
+            <button
+              key={p.productId}
+              onClick={() => onSelectRecent(p)}
+              className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium transition-all ${
+                p.productId === selected.productId
+                  ? "bg-primary/20 border border-primary/50 text-primary"
+                  : "bg-surface-dark border border-border-dark text-slate-400 hover:text-white hover:border-slate-500"
+              }`}
+              title={`${p.instrument} — ${p.productId}`}
+            >
+              {p.productId.length > 16 ? p.productId.slice(0, 14) + "…" : p.productId}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-4 scrollbar-dark">
@@ -544,7 +581,7 @@ export default function Inspector({
                     isDisabled
                       ? "bg-slate-800 text-slate-600 cursor-not-allowed"
                       : isActive
-                      ? `bg-${config.color}-500/20 border border-${config.color}-500/50 text-${config.color}-400`
+                      ? config.activeClass
                       : "bg-surface-dark border border-border-dark text-slate-400 hover:border-slate-500"
                   }`}
                   title={isDisabled ? "No high-res data available" : config.label}
@@ -625,6 +662,33 @@ export default function Inspector({
             </span>
             {hasNote ? `Field Notes (${noteCount})` : "Add Field Note"}
           </button>
+        )}
+
+        {/* Quick Actions Bar */}
+        {selected && selected.instrument !== "CUSTOM" && (
+          <div className="grid grid-cols-2 gap-2">
+            {/* Download */}
+            {onDownloadProduct && (
+              <button
+                onClick={() => onDownloadProduct(selected.productId, selected.instrument)}
+                className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30 transition-all active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined text-sm">download</span>
+                Download
+              </button>
+            )}
+
+            {/* Find Related */}
+            {onFindRelated && (
+              <button
+                onClick={() => onFindRelated(selected.productId, selected.instrument)}
+                className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-purple-500/20 border border-purple-500/50 text-purple-400 hover:bg-purple-500/30 transition-all active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined text-sm">hub</span>
+                Related
+              </button>
+            )}
+          </div>
         )}
 
         <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all">
@@ -1016,7 +1080,7 @@ function MetadataTab({ selected }: { selected: InspectorContext }) {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <span className="material-symbols-outlined text-primary">
-          {selected.instrument === "CRISM" ? "spectrum" : "satellite_alt"}
+          {selected.instrument === "CRISM" || selected.instrument === "CRISM_TRR3" ? "spectrum" : "satellite_alt"}
         </span>
         <span className="text-sm font-bold">{selected.instrument}</span>
       </div>

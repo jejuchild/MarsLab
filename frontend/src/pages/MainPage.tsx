@@ -1,27 +1,41 @@
-import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from "react";
-import MapView from "../components/MapView";
-import Inspector from "../components/Inspector";
+import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense, memo } from "react";
+import { useSearchParams } from "react-router-dom";
+import toast from "react-hot-toast";
+import MapViewRaw from "../components/MapView";
+import InspectorRaw from "../components/Inspector";
 import type { InspectorContext, RGBWavelengths } from "../components/Inspector";
 import SlopeAnalysis from "../components/SlopeAnalysis";
 import type { HiRiseDTMPoint } from "../components/HiRiseDTM3DViewer";
 import type { TerrainPoint } from "../components/SlopeAnalysis";
 import type { ProfilePoint } from "../components/LineProfile";
 import TopBar from "../components/TopBar";
-import LayerPanel from "../components/LayerPanel";
+import LayerPanelRaw from "../components/LayerPanel";
 import type { IceScoreFilter } from "../components/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
 import FieldNoteModal from "../components/FieldNoteModal";
-import AiAnalysisPanel from "../components/AiAnalysisPanel";
+import AiAnalysisPanelRaw from "../components/AiAnalysisPanel";
+import AgenticPanelRaw from "../components/AgenticPanel";
 import { listFieldNotes } from "../api/fieldnotes";
 import type { FieldNote } from "../api/fieldnotes";
 import AppShell from "../components/layout/AppShell";
+import BottomSheet from "../components/BottomSheet";
+import useIsMobile from "../hooks/useIsMobile";
 import type { InstrumentType } from "../utils/FootprintManager";
+import { getInstrumentIds, type InstrumentId } from "../config/instrumentRegistry";
 import type { OverlapStats } from "../utils/overlapFilter";
+
+// Memoize heavy child components to prevent unnecessary re-renders
+const MapView = memo(MapViewRaw);
+const Inspector = memo(InspectorRaw);
+const LayerPanel = memo(LayerPanelRaw);
+const AiAnalysisPanel = memo(AiAnalysisPanelRaw);
+const AgenticPanel = memo(AgenticPanelRaw);
 
 // Lazy-loaded heavy components (Three.js / Recharts)
 const Slope3DViewer = lazy(() => import("../components/Slope3DViewer"));
 const HiRiseDTM3DViewer = lazy(() => import("../components/HiRiseDTM3DViewer"));
 const LineProfile = lazy(() => import("../components/LineProfile"));
+const ReportPanel = lazy(() => import("../components/ReportPanel"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -62,7 +76,7 @@ async function getDTMCenter(productId: string): Promise<{ lat: number; lon: numb
 
 export type VisibleProduct = {
   productId: string;
-  instrument: "HIRISE" | "CRISM" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
+  instrument: "HIRISE" | "CRISM" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM" | "CRISM_TRR3";
   title?: string;  // HiRISE observation title (e.g., "Gullies in Arcadia Region")
   lat?: number;    // Center latitude (from footprint)
   lon?: number;    // Center longitude (from footprint)
@@ -162,14 +176,18 @@ export function getScoreType(type: OverlayType): "score_ice" | "score_hyd" | nul
 }
 
 export default function MainPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isMobile = useIsMobile();
+  const [mobilePanel, setMobilePanel] = useState<'none' | 'layers' | 'inspector'>('none');
+
   // Selected footprint for Inspector
   const [selected, setSelected] = useState<InspectorContext | null>(null);
 
   // Terrain click point for slope analysis (when clicking empty terrain)
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
-  // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line / ai_analysis
-  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | null;
+  // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line / ai_analysis / agentic
+  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Slope 3D analysis point (separate from regular slope terrainPoint)
@@ -180,6 +198,16 @@ export default function MainPage() {
 
   // Active HiRISE DTM product (for terrain clicks in hirise_dtm_3d mode)
   const [activeDTMProduct, setActiveDTMProduct] = useState<string | null>(null);
+
+  // Recent products (last 5 inspected) for quick re-access
+  type RecentProduct = { productId: string; instrument: InspectorContext["instrument"]; lat: number; lon: number; title?: string };
+  const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
+  const addRecentProduct = useCallback((ctx: InspectorContext) => {
+    setRecentProducts(prev => {
+      const filtered = prev.filter(p => p.productId !== ctx.productId);
+      return [{ productId: ctx.productId, instrument: ctx.instrument, lat: ctx.lat, lon: ctx.lon, title: ctx.title }, ...filtered].slice(0, 5);
+    });
+  }, []);
 
   // Line profile state: two endpoints
   const [linePoints, setLinePoints] = useState<ProfilePoint[]>([]);
@@ -198,23 +226,34 @@ export default function MainPage() {
   const [viewBoundSelectionMode, setViewBoundSelectionMode] = useState(false);
 
   // Footprint layer toggles (visibility only - does NOT trigger loading)
-  const [showCRISM, setShowCRISM] = useState(false);
-  const [showHiRISE, setShowHiRISE] = useState(false);
-  const [showSHARAD, setShowSHARAD] = useState(false);
-  const [showCTX, setShowCTX] = useState(false);
-  const [showSharadHighres, setShowSharadHighres] = useState(false);
-  const [showHiRISEDTM, setShowHiRISEDTM] = useState(false);
+  type InstrumentVisibility = Record<InstrumentId, boolean>;
+  const [instrumentVisibility, setInstrumentVisibility] = useState<InstrumentVisibility>(
+    () => Object.fromEntries(getInstrumentIds().map(id => [id, false])) as InstrumentVisibility
+  );
+  const handleToggleInstrument = useCallback((id: InstrumentId, v: boolean) => {
+    setInstrumentVisibility(prev => ({ ...prev, [id]: v }));
+  }, []);
+
+  // Derived booleans for MapView backward compatibility
+  const showCRISM = instrumentVisibility.crism;
+  const showHiRISE = instrumentVisibility.hirise;
+  const showSHARAD = instrumentVisibility.sharad;
+  const showSharadHighres = instrumentVisibility.sharad_highres;
+  const showCTX = instrumentVisibility.ctx;
+  const showHiRISEDTM = instrumentVisibility.hirise_dtm;
+  const showCRISM_TRR3 = instrumentVisibility.crism_trr3;
 
   // Explicit footprint loading state
-  type FootprintLoadTrigger = { instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM"; timestamp: number } | null;
+  type FootprintLoadTrigger = { instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3"; timestamp: number } | null;
   const [loadFootprintsTrigger, setLoadFootprintsTrigger] = useState<FootprintLoadTrigger>(null);
-  const [footprintsLoading, setFootprintsLoading] = useState<{ crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean; hirise_dtm: boolean }>({
+  const [footprintsLoading, setFootprintsLoading] = useState<{ crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean; hirise_dtm: boolean; crism_trr3: boolean }>({
     crism: false,
     hirise: false,
     sharad: false,
     sharad_highres: false,
     ctx: false,
     hirise_dtm: false,
+    crism_trr3: false,
   });
   const [footprintCounts, setFootprintCounts] = useState<{
     crism: { count: number; truncated: boolean; total: number } | null;
@@ -223,7 +262,8 @@ export default function MainPage() {
     sharad_highres: { count: number; truncated: boolean; total: number } | null;
     ctx: { count: number; truncated: boolean; total: number } | null;
     hirise_dtm: { count: number; truncated: boolean; total: number } | null;
-  }>({ crism: null, hirise: null, sharad: null, sharad_highres: null, ctx: null, hirise_dtm: null });
+    crism_trr3: { count: number; truncated: boolean; total: number } | null;
+  }>({ crism: null, hirise: null, sharad: null, sharad_highres: null, ctx: null, hirise_dtm: null, crism_trr3: null });
 
   // Visible products in current map view
   const [visibleProducts, setVisibleProducts] = useState<VisibleProduct[]>([]);
@@ -233,6 +273,9 @@ export default function MainPage() {
 
   // Product to fly to (set when clicking product_id in LayerPanel)
   const [flyToProductId, setFlyToProductId] = useState<string | null>(null);
+
+  // Product to highlight after fly-to (temporary bright highlight)
+  const [highlightProductId, setHighlightProductId] = useState<string | null>(null);
 
   // Product to bring to front (for z-ordering overlays)
   const [bringToFrontId, setBringToFrontId] = useState<string | null>(null);
@@ -266,6 +309,8 @@ export default function MainPage() {
 
   // SHARAD High-Res Inspector — opens when a product is selected
   const [sharadHiresProductId, setSharadHiresProductId] = useState<string | null>(null);
+  // Pin showing clicked radargram location on the map track
+  const [sharadTracePin, setSharadTracePin] = useState<{ lat: number; lon: number } | null>(null);
 
   // Custom user-uploaded datasets
   const [showCustomData, setShowCustomData] = useState(false);
@@ -291,8 +336,18 @@ export default function MainPage() {
     [fieldNotes, fieldNoteActiveTag]
   );
 
+  // Stable reference for field notes passed to MapView (avoids new [] on every render)
+  const EMPTY_NOTES: FieldNote[] = useMemo(() => [], []);
+  const mapFieldNotesForView = useMemo(
+    () => showFieldNotesOnMap ? mapFieldNotes : EMPTY_NOTES,
+    [showFieldNotesOnMap, mapFieldNotes, EMPTY_NOTES]
+  );
+
   // Coordinate grid
   const [showGrid, setShowGrid] = useState(false);
+
+  // Memoized inspected product ID for MapView (avoids re-render on unrelated state changes)
+  const inspectedProductId = useMemo(() => selected?.productId ?? null, [selected?.productId]);
 
   // AI Analysis pin
   const [aiAnalysisPin, setAiAnalysisPin] = useState<TerrainPoint | null>(null);
@@ -308,12 +363,8 @@ export default function MainPage() {
   // Explicit footprint loading handlers
   const handleLoadFootprints = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM") => {
     // Auto-enable visibility when loading
-    if (instrument === "CRISM") setShowCRISM(true);
-    else if (instrument === "HIRISE") setShowHiRISE(true);
-    else if (instrument === "SHARAD") setShowSHARAD(true);
-    else if (instrument === "SHARAD_HIGHRES") setShowSharadHighres(true);
-    else if (instrument === "CTX") setShowCTX(true);
-    else if (instrument === "HIRISE_DTM") setShowHiRISEDTM(true);
+    const id = instrument.toLowerCase() as InstrumentId;
+    setInstrumentVisibility(prev => ({ ...prev, [id]: true }));
     setLoadFootprintsTrigger({ instrument, timestamp: Date.now() });
   }, []);
 
@@ -374,6 +425,10 @@ export default function MainPage() {
     });
   }, []);
 
+  // Stable ref for activeOverlays to avoid callback dependency on Map reference
+  const activeOverlaysRef = useRef(activeOverlays);
+  activeOverlaysRef.current = activeOverlays;
+
   // Handle clicking product_id - fly to it, select it, and bring overlay to front
   const handleSelectProduct = useCallback((product: VisibleProduct) => {
     // Open inspector with coordinates from product (if available)
@@ -389,29 +444,55 @@ export default function MainPage() {
     setFlyToProductId(product.productId);
 
     // Bring overlay to front if it exists
-    if (activeOverlays.has(product.productId)) {
+    if (activeOverlaysRef.current.has(product.productId)) {
       setBringToFrontId(product.productId);
     }
-  }, [activeOverlays]);
+  }, []);
 
   // Handle fly-to from Active Products section
   const handleFlyToProduct = useCallback((productId: string) => {
     setFlyToProductId(productId);
 
     // Also bring overlay to front
-    if (activeOverlays.has(productId)) {
+    if (activeOverlaysRef.current.has(productId)) {
       setBringToFrontId(productId);
     }
-  }, [activeOverlays]);
+  }, []);
 
-  // Clear flyTo after it's processed
+  // Stable ref for flyToProductId
+  const flyToProductIdRef = useRef(flyToProductId);
+  flyToProductIdRef.current = flyToProductId;
+
+  // Clear flyTo after it's processed — then trigger highlight
   const handleFlyToComplete = useCallback(() => {
+    const pid = flyToProductIdRef.current;
     setFlyToProductId(null);
+    // If this fly-to came from a deep-link, highlight the product after arrival
+    if (pid && deepLinkFlyToRef.current) {
+      deepLinkFlyToRef.current = false;
+      setHighlightProductId(pid);
+    }
+  }, []);
+
+  // Clear highlight after it's processed
+  const handleHighlightComplete = useCallback(() => {
+    setHighlightProductId(null);
   }, []);
 
   // Clear bringToFront after it's processed
   const handleBringToFrontComplete = useCallback(() => {
     setBringToFrontId(null);
+  }, []);
+
+  // Handle clicking a recent product chip in Inspector
+  const handleSelectRecent = useCallback((p: { productId: string; instrument: InspectorContext["instrument"]; lat: number; lon: number; title?: string }) => {
+    setSelected({ instrument: p.instrument, productId: p.productId, lat: p.lat, lon: p.lon, title: p.title });
+    setFlyToProductId(p.productId);
+  }, []);
+
+  // Handle download from Inspector quick actions
+  const handleDownloadProduct = useCallback((productId: string, instrument: string) => {
+    window.open(`/download?tab=product&product_id=${encodeURIComponent(productId)}&instrument=${encodeURIComponent(instrument)}&autoDownload=true`, "_self");
   }, []);
 
   // Handle RGB wavelength changes from Inspector
@@ -430,13 +511,37 @@ export default function MainPage() {
     setSelected(null); // Close regular Inspector
   }, []);
 
+  // Track whether the current fly-to was triggered by a deep-link
+  const deepLinkFlyToRef = useRef(false);
+
+  // Handle deep-link: /?flyTo=PRODUCT_ID&instrument=INST
+  useEffect(() => {
+    const flyTo = searchParams.get("flyTo");
+    if (flyTo) {
+      deepLinkFlyToRef.current = true;
+      setFlyToProductId(flyTo);
+      // Clean up URL params after consuming them
+      setSearchParams({}, { replace: true });
+    }
+  }, []); // Run once on mount
+
+  // Track recently inspected products
+  useEffect(() => {
+    if (selected && selected.instrument !== "CUSTOM") {
+      addRecentProduct(selected);
+    }
+  }, [selected, addRecentProduct]);
+
   // Field Notes handlers
   useEffect(() => {
     listFieldNotes().then(setFieldNotes).catch(console.error);
   }, []);
 
   const refreshFieldNotes = useCallback(() => {
-    listFieldNotes().then(setFieldNotes).catch(console.error);
+    listFieldNotes().then((notes) => {
+      setFieldNotes(notes);
+      toast.success("Field note saved");
+    }).catch(console.error);
   }, []);
 
   const handleOpenFieldNote = useCallback((productId: string, instrument: string, lat: number, lon: number) => {
@@ -540,13 +645,14 @@ export default function MainPage() {
   // Handle HiRISE DTM footprint click - One-click inspection flow
   // Automatically: 1) Open inspector, 2) Enable quickview, 3) Activate DTM 3D mode
   // Then user can immediately click on the DTM to open 3D terrain view
-  const handleHiRiseDTMClick = useCallback((productId: string, lat: number, lon: number) => {
+  const handleHiRiseDTMClick = useCallback((productId: string, lat: number, lon: number, title?: string) => {
     // 1. Open the product inspector
     setSelected({
       instrument: "HIRISE_DTM",
       productId,
       lat,
       lon,
+      title,
     });
 
     // 2. Automatically enable quickview overlay
@@ -571,6 +677,7 @@ export default function MainPage() {
   // Deactivate all overlays
   const handleDeactivateAll = useCallback(() => {
     setActiveOverlays(new Map());
+    toast("All overlays cleared", { icon: "🗑" });
   }, []);
 
   // Check high-res availability for visible products
@@ -628,6 +735,13 @@ export default function MainPage() {
 
     fetchFilteredIds();
   }, [iceScoreFilter.enabled, iceScoreFilter.minScore, iceScoreFilter.minPercent]);
+
+  // Auto-open inspector bottom sheet on mobile when a product is selected
+  useEffect(() => {
+    if (isMobile && (selected || sharadHiresProductId)) {
+      setMobilePanel('inspector');
+    }
+  }, [isMobile, selected, sharadHiresProductId]);
 
   // Load custom datasets from server (triggered by Load button)
   const handleLoadCustomData = useCallback(async () => {
@@ -749,6 +863,10 @@ export default function MainPage() {
     setViewBoundSelectionMode(false); // Exit selection mode after selection
   }, []);
 
+  // Stable ref for visibleProducts
+  const visibleProductsRef = useRef(visibleProducts);
+  visibleProductsRef.current = visibleProducts;
+
   // Handle search result selection from TopBar
   const handleSearchSelect = useCallback((productId: string, instrument?: string, lat?: number | null, lon?: number | null) => {
     // Handle REGION type - just fly to location, no inspector
@@ -760,7 +878,7 @@ export default function MainPage() {
     }
 
     // First try to find the product on the map
-    const product = visibleProducts.find((p) => p.productId === productId);
+    const product = visibleProductsRef.current.find((p: VisibleProduct) => p.productId === productId);
     if (product) {
       handleSelectProduct(product);
       return;
@@ -782,7 +900,7 @@ export default function MainPage() {
         lon: lon ?? 0,
       });
     }
-  }, [visibleProducts, handleSelectProduct]);
+  }, [handleSelectProduct]);
 
   // Derive legacy overlay formats for MapView compatibility
   // These will be replaced when MapView is updated to use unified format
@@ -820,148 +938,181 @@ export default function MainPage() {
     return { quickviewOverlays, highResOverlays, browseOverlays, scoreOverlays, opacities };
   }, [activeOverlays]);
 
+  // --- Panel content (shared between desktop sidebar & mobile bottom sheet) ---
+  const layerPanelContent = (
+    <LayerPanel
+      isMobile={isMobile}
+      // Map mode (2D/3D)
+      mapMode={mapMode}
+      onMapModeChange={setMapMode}
+      // Base layer selection
+      baseLayer={baseLayer}
+      onBaseLayerChange={setBaseLayer}
+      // View bounds restriction
+      viewBounds={viewBounds}
+      onViewBoundsChange={setViewBounds}
+      // Footprint toggles (visibility)
+      instrumentVisibility={instrumentVisibility}
+      onToggleInstrument={handleToggleInstrument}
+      // Explicit footprint loading
+      onLoadFootprints={handleLoadFootprints}
+      footprintsLoading={footprintsLoading}
+      footprintCounts={footprintCounts}
+      // Ice Score Filter
+      iceScoreFilter={iceScoreFilter}
+      onIceScoreFilterChange={setIceScoreFilter}
+      filteredProductIds={filteredProductIds}
+      // Product data
+      visibleProducts={visibleProducts}
+      activeOverlays={activeOverlays}
+      // Overlay handlers
+      onSetOverlay={handleSetOverlay}
+      onSetOpacity={handleSetOpacity}
+      onSelectProduct={handleSelectProduct}
+      onFlyToProduct={handleFlyToProduct}
+      onDeactivateAll={handleDeactivateAll}
+      // Custom datasets
+      showCustomData={showCustomData}
+      onToggleCustomData={setShowCustomData}
+      onLoadCustomData={handleLoadCustomData}
+      customDataLoading={customDataLoading}
+      customDatasets={customDatasets}
+      onCustomDatasetToggle={handleCustomDatasetToggle}
+      // Analysis mode
+      analysisMode={analysisMode}
+      onAnalysisModeChange={handleAnalysisModeChange}
+      // Fly-To navigation
+      onFlyToCoords={handleFlyToCoords}
+      // View bound selection mode
+      viewBoundSelectionMode={viewBoundSelectionMode}
+      onViewBoundSelectionModeChange={setViewBoundSelectionMode}
+      // Coordinate grid
+      showGrid={showGrid}
+      onToggleGrid={setShowGrid}
+      // Field Notes
+      fieldNotes={fieldNotes}
+      showFieldNotesOnMap={showFieldNotesOnMap}
+      onToggleFieldNotesOnMap={setShowFieldNotesOnMap}
+      onFieldNoteClick={handleFieldNoteClick}
+      onActiveTagChange={setFieldNoteActiveTag}
+      // Overlap Filter
+      overlapFilter={overlapFilter}
+      onOverlapFilterChange={setOverlapFilter}
+      overlapStats={overlapStats}
+    />
+  );
+
+  const rightPanelContent =
+    sharadHiresProductId ? (
+      <SharadHiresInspector
+        productId={sharadHiresProductId}
+        onClose={() => { setSharadHiresProductId(null); setSharadTracePin(null); }}
+        fieldNotes={fieldNotes}
+        onOpenFieldNote={(pid, lat, lon) => setShowFieldNoteModal({ productId: pid, instrument: "SHARAD_HIGHRES", lat, lon })}
+        onLocatePoint={(lat, lon) => setSharadTracePin({ lat, lon })}
+      />
+    ) : selected ? (
+      <Inspector
+        selected={selected}
+        onClose={() => setSelected(null)}
+        activeOverlay={activeOverlays.get(selected.productId) || null}
+        onSetOverlay={(type) => handleSetOverlay(selected.productId, type)}
+        onSetOpacity={(opacity) => handleSetOpacity(selected.productId, opacity)}
+        rgbWavelengths={rgbWavelengths}
+        onRGBChange={handleRGBChange}
+        hasHighResData={productsWithHighRes.has(selected.productId)}
+        customDataset={customDatasets.find((d) => d.id === selected.productId) || null}
+        onCustomDatasetOpacity={handleCustomDatasetOpacity}
+        fieldNotes={fieldNotes}
+        onOpenFieldNote={handleOpenFieldNote}
+        recentProducts={recentProducts}
+        onSelectRecent={handleSelectRecent}
+        onShow3DView={async (productId, lat, lon) => {
+          setSelected(null);
+          const center = await getDTMCenter(productId);
+          const safeLat = center?.lat ?? lat;
+          const safeLon = center?.lon ?? lon;
+          setHiRiseDTM3DPoint({ productId, lat: safeLat, lon: safeLon });
+        }}
+        onFindRelated={(productId, instrument) => {
+          window.open(`/download?tab=product&product_id=${encodeURIComponent(productId)}&instrument=${encodeURIComponent(instrument)}`, "_self");
+        }}
+        onDownloadProduct={handleDownloadProduct}
+      />
+    ) : terrainPoint ? (
+      <SlopeAnalysis
+        point={terrainPoint}
+        onClose={() => setTerrainPoint(null)}
+      />
+    ) : slope3DPoint ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
+        <Slope3DViewer
+          point={slope3DPoint}
+          onClose={() => setSlope3DPoint(null)}
+        />
+      </Suspense>
+    ) : hiRiseDTM3DPoint ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
+        <HiRiseDTM3DViewer
+          point={hiRiseDTM3DPoint}
+          onClose={() => {
+            setHiRiseDTM3DPoint(null);
+            setAnalysisMode(null);
+            setActiveDTMProduct(null);
+          }}
+        />
+      </Suspense>
+    ) : aiAnalysisPin ? (
+      <AiAnalysisPanel
+        pin={aiAnalysisPin}
+        onClose={() => {
+          setAiAnalysisPin(null);
+          setAnalysisMode(null);
+        }}
+      />
+    ) : analysisMode === "agentic" ? (
+      <AgenticPanel
+        onClose={() => setAnalysisMode(null)}
+      />
+    ) : analysisMode === "report" ? (
+      <Suspense fallback={<div className="flex items-center justify-center h-full text-[#6b7c9c] text-xs">Loading...</div>}>
+        <ReportPanel onClose={() => setAnalysisMode(null)} isMobile={isMobile} />
+      </Suspense>
+    ) : null;
+
   return (
     <AppShell
+      isMobile={isMobile}
       header={
         <TopBar
+          isMobile={isMobile}
           onSelectResult={handleSearchSelect}
         />
       }
-      leftPanel={
-        <LayerPanel
-          // Map mode (2D/3D)
-          mapMode={mapMode}
-          onMapModeChange={setMapMode}
-          // Base layer selection
-          baseLayer={baseLayer}
-          onBaseLayerChange={setBaseLayer}
-          // View bounds restriction
-          viewBounds={viewBounds}
-          onViewBoundsChange={setViewBounds}
-          // Footprint toggles (visibility)
-          showCRISM={showCRISM}
-          showHiRISE={showHiRISE}
-          showSHARAD={showSHARAD}
-          showCTX={showCTX}
-          showSharadHighres={showSharadHighres}
-          showHiRISEDTM={showHiRISEDTM}
-          onToggleCRISM={setShowCRISM}
-          onToggleHiRISE={setShowHiRISE}
-          onToggleSHARAD={setShowSHARAD}
-          onToggleSharadHighres={setShowSharadHighres}
-          onToggleCTX={setShowCTX}
-          onToggleHiRISEDTM={setShowHiRISEDTM}
-          // Explicit footprint loading
-          onLoadFootprints={handleLoadFootprints}
-          footprintsLoading={footprintsLoading}
-          footprintCounts={footprintCounts}
-          // Ice Score Filter
-          iceScoreFilter={iceScoreFilter}
-          onIceScoreFilterChange={setIceScoreFilter}
-          filteredProductIds={filteredProductIds}
-          // Product data
-          visibleProducts={visibleProducts}
-          activeOverlays={activeOverlays}
-          // Overlay handlers
-          onSetOverlay={handleSetOverlay}
-          onSetOpacity={handleSetOpacity}
-          onSelectProduct={handleSelectProduct}
-          onFlyToProduct={handleFlyToProduct}
-          onDeactivateAll={handleDeactivateAll}
-          // Custom datasets
-          showCustomData={showCustomData}
-          onToggleCustomData={setShowCustomData}
-          onLoadCustomData={handleLoadCustomData}
-          customDataLoading={customDataLoading}
-          customDatasets={customDatasets}
-          onCustomDatasetToggle={handleCustomDatasetToggle}
-          // Analysis mode
-          analysisMode={analysisMode}
-          onAnalysisModeChange={handleAnalysisModeChange}
-          // Fly-To navigation
-          onFlyToCoords={handleFlyToCoords}
-          // View bound selection mode
-          viewBoundSelectionMode={viewBoundSelectionMode}
-          onViewBoundSelectionModeChange={setViewBoundSelectionMode}
-          // Coordinate grid
-          showGrid={showGrid}
-          onToggleGrid={setShowGrid}
-          // Field Notes
-          fieldNotes={fieldNotes}
-          showFieldNotesOnMap={showFieldNotesOnMap}
-          onToggleFieldNotesOnMap={setShowFieldNotesOnMap}
-          onFieldNoteClick={handleFieldNoteClick}
-          onActiveTagChange={setFieldNoteActiveTag}
-          // Overlap Filter
-          overlapFilter={overlapFilter}
-          onOverlapFilterChange={setOverlapFilter}
-          overlapStats={overlapStats}
-        />
-      }
-      rightPanel={
-        sharadHiresProductId ? (
-          <SharadHiresInspector
-            productId={sharadHiresProductId}
-            onClose={() => setSharadHiresProductId(null)}
-            fieldNotes={fieldNotes}
-            onOpenFieldNote={(pid, lat, lon) => setShowFieldNoteModal({ productId: pid, instrument: "SHARAD_HIGHRES", lat, lon })}
-          />
-        ) : selected ? (
-          <Inspector
-            selected={selected}
-            onClose={() => setSelected(null)}
-            activeOverlay={activeOverlays.get(selected.productId) || null}
-            onSetOverlay={(type) => handleSetOverlay(selected.productId, type)}
-            onSetOpacity={(opacity) => handleSetOpacity(selected.productId, opacity)}
-            rgbWavelengths={rgbWavelengths}
-            onRGBChange={handleRGBChange}
-            hasHighResData={productsWithHighRes.has(selected.productId)}
-            customDataset={customDatasets.find((d) => d.id === selected.productId) || null}
-            onCustomDatasetOpacity={handleCustomDatasetOpacity}
-            fieldNotes={fieldNotes}
-            onOpenFieldNote={handleOpenFieldNote}
-            onShow3DView={async (productId, lat, lon) => {
-              setSelected(null);
-              // Use DTM center to ensure point is within bounds
-              const center = await getDTMCenter(productId);
-              const safeLat = center?.lat ?? lat;
-              const safeLon = center?.lon ?? lon;
-              setHiRiseDTM3DPoint({ productId, lat: safeLat, lon: safeLon });
-            }}
-          />
-        ) : terrainPoint ? (
-          <SlopeAnalysis
-            point={terrainPoint}
-            onClose={() => setTerrainPoint(null)}
-          />
-        ) : slope3DPoint ? (
-          <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
-            <Slope3DViewer
-              point={slope3DPoint}
-              onClose={() => setSlope3DPoint(null)}
-            />
-          </Suspense>
-        ) : hiRiseDTM3DPoint ? (
-          <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
-            <HiRiseDTM3DViewer
-              point={hiRiseDTM3DPoint}
-              onClose={() => {
-                setHiRiseDTM3DPoint(null);
-                setAnalysisMode(null);
-                setActiveDTMProduct(null);
-              }}
-            />
-          </Suspense>
-        ) : aiAnalysisPin ? (
-          <AiAnalysisPanel
-            pin={aiAnalysisPin}
-            onClose={() => {
-              setAiAnalysisPin(null);
-              setAnalysisMode(null);
-            }}
-          />
-        ) : null
-      }
+      leftPanel={isMobile ? null : layerPanelContent}
+      rightPanel={isMobile ? undefined : rightPanelContent}
+      mobileNav={isMobile ? (
+        <div className="flex items-center justify-around border-t border-border-dark bg-bg-dark px-2 py-1.5">
+          <button
+            onClick={() => setMobilePanel(p => p === 'layers' ? 'none' : 'layers')}
+            className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors ${
+              mobilePanel === 'layers' ? 'text-primary' : 'text-slate-400'
+            }`}
+          >
+            <span className="material-symbols-outlined text-xl">layers</span>
+            <span className="text-[10px] font-medium">Layers</span>
+          </button>
+          <button
+            onClick={() => setMobilePanel(p => p === 'inspector' ? 'none' : 'inspector')}
+            className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors ${
+              mobilePanel === 'inspector' ? 'text-primary' : 'text-slate-400'
+            }`}
+          >
+            <span className="material-symbols-outlined text-xl">info</span>
+            <span className="text-[10px] font-medium">Inspector</span>
+          </button>
+        </div>
+      ) : undefined}
     >
       {/* Map Canvas */}
       <MapView
@@ -976,6 +1127,7 @@ export default function MainPage() {
         showSharadHighres={showSharadHighres}
         showCTX={showCTX}
         showHiRISEDTM={showHiRISEDTM}
+        showCRISM_TRR3={showCRISM_TRR3}
         onSharadClick={handleSharadClick}
         onSharadHiresClick={handleSharadHiresClick}
         onHiRiseDTMClick={handleHiRiseDTMClick}
@@ -1003,14 +1155,42 @@ export default function MainPage() {
         linePoints={linePoints}
         viewBoundSelectionMode={viewBoundSelectionMode}
         onViewBoundSelected={handleViewBoundSelected}
-        fieldNotes={showFieldNotesOnMap ? mapFieldNotes : []}
+        fieldNotes={mapFieldNotesForView}
         onFieldNoteClick={handleFieldNoteClick}
         activeDTMProductId={activeDTMProduct}
         showGrid={showGrid}
         aiAnalysisPin={aiAnalysisPin}
         overlapFilter={overlapFilter}
         onOverlapStatsChange={handleOverlapStatsChange}
+        highlightProductId={highlightProductId}
+        onHighlightComplete={handleHighlightComplete}
+        inspectedProductId={inspectedProductId}
+        sharadTracePin={sharadTracePin}
       />
+
+      {/* Mobile Bottom Sheets */}
+      {isMobile && (
+        <>
+          <BottomSheet
+            isOpen={mobilePanel === 'layers'}
+            onClose={() => setMobilePanel('none')}
+            title="Layers"
+          >
+            {layerPanelContent}
+          </BottomSheet>
+          <BottomSheet
+            isOpen={mobilePanel === 'inspector'}
+            onClose={() => setMobilePanel('none')}
+            title="Inspector"
+          >
+            {rightPanelContent || (
+              <div className="p-6 text-center text-slate-500 text-sm">
+                Tap a footprint on the map to inspect it
+              </div>
+            )}
+          </BottomSheet>
+        </>
+      )}
 
       {/* Line Profile Popup */}
       {lineProfileData && (

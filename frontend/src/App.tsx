@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import MainPage from "./pages/MainPage";
 
 // Lazy-load secondary pages (not needed on initial load)
@@ -9,13 +10,32 @@ const FeatureSuggestionsPage = lazy(() => import("./pages/FeatureSuggestionsPage
 
 export default function App() {
   return (
-    <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-[#0a0f18] text-[#6b7c9c]">Loading…</div>}>
-      <Routes>
-        <Route path="/" element={<MainPage />} />
-        <Route path="/download" element={<DataDownloadPage />} />
-        <Route path="/upload" element={<DataUploadPage />} />
-        <Route path="/suggestions" element={<FeatureSuggestionsPage />} />
-      </Routes>
-    </Suspense>
+    <>
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: "#161e2d",
+            color: "#f1f5f9",
+            border: "1px solid #2d3a54",
+            fontSize: "13px",
+          },
+          success: {
+            iconTheme: { primary: "#22c55e", secondary: "#161e2d" },
+          },
+          error: {
+            iconTheme: { primary: "#ef4444", secondary: "#161e2d" },
+          },
+        }}
+      />
+      <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-[#0a0f18] text-[#6b7c9c]">Loading…</div>}>
+        <Routes>
+          <Route path="/" element={<MainPage />} />
+          <Route path="/download" element={<DataDownloadPage />} />
+          <Route path="/upload" element={<DataUploadPage />} />
+          <Route path="/suggestions" element={<FeatureSuggestionsPage />} />
+        </Routes>
+      </Suspense>
+    </>
   );
 }
