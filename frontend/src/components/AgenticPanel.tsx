@@ -68,6 +68,20 @@ const TOOL_ICONS: Record<string, string> = {
   finish: "task_alt",
 };
 
+/** Human-readable activity labels shown during tool execution */
+const TOOL_ACTIVITY: Record<string, (params: Record<string, unknown>) => string> = {
+  resolve_region: (p) => `Resolving region "${p.region_name || "..."}"`,
+  search_products: (p) => `Searching ${p.instrument || "products"} data...`,
+  check_local_data: () => "Checking local data availability...",
+  download_products: () => "Downloading missing products...",
+  analyze_slope: () => "Analyzing terrain slope...",
+  analyze_subsurface: () => "Scanning SHARAD subsurface radar...",
+  analyze_minerals: () => "Analyzing CRISM mineral signatures...",
+  classify_minerals_cnn: () => "Running CNN mineral classification...",
+  estimate_dielectric: () => "Calculating dielectric constant...",
+  recommend_site: () => "Cross-referencing data for site recommendation...",
+};
+
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
@@ -143,6 +157,7 @@ export default function AgenticPanel({
   const [chatLog, setChatLog] = useState<ChatEntry[]>([]);
   const [agentMode, setAgentMode] = useState<"react" | "rules" | null>(null);
   const [iterationCount, setIterationCount] = useState(0);
+  const [activeAction, setActiveAction] = useState<{ tool: string; params: Record<string, unknown> } | null>(null);
   const narrativePhaseRef = useRef(false);
 
   // Check Ollama status on mount
@@ -304,18 +319,22 @@ export default function AgenticPanel({
           });
         }
         break;
-      case "action_start":
+      case "action_start": {
+        const startTool = event.data.tool as string;
+        const startParams = (event.data.params as Record<string, unknown>) || {};
         setChatLog(prev => [...prev, {
           type: "action" as const,
-          tool: event.data.tool as string,
-          params: (event.data.params as Record<string, unknown>) || {},
+          tool: startTool,
+          params: startParams,
           iteration: event.data.iteration as number,
         }]);
-        if ((event.data.tool as string) === "download_products") {
+        setActiveAction({ tool: startTool, params: startParams });
+        if (startTool === "download_products") {
           setDownloadProgress(null);
           downloadStartRef.current = Date.now();
         }
         break;
+      }
       case "action_complete":
         setChatLog(prev => [...prev, {
           type: "observation" as const,
@@ -324,6 +343,7 @@ export default function AgenticPanel({
           success: event.data.success as boolean,
           iteration: event.data.iteration as number,
         }]);
+        setActiveAction(null);
         setCompletedSteps(prev => prev + 1);
         if ((event.data.tool as string) === "download_products") {
           setDownloadProgress(null);
@@ -400,6 +420,7 @@ export default function AgenticPanel({
     setChatLog([]);
     setAgentMode(null);
     setIterationCount(0);
+    setActiveAction(null);
     narrativePhaseRef.current = false;
     setStartTime(Date.now());
     setElapsed(0);
@@ -486,6 +507,7 @@ export default function AgenticPanel({
     setChatLog([]);
     setAgentMode(null);
     setIterationCount(0);
+    setActiveAction(null);
     narrativePhaseRef.current = false;
     setStartTime(null);
     setElapsed(0);
@@ -801,8 +823,12 @@ export default function AgenticPanel({
                       </span>
                     </div>
                     <pre className="text-[10px] text-[#c8d6e5] font-mono whitespace-pre-wrap leading-relaxed">
-                      {entry.text}
-                      {entry.streaming && <span className="animate-pulse text-violet-400">|</span>}
+                      {entry.text || (entry.streaming ? "" : "(no output)")}
+                      {entry.streaming && (
+                        entry.text
+                          ? <span className="animate-pulse text-violet-400">|</span>
+                          : <span className="text-[#6b7c9c] italic animate-pulse">Thinking...</span>
+                      )}
                     </pre>
                   </div>
                 );
@@ -892,6 +918,20 @@ export default function AgenticPanel({
                 </div>
               );
             })()}
+
+            {/* Active action indicator — shows what agent is doing right now */}
+            {activeAction && !downloadProgress && (
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-[#1a2333] border border-[#232f48] rounded-lg animate-pulse">
+                <span className="material-symbols-outlined text-sm text-amber-400 animate-spin">
+                  progress_activity
+                </span>
+                <span className="text-[10px] text-amber-300 font-medium">
+                  {TOOL_ACTIVITY[activeAction.tool]
+                    ? TOOL_ACTIVITY[activeAction.tool](activeAction.params)
+                    : `Running ${activeAction.tool}...`}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
