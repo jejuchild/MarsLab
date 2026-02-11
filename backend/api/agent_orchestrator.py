@@ -453,11 +453,11 @@ Action: {{"tool": "finish", "params": {{"summary": "Jezero Crater shows strong e
 
 STRATEGY:
 1. Resolve the region first if a named location is mentioned.
-2. Search for relevant instruments: CRISM (ice/minerals), SHARAD and SHARAD_HIGHRES (subsurface), HIRISE_DTM (terrain), CTX (context imagery).
-3. Call check_local_data, then download_products for missing data.
-4. Run analyses: analyze_subsurface (SHARAD), analyze_minerals (CRISM), analyze_slope (terrain), classify_minerals_cnn, estimate_dielectric.
-5. Call recommend_site to cross-reference everything.
-6. Call finish when your analysis is complete.
+2. Search ALL relevant instruments one by one: CRISM, HIRISE, SHARAD, SHARAD_HIGHRES, CTX, HIRISE_DTM. Each search_products call handles one instrument.
+3. Call check_local_data to see what is available locally, then download_products for missing data.
+4. Run analyses: analyze_subsurface, analyze_minerals, analyze_slope, classify_minerals_cnn, estimate_dielectric.
+5. Call recommend_site to cross-reference everything into a landing site recommendation.
+6. Call finish with your final summary and recommendation.
 
 RULES:
 - Output Thought: and Action: on EVERY turn. Nothing else.
@@ -1526,10 +1526,32 @@ async def run_agent(
             # Handle empty/malformed output
             if not action or "tool" not in action:
                 consecutive_errors += 1
-                observation = (
-                    "Error: Could not parse your action. You MUST output "
-                    'Thought: followed by Action: {"tool": "...", "params": {...}}'
-                )
+                # Give progressively more specific hints
+                if consecutive_errors == 1:
+                    observation = (
+                        "Error: Could not parse your action. Remember the format:\n"
+                        "Thought: your reasoning here\n"
+                        'Action: {"tool": "resolve_region", "params": {"region_name": "Jezero Crater"}}\n'
+                        "Try again with this exact format."
+                    )
+                elif consecutive_errors == 2:
+                    # Suggest a specific action based on context
+                    if not session.bbox:
+                        suggestion = '{"tool": "resolve_region", "params": {"region_name": "' + (session.region_name or "the target region") + '"}}'
+                    elif not any(k.startswith("search_") for k in session.all_results):
+                        suggestion = '{"tool": "search_products", "params": {"instrument": "CRISM"}}'
+                    else:
+                        suggestion = '{"tool": "analyze_subsurface", "params": {}}'
+                    observation = (
+                        f"Error: Still could not parse. Output ONLY this:\n"
+                        f"Thought: Proceeding with analysis.\n"
+                        f"Action: {suggestion}"
+                    )
+                else:
+                    observation = (
+                        "Error: Parse failed 3 times. The agent will auto-recover "
+                        "by running standard searches and analyses."
+                    )
                 history.append({
                     "thought": thought or "(no thought parsed)",
                     "action": {"tool": "parse_error"},
@@ -1541,7 +1563,8 @@ async def run_agent(
                 }}
                 if consecutive_errors >= 3:
                     logger.warning(
-                        "Too many consecutive parse errors — force-finishing"
+                        "Too many consecutive parse errors — "
+                        "will auto-recover with fallback searches"
                     )
                     break
                 continue
@@ -1655,6 +1678,75 @@ async def run_agent(
                 "thought": thought, "action": action,
                 "observation": observation,
             })
+
+        # ── Safety net: if agent loop ended without any searches, auto-run ──
+        has_searches = any(
+            k.startswith("search_") for k in session.all_results
+        )
+        if not has_searches and session.bbox:
+            logger.warning(
+                "ReAct loop ended without any searches — "
+                "running fallback data collection"
+            )
+            yield {"event": "action_start", "data": {
+                "tool": "_auto_recovery", "params": {},
+                "iteration": iteration + 1,
+            }}
+
+            # Run all instrument searches
+            fallback_instruments = [
+                "CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES",
+                "CTX", "HIRISE_DTM",
+            ]
+            for inst in fallback_instruments:
+                try:
+                    result = await search_region(inst, session.bbox)
+                    session.all_results[f"search_{inst}"] = result
+                    if result.success:
+                        products = result.data.get("products", [])
+                        if not hasattr(session, "_all_products"):
+                            session._all_products = []
+                        session._all_products.extend(products)
+                except Exception as e:
+                    logger.error(f"Fallback search {inst} failed: {e}")
+
+            # Check local data + run basic analyses
+            products = getattr(session, "_all_products", [])
+            if products:
+                check_result = check_local_data(products)
+                session.all_results["check_local"] = check_result
+
+                try:
+                    sub_result = subsurface_scan(products)
+                    session.all_results["subsurface"] = sub_result
+                except Exception:
+                    pass
+                try:
+                    min_result = mineral_analysis(products)
+                    session.all_results["mineral"] = min_result
+                except Exception:
+                    pass
+                try:
+                    slope_result = slope_analysis(
+                        session.bbox.center_lat,
+                        session.bbox.center_lon,
+                        radius_m=5000,
+                        bbox=session.bbox,
+                    )
+                    session.all_results["slope"] = slope_result
+                except Exception:
+                    pass
+
+            count = len(products)
+            yield {"event": "action_complete", "data": {
+                "tool": "_auto_recovery",
+                "observation": (
+                    f"Auto-recovery: searched {len(fallback_instruments)} "
+                    f"instruments, found {count} products, ran basic analyses."
+                ),
+                "success": count > 0,
+                "iteration": iteration + 1,
+            }}
 
         # ── Synthesize results ──
         if "synthesize" not in session.all_results:
