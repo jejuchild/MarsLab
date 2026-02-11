@@ -425,37 +425,45 @@ def _format_tool_descriptions() -> str:
     return "\n".join(lines)
 
 
-REACT_SYSTEM_PROMPT = """You are a Mars science mission AI agent. You autonomously analyze multi-instrument orbital data to evaluate landing sites, find subsurface ice, and assess engineering feasibility.
+REACT_SYSTEM_PROMPT = """You are a Mars science mission AI agent. You analyze multi-instrument orbital data to evaluate landing sites, find subsurface ice, and assess engineering feasibility.
 
 You work in a loop: Thought → Action → Observation → Thought → Action → ...
 
 AVAILABLE TOOLS:
 {tools}
 
-FORMAT — On each turn, output EXACTLY:
-Thought: <your reasoning about what to do next and why, 1-3 sentences>
+OUTPUT FORMAT — You MUST output exactly two lines on each turn:
+
+Thought: <your reasoning, 1-3 sentences>
 Action: {{"tool": "<tool_name>", "params": {{...}}}}
 
-EXAMPLE:
-Thought: The user wants to find ice in Jezero Crater. I should first resolve the region to get its coordinates, then search for SHARAD and CRISM data.
+IMPORTANT: Do NOT wrap the JSON in code blocks. Do NOT add any text after the Action JSON. Just output Thought: then Action: with raw JSON.
+
+EXAMPLE 1 — resolving a region:
+Thought: I need to resolve Jezero Crater to get its bounding box coordinates before I can search for data.
 Action: {{"tool": "resolve_region", "params": {{"region_name": "Jezero Crater"}}}}
+
+EXAMPLE 2 — searching for data:
+Thought: Now I should search for SHARAD high-resolution data to look for subsurface ice reflectors in this region.
+Action: {{"tool": "search_products", "params": {{"instrument": "SHARAD_HIGHRES"}}}}
+
+EXAMPLE 3 — finishing:
+Thought: I have gathered enough data. The region shows strong subsurface ice signatures and favorable terrain. I should provide my final assessment.
+Action: {{"tool": "finish", "params": {{"summary": "Jezero Crater shows strong evidence of subsurface ice at 15-30m depth with favorable landing terrain.", "recommendation": "STRONG_CANDIDATE"}}}}
 
 STRATEGY:
 1. Resolve the region first if a named location is mentioned.
-2. Search for instruments relevant to the objective (CRISM for ice/minerals, SHARAD/SHARAD_HIGHRES for subsurface, HIRISE_DTM for terrain).
-3. Check what data is available locally, then download missing products.
-4. Run analyses: subsurface (SHARAD), minerals (CRISM), slope (terrain), CNN classification, dielectric estimation.
-5. If a search returns 0 results, try a different instrument or widen your approach.
-6. Call recommend_site to cross-reference everything into a landing site recommendation.
-7. Call finish when you have enough evidence.
+2. Search for relevant instruments: CRISM (ice/minerals), SHARAD and SHARAD_HIGHRES (subsurface), HIRISE_DTM (terrain), CTX (context imagery).
+3. Call check_local_data, then download_products for missing data.
+4. Run analyses: analyze_subsurface (SHARAD), analyze_minerals (CRISM), analyze_slope (terrain), classify_minerals_cnn, estimate_dielectric.
+5. Call recommend_site to cross-reference everything.
+6. Call finish when your analysis is complete.
 
 RULES:
-- You MUST output Thought: and Action: on every turn. No exceptions.
-- Do NOT output multiple actions. One action per turn.
+- Output Thought: and Action: on EVERY turn. Nothing else.
+- One action per turn.
 - Call check_local_data before download_products.
-- Call analyze_subsurface and analyze_minerals only after downloading relevant data.
-- Be adaptive: if something returns no results, reason about alternatives.
-- Call "finish" when your analysis is complete."""
+- Be adaptive: if something returns 0 results, try a different approach."""
 
 
 async def _tool_resolve_region(session: "AgentSession", params: dict):
@@ -724,33 +732,113 @@ def _build_react_prompt(objective: str, session: "AgentSession", history: list) 
 
 
 def _parse_react_output(text: str) -> tuple:
-    """Extract Thought and Action from Llama ReAct output."""
+    """Extract Thought and Action from Llama ReAct output.
+
+    Handles common LLM format variations:
+    - Markdown bold: **Thought:**
+    - Code blocks: ```json { ... } ```
+    - Mixed casing: thought:, THOUGHT:, Thought:
+    - Single-quoted JSON
+    - Missing Action: label (fallback: any JSON with "tool" key)
+    """
     thought = ""
     action = {}
 
-    # Extract Thought
-    thought_match = re.search(r'Thought:\s*(.*?)(?=Action:|$)', text, re.DOTALL)
-    if thought_match:
-        thought = thought_match.group(1).strip()
+    logger.debug(f"Parsing ReAct output ({len(text)} chars): {text[:300]}...")
 
-    # Extract Action JSON — use bracket-counting for robustness
-    action_match = re.search(r'Action:\s*(\{)', text)
+    # Normalize: strip markdown bold markers
+    normalized = re.sub(r'\*\*', '', text)
+    # Strip code block markers
+    normalized = re.sub(r'```(?:json|JSON)?\s*', '', normalized)
+
+    # Extract Thought — case-insensitive, multiple label variants
+    for pattern in [
+        r'[Tt]hought:\s*(.*?)(?=[Aa]ction\s*:|$)',
+        r'[Rr]easoning:\s*(.*?)(?=[Aa]ction\s*:|$)',
+        r'[Tt]hinking:\s*(.*?)(?=[Aa]ction\s*:|$)',
+    ]:
+        m = re.search(pattern, normalized, re.DOTALL)
+        if m and m.group(1).strip():
+            thought = m.group(1).strip()
+            break
+
+    # If no thought label found, use everything before the first JSON
+    if not thought:
+        first_brace = normalized.find('{')
+        if first_brace > 0:
+            thought = normalized[:first_brace].strip()
+            # Clean up any trailing label like "Action:"
+            thought = re.sub(r'[Aa]ction\s*:\s*$', '', thought).strip()
+
+    # Extract Action JSON
+    # 1. Try standard: Action: { ... }
+    action_match = re.search(r'[Aa]ction\s*:\s*', normalized)
     if action_match:
-        start = action_match.start(1)
-        depth = 0
-        for i in range(start, len(text)):
-            if text[i] == '{':
-                depth += 1
-            elif text[i] == '}':
-                depth -= 1
-                if depth == 0:
-                    try:
-                        action = json.loads(text[start:i + 1])
-                    except json.JSONDecodeError:
-                        pass
-                    break
+        remaining = normalized[action_match.end():].strip()
+        action = _extract_json_object(remaining)
+
+    # 2. Fallback: find ANY JSON with a "tool" key anywhere in the output
+    if not action or "tool" not in action:
+        action = _find_tool_json(normalized)
+
+    if not action or "tool" not in action:
+        logger.warning(f"Failed to parse action from Llama output: {text[:500]}")
 
     return thought, action
+
+
+def _extract_json_object(text: str) -> dict:
+    """Extract the first JSON object from text using bracket-counting.
+    Handles strings properly (ignores braces inside quoted strings)."""
+    start = text.find('{')
+    if start < 0:
+        return {}
+
+    depth = 0
+    in_string = False
+    escape_next = False
+
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape_next:
+            escape_next = False
+            continue
+        if c == '\\':
+            escape_next = True
+            continue
+        if c == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                json_str = text[start:i + 1]
+                # Try parsing as-is
+                try:
+                    return json.loads(json_str)
+                except json.JSONDecodeError:
+                    pass
+                # Try fixing single quotes → double quotes
+                try:
+                    fixed = json_str.replace("'", '"')
+                    return json.loads(fixed)
+                except json.JSONDecodeError:
+                    pass
+                return {}
+    return {}
+
+
+def _find_tool_json(text: str) -> dict:
+    """Find any JSON object in text that contains a 'tool' key."""
+    for m in re.finditer(r'\{', text):
+        result = _extract_json_object(text[m.start():])
+        if result and "tool" in result:
+            return result
+    return {}
 
 
 # =============================================================================
