@@ -7,12 +7,15 @@ using the HRSC/MOLA Blend DEM (~200m/pixel).
 
 import os
 import math
+import tempfile
 
 import numpy as np
 import rasterio
+import rasterio.transform
 from rasterio.windows import Window
-from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Query, Body
+from fastapi.responses import JSONResponse, FileResponse
+from cachetools import LRUCache
 
 router = APIRouter(prefix="/terrain", tags=["Terrain"])
 
@@ -214,6 +217,181 @@ async def get_slope_stats(
     except FileNotFoundError as e:
         return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ──────────────────────────────────────────────
+# Region stats endpoint (polygon analysis)
+# ──────────────────────────────────────────────
+def _point_in_polygon_vectorized(
+    lats: np.ndarray, lons: np.ndarray, vertices: list
+) -> np.ndarray:
+    """Vectorised ray-casting point-in-polygon test.
+
+    *vertices* is a list of ``{"lat": ..., "lon": ...}`` dicts.
+    Returns a boolean array of shape ``(len(lats),)``.
+    """
+    n = len(vertices)
+    vlats = np.array([v["lat"] for v in vertices], dtype=np.float64)
+    vlons = np.array([v["lon"] for v in vertices], dtype=np.float64)
+
+    inside = np.zeros(lats.shape, dtype=bool)
+    j = n - 1
+    with np.errstate(divide="ignore", invalid="ignore"):
+        for i in range(n):
+            cond = (vlats[i] > lats) != (vlats[j] > lats)
+            cross = vlons[i] + (vlons[j] - vlons[i]) * (lats - vlats[i]) / (vlats[j] - vlats[i])
+            inside ^= cond & (lons < cross)
+            j = i
+    return inside
+
+
+def compute_region_stats(vertices: list) -> dict:
+    """
+    Compute elevation and slope statistics within a polygon defined by
+    *vertices* (list of ``{"lat": ..., "lon": ...}``).
+    """
+    ds = _get_dem()
+
+    # Bounding box of vertices
+    v_lats = [v["lat"] for v in vertices]
+    v_lons = [v["lon"] for v in vertices]
+    min_lat, max_lat = min(v_lats), max(v_lats)
+    min_lon, max_lon = min(v_lons), max(v_lons)
+
+    # Convert bounding box to pixel window
+    row_top, col_left = ds.index(min_lon, max_lat)
+    row_bot, col_right = ds.index(max_lon, min_lat)
+
+    # Ensure correct ordering (row increases downward)
+    if row_top > row_bot:
+        row_top, row_bot = row_bot, row_top
+    if col_left > col_right:
+        col_left, col_right = col_right, col_left
+
+    # Clamp to raster
+    row_top = max(0, row_top)
+    row_bot = min(ds.height, row_bot + 1)
+    col_left = max(0, col_left)
+    col_right = min(ds.width, col_right + 1)
+
+    window = Window(col_left, row_top, col_right - col_left, row_bot - row_top)
+    elev = ds.read(1, window=window).astype(np.float64)
+
+    if ds.nodata is not None:
+        elev[elev == ds.nodata] = np.nan
+
+    nrows, ncols = elev.shape
+
+    # Build lat/lon grids for the window
+    abs_rows = row_top + np.arange(nrows)
+    abs_cols = col_left + np.arange(ncols)
+    col_grid, row_grid = np.meshgrid(abs_cols, abs_rows)
+
+    t = ds.transform
+    lons_grid = t.c + col_grid * t.a
+    lats_grid = t.f + row_grid * t.e
+
+    # Flatten for point-in-polygon test
+    flat_lats = lats_grid.ravel()
+    flat_lons = lons_grid.ravel()
+    in_poly = _point_in_polygon_vectorized(flat_lats, flat_lons, vertices)
+    poly_mask = in_poly.reshape(nrows, ncols)
+
+    # Pixel sizes in metres
+    centre_lat = (min_lat + max_lat) / 2
+    px_deg_ew = abs(t.a)
+    px_deg_ns = abs(t.e)
+    ew_m_per_deg = (2 * math.pi * MARS_EQUATORIAL_RADIUS * math.cos(math.radians(centre_lat))) / 360
+    ns_m_per_deg = (2 * math.pi * MARS_POLAR_RADIUS) / 360
+    px_m_ew = px_deg_ew * ew_m_per_deg
+    px_m_ns = px_deg_ns * ns_m_per_deg
+
+    # Slope computation
+    dz_dy, dz_dx = np.gradient(elev, px_m_ns, px_m_ew)
+    slope_deg = np.degrees(np.arctan(np.sqrt(dz_dx ** 2 + dz_dy ** 2)))
+
+    valid = poly_mask & ~np.isnan(elev) & ~np.isnan(slope_deg)
+
+    if not np.any(valid):
+        return {
+            "area_km2": 0,
+            "elevation": {"min": 0, "max": 0, "mean": 0, "std": 0},
+            "slope": {"min": 0, "max": 0, "mean": 0, "std": 0},
+            "slope_distribution": {"safe_0_3": 0, "marginal_3_5": 0, "hazardous_5_plus": 0},
+            "safety_rating": "UNKNOWN",
+            "pixel_count": 0,
+            "vertices_count": len(vertices),
+        }
+
+    elev_valid = elev[valid]
+    slope_valid = slope_deg[valid]
+    pixel_count = int(np.sum(valid))
+
+    # Area in km²
+    pixel_area_m2 = px_m_ew * px_m_ns
+    area_km2 = pixel_count * pixel_area_m2 / 1e6
+
+    # Slope distribution
+    total = len(slope_valid)
+    pct_0_3 = float(np.sum(slope_valid < 3) / total * 100)
+    pct_3_5 = float(np.sum((slope_valid >= 3) & (slope_valid < 5)) / total * 100)
+    pct_5_plus = float(np.sum(slope_valid >= 5) / total * 100)
+
+    # Safety assessment (same logic as slope_stats)
+    pct_below_5 = pct_0_3 + pct_3_5
+    mean_slope = float(np.mean(slope_valid))
+    if pct_below_5 >= 100.0:
+        safety = "FAVORABLE"
+    elif mean_slope < 5 and pct_5_plus < 10:
+        safety = "MARGINAL"
+    else:
+        safety = "UNFAVORABLE"
+
+    return {
+        "area_km2": round(area_km2, 2),
+        "elevation": {
+            "min": round(float(np.min(elev_valid)), 1),
+            "max": round(float(np.max(elev_valid)), 1),
+            "mean": round(float(np.mean(elev_valid)), 1),
+            "std": round(float(np.std(elev_valid)), 1),
+        },
+        "slope": {
+            "min": round(float(np.min(slope_valid)), 2),
+            "max": round(float(np.max(slope_valid)), 2),
+            "mean": round(mean_slope, 2),
+            "std": round(float(np.std(slope_valid)), 2),
+        },
+        "slope_distribution": {
+            "safe_0_3": round(pct_0_3, 1),
+            "marginal_3_5": round(pct_3_5, 1),
+            "hazardous_5_plus": round(pct_5_plus, 1),
+        },
+        "safety_rating": safety,
+        "pixel_count": pixel_count,
+        "vertices_count": len(vertices),
+    }
+
+
+@router.post("/region_stats")
+async def region_stats(
+    vertices: list = Body(..., description="List of {lat, lon} vertices defining polygon"),
+):
+    """Compute terrain statistics within a polygon region on Mars."""
+    if len(vertices) < 3:
+        return JSONResponse(
+            content={"error": "At least 3 vertices are required to define a polygon."},
+            status_code=400,
+        )
+
+    try:
+        result = compute_region_stats(vertices)
+        return JSONResponse(content=result)
+    except FileNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
@@ -533,7 +711,18 @@ async def get_dem_patch(
 # HiRISE DTM patch endpoint (high-resolution 3D)
 # ──────────────────────────────────────────────
 _HIRISE_DTM_DIR = os.path.join(_BACKEND_DIR, "hirise_dtm_data")
-_hirise_dtm_cache = {}  # Cache for opened DTM datasets
+
+
+def _on_dtm_evict(key, value):
+    """Close rasterio dataset handle when evicted from cache."""
+    ds, _props = value
+    try:
+        ds.close()
+    except Exception:
+        pass
+
+
+_hirise_dtm_cache: LRUCache = LRUCache(maxsize=10)  # Cache for opened DTM datasets
 
 
 def _get_hirise_dtm(product_id: str):
@@ -567,6 +756,12 @@ def _get_hirise_dtm(product_id: str):
         raise FileNotFoundError(f"DTM file not found: {dtm_path}")
 
     ds = rasterio.open(dtm_path)
+    # If cache is full, manually close the evicted entry before inserting
+    if len(_hirise_dtm_cache) >= _hirise_dtm_cache.maxsize:
+        # Pop the LRU item and close its dataset
+        _evicted_key = next(iter(_hirise_dtm_cache))
+        evicted = _hirise_dtm_cache.pop(_evicted_key)
+        _on_dtm_evict(_evicted_key, evicted)
     _hirise_dtm_cache[product_id] = (ds, dtm_props)
     return ds, dtm_props
 
@@ -723,7 +918,7 @@ async def get_hirise_dtm_patch(
     product_id: str = Query(..., description="HiRISE DTM product ID"),
     lat: float = Query(..., description="Centre latitude (degrees)"),
     lon: float = Query(..., description="Centre longitude (degrees)"),
-    radius_m: float = Query(500, ge=50, le=5000, description="Patch radius (metres)"),
+    radius_m: float = Query(500, ge=50, le=100000, description="Patch radius (metres)"),
     grid_size: int = Query(128, ge=32, le=256, description="Output grid size (rows/cols)"),
 ):
     """
@@ -834,6 +1029,302 @@ async def get_hirise_dtm_elevation_grid(
             "elevations": elevations,
             "min_elevation": round(float(np.nanmin(data)), 2),
             "max_elevation": round(float(np.nanmax(data)), 2),
+        })
+
+    except FileNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ──────────────────────────────────────────────
+# Thermal Inertia (parametric estimate)
+# ──────────────────────────────────────────────
+def estimate_thermal_inertia(lat: float, lon: float) -> dict:
+    """
+    Estimate thermal inertia using elevation-based proxy.
+    Real TES data shows strong correlation between elevation and TI.
+    Low elevation (smooth plains) -> higher TI (400-600)
+    High elevation (highlands) -> lower TI (100-300)
+    Polar regions -> very low TI (50-150, CO2/H2O frost)
+    """
+    ds = _get_dem()
+
+    # Normalize longitude for the DEM (0-360)
+    lon_norm = lon % 360
+    if lon_norm < 0:
+        lon_norm += 360
+
+    row, col = ds.index(lon_norm, lat)
+
+    # Clamp to valid range
+    row = max(0, min(row, ds.height - 1))
+    col = max(0, min(col, ds.width - 1))
+
+    window = Window(col, row, 1, 1)
+    elev = float(ds.read(1, window=window)[0, 0])
+
+    abs_lat = abs(lat)
+
+    # Base TI from elevation (higher elevation = more dust = lower TI)
+    # Mars elevation range: roughly -8000 to +21000 m
+    elev_normalized = (elev + 8000) / 29000  # 0 to 1
+    elev_normalized = max(0.0, min(1.0, elev_normalized))
+    base_ti = 600 - 400 * elev_normalized  # 200-600 range
+
+    # Latitude correction (polar regions have frost -> low TI)
+    if abs_lat > 60:
+        polar_factor = (abs_lat - 60) / 30  # 0 to 1 from 60 to 90
+        base_ti *= (1 - 0.7 * polar_factor)  # Reduce by up to 70%
+
+    # Add some variation based on longitude (simplified)
+    lon_variation = 30 * math.sin(math.radians(lon * 3))
+    ti = max(20.0, base_ti + lon_variation)
+
+    # Interpretation
+    if ti < 100:
+        interpretation = "Very fine dust or frost deposits"
+        material = "Fine dust / frost"
+    elif ti < 250:
+        interpretation = "Fine-grained regolith (sand-sized particles)"
+        material = "Fine regolith"
+    elif ti < 450:
+        interpretation = "Coarse sand to duricrust"
+        material = "Coarse sand / duricrust"
+    elif ti < 800:
+        interpretation = "Indurated surface or rock fragments"
+        material = "Indurated surface"
+    else:
+        interpretation = "Bedrock or very coarse material"
+        material = "Bedrock"
+
+    return {
+        "thermal_inertia": round(ti, 1),
+        "unit": "J m\u207b\u00b2 K\u207b\u00b9 s\u207b\u00b9/\u00b2",
+        "elevation_m": round(elev, 1),
+        "interpretation": interpretation,
+        "material_estimate": material,
+        "note": "Estimated from elevation-latitude proxy model (not direct TES measurement)",
+    }
+
+
+@router.get("/thermal_inertia")
+async def get_thermal_inertia(
+    lat: float = Query(..., ge=-90, le=90, description="Latitude (degrees)"),
+    lon: float = Query(..., ge=-360, le=360, description="Longitude (degrees)"),
+):
+    """Estimate thermal inertia at a point on Mars using elevation-latitude proxy."""
+    try:
+        result = estimate_thermal_inertia(lat, lon)
+        return JSONResponse(content=result)
+    except FileNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ──────────────────────────────────────────────
+# GeoTIFF Export
+# ──────────────────────────────────────────────
+@router.get("/export_geotiff")
+async def export_geotiff(
+    lat: float = Query(..., ge=-90, le=90, description="Centre latitude (degrees)"),
+    lon: float = Query(..., ge=-360, le=360, description="Centre longitude (degrees)"),
+    radius_km: float = Query(5, ge=1, le=100, description="Radius in km"),
+    data_type: str = Query("elevation", description="Data type: elevation or slope"),
+):
+    """Export a DEM patch (elevation or slope) as a GeoTIFF file."""
+    if data_type not in ("elevation", "slope"):
+        return JSONResponse(
+            content={"error": "data_type must be 'elevation' or 'slope'"},
+            status_code=400,
+        )
+
+    try:
+        ds = _get_dem()
+
+        # Normalize longitude for the DEM (0-360)
+        lon_norm = lon % 360
+        if lon_norm < 0:
+            lon_norm += 360
+
+        radius_m = radius_km * 1000.0
+
+        # Approximate degrees per km at this latitude
+        meters_per_deg_lat = (math.pi / 180.0) * MARS_MEAN_RADIUS
+        meters_per_deg_lon = meters_per_deg_lat * math.cos(math.radians(lat))
+
+        lat_extent = radius_m / meters_per_deg_lat
+        lon_extent = radius_m / max(meters_per_deg_lon, 1.0)
+
+        # Pixel sizes
+        px_deg_ew = abs(ds.transform.a)
+        px_deg_ns = abs(ds.transform.e)
+        px_m_ew = px_deg_ew * max(meters_per_deg_lon, 1.0)
+        px_m_ns = px_deg_ns * meters_per_deg_lat
+
+        # Centre pixel
+        row_c, col_c = ds.index(lon_norm, lat)
+        row_c = max(0, min(ds.height - 1, row_c))
+        col_c = max(0, min(ds.width - 1, col_c))
+
+        half_rows = int(math.ceil(radius_m / px_m_ns))
+        half_cols = int(math.ceil(radius_m / px_m_ew))
+
+        row0 = max(0, row_c - half_rows)
+        row1 = min(ds.height, row_c + half_rows + 1)
+        col0 = max(0, col_c - half_cols)
+        col1 = min(ds.width, col_c + half_cols + 1)
+
+        window = Window(col0, row0, col1 - col0, row1 - row0)
+        grid = ds.read(1, window=window).astype(np.float32)
+
+        if ds.nodata is not None:
+            grid[grid == ds.nodata] = np.nan
+
+        if data_type == "slope":
+            dz_dy, dz_dx = np.gradient(grid, px_m_ns, px_m_ew)
+            grid = np.degrees(np.arctan(np.sqrt(dz_dx**2 + dz_dy**2))).astype(np.float32)
+
+        # Build geo-transform for the extracted window
+        west = lon_norm - lon_extent
+        east = lon_norm + lon_extent
+        south = lat - lat_extent
+        north = lat + lat_extent
+
+        transform = rasterio.transform.from_bounds(
+            west, south, east, north,
+            grid.shape[1], grid.shape[0],
+        )
+
+        mars_crs = rasterio.CRS.from_proj4(
+            "+proj=longlat +a=3396190 +b=3376200 +no_defs"
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        with rasterio.open(
+            tmp_path, "w",
+            driver="GTiff",
+            height=grid.shape[0],
+            width=grid.shape[1],
+            count=1,
+            dtype=grid.dtype,
+            crs=mars_crs,
+            transform=transform,
+        ) as dst:
+            dst.write(grid, 1)
+
+        filename = f"mars_{data_type}_{lat:.2f}_{lon:.2f}_{radius_km}km.tif"
+        return FileResponse(
+            tmp_path,
+            filename=filename,
+            media_type="image/tiff",
+        )
+
+    except FileNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ──────────────────────────────────────────────
+# Transect Profile (elevation + slope)
+# ──────────────────────────────────────────────
+@router.get("/transect_profile")
+async def transect_profile(
+    start_lat: float = Query(..., description="Start latitude (degrees)"),
+    start_lon: float = Query(..., description="Start longitude (degrees)"),
+    end_lat: float = Query(..., description="End latitude (degrees)"),
+    end_lon: float = Query(..., description="End longitude (degrees)"),
+    num_points: int = Query(200, ge=10, le=1000, description="Number of sample points"),
+):
+    """
+    Extract elevation + slope transect along a line between two points on Mars.
+
+    Returns an array of {distance_km, lat, lon, elevation_m, slope_deg} plus
+    a total_distance_km summary.
+    """
+    try:
+        ds = _get_dem()
+
+        # Pixel sizes in degrees
+        px_deg_ew = abs(ds.transform.a)
+        px_deg_ns = abs(ds.transform.e)
+
+        # Generate sample points along the line
+        lats = np.linspace(start_lat, end_lat, num_points)
+        lons = np.linspace(start_lon, end_lon, num_points)
+
+        # Normalize longitudes for DEM (0-360)
+        lons_norm = lons % 360
+        lons_norm[lons_norm < 0] += 360
+
+        results = []
+        cumulative_dist = 0.0
+
+        for i in range(num_points):
+            lat_i = float(lats[i])
+            lon_i = float(lons[i])
+            lon_i_norm = float(lons_norm[i])
+
+            # Get elevation from 3x3 patch for slope computation
+            row, col = ds.index(lon_i_norm, lat_i)
+            row = max(0, min(row, ds.height - 1))
+            col = max(0, min(col, ds.width - 1))
+
+            # Read a 3x3 patch for gradient computation
+            win_col = max(0, col - 1)
+            win_row = max(0, row - 1)
+            win_w = min(3, ds.width - win_col)
+            win_h = min(3, ds.height - win_row)
+            window = Window(win_col, win_row, win_w, win_h)
+            patch = ds.read(1, window=window).astype(np.float64)
+
+            # Centre of patch
+            local_r = min(1, patch.shape[0] - 1)
+            local_c = min(1, patch.shape[1] - 1)
+            elev = float(patch[local_r, local_c])
+
+            # Compute slope from 3x3 patch
+            slope = 0.0
+            if patch.shape[0] >= 2 and patch.shape[1] >= 2:
+                meters_per_deg_lat = (math.pi / 180.0) * MARS_MEAN_RADIUS
+                meters_per_deg_lon = meters_per_deg_lat * math.cos(math.radians(lat_i))
+                meter_per_px_ns = px_deg_ns * meters_per_deg_lat
+                meter_per_px_ew = px_deg_ew * max(meters_per_deg_lon, 1.0)
+                dz_dy, dz_dx = np.gradient(patch, meter_per_px_ns, meter_per_px_ew)
+                slope_grid = np.degrees(np.arctan(np.sqrt(dz_dx**2 + dz_dy**2)))
+                slope = float(slope_grid[local_r, local_c])
+
+            # Cumulative distance from start
+            if i > 0:
+                cumulative_dist += _haversine_scalar(
+                    float(lats[i - 1]), float(lons[i - 1]),
+                    lat_i, lon_i,
+                )
+
+            results.append({
+                "distance_km": round(cumulative_dist / 1000.0, 3),
+                "lat": round(lat_i, 5),
+                "lon": round(lon_i, 5),
+                "elevation_m": round(elev, 1),
+                "slope_deg": round(slope, 2),
+            })
+
+        total_dist = results[-1]["distance_km"] if results else 0.0
+
+        return JSONResponse(content={
+            "profile": results,
+            "total_distance_km": round(total_dist, 2),
+            "num_points": len(results),
+            "start": {"lat": start_lat, "lon": start_lon},
+            "end": {"lat": end_lat, "lon": end_lon},
         })
 
     except FileNotFoundError as e:

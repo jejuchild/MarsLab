@@ -3,8 +3,11 @@ import type { VisibleProduct, BaseLayerType, BoundingBox, MapMode, ActiveOverlay
 import { normalizeLonForMap, clampLatitude, parseCoordinate } from "../utils/coordinates";
 import type { FieldNote } from "../api/fieldnotes";
 import type { OverlapStats } from "../utils/overlapFilter";
+import { INSTRUMENTS, INSTRUMENT_GROUPS, type InstrumentId } from "../config/instrumentRegistry";
 
-type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
+type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM" | "CRISM_TRR3";
+type InstrumentVisibility = Record<InstrumentId, boolean>;
+type FootprintCount = { count: number; truncated: boolean; total: number } | null;
 
 /**
  * Extract CRISM observation ID from full product ID
@@ -14,6 +17,20 @@ function extractCrismObsId(productId: string): string {
   const match = productId.match(/^([a-z]{3}[0-9a-f]{8})/i);
   return match ? match[1].toLowerCase() : productId.toLowerCase();
 }
+
+// Static Tailwind class lookup per instrument (avoids dynamic class issues)
+const INST_STYLES: Record<InstrumentId, {
+  text: string; bgActive: string; checkbox: string;
+  btn: string; btnLoading: string;
+}> = {
+  crism:         { text: "text-cyan-400",   bgActive: "bg-cyan-500/15 border border-cyan-500/40",   checkbox: "text-cyan-500",   btn: "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30",     btnLoading: "bg-cyan-500/10 text-cyan-400/50 border border-cyan-500/20 cursor-wait" },
+  hirise:        { text: "text-yellow-400", bgActive: "bg-yellow-500/15 border border-yellow-500/40", checkbox: "text-yellow-500", btn: "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30", btnLoading: "bg-yellow-500/10 text-yellow-400/50 border border-yellow-500/20 cursor-wait" },
+  sharad:        { text: "text-orange-400", bgActive: "bg-orange-500/15 border border-orange-500/40", checkbox: "text-orange-500", btn: "bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500/30", btnLoading: "bg-orange-500/10 text-orange-400/50 border border-orange-500/20 cursor-wait" },
+  sharad_highres:{ text: "text-amber-400",  bgActive: "bg-amber-500/15 border border-amber-500/40",  checkbox: "text-amber-500",  btn: "bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30",   btnLoading: "bg-amber-500/10 text-amber-400/50 border border-amber-500/20 cursor-wait" },
+  ctx:           { text: "text-pink-400",   bgActive: "bg-pink-500/15 border border-pink-500/40",   checkbox: "text-pink-500",   btn: "bg-pink-500/20 text-pink-400 border border-pink-500/30 hover:bg-pink-500/30",     btnLoading: "bg-pink-500/10 text-pink-400/50 border border-pink-500/20 cursor-wait" },
+  hirise_dtm:    { text: "text-amber-600",  bgActive: "bg-amber-700/15 border border-amber-700/40",  checkbox: "text-amber-600",  btn: "bg-amber-700/20 text-amber-600 border border-amber-700/30 hover:bg-amber-700/30",   btnLoading: "bg-amber-700/10 text-amber-600/50 border border-amber-700/20 cursor-wait" },
+  crism_trr3:    { text: "text-teal-400",   bgActive: "bg-teal-500/15 border border-teal-500/40",   checkbox: "text-teal-500",   btn: "bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30",     btnLoading: "bg-teal-500/10 text-teal-400/50 border border-teal-500/20 cursor-wait" },
+};
 
 // localStorage key for panel collapse state
 const PANEL_COLLAPSED_KEY = "marslab-layer-panel-collapsed";
@@ -29,21 +46,6 @@ const OVERLAY_LABELS: Record<OverlayType, { short: string; full: string; color: 
   score_hyd: { short: "S-HYD", full: "Hydration Score", color: "rose" },
 };
 
-// Overlap Filter instrument options
-const OVERLAP_INSTRUMENTS: Array<{
-  id: "CRISM" | "HIRISE" | "HIRISE_DTM" | "SHARAD" | "SHARAD_HIGHRES";
-  label: string;
-  textColor: string;
-  bgColor: string;
-  borderColor: string;
-}> = [
-  { id: "CRISM", label: "CRISM", textColor: "text-cyan-400", bgColor: "bg-cyan-500/20", borderColor: "border-cyan-500/50" },
-  { id: "HIRISE", label: "HiRISE", textColor: "text-yellow-400", bgColor: "bg-yellow-500/20", borderColor: "border-yellow-500/50" },
-  { id: "HIRISE_DTM", label: "HiRISE DTM", textColor: "text-amber-500", bgColor: "bg-amber-700/20", borderColor: "border-amber-700/50" },
-  { id: "SHARAD", label: "SHARAD", textColor: "text-orange-400", bgColor: "bg-orange-500/20", borderColor: "border-orange-500/50" },
-  { id: "SHARAD_HIGHRES", label: "SHARAD High-Res", textColor: "text-orange-400", bgColor: "bg-orange-500/20", borderColor: "border-orange-500/50" },
-];
-
 // Multi-Instrument Overlap Filter Section Component
 function OverlapFilterSection({
   filter,
@@ -54,35 +56,17 @@ function OverlapFilterSection({
   onChange?: (filter: OverlapFilter) => void;
   stats?: OverlapStats | null;
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(true);
-
   const currentFilter = filter ?? { enabled: false, instruments: [] };
-  const selectedSet = new Set(currentFilter.instruments);
-  const selectedCount = selectedSet.size;
-  const needsMore = selectedCount < 2;
 
   const handleToggle = () => {
     onChange?.({ ...currentFilter, enabled: !currentFilter.enabled });
   };
 
-  const handleInstrumentToggle = (instId: typeof OVERLAP_INSTRUMENTS[number]["id"]) => {
-    const next = selectedSet.has(instId)
-      ? currentFilter.instruments.filter(i => i !== instId)
-      : [...currentFilter.instruments, instId];
-    onChange?.({ ...currentFilter, instruments: next });
-  };
-
   return (
     <div className="p-4 border-b border-[#232f48]">
-      {/* Header */}
-      <div
-        className="flex items-center justify-between mb-2 cursor-pointer"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-      >
+      <div className="flex items-center justify-between">
         <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
-          <span className="material-symbols-outlined text-xs">
-            {isCollapsed ? "expand_more" : "expand_less"}
-          </span>
+          <span className="material-symbols-outlined text-xs">filter_alt</span>
           Overlap Filter
         </h3>
         <div className="flex items-center gap-2">
@@ -90,10 +74,7 @@ function OverlapFilterSection({
             <span className="text-sky-400 text-[10px] font-mono">{stats.totalPassing}/{stats.totalChecked}</span>
           )}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleToggle();
-            }}
+            onClick={handleToggle}
             className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase transition-colors ${
               currentFilter.enabled
                 ? "bg-sky-500/20 text-sky-400 border border-sky-500/30"
@@ -105,53 +86,27 @@ function OverlapFilterSection({
         </div>
       </div>
 
-      {!isCollapsed && (
-        <div className="space-y-3">
+      {currentFilter.enabled && (
+        <div className="mt-2 space-y-1.5">
           <p className="text-[8px] text-[#6b7c9c] leading-relaxed">
-            Show only products that spatially overlap across all selected instruments.
+            Showing only products that overlap with at least one product from another instrument.
           </p>
 
-          {/* Instrument checkboxes */}
-          <div className="space-y-1.5">
-            {OVERLAP_INSTRUMENTS.map(({ id, label, textColor, bgColor, borderColor }) => (
-              <label
-                key={id}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${
-                  selectedSet.has(id)
-                    ? `${bgColor} border ${borderColor}`
-                    : "bg-[#1a2333] border border-[#232f48] hover:border-[#3a4a68]"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedSet.has(id)}
-                  onChange={() => handleInstrumentToggle(id)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-sky-500 focus:ring-0 focus:ring-offset-0 h-3 w-3"
-                />
-                <span className={`text-[10px] font-medium ${selectedSet.has(id) ? textColor : "text-[#6b7c9c]"}`}>
-                  {label}
-                </span>
-                {/* Per-instrument stats */}
-                {currentFilter.enabled && stats && (() => {
-                  const s = stats.perInstrument.get(id);
-                  return s && s.checked > 0 ? (
-                    <span className="text-[9px] text-[#6b7c9c] ml-auto font-mono">{s.passing}/{s.checked}</span>
-                  ) : null;
-                })()}
-              </label>
-            ))}
-          </div>
-
-          {/* Hint: need at least 2 instruments */}
-          {currentFilter.enabled && needsMore && (
-            <p className="text-[9px] text-yellow-400/80 flex items-center gap-1">
-              <span className="material-symbols-outlined text-xs">info</span>
-              Select at least 2 instruments
-            </p>
+          {/* Per-instrument stats */}
+          {stats && stats.totalChecked > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from(stats.perInstrument.entries()).map(([inst, s]) => (
+                s.checked > 0 && (
+                  <span key={inst} className="text-[9px] text-[#6b7c9c] font-mono bg-[#1a2333] px-1.5 py-0.5 rounded border border-[#232f48]">
+                    {inst}: {s.passing}/{s.checked}
+                  </span>
+                )
+              ))}
+            </div>
           )}
 
           {/* No overlap message */}
-          {currentFilter.enabled && !needsMore && stats && stats.totalPassing === 0 && stats.totalChecked > 0 && (
+          {stats && stats.totalPassing === 0 && stats.totalChecked > 0 && (
             <p className="text-[9px] text-orange-400/80 flex items-center gap-1">
               <span className="material-symbols-outlined text-xs">warning</span>
               No overlapping regions found
@@ -159,10 +114,10 @@ function OverlapFilterSection({
           )}
 
           {/* No footprints loaded */}
-          {currentFilter.enabled && !needsMore && (!stats || stats.totalChecked === 0) && (
+          {(!stats || stats.totalChecked === 0) && (
             <p className="text-[9px] text-[#6b7c9c] flex items-center gap-1">
               <span className="material-symbols-outlined text-xs">info</span>
-              Load footprints for selected instruments first
+              Load footprints for at least 2 instruments
             </p>
           )}
         </div>
@@ -332,31 +287,14 @@ interface LayerPanelProps {
   viewBounds: BoundingBox;
   onViewBoundsChange: (bounds: BoundingBox) => void;
 
-  // Footprint visibility toggles
-  showCRISM: boolean;
-  showHiRISE: boolean;
-  showSHARAD: boolean;
-  showSharadHighres: boolean;
-  showCTX: boolean;
-  showHiRISEDTM?: boolean;
-  onToggleCRISM: (v: boolean) => void;
-  onToggleHiRISE: (v: boolean) => void;
-  onToggleSHARAD: (v: boolean) => void;
-  onToggleSharadHighres: (v: boolean) => void;
-  onToggleCTX: (v: boolean) => void;
-  onToggleHiRISEDTM?: (v: boolean) => void;
+  // Footprint visibility (unified)
+  instrumentVisibility: InstrumentVisibility;
+  onToggleInstrument: (id: InstrumentId, v: boolean) => void;
 
   // Explicit footprint loading
-  onLoadFootprints?: (instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM") => void;
-  footprintsLoading?: { crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean; hirise_dtm: boolean };
-  footprintCounts?: {
-    crism: { count: number; truncated: boolean; total: number } | null;
-    hirise: { count: number; truncated: boolean; total: number } | null;
-    sharad: { count: number; truncated: boolean; total: number } | null;
-    sharad_highres: { count: number; truncated: boolean; total: number } | null;
-    ctx: { count: number; truncated: boolean; total: number } | null;
-    hirise_dtm: { count: number; truncated: boolean; total: number } | null;
-  };
+  onLoadFootprints?: (instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3") => void;
+  footprintsLoading?: Record<string, boolean>;
+  footprintCounts?: Record<string, FootprintCount>;
 
   // Ice Score Filter
   iceScoreFilter?: IceScoreFilter;
@@ -383,8 +321,8 @@ interface LayerPanelProps {
   onCustomDatasetToggle?: (id: string, visible: boolean) => void;
 
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | null;
-  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | null) => void;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | null;
+  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | null) => void;
 
   // Fly-To navigation
   onFlyToCoords?: (lat: number, lon: number) => void;
@@ -392,6 +330,9 @@ interface LayerPanelProps {
   // View bound selection mode
   viewBoundSelectionMode?: boolean;
   onViewBoundSelectionModeChange?: (active: boolean) => void;
+
+  // Region Dashboard
+  onShowRegionDashboard?: () => void;
 
   // Coordinate grid
   showGrid?: boolean;
@@ -408,6 +349,13 @@ interface LayerPanelProps {
   overlapFilter?: OverlapFilter;
   onOverlapFilterChange?: (filter: OverlapFilter) => void;
   overlapStats?: OverlapStats | null;
+
+  // Measurement Tools
+  showMeasurementTools?: boolean;
+  onToggleMeasurementTools?: (v: boolean) => void;
+
+  // Mobile mode
+  isMobile?: boolean;
 }
 
 // Fly-To Navigation Component
@@ -640,23 +588,13 @@ export default function LayerPanel({
   // View bounds
   viewBounds,
   onViewBoundsChange,
-  // Footprints
-  showCRISM,
-  showHiRISE,
-  showSHARAD,
-  showSharadHighres,
-  showCTX,
-  showHiRISEDTM = false,
-  onToggleCRISM,
-  onToggleHiRISE,
-  onToggleSHARAD,
-  onToggleSharadHighres,
-  onToggleCTX,
-  onToggleHiRISEDTM,
+  // Footprints (unified)
+  instrumentVisibility,
+  onToggleInstrument,
   // Explicit footprint loading
   onLoadFootprints,
-  footprintsLoading = { crism: false, hirise: false, sharad: false, sharad_highres: false, ctx: false, hirise_dtm: false },
-  footprintCounts = { crism: null, hirise: null, sharad: null, sharad_highres: null, ctx: null, hirise_dtm: null },
+  footprintsLoading = {},
+  footprintCounts = {},
   // Ice Score Filter
   iceScoreFilter,
   onIceScoreFilterChange,
@@ -680,6 +618,8 @@ export default function LayerPanel({
   // Analysis mode
   analysisMode = null,
   onAnalysisModeChange,
+  // Region Dashboard
+  onShowRegionDashboard,
   // Fly-To navigation
   onFlyToCoords,
   // View bound selection mode
@@ -698,6 +638,9 @@ export default function LayerPanel({
   overlapFilter,
   onOverlapFilterChange,
   overlapStats,
+  showMeasurementTools = false,
+  onToggleMeasurementTools,
+  isMobile = false,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -760,8 +703,8 @@ export default function LayerPanel({
     return passingCount;
   }, [visibleProducts, filteredProductIds, iceScoreFilter?.enabled]);
 
-  // Collapsed state - show thin bar with toggle button
-  if (isCollapsed) {
+  // Collapsed state - show thin bar with toggle button (desktop only)
+  if (isCollapsed && !isMobile) {
     return (
       <div className="flex h-full w-12 flex-col border-r border-[#232f48] bg-[#101622] transition-all duration-300 ease-in-out">
         {/* Expand button */}
@@ -803,23 +746,30 @@ export default function LayerPanel({
 
   // Expanded state - full panel
   return (
-    <div className="relative flex h-full flex-col border-r border-[#232f48] bg-[#101622]" style={{ width: panelWidth }}>
-      {/* Resize handle (right edge) */}
-      <div
-        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
-        onMouseDown={handleResizeStart}
-      />
+    <div
+      className={`relative flex flex-col bg-[#101622] ${isMobile ? 'w-full' : 'h-full border-r border-[#232f48]'}`}
+      style={isMobile ? undefined : { width: panelWidth }}
+    >
+      {/* Resize handle (right edge) - desktop only */}
+      {!isMobile && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+          onMouseDown={handleResizeStart}
+        />
+      )}
       {/* Header */}
       <div className="p-4 border-b border-[#232f48]">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsCollapsed(true)}
-              className="p-1 rounded hover:bg-[#1a2333] transition-colors"
-              title="Collapse Panel"
-            >
-              <span className="material-symbols-outlined text-sm text-[#92a4c9]">chevron_left</span>
-            </button>
+            {!isMobile && (
+              <button
+                onClick={() => setIsCollapsed(true)}
+                className="p-1 rounded hover:bg-[#1a2333] transition-colors"
+                title="Collapse Panel"
+              >
+                <span className="material-symbols-outlined text-sm text-[#92a4c9]">chevron_left</span>
+              </button>
+            )}
             <h1 className="text-white text-xs font-bold uppercase tracking-wider">
               Control Center
             </h1>
@@ -935,224 +885,103 @@ export default function LayerPanel({
           </label>
         </div>
 
-        {/* Footprints Section */}
+        {/* Footprints Section — Hierarchical instrument tree */}
         <div className="p-4 border-b border-[#232f48]">
           <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest mb-3">
             Footprints
           </h3>
-          <div className="space-y-3">
-            {/* CRISM Row */}
-            <div className="flex items-center gap-2">
-              <label
-                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors flex-1 ${
-                  showCRISM
-                    ? "bg-cyan-500/20 border border-cyan-500/50"
-                    : "bg-[#1a2333] border border-[#232f48] hover:border-cyan-500/30"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={showCRISM}
-                  onChange={(e) => onToggleCRISM(e.target.checked)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-cyan-500 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[11px] font-medium text-cyan-400">CRISM</span>
-                {footprintCounts.crism && (
-                  <span className="text-[9px] text-cyan-400/70 ml-auto">
-                    {footprintCounts.crism.count}{footprintCounts.crism.truncated && `/${footprintCounts.crism.total}`}
-                  </span>
-                )}
-              </label>
-              <button
-                onClick={() => onLoadFootprints?.("CRISM")}
-                disabled={footprintsLoading.crism}
-                className={`px-2 py-2 rounded text-[10px] font-medium transition-colors whitespace-nowrap ${
-                  footprintsLoading.crism
-                    ? "bg-cyan-500/10 text-cyan-400/50 border border-cyan-500/20 cursor-wait"
-                    : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30"
-                }`}
-              >
-                {footprintsLoading.crism ? (
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                  </span>
-                ) : (
-                  "Load"
-                )}
-              </button>
-            </div>
+          <div className="space-y-1">
+            {INSTRUMENT_GROUPS.map((group) => {
+              const activeCount = group.instruments.filter(id => instrumentVisibility[id]).length;
+              const allActive = activeCount === group.instruments.length;
+              const someActive = activeCount > 0 && !allActive;
 
-            {/* HiRISE Row */}
-            <div className="flex items-center gap-2">
-              <label
-                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors flex-1 ${
-                  showHiRISE
-                    ? "bg-yellow-500/20 border border-yellow-500/50"
-                    : "bg-[#1a2333] border border-[#232f48] hover:border-yellow-500/30"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={showHiRISE}
-                  onChange={(e) => onToggleHiRISE(e.target.checked)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-yellow-500 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[11px] font-medium text-yellow-400">HiRISE</span>
-                {footprintCounts.hirise && (
-                  <span className="text-[9px] text-yellow-400/70 ml-auto">
-                    {footprintCounts.hirise.count}{footprintCounts.hirise.truncated && `/${footprintCounts.hirise.total}`}
-                  </span>
-                )}
-              </label>
-              <button
-                onClick={() => onLoadFootprints?.("HIRISE")}
-                disabled={footprintsLoading.hirise}
-                className={`px-2 py-2 rounded text-[10px] font-medium transition-colors whitespace-nowrap ${
-                  footprintsLoading.hirise
-                    ? "bg-yellow-500/10 text-yellow-400/50 border border-yellow-500/20 cursor-wait"
-                    : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30"
-                }`}
-              >
-                {footprintsLoading.hirise ? (
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                  </span>
-                ) : (
-                  "Load"
-                )}
-              </button>
-            </div>
+              return (
+                <div key={group.id} className="rounded overflow-hidden">
+                  {/* Group header */}
+                  <button
+                    onClick={() => {
+                      // Toggle all instruments in this group
+                      const newVal = !allActive;
+                      for (const instId of group.instruments) {
+                        onToggleInstrument(instId, newVal);
+                      }
+                    }}
+                    className={`flex items-center gap-2 w-full px-2.5 py-2 text-left transition-colors ${
+                      someActive || allActive
+                        ? "bg-[#1a2333]"
+                        : "bg-[#101622] hover:bg-[#1a2333]"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-sm text-[#6b7c9c]">{group.icon}</span>
+                    <span className="text-[11px] font-bold text-[#92a4c9] flex-1">{group.displayName}</span>
+                    {activeCount > 0 && (
+                      <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-bold">
+                        {activeCount}
+                      </span>
+                    )}
+                    <span className="material-symbols-outlined text-xs text-[#6b7c9c]">
+                      {someActive || allActive ? "toggle_on" : "toggle_off"}
+                    </span>
+                  </button>
 
-            {/* SHARAD Row */}
-            <div className="flex items-center gap-2">
-              <label
-                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors flex-1 ${
-                  showSHARAD
-                    ? "bg-orange-500/20 border border-orange-500/50"
-                    : "bg-[#1a2333] border border-[#232f48] hover:border-orange-500/30"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={showSHARAD}
-                  onChange={(e) => onToggleSHARAD(e.target.checked)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-orange-500 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[11px] font-medium text-orange-400">SHARAD</span>
-                {footprintCounts.sharad && (
-                  <span className="text-[9px] text-orange-400/70 ml-auto">
-                    {footprintCounts.sharad.count}{footprintCounts.sharad.truncated && `/${footprintCounts.sharad.total}`}
-                  </span>
-                )}
-              </label>
-              <button
-                onClick={() => onLoadFootprints?.("SHARAD")}
-                disabled={footprintsLoading.sharad}
-                className={`px-2 py-2 rounded text-[10px] font-medium transition-colors whitespace-nowrap ${
-                  footprintsLoading.sharad
-                    ? "bg-orange-500/10 text-orange-400/50 border border-orange-500/20 cursor-wait"
-                    : "bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500/30"
-                }`}
-              >
-                {footprintsLoading.sharad ? (
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                  </span>
-                ) : (
-                  "Load"
-                )}
-              </button>
-            </div>
+                  {/* Child instruments */}
+                  <div className="pl-4 space-y-1 py-1 bg-[#0d1219]">
+                    {group.instruments.map((instId) => {
+                      const inst = INSTRUMENTS[instId];
+                      const isVisible = instrumentVisibility[instId];
+                      const isLoading = footprintsLoading[instId] ?? false;
+                      const count = footprintCounts[instId] as FootprintCount;
+                      const style = INST_STYLES[instId];
 
-            {/* SHARAD High-Res Row */}
-            <div className="flex items-center gap-2">
-              <label
-                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors flex-1 ${
-                  showSharadHighres
-                    ? "bg-amber-500/20 border border-amber-500/50"
-                    : "bg-[#1a2333] border border-[#232f48] hover:border-amber-500/30"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={showSharadHighres}
-                  onChange={(e) => onToggleSharadHighres(e.target.checked)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-amber-500 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[11px] font-medium text-amber-400">SHARAD HR</span>
-                {footprintCounts.sharad_highres && (
-                  <span className="text-[9px] text-amber-400/70 ml-auto">
-                    {footprintCounts.sharad_highres.count}{footprintCounts.sharad_highres.truncated && `/${footprintCounts.sharad_highres.total}`}
-                  </span>
-                )}
-              </label>
-              <button
-                onClick={() => onLoadFootprints?.("SHARAD_HIGHRES")}
-                disabled={footprintsLoading.sharad_highres}
-                className={`px-2 py-2 rounded text-[10px] font-medium transition-colors whitespace-nowrap ${
-                  footprintsLoading.sharad_highres
-                    ? "bg-amber-500/10 text-amber-400/50 border border-amber-500/20 cursor-wait"
-                    : "bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30"
-                }`}
-              >
-                {footprintsLoading.sharad_highres ? (
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                  </span>
-                ) : (
-                  "Load"
-                )}
-              </button>
-            </div>
+                      return (
+                        <div key={instId} className="flex items-center gap-1.5 pr-2">
+                          <label
+                            className={`flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer transition-colors flex-1 ${
+                              isVisible ? style.bgActive : `bg-transparent hover:bg-[#1a2333]`
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isVisible}
+                              onChange={(e) => onToggleInstrument(instId, e.target.checked)}
+                              className={`rounded bg-[#0a0f18] border-[#232f48] focus:ring-0 focus:ring-offset-0 ${style.checkbox}`}
+                            />
+                            <span className={`text-[10px] font-medium ${style.text}`}>{inst.subLabel}</span>
+                            {count && (
+                              <span className={`text-[8px] ${style.text} opacity-60 ml-auto`}>
+                                {count.count}{count.truncated && `/${count.total}`}
+                              </span>
+                            )}
+                          </label>
+                          <button
+                            onClick={() => onLoadFootprints?.(inst.name as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3")}
+                            disabled={isLoading}
+                            className={`px-1.5 py-1 rounded text-[9px] font-medium transition-colors whitespace-nowrap ${
+                              isLoading ? style.btnLoading : style.btn
+                            }`}
+                          >
+                            {isLoading ? (
+                              <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                            ) : (
+                              "Load"
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
 
-            {/* CTX Row */}
-            <div className="flex items-center gap-2">
+            {/* Custom Data Row (not part of instrument groups) */}
+            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-[#232f48]">
               <label
-                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors flex-1 ${
-                  showCTX
-                    ? "bg-pink-500/20 border border-pink-500/50"
-                    : "bg-[#1a2333] border border-[#232f48] hover:border-pink-500/30"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={showCTX}
-                  onChange={(e) => onToggleCTX(e.target.checked)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-pink-500 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[11px] font-medium text-pink-400">CTX</span>
-                {footprintCounts.ctx && (
-                  <span className="text-[9px] text-pink-400/70 ml-auto">
-                    {footprintCounts.ctx.count}{footprintCounts.ctx.truncated && `/${footprintCounts.ctx.total}`}
-                  </span>
-                )}
-              </label>
-              <button
-                onClick={() => onLoadFootprints?.("CTX")}
-                disabled={footprintsLoading.ctx}
-                className={`px-2 py-2 rounded text-[10px] font-medium transition-colors whitespace-nowrap ${
-                  footprintsLoading.ctx
-                    ? "bg-pink-500/10 text-pink-400/50 border border-pink-500/20 cursor-wait"
-                    : "bg-pink-500/20 text-pink-400 border border-pink-500/30 hover:bg-pink-500/30"
-                }`}
-              >
-                {footprintsLoading.ctx ? (
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                  </span>
-                ) : (
-                  "Load"
-                )}
-              </button>
-            </div>
-
-            {/* Custom Data Row */}
-            <div className="flex items-center gap-2">
-              <label
-                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors flex-1 ${
+                className={`flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer transition-colors flex-1 ${
                   showCustomData
                     ? "bg-fuchsia-500/20 border border-fuchsia-500/50"
-                    : "bg-[#1a2333] border border-[#232f48] hover:border-fuchsia-500/30"
+                    : "bg-transparent border border-transparent hover:bg-[#1a2333]"
                 }`}
               >
                 <input
@@ -1161,9 +990,9 @@ export default function LayerPanel({
                   onChange={(e) => onToggleCustomData(e.target.checked)}
                   className="rounded bg-[#0a0f18] border-[#232f48] text-fuchsia-500 focus:ring-0 focus:ring-offset-0"
                 />
-                <span className="text-[11px] font-medium text-fuchsia-400">Custom Data</span>
+                <span className="text-[10px] font-medium text-fuchsia-400">Custom Data</span>
                 {customDatasets.length > 0 && (
-                  <span className="text-[9px] text-fuchsia-400/70 ml-auto">
+                  <span className="text-[8px] text-fuchsia-400/60 ml-auto">
                     {customDatasets.length}
                   </span>
                 )}
@@ -1171,57 +1000,14 @@ export default function LayerPanel({
               <button
                 onClick={() => onLoadCustomData?.()}
                 disabled={customDataLoading}
-                className={`px-2 py-2 rounded text-[10px] font-medium transition-colors whitespace-nowrap ${
+                className={`px-1.5 py-1 rounded text-[9px] font-medium transition-colors whitespace-nowrap ${
                   customDataLoading
                     ? "bg-fuchsia-500/10 text-fuchsia-400/50 border border-fuchsia-500/20 cursor-wait"
                     : "bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 hover:bg-fuchsia-500/30"
                 }`}
               >
                 {customDataLoading ? (
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                  </span>
-                ) : (
-                  "Load"
-                )}
-              </button>
-            </div>
-
-            {/* HiRISE DTM Row */}
-            <div className="flex items-center gap-2">
-              <label
-                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors flex-1 ${
-                  showHiRISEDTM
-                    ? "bg-amber-700/20 border border-amber-700/50"
-                    : "bg-[#1a2333] border border-[#232f48] hover:border-amber-700/30"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={showHiRISEDTM}
-                  onChange={(e) => onToggleHiRISEDTM?.(e.target.checked)}
-                  className="rounded bg-[#0a0f18] border-[#232f48] text-amber-600 focus:ring-0 focus:ring-offset-0"
-                />
-                <span className="text-[11px] font-medium text-amber-600">HiRISE DTM</span>
-                {footprintCounts.hirise_dtm && (
-                  <span className="text-[9px] text-amber-600/70 ml-auto">
-                    {footprintCounts.hirise_dtm.count}{footprintCounts.hirise_dtm.truncated && `/${footprintCounts.hirise_dtm.total}`}
-                  </span>
-                )}
-              </label>
-              <button
-                onClick={() => onLoadFootprints?.("HIRISE_DTM")}
-                disabled={footprintsLoading.hirise_dtm}
-                className={`px-2 py-2 rounded text-[10px] font-medium transition-colors whitespace-nowrap ${
-                  footprintsLoading.hirise_dtm
-                    ? "bg-amber-700/10 text-amber-600/50 border border-amber-700/20 cursor-wait"
-                    : "bg-amber-700/20 text-amber-600 border border-amber-700/30 hover:bg-amber-700/30"
-                }`}
-              >
-                {footprintsLoading.hirise_dtm ? (
-                  <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                  </span>
+                  <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
                 ) : (
                   "Load"
                 )}
@@ -1299,22 +1085,118 @@ export default function LayerPanel({
               )}
             </button>
 
-            {/* AI Analysis */}
+            {/* Agentic AI */}
             <button
-              onClick={() => onAnalysisModeChange?.(analysisMode === "ai_analysis" ? null : "ai_analysis")}
+              onClick={() => onAnalysisModeChange?.(analysisMode === "agentic" ? null : "agentic")}
               className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
-                analysisMode === "ai_analysis"
-                  ? "bg-violet-500/20 border border-violet-500/50 text-violet-400"
-                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-violet-500/30"
+                analysisMode === "agentic"
+                  ? "bg-fuchsia-500/20 border border-fuchsia-500/50 text-fuchsia-400"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-fuchsia-500/30"
               }`}
             >
-              <span className="material-symbols-outlined text-sm">psychology</span>
+              <span className="material-symbols-outlined text-sm">smart_toy</span>
               <div className="flex-1">
-                <span className="text-[11px] font-medium">AI Analysis</span>
-                <p className="text-[9px] text-[#6b7c9c]">Click map to analyze area</p>
+                <span className="text-[11px] font-medium">Agentic AI <span className="text-[8px] px-1 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 font-bold">BETA</span></span>
+                <p className="text-[9px] text-[#6b7c9c]">Autonomous multi-instrument analysis</p>
               </div>
-              {analysisMode === "ai_analysis" && (
-                <span className="text-[8px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 border border-violet-500/30 font-bold uppercase">
+              {analysisMode === "agentic" && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 font-bold uppercase">
+                  ON
+                </span>
+              )}
+            </button>
+
+            {/* Landing Site Report Generator */}
+            <button
+              onClick={() => onAnalysisModeChange?.(analysisMode === "report" ? null : "report")}
+              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
+                analysisMode === "report"
+                  ? "bg-amber-500/20 border border-amber-500/50 text-amber-400"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-amber-500/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">assignment</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">AI Landing Site Report <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold">BETA</span></span>
+                <p className="text-[9px] text-[#6b7c9c]">Compare regions with ground rules</p>
+              </div>
+              {analysisMode === "report" && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold uppercase">
+                  ON
+                </span>
+              )}
+            </button>
+
+            {/* Guided Workflows */}
+            <button
+              onClick={() => onAnalysisModeChange?.(analysisMode === "guided" ? null : "guided")}
+              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
+                analysisMode === "guided"
+                  ? "bg-sky-500/20 border border-sky-500/50 text-sky-400"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-sky-500/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">explore</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">Guided Workflows <span className="text-[8px] px-1 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold">NEW</span></span>
+                <p className="text-[9px] text-[#6b7c9c]">Step-by-step investigation guides</p>
+              </div>
+              {analysisMode === "guided" && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 font-bold uppercase">
+                  ON
+                </span>
+              )}
+            </button>
+
+            {/* Region Dashboard */}
+            <button
+              onClick={() => onShowRegionDashboard?.()}
+              className="flex items-center gap-2 w-full p-2 rounded transition-colors text-left bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-teal-500/30"
+            >
+              <span className="material-symbols-outlined text-sm">public</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">Region Dashboard <span className="text-[8px] px-1 py-0.5 rounded bg-teal-500/20 text-teal-400 border border-teal-500/30 font-bold">NEW</span></span>
+                <p className="text-[9px] text-[#6b7c9c]">Browse all 55 regions at a glance</p>
+              </div>
+            </button>
+
+            {/* Measurement Tools */}
+            <button
+              onClick={() => onToggleMeasurementTools?.(!showMeasurementTools)}
+              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
+                showMeasurementTools
+                  ? "bg-cyan-900/40 border border-cyan-500/40 text-cyan-300"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-cyan-500/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">straighten</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">Measurement Tools</span>
+                <p className="text-[9px] text-[#6b7c9c]">Distance, area, elevation, pins</p>
+              </div>
+              {showMeasurementTools && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-bold uppercase">
+                  ON
+                </span>
+              )}
+            </button>
+
+            {/* Region Stats */}
+            <button
+              onClick={() => onAnalysisModeChange?.(analysisMode === "region_stats" ? null : "region_stats")}
+              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
+                analysisMode === "region_stats"
+                  ? "bg-indigo-500/20 border border-indigo-500/50 text-indigo-400"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-indigo-500/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">pentagon</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">Region Stats</span>
+                <p className="text-[9px] text-[#6b7c9c]">Draw polygon for area statistics</p>
+              </div>
+              {analysisMode === "region_stats" && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-bold uppercase">
                   ON
                 </span>
               )}
@@ -1551,6 +1433,7 @@ const INSTRUMENT_COLORS: Record<InstrumentType, { bg: string; text: string; bord
   CTX: { bg: "bg-pink-500/20", text: "text-pink-400", border: "border-pink-500/30" },
   CUSTOM: { bg: "bg-fuchsia-500/20", text: "text-fuchsia-400", border: "border-fuchsia-500/30" },
   HIRISE_DTM: { bg: "bg-amber-700/20", text: "text-amber-600", border: "border-amber-700/30" },
+  CRISM_TRR3: { bg: "bg-teal-500/20", text: "text-teal-400", border: "border-teal-500/30" },
 };
 
 // Displayed Products Section Component
@@ -1583,6 +1466,7 @@ function DisplayedProductsSection({
       CTX: [],
       CUSTOM: [],
       HIRISE_DTM: [],
+      CRISM_TRR3: [],
     };
     for (const product of visibleProducts) {
       if (product.instrument in groups) {
@@ -1787,6 +1671,7 @@ function ActiveProductsSection({
       CTX: [],
       CUSTOM: [],
       HIRISE_DTM: [],
+      CRISM_TRR3: [],
     };
     for (const product of activeProducts) {
       if (product.instrument in groups) {

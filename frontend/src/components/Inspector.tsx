@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import toast from "react-hot-toast";
 import { fetchHiRISEWindow } from "../api/hirise";
 import type { OverlayType, ProductOverlay, CustomDataset } from "../pages/MainPage";
 import type { FieldNote } from "../api/fieldnotes";
+import BandRatioCalculator from "./BandRatioCalculator";
 
 /* =========================================================
  * Types
@@ -62,6 +64,7 @@ const OVERLAY_CONFIG: Record<OverlayType, { label: string; activeClass: string; 
   browse_IC2: { label: "IC2", activeClass: "bg-cyan-500/20 border border-cyan-500/50 text-cyan-400", icon: "ac_unit" },
   score_ice: { label: "S-ICE", activeClass: "bg-sky-500/20 border border-sky-500/50 text-sky-400", icon: "analytics" },
   score_hyd: { label: "S-HYD", activeClass: "bg-rose-500/20 border border-rose-500/50 text-rose-400", icon: "analytics" },
+  mineral_cnn: { label: "Minerals", activeClass: "bg-amber-500/20 border border-amber-500/50 text-amber-400", icon: "science" },
 };
 
 /* =========================================================
@@ -80,6 +83,11 @@ function CRISMQuickviewImage({ productId, instrument }: { productId: string; ins
 
     if (instrument === "HIRISE_DTM") {
       setImgSrc(`/hirise_dtm/overlay/${productId}.png`);
+      return;
+    }
+
+    if (instrument === "CRISM_TRR3") {
+      setImgSrc(`/api/mineral-cnn/quickview/${productId}`);
       return;
     }
 
@@ -157,7 +165,10 @@ export default function Inspector({
   onFindRelated,
   recentProducts = [],
   onSelectRecent,
+  onRemoveRecent,
   onDownloadProduct,
+  onPinSpectrum,
+  onFindTemporalPairs,
   isMobile = false,
 }: {
   selected: InspectorContext | null;
@@ -176,7 +187,10 @@ export default function Inspector({
   onFindRelated?: (productId: string, instrument: string) => void;
   recentProducts?: RecentProduct[];
   onSelectRecent?: (product: RecentProduct) => void;
+  onRemoveRecent?: (productId: string) => void;
   onDownloadProduct?: (productId: string, instrument: string) => void;
+  onPinSpectrum?: (spectrum: { productId: string; lat: number; lon: number; wavelengths: number[]; reflectance: (number | null)[] }) => void;
+  onFindTemporalPairs?: (lat: number, lon: number) => void;
   isMobile?: boolean;
 }) {
   const hasNote = useMemo(
@@ -303,7 +317,7 @@ export default function Inspector({
 
   // Fetch CRISM spectrum when pixel coordinates change
   useEffect(() => {
-    if (!selected || selected.instrument !== "CRISM") {
+    if (!selected || (selected.instrument !== "CRISM" && selected.instrument !== "CRISM_TRR3")) {
       setSpectrumData(null);
       return;
     }
@@ -317,11 +331,22 @@ export default function Inspector({
     const productId = selected.productId;
     const pixelLine = selected.pixelLine;
     const pixelSample = selected.pixelSample;
+    const isTRR3 = selected.instrument === "CRISM_TRR3";
 
     async function fetchSpectrum() {
       setSpectrumLoading(true);
       try {
-        const response = await fetch(`/crism/${productId}/spectrum`, {
+        // TRR3: use /api/crism-trr3/{obs_id}/spectrum
+        // MTRDR: use /crism/{product_id}/spectrum
+        let url: string;
+        if (isTRR3) {
+          const obsId = productId.replace(/_\d{2}$/, "");
+          url = `/api/crism-trr3/${obsId}/spectrum`;
+        } else {
+          url = `/crism/${productId}/spectrum`;
+        }
+
+        const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -342,6 +367,7 @@ export default function Inspector({
         });
       } catch (e) {
         console.error("Failed to fetch spectrum:", e);
+        toast.error("Failed to load spectrum data");
         setSpectrumData(null);
       } finally {
         setSpectrumLoading(false);
@@ -355,6 +381,7 @@ export default function Inspector({
 
   const isHiRISE = selected.instrument === "HIRISE";
   const isCRISM = selected.instrument === "CRISM" || selected.instrument === "CRISM_TRR3";
+  const isTRR3 = selected.instrument === "CRISM_TRR3";
   const isCustom = selected.instrument === "CUSTOM";
   const isDTM = selected.instrument === "HIRISE_DTM";
 
@@ -364,6 +391,10 @@ export default function Inspector({
   };
 
   const handleApplyRGB = () => {
+    // Auto-activate highres overlay if not already active
+    if (activeOverlay?.type !== "highres") {
+      onSetOverlay("highres");
+    }
     onRGBChange?.(localRGB);
   };
 
@@ -372,9 +403,11 @@ export default function Inspector({
   const crismTabs: CRISMTabKey[] = ["Metadata", "Spectrum", "Bands"];
 
   // Available overlay types for this instrument
-  const availableOverlays: OverlayType[] = isCRISM
-    ? ["quickview", "highres", "browse_HYD", "browse_ICE", "browse_IC2", "score_ice", "score_hyd"]
-    : ["quickview", "highres"];
+  const availableOverlays: OverlayType[] = isTRR3
+    ? ["quickview", "highres", "mineral_cnn"]
+    : isCRISM
+      ? ["quickview", "highres", "browse_HYD", "browse_ICE", "browse_IC2", "score_ice", "score_hyd"]
+      : ["quickview", "highres"];
 
   // Filter out highres if not available
   const displayOverlays = availableOverlays.filter(
@@ -453,18 +486,34 @@ export default function Inspector({
       {recentProducts.length > 1 && onSelectRecent && (
         <div className="flex gap-1.5 px-3 py-2 border-b border-border-dark overflow-x-auto scrollbar-dark">
           {recentProducts.map((p) => (
-            <button
+            <div
               key={p.productId}
-              onClick={() => onSelectRecent(p)}
-              className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-medium transition-all ${
+              className={`flex-shrink-0 flex items-center rounded-full text-[10px] font-medium transition-all ${
                 p.productId === selected.productId
                   ? "bg-primary/20 border border-primary/50 text-primary"
                   : "bg-surface-dark border border-border-dark text-slate-400 hover:text-white hover:border-slate-500"
               }`}
-              title={`${p.instrument} — ${p.productId}`}
             >
-              {p.productId.length > 16 ? p.productId.slice(0, 14) + "…" : p.productId}
-            </button>
+              <button
+                onClick={() => onSelectRecent(p)}
+                className="pl-2.5 pr-1 py-1"
+                title={`${p.instrument} — ${p.productId}`}
+              >
+                {p.productId.length > 16 ? p.productId.slice(0, 14) + "…" : p.productId}
+              </button>
+              {onRemoveRecent && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveRecent(p.productId);
+                  }}
+                  className="pr-1.5 pl-0.5 py-1 opacity-50 hover:opacity-100 hover:text-red-400 transition-all"
+                  title="Remove from history"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 12 }}>close</span>
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -492,6 +541,7 @@ export default function Inspector({
             selected={selected}
             spectrumData={spectrumData}
             loading={spectrumLoading}
+            onPinSpectrum={onPinSpectrum}
           />
         )}
 
@@ -691,6 +741,17 @@ export default function Inspector({
           </div>
         )}
 
+        {/* Find Temporal Pairs */}
+        {selected && selected.instrument !== "CUSTOM" && onFindTemporalPairs && (
+          <button
+            onClick={() => onFindTemporalPairs(selected.lat, selected.lon)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30 transition-all active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined text-sm">compare</span>
+            Find Temporal Pairs
+          </button>
+        )}
+
         <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all">
           <span className="material-symbols-outlined text-sm">ios_share</span>
           Export Statistics
@@ -854,15 +915,15 @@ function BandsTab({
       </div>
 
       {/* Apply Button */}
-      {isOverlayActive && (
-        <button
-          onClick={onApply}
-          className="w-full py-2.5 rounded-lg bg-primary/20 border border-primary/30 text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary/30 transition-colors"
-        >
-          <span className="material-symbols-outlined text-sm align-middle mr-1">refresh</span>
-          Apply RGB Changes
-        </button>
-      )}
+      <button
+        onClick={onApply}
+        className="w-full py-2.5 rounded-lg bg-primary/20 border border-primary/30 text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary/30 transition-colors"
+      >
+        <span className="material-symbols-outlined text-sm align-middle mr-1">
+          {isOverlayActive ? "refresh" : "add_photo_alternate"}
+        </span>
+        {isOverlayActive ? "Apply RGB Changes" : "Create RGB Overlay"}
+      </button>
     </div>
   );
 }
@@ -874,11 +935,14 @@ function SpectrumTab({
   selected,
   spectrumData,
   loading,
+  onPinSpectrum,
 }: {
   selected: InspectorContext;
   spectrumData: SpectrumData | null;
   loading: boolean;
+  onPinSpectrum?: (spectrum: { productId: string; lat: number; lon: number; wavelengths: number[]; reflectance: (number | null)[] }) => void;
 }) {
+  const [showBandRatios, setShowBandRatios] = useState(false);
   const hasPixel = selected.pixelLine !== undefined && selected.pixelSample !== undefined;
 
   if (!hasPixel) {
@@ -968,9 +1032,31 @@ function SpectrumTab({
             Pixel Spectrum
           </h3>
         </div>
-        <span className="text-[10px] text-slate-500">
-          {spectrumData.validBands} bands
-        </span>
+        <div className="flex items-center gap-2">
+          {onPinSpectrum && (
+            <button
+              onClick={() =>
+                onPinSpectrum({
+                  productId: selected.productId,
+                  lat: selected.lat,
+                  lon: selected.lon,
+                  wavelengths: spectrumData.wavelengths,
+                  reflectance: spectrumData.reflectance,
+                })
+              }
+              className="flex items-center gap-1 rounded px-2 py-1 text-[10px] font-medium bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+              title="Pin spectrum for comparison"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                push_pin
+              </span>
+              Pin
+            </button>
+          )}
+          <span className="text-[10px] text-slate-500">
+            {spectrumData.validBands} bands
+          </span>
+        </div>
       </div>
 
       {/* Pixel coordinates */}
@@ -1068,6 +1154,292 @@ function SpectrumTab({
           <div className="font-mono text-xs text-white">{meanRefl.toFixed(4)}</div>
         </div>
       </div>
+
+      {/* Band Ratios Section */}
+      {!showBandRatios ? (
+        <button
+          onClick={() => setShowBandRatios(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[10px] font-bold uppercase tracking-widest bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-colors"
+        >
+          <span className="material-symbols-outlined text-sm">calculate</span>
+          Band Ratios
+        </button>
+      ) : (
+        <BandRatioCalculator
+          wavelengths={spectrumData.wavelengths}
+          reflectance={spectrumData.reflectance}
+          onClose={() => setShowBandRatios(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+ * TRR3 Mineral Classification Section
+ * =======================================================*/
+function TRR3MineralSection({ obsId }: { obsId: string }) {
+  const [status, setStatus] = useState<"checking" | "not_downloaded" | "idle" | "loading" | "done" | "error">("checking");
+  const [stats, setStats] = useState<any>(null);
+  const [legend, setLegend] = useState<any[]>([]);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [progressMsg, setProgressMsg] = useState("");
+  const [progressPct, setProgressPct] = useState<number | null>(null);
+
+  // Check data availability on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    // First check if classification results exist
+    fetch(`/api/mineral-cnn/result/${obsId}/stats`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (cancelled) return;
+        if (data) {
+          setStats(data);
+          setStatus("done");
+          fetch(`/api/mineral-cnn/result/${obsId}/legend`)
+            .then((r) => r.json())
+            .then((d) => !cancelled && setLegend(d.legend || []))
+            .catch(() => {});
+          return;
+        }
+        // No results — check if data is downloaded
+        return fetch(`/api/mineral-cnn/acquire/${obsId}/status`);
+      })
+      .then((res) => {
+        if (!res || cancelled) return;
+        return res.json();
+      })
+      .then((data) => {
+        if (!data || cancelled) return;
+        if (data.has_results) {
+          setStatus("done");
+        } else if (data.has_trr3_data) {
+          setStatus("idle"); // Data exists, ready to classify
+        } else {
+          setStatus("not_downloaded"); // Need to download first
+        }
+      })
+      .catch((e) => { if (!cancelled) { setStatus("not_downloaded"); toast.error(`CNN status check failed: ${e.message}`); } });
+
+    return () => { cancelled = true; };
+  }, [obsId]);
+
+  // SSE stream reader — shared between classify-only and full acquire
+  const streamSSE = async (url: string) => {
+    setStatus("loading");
+    setErrorMsg("");
+    setProgressMsg("Starting...");
+    setProgressPct(null);
+    try {
+      const res = await fetch(url, { method: "POST" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let gotError = false;
+      let errDetail = "Pipeline failed";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.replace(/^data:\s*/, "").trim();
+          if (!trimmed.startsWith("{")) continue;
+          try {
+            const evt = JSON.parse(trimmed);
+            if (evt.event === "error") {
+              gotError = true;
+              errDetail = evt.data?.error || "Pipeline failed";
+              break;
+            }
+            if (evt.event === "status" && evt.data?.message) {
+              setProgressMsg(evt.data.message);
+              if (evt.data.step !== "jcat") setProgressPct(null);
+            }
+            if (evt.event === "progress" && evt.data?.percent != null) {
+              setProgressPct(evt.data.percent);
+              setProgressMsg(`JCAT atmospheric correction: ${evt.data.percent}%`);
+            }
+            if (evt.event === "download_progress" && evt.data?.percent != null) {
+              setProgressPct(evt.data.percent);
+              setProgressMsg(`Downloading ${evt.data.file}: ${evt.data.percent}%`);
+            }
+            if (evt.event === "discovery" && evt.data) {
+              setProgressMsg(`Found ${evt.data.files} files (${evt.data.total_size_mb} MB)`);
+            }
+          } catch { /* skip */ }
+        }
+        if (gotError) break;
+      }
+
+      if (gotError) {
+        setStatus("error");
+        setErrorMsg(errDetail);
+        return;
+      }
+
+      // Fetch results
+      const statsRes = await fetch(`/api/mineral-cnn/result/${obsId}/stats`);
+      if (statsRes.ok) {
+        setStats(await statsRes.json());
+        setStatus("done");
+        const legendRes = await fetch(`/api/mineral-cnn/result/${obsId}/legend`);
+        if (legendRes.ok) {
+          const ld = await legendRes.json();
+          setLegend(ld.legend || []);
+        }
+      } else {
+        // Retry once after short delay
+        await new Promise(r => setTimeout(r, 500));
+        const retry = await fetch(`/api/mineral-cnn/result/${obsId}/stats`);
+        if (retry.ok) {
+          setStats(await retry.json());
+          setStatus("done");
+        } else {
+          setStatus("error");
+          setErrorMsg("Pipeline completed but results not available");
+        }
+      }
+    } catch (e: any) {
+      setStatus("error");
+      setErrorMsg(e.message || "Pipeline failed");
+    }
+  };
+
+  const runAcquire = () => streamSSE(`/api/mineral-cnn/acquire/${obsId}`);
+  const runClassification = () => streamSSE(`/api/mineral-cnn/classify/${obsId}`);
+
+  return (
+    <div className="space-y-3">
+      <h4 className="text-xs font-bold uppercase tracking-wider text-teal-400 flex items-center gap-1.5">
+        <span className="material-symbols-outlined text-sm">science</span>
+        CNN Mineral Classification
+      </h4>
+
+      {status === "checking" && (
+        <div className="flex items-center gap-2 py-2 text-slate-400 text-[11px]">
+          <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+          Checking data availability...
+        </div>
+      )}
+
+      {status === "not_downloaded" && (
+        <div className="space-y-2">
+          <p className="text-[9px] text-slate-400/80 leading-relaxed">
+            TRR3 data not downloaded yet. This will download L-sensor TRR3 + DDR from PDS, then run JCAT atmospheric correction and CNN classification.
+          </p>
+          <button
+            onClick={runAcquire}
+            className="w-full px-3 py-2 rounded text-[11px] font-medium bg-teal-500/20 border border-teal-500/30 text-teal-400 hover:bg-teal-500/30 transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">download</span>
+            Download & Classify
+          </button>
+        </div>
+      )}
+
+      {status === "idle" && (
+        <div className="space-y-2">
+          <p className="text-[9px] text-amber-400/80 flex items-center gap-1 leading-relaxed">
+            <span className="material-symbols-outlined text-xs">info</span>
+            TRR3 data available locally. Ready to classify.
+          </p>
+          <button
+            onClick={runClassification}
+            className="w-full px-3 py-2 rounded text-[11px] font-medium bg-teal-500/20 border border-teal-500/30 text-teal-400 hover:bg-teal-500/30 transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-sm">play_arrow</span>
+            Run Classification
+          </button>
+        </div>
+      )}
+
+      {status === "loading" && (
+        <div className="space-y-2 py-3">
+          <div className="flex items-center gap-2 text-teal-400 text-[11px]">
+            <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+            <span className="truncate">{progressMsg || "Running CNN inference..."}</span>
+          </div>
+          {progressPct != null && (
+            <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-teal-500 rounded-full transition-all duration-300"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {status === "error" && (
+        <div className="space-y-2">
+          <p className="text-[11px] text-red-400 flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">error</span>
+            {errorMsg}
+          </p>
+          <button
+            onClick={runAcquire}
+            className="px-3 py-1.5 rounded text-[10px] font-medium bg-teal-500/20 border border-teal-500/30 text-teal-400 hover:bg-teal-500/30 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {status === "done" && stats && (
+        <div className="space-y-3">
+          {/* Mineral map */}
+          <div className="overflow-hidden rounded-lg border border-border-dark">
+            <img
+              src={`/api/mineral-cnn/result/${obsId}/mineral-map.png`}
+              alt="Mineral Map"
+              className="w-full bg-black"
+              loading="lazy"
+            />
+          </div>
+
+          {/* Stats summary */}
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
+            <div className="rounded border border-border-dark/50 bg-bg-dark/40 p-2">
+              <div className="text-[9px] uppercase text-slate-500">Classified</div>
+              <div className="font-mono text-white">{stats.classified_pixels?.toLocaleString()}</div>
+            </div>
+            <div className="rounded border border-border-dark/50 bg-bg-dark/40 p-2">
+              <div className="text-[9px] uppercase text-slate-500">Confidence</div>
+              <div className="font-mono text-white">≥{((stats.confidence_threshold ?? 0.95) * 100).toFixed(0)}%</div>
+            </div>
+          </div>
+
+          {/* Legend */}
+          {legend.length > 0 && (
+            <div className="space-y-1">
+              <h5 className="text-[9px] uppercase text-slate-500 font-bold">Minerals Detected</h5>
+              <div className="max-h-40 overflow-y-auto scrollbar-dark space-y-0.5">
+                {legend.map((item: any) => (
+                  <div key={item.mineral_id} className="flex items-center gap-2 py-0.5">
+                    <span
+                      className="w-3 h-3 rounded-sm flex-shrink-0"
+                      style={{ backgroundColor: item.color_hex }}
+                    />
+                    <span className="text-[10px] text-white flex-1 truncate">{item.name}</span>
+                    <span className="text-[9px] text-slate-500 font-mono">{item.pixel_count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1116,6 +1488,11 @@ function MetadataTab({ selected }: { selected: InspectorContext }) {
           <CRISMQuickviewImage productId={selected.productId} instrument={selected.instrument} />
         </div>
       </div>
+
+      {/* TRR3 Mineral Classification */}
+      {selected.instrument === "CRISM_TRR3" && (
+        <TRR3MineralSection obsId={selected.productId} />
+      )}
     </div>
   );
 }

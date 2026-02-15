@@ -1,14 +1,19 @@
 # app.py
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse  # ✅ (추가) CORS 확실히 타게 JSON으로 반환
 import os
 import json  # ✅ (추가)
+import gzip
 from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
 
+import aiohttp
 import numpy as np
 import cv2
 import rasterio
@@ -22,10 +27,53 @@ from datetime import datetime
 
 from api.crism.processing import make_rgb
 
+
+# ======================================================
+# Lifespan: shared HTTP session + parallel index preload
+# ======================================================
+async def _background_index_repair(app: FastAPI):
+    """Run index repair as a background task after startup."""
+    from api.index_repair import repair_all_indices
+    try:
+        repair_results = await repair_all_indices(app.state.http_session)
+        total_added = sum(r.get("added", 0) for r in repair_results.values())
+        if total_added > 0:
+            print(f"[REPAIR] Added {total_added} orphaned products to indices, refreshing caches...")
+            _preload_indices_parallel()  # Refresh in-memory caches
+        for name, stats in repair_results.items():
+            if stats.get("orphaned", 0) > 0:
+                print(f"[REPAIR] {name}: scanned={stats['scanned']}, orphaned={stats['orphaned']}, added={stats['added']}")
+    except Exception as e:
+        print(f"[REPAIR] Index repair failed (non-fatal): {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- Startup ---
+    # Phase 2a: shared aiohttp session for ODE connection pooling
+    app.state.http_session = aiohttp.ClientSession()
+
+    # Phase 2c: preload GeoJSON indices in parallel using threads
+    _preload_indices_parallel()
+
+    # Auto-repair: run as background task (non-blocking startup)
+    import asyncio
+    repair_task = asyncio.create_task(_background_index_repair(app))
+
+    yield
+
+    # --- Shutdown ---
+    repair_task.cancel()
+    await app.state.http_session.close()
+
+
 # ======================================================
 # App init
 # ======================================================
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
+
+# GZip compression - compresses JSON responses (2.7MB CRISM → ~270KB)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # ✅ CORS: 명시적으로 (iframe + fetch 안정화)
 app.add_middleware(
@@ -37,6 +85,73 @@ app.add_middleware(
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ======================================================
+# In-memory GeoJSON index cache (loaded once at startup)
+# ======================================================
+_geojson_cache: dict[str, dict] = {}  # key → parsed JSON
+_geojson_bytes_cache: dict[str, bytes] = {}  # key → serialized JSON bytes
+_geojson_gz_cache: dict[str, bytes] = {}  # key → pre-compressed gzip bytes
+
+def _preload_geojson(key: str, path: str):
+    """Load a GeoJSON file into memory cache (incl. pre-compressed gzip)."""
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        _geojson_cache[key] = data
+        raw = json.dumps(data, separators=(",", ":")).encode("utf-8")
+        _geojson_bytes_cache[key] = raw
+        # Phase 2c: pre-compress gzip bytes at startup (avoid per-request gzip)
+        _geojson_gz_cache[key] = gzip.compress(raw, compresslevel=6)
+        print(f"[CACHE] Preloaded {key}: {len(raw):,} bytes, gzip {len(_geojson_gz_cache[key]):,} bytes")
+    else:
+        print(f"[CACHE] Skipped {key}: {path} not found")
+
+# ======================================================
+# Phase 2c: Parallel startup - load all GeoJSON files concurrently
+# ======================================================
+_INDEX_FILES = {
+    "hirise": os.path.join(BASE_DIR, "hirise_data", "index.geojson"),
+    "crism": os.path.join(BASE_DIR, "crism_data", "index.geojson"),
+    "sharad": os.path.join(BASE_DIR, "sharad_data", "index.geojson"),
+    "hirise_dtm": os.path.join(BASE_DIR, "hirise_dtm_data", "index.geojson"),
+    "sharad_highres": os.path.join(BASE_DIR, "sharad_highres_data", "index.geojson"),
+    "ctx": os.path.join(BASE_DIR, "ctx_data", "index.geojson"),
+    "crism_trr3": os.path.join(BASE_DIR, "mineral_cnn_data", "index.geojson"),
+}
+
+
+def _preload_indices_parallel():
+    """Load all GeoJSON index files in parallel using a thread pool."""
+    with ThreadPoolExecutor(max_workers=len(_INDEX_FILES)) as executor:
+        futures = {
+            executor.submit(_preload_geojson, key, path): key
+            for key, path in _INDEX_FILES.items()
+        }
+        for future in futures:
+            future.result()  # propagate exceptions
+    print(f"[CACHE] All indices preloaded in parallel ({len(_geojson_cache)} total)")
+
+
+def refresh_geojson_cache(instrument_key: str):
+    """Refresh a single instrument's GeoJSON cache from disk after download.
+
+    Called by download_manager after _update_index() writes new data to disk.
+    Also clears the footprints_router lru_cache so subsequent requests see fresh data.
+    """
+    path = _INDEX_FILES.get(instrument_key)
+    if not path:
+        print(f"[CACHE] Unknown instrument key for refresh: {instrument_key}")
+        return
+    _preload_geojson(instrument_key, path)
+    # Clear the footprints_router lru_cache so it picks up fresh data
+    try:
+        from api.footprints_router import load_geojson_index
+        load_geojson_index.cache_clear()
+    except ImportError:
+        pass
+    print(f"[CACHE] Refreshed {instrument_key} cache after download")
+
 
 # ======================================================
 # Static mounts
@@ -179,12 +294,48 @@ def get_world_tile(name: str, z: int, x: int, y: int):
         return Response(blank_png(), media_type="image/png")
 
     png = load_world_tile(name, z, x, y)
-    return Response(png, media_type="image/png")
+    return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
-# Overlay cache directory
+# Overlay cache directory with LRU cleanup
 OVERLAY_CACHE_DIR = os.path.join(BASE_DIR, ".overlay_cache")
 os.makedirs(OVERLAY_CACHE_DIR, exist_ok=True)
+
+OVERLAY_CACHE_MAX_MB = 500  # Max cache size in MB
+OVERLAY_CACHE_TTL_DAYS = 30  # Max age for cache entries
+
+
+def _cleanup_overlay_cache():
+    """Evict oldest files when cache exceeds size limit or TTL."""
+    import time
+    now = time.time()
+    ttl_seconds = OVERLAY_CACHE_TTL_DAYS * 86400
+    files = []
+    total_size = 0
+    for fname in os.listdir(OVERLAY_CACHE_DIR):
+        fpath = os.path.join(OVERLAY_CACHE_DIR, fname)
+        if not os.path.isfile(fpath):
+            continue
+        stat = os.stat(fpath)
+        # Remove files older than TTL
+        if now - stat.st_mtime > ttl_seconds:
+            os.remove(fpath)
+            continue
+        files.append((fpath, stat.st_mtime, stat.st_size))
+        total_size += stat.st_size
+
+    # LRU eviction if over size limit
+    max_bytes = OVERLAY_CACHE_MAX_MB * 1024 * 1024
+    if total_size > max_bytes:
+        files.sort(key=lambda x: x[1])  # oldest first
+        while total_size > max_bytes * 0.8 and files:  # evict to 80%
+            fpath, _, fsize = files.pop(0)
+            os.remove(fpath)
+            total_size -= fsize
+
+
+# Run cleanup on startup
+_cleanup_overlay_cache()
 
 @app.get("/hirise/overlay/{product_id}.png")
 def get_hirise_overlay(product_id: str, max_size: int = 2048):
@@ -197,7 +348,7 @@ def get_hirise_overlay(product_id: str, max_size: int = 2048):
     cache_file = os.path.join(OVERLAY_CACHE_DIR, f"{product_id}_{max_size}.png")
     if os.path.exists(cache_file):
         with open(cache_file, "rb") as f:
-            return Response(f.read(), media_type="image/png")
+            return Response(f.read(), media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
     path = tif_path(product_id)
     if not os.path.exists(path):
@@ -243,32 +394,30 @@ def get_hirise_overlay(product_id: str, max_size: int = 2048):
         with open(cache_file, "wb") as f:
             f.write(png_bytes)
 
-        return Response(png_bytes, media_type="image/png")
+        return Response(png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/hirise_index.geojson")
 def get_hirise_index():
-    path = os.path.join(HIRISE_DATA_DIR, "index.geojson")
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="HiRISE index.geojson not found")
-
-    # ✅ (수정) FileResponse 대신 JSONResponse로 반환 (CORS 안정화)
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return JSONResponse(content=data)
+    if "hirise" in _geojson_bytes_cache:
+        return Response(
+            content=_geojson_bytes_cache["hirise"],
+            media_type="application/json",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    raise HTTPException(status_code=404, detail="HiRISE index.geojson not found")
 
 @app.get("/crism_index.geojson")
 def get_crism_index():
-    path = os.path.join(CRISM_DATA_DIR, "index.geojson")
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="CRISM index.geojson not found")
-
-    # ✅ (수정) FileResponse 대신 JSONResponse로 반환 (CORS 안정화)
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return JSONResponse(content=data)
+    if "crism" in _geojson_bytes_cache:
+        return Response(
+            content=_geojson_bytes_cache["crism"],
+            media_type="application/json",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    raise HTTPException(status_code=404, detail="CRISM index.geojson not found")
 
 from api.crism.router import router as crism_router
 from api.search_router import router as search_router
@@ -276,6 +425,7 @@ from api.footprints_router import router as footprints_router
 from api.custom_router import router as custom_router
 from api.point_search import router as point_search_router
 from api.ai_search import router as ai_search_router
+from api.proximity_router import router as proximity_router
 
 app.include_router(crism_router, prefix="/crism")
 app.include_router(search_router)  # Mounts at /api/*
@@ -283,6 +433,7 @@ app.include_router(footprints_router)  # Viewport-based footprint API
 app.include_router(custom_router)  # Custom user data upload
 app.include_router(point_search_router)  # Point-based coordinate search
 app.include_router(ai_search_router)  # AI-assisted natural language search
+app.include_router(proximity_router)  # Product proximity + region lookup
 
 app.mount(
     "/hirise_lbl",
@@ -296,6 +447,14 @@ from api.sharad_highres_router import router as sharad_highres_router
 from api.suggestions_router import router as suggestions_router
 from api.fieldnotes_router import router as fieldnotes_router
 from api.ai_analysis_router import router as ai_analysis_router
+from api.agentic_router import router as agentic_router
+from api.llama_search import router as smart_search_router
+from api.report_router import router as report_router
+from api.mineral_cnn.router import router as mineral_cnn_router
+from api.crism_trr3.router import router as crism_trr3_router
+from api.sharad_report_router import router as sharad_report_router
+from api.multi_report_router import router as multi_report_router
+from api.region_scores import router as region_scores_router
 
 app.include_router(
     hirise_pixel_router,
@@ -307,6 +466,20 @@ app.include_router(sharad_highres_router)  # /api/sharad_highres/*
 app.include_router(suggestions_router)  # /api/feature_suggestions
 app.include_router(fieldnotes_router)  # /api/fieldnotes
 app.include_router(ai_analysis_router)  # /api/ai_analysis
+app.include_router(agentic_router)  # /api/agent/* — Agentic AI
+app.include_router(smart_search_router)  # /api/ai/smart/* — Llama smart search
+app.include_router(report_router)  # /api/report/* — Landing Site Report Generator
+app.include_router(mineral_cnn_router)  # /api/mineral-cnn/* — CNN Mineral Classification
+app.include_router(crism_trr3_router)  # /api/crism-trr3/* — TRR3 Spectrum + RGB
+app.include_router(sharad_report_router)  # /api/sharad-report/* — Subsurface Interface Report
+app.include_router(multi_report_router)  # /api/multi-report/* — Multi-Instrument Report
+app.include_router(region_scores_router)  # /api/regions/scores — Real region scoring
+
+from api.temporal_router import router as temporal_router
+app.include_router(temporal_router)  # /api/temporal/* — Temporal Change Detection
+
+from analysis.ice_evidence.router import router as ice_evidence_router
+app.include_router(ice_evidence_router)  # /api/ice/* — Ice Evidence Synthesizer
 
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
@@ -352,17 +525,108 @@ def get_hirise_quickview_transparent(product_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@lru_cache(maxsize=16)
+def _cached_pds3_label(lbl_path: str) -> dict:
+    """Cache PDS3 label parsing to avoid re-reading on repeated requests."""
+    from api.mineral_cnn.data_loader import parse_pds3_label
+    return parse_pds3_label(lbl_path)
+
+
+def _generate_trr3_quickview(trr_img_path: str, trr_lbl_path: str, cache_dir: str) -> Response:
+    """Generate a VNIR quickview PNG from a TRR3 cube and cache it."""
+    meta = _cached_pds3_label(trr_lbl_path)
+    rows = int(meta["LINES"])
+    cols = int(meta["LINE_SAMPLES"])
+    bands = int(meta["BANDS"])
+
+    # Use memmap to avoid loading full cube into RAM
+    mm = np.memmap(trr_img_path, dtype=np.float32, mode="r",
+                   shape=(rows, bands, cols))
+
+    # Pick a VNIR band (~60% through bands for good contrast)
+    band_idx = int(bands * 0.6)
+    single = np.array(mm[:, band_idx, :], dtype=np.float64)
+
+    valid = (single > 0) & (single < 1.5) & np.isfinite(single)
+    if valid.sum() < 10:
+        raise HTTPException(status_code=500, detail="No valid data in selected band")
+
+    p2 = float(np.percentile(single[valid], 2))
+    p98 = float(np.percentile(single[valid], 98))
+    if p98 <= p2:
+        p98 = p2 + 0.01
+
+    stretched = np.clip((single - p2) / (p98 - p2) * 255, 0, 255).astype(np.uint8)
+    stretched[~valid] = 0
+
+    # RGBA with transparency for invalid pixels
+    h, w = stretched.shape
+    rgba = np.zeros((h, w, 4), dtype=np.uint8)
+    rgba[:, :, 0] = stretched
+    rgba[:, :, 1] = stretched
+    rgba[:, :, 2] = stretched
+    rgba[:, :, 3] = np.where(valid, 255, 0).astype(np.uint8)
+
+    ok, png = cv2.imencode(".png", cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA))
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to encode PNG")
+
+    png_bytes = png.tobytes()
+
+    # Cache the quickview
+    cache_path = os.path.join(cache_dir, "quickview.png")
+    try:
+        with open(cache_path, "wb") as f:
+            f.write(png_bytes)
+    except OSError:
+        pass
+
+    return Response(png_bytes, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/crism/quickview/{product_id}.png")
 def get_crism_quickview_transparent(product_id: str):
     """
     Serve CRISM quickview image with transparent background.
     Black pixels are made transparent.
+    Searches multiple locations: crism_quickview/, crism_data/ browse images.
     """
-    png_path = os.path.join(BASE_DIR, "crism_quickview", f"{product_id}.png")
-    jpg_path = os.path.join(BASE_DIR, "crism_quickview", f"{product_id}.jpg")
+    obs_id = product_id.split("_")[0]  # e.g. frt00008a1e
+    # base = obs_id + _NN (e.g. frt00008a1e_07)
+    parts = product_id.split("_")
+    base = f"{parts[0]}_{parts[1]}" if len(parts) >= 2 else product_id
 
-    path = png_path if os.path.exists(png_path) else jpg_path
-    if not os.path.exists(path):
+    # Try all possible file locations in order of preference
+    candidates = [
+        os.path.join(BASE_DIR, "crism_quickview", f"{product_id}.png"),
+        os.path.join(BASE_DIR, "crism_quickview", f"{product_id}.jpg"),
+        os.path.join(BASE_DIR, "crism_quickview", f"{obs_id}_VNIR.png"),
+        os.path.join(BASE_DIR, "crism_quickview", f"{base}.png"),
+        os.path.join(BASE_DIR, "crism_quickview", f"{base}_brvnaj_mtr3.png"),
+        os.path.join(BASE_DIR, "crism_data", base, f"{base}_brvnaj_mtr3.png"),
+        os.path.join(BASE_DIR, "crism_data", base, "quickview.png"),  # cached TRR3 quickview
+    ]
+
+    path = None
+    for c in candidates:
+        if os.path.exists(c):
+            path = c
+            break
+
+    if not path:
+        # Last resort: generate from TRR3 cube data in crism_data/
+        trr_dir = os.path.join(BASE_DIR, "crism_data", base)
+        if os.path.isdir(trr_dir):
+            trr_img_file = trr_lbl_file = None
+            for fname in os.listdir(trr_dir):
+                upper = fname.upper()
+                if upper.endswith("_TRR3.IMG"):
+                    trr_img_file = os.path.join(trr_dir, fname)
+                elif upper.endswith("_TRR3.LBL"):
+                    trr_lbl_file = os.path.join(trr_dir, fname)
+            if trr_img_file and trr_lbl_file:
+                return _generate_trr3_quickview(trr_img_file, trr_lbl_file, trr_dir)
         raise HTTPException(status_code=404, detail=f"CRISM quickview not found: {product_id}")
 
     try:
@@ -428,13 +692,13 @@ app.mount(
 # ======================================================
 @app.get("/sharad_index.geojson")
 def get_sharad_index():
-    path = os.path.join(SHARAD_DATA_DIR, "index.geojson")
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="SHARAD index.geojson not found")
-
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return JSONResponse(content=data)
+    if "sharad" in _geojson_bytes_cache:
+        return Response(
+            content=_geojson_bytes_cache["sharad"],
+            media_type="application/json",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    raise HTTPException(status_code=404, detail="SHARAD index.geojson not found")
 
 @app.get("/sharad/quickview/{product_id}.jpg")
 def get_sharad_quickview(product_id: str):
@@ -462,13 +726,25 @@ app.mount(
 @app.get("/hirise_dtm_index.geojson")
 def get_hirise_dtm_index():
     """Serve HiRISE DTM index.geojson."""
-    path = os.path.join(HIRISE_DTM_DIR, "index.geojson")
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="HiRISE DTM index.geojson not found")
+    if "hirise_dtm" in _geojson_bytes_cache:
+        return Response(
+            content=_geojson_bytes_cache["hirise_dtm"],
+            media_type="application/json",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    raise HTTPException(status_code=404, detail="HiRISE DTM index.geojson not found")
 
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return JSONResponse(content=data)
+
+@app.get("/crism_trr3_index.geojson")
+def get_crism_trr3_index():
+    """Serve CRISM TRR3 index.geojson."""
+    if "crism_trr3" in _geojson_bytes_cache:
+        return Response(
+            content=_geojson_bytes_cache["crism_trr3"],
+            media_type="application/json",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    raise HTTPException(status_code=404, detail="CRISM TRR3 index.geojson not found")
 
 
 # HiRISE DTM overlay cache
@@ -488,7 +764,7 @@ def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
     cache_file = os.path.join(HIRISE_DTM_OVERLAY_CACHE_DIR, f"{product_id}_{max_size}.png")
     if os.path.exists(cache_file):
         with open(cache_file, "rb") as f:
-            return Response(f.read(), media_type="image/png")
+            return Response(f.read(), media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
     # Find matching orthoimage
     index_path = os.path.join(HIRISE_DTM_DIR, "index.geojson")
@@ -499,21 +775,32 @@ def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
         index = json.load(f)
 
     ortho_file = None
+    dtm_file = None
     for feature in index.get("features", []):
         props = feature.get("properties", {})
         if props.get("product_id") == product_id:
             ortho_file = props.get("ortho_file")
+            dtm_file = props.get("dtm_file")
             break
 
-    if not ortho_file:
-        raise HTTPException(status_code=404, detail=f"Orthoimage not found for: {product_id}")
+    # Try orthoimage first, fall back to DTM IMG for hillshade
+    source_path = None
+    use_hillshade = False
+    if ortho_file:
+        path = os.path.join(HIRISE_DTM_DIR, ortho_file)
+        if os.path.exists(path):
+            source_path = path
+    if not source_path and dtm_file:
+        path = os.path.join(HIRISE_DTM_DIR, dtm_file)
+        if os.path.exists(path):
+            source_path = path
+            use_hillshade = True
 
-    ortho_path = os.path.join(HIRISE_DTM_DIR, ortho_file)
-    if not os.path.exists(ortho_path):
-        raise HTTPException(status_code=404, detail=f"Orthoimage file not found: {ortho_file}")
+    if not source_path:
+        raise HTTPException(status_code=404, detail=f"No orthoimage or DTM file found for: {product_id}")
 
     try:
-        ds = rasterio.open(ortho_path)
+        ds = rasterio.open(source_path)
 
         # Calculate downsampling factor
         scale = max(ds.width, ds.height) / max_size
@@ -531,20 +818,39 @@ def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
         )
         ds.close()
 
-        # Normalize to 0-255 (adjust based on data range)
-        p2, p98 = np.percentile(data[data > 0], [2, 98]) if np.any(data > 0) else (0, 255)
-        if p98 > p2:
-            data_norm = np.clip((data - p2) / (p98 - p2) * 255, 0, 255).astype(np.uint8)
+        if use_hillshade:
+            # Generate hillshade from elevation data
+            nodata_mask = (data == 0) | (data == -32768) | np.isnan(data.astype(float))
+            # Compute gradient for hillshade
+            dy, dx = np.gradient(data.astype(float))
+            azimuth_rad = np.radians(315)
+            altitude_rad = np.radians(45)
+            slope = np.sqrt(dx**2 + dy**2)
+            aspect = np.arctan2(-dy, dx)
+            shaded = (np.sin(altitude_rad) * np.cos(np.arctan(slope)) +
+                      np.cos(altitude_rad) * np.sin(np.arctan(slope)) *
+                      np.cos(azimuth_rad - aspect))
+            shaded = np.clip(shaded * 255, 0, 255).astype(np.uint8)
+            # Create RGBA with transparency for nodata
+            rgba = np.zeros((out_height, out_width, 4), dtype=np.uint8)
+            rgba[:, :, 0] = shaded
+            rgba[:, :, 1] = shaded
+            rgba[:, :, 2] = shaded
+            rgba[:, :, 3] = np.where(nodata_mask, 0, 255)
         else:
-            data_norm = np.clip(data, 0, 255).astype(np.uint8)
+            # Normalize orthoimage to 0-255
+            p2, p98 = np.percentile(data[data > 0], [2, 98]) if np.any(data > 0) else (0, 255)
+            if p98 > p2:
+                data_norm = np.clip((data - p2) / (p98 - p2) * 255, 0, 255).astype(np.uint8)
+            else:
+                data_norm = np.clip(data, 0, 255).astype(np.uint8)
 
-        # Create RGBA image with transparency for black pixels
-        rgba = np.zeros((out_height, out_width, 4), dtype=np.uint8)
-        rgba[:, :, 0] = data_norm  # R
-        rgba[:, :, 1] = data_norm  # G
-        rgba[:, :, 2] = data_norm  # B
-        # Alpha: 255 for non-zero pixels, 0 for black
-        rgba[:, :, 3] = np.where(data_norm > 5, 255, 0)
+            # Create RGBA image with transparency only for nodata (original==0)
+            rgba = np.zeros((out_height, out_width, 4), dtype=np.uint8)
+            rgba[:, :, 0] = data_norm  # R
+            rgba[:, :, 1] = data_norm  # G
+            rgba[:, :, 2] = data_norm  # B
+            rgba[:, :, 3] = np.where(data > 0, 255, 0)
 
         # Encode as PNG
         ok, png = cv2.imencode(".png", cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA))
@@ -557,7 +863,7 @@ def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
         with open(cache_file, "wb") as f:
             f.write(png_bytes)
 
-        return Response(png_bytes, media_type="image/png")
+        return Response(png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -789,6 +1095,30 @@ def get_score_stats():
     return JSONResponse(content={
         "total_observations": len(stats),
         "available_thresholds": SCORE_THRESHOLDS
+    })
+
+# ======================================================
+# Index Repair API (manual trigger)
+# ======================================================
+@app.post("/api/repair-index")
+async def repair_index_endpoint():
+    """
+    Manually trigger index repair: scan all data directories for orphaned
+    downloads and add them to their respective index.geojson files.
+    Refreshes in-memory caches if any orphans are found.
+    """
+    from api.index_repair import repair_all_indices
+
+    session = getattr(app.state, "http_session", None)
+    results = await repair_all_indices(session)
+
+    total_added = sum(r.get("added", 0) for r in results.values())
+    if total_added > 0:
+        _preload_indices_parallel()  # Refresh in-memory caches
+
+    return JSONResponse(content={
+        "total_added": total_added,
+        "instruments": results,
     })
 
 # ======================================================

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense, memo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import MapViewRaw from "../components/MapView";
 import InspectorRaw from "../components/Inspector";
@@ -15,14 +15,28 @@ import SharadHiresInspector from "../components/SharadHiresInspector";
 import FieldNoteModal from "../components/FieldNoteModal";
 import AiAnalysisPanelRaw from "../components/AiAnalysisPanel";
 import AgenticPanelRaw from "../components/AgenticPanel";
-import { listFieldNotes } from "../api/fieldnotes";
+import GuidedWorkflowsRaw from "../components/GuidedWorkflows";
+import type { WorkflowAction } from "../components/GuidedWorkflows";
+import ContextCopilot from "../components/ContextCopilot";
+import type { CopilotDispatch } from "../components/ContextCopilot";
 import type { FieldNote } from "../api/fieldnotes";
+import useFieldNotes from "../hooks/useFieldNotes";
 import AppShell from "../components/layout/AppShell";
 import BottomSheet from "../components/BottomSheet";
 import useIsMobile from "../hooks/useIsMobile";
+import useUrlState from "../hooks/useUrlState";
+import useCommandPalette from "../hooks/useCommandPalette";
+import { useUndoRedo } from "../hooks/useUndoRedo";
+import CommandPalette from "../components/CommandPalette";
+import type { CommandAction } from "../components/CommandPalette";
+import EmptyState from "../components/EmptyState";
+import KeyboardShortcuts from "../components/KeyboardShortcuts";
+import OnboardingTour from "../components/OnboardingTour";
 import type { InstrumentType } from "../utils/FootprintManager";
-import { getInstrumentIds, type InstrumentId } from "../config/instrumentRegistry";
+import { getInstrumentIds, type InstrumentId, isInstrumentId } from "../config/instrumentRegistry";
 import type { OverlapStats } from "../utils/overlapFilter";
+import SpectralComparison from "../components/SpectralComparison";
+import type { PinnedSpectrum } from "../components/SpectralComparison";
 
 // Memoize heavy child components to prevent unnecessary re-renders
 const MapView = memo(MapViewRaw);
@@ -30,12 +44,17 @@ const Inspector = memo(InspectorRaw);
 const LayerPanel = memo(LayerPanelRaw);
 const AiAnalysisPanel = memo(AiAnalysisPanelRaw);
 const AgenticPanel = memo(AgenticPanelRaw);
+const GuidedWorkflows = memo(GuidedWorkflowsRaw);
 
 // Lazy-loaded heavy components (Three.js / Recharts)
 const Slope3DViewer = lazy(() => import("../components/Slope3DViewer"));
 const HiRiseDTM3DViewer = lazy(() => import("../components/HiRiseDTM3DViewer"));
 const LineProfile = lazy(() => import("../components/LineProfile"));
 const ReportPanel = lazy(() => import("../components/ReportPanel"));
+const RegionDashboard = lazy(() => import("../components/RegionDashboard"));
+const SpaceGame = lazy(() => import("../components/SpaceGame"));
+const RegionStatsPanel = lazy(() => import("../components/RegionStatsPanel"));
+const TemporalComparison = lazy(() => import("../components/TemporalComparison"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -119,7 +138,8 @@ export type OverlayType =
   | "browse_ICE"
   | "browse_IC2"
   | "score_ice"
-  | "score_hyd";
+  | "score_hyd"
+  | "mineral_cnn";
 
 // Product overlay state - unified structure
 export type ProductOverlay = {
@@ -176,9 +196,20 @@ export function getScoreType(type: OverlayType): "score_ice" | "score_hyd" | nul
 }
 
 export default function MainPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { urlState, updateUrl } = useUrlState();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const commandPalette = useCommandPalette();
+  const { pushAction, undo, redo, canUndo, canRedo, lastAction } = useUndoRedo();
   const [mobilePanel, setMobilePanel] = useState<'none' | 'layers' | 'inspector'>('none');
+
+  // Field notes hook (extracted from MainPage)
+  const {
+    fieldNotes, showFieldNoteModal, setShowFieldNoteModal,
+    showFieldNotesOnMap, setShowFieldNotesOnMap,
+    fieldNoteActiveTag, setFieldNoteActiveTag,
+    mapFieldNotesForView, refreshFieldNotes, handleOpenFieldNote,
+  } = useFieldNotes();
 
   // Selected footprint for Inspector
   const [selected, setSelected] = useState<InspectorContext | null>(null);
@@ -187,8 +218,11 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | null;
+  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
+
+  // Guided Workflow: user-selected location
+  const [guidedLocation, setGuidedLocation] = useState<{ lat: number; lon: number } | null>(null);
 
   // Slope 3D analysis point (separate from regular slope terrainPoint)
   const [slope3DPoint, setSlope3DPoint] = useState<TerrainPoint | null>(null);
@@ -208,10 +242,46 @@ export default function MainPage() {
       return [{ productId: ctx.productId, instrument: ctx.instrument, lat: ctx.lat, lon: ctx.lon, title: ctx.title }, ...filtered].slice(0, 5);
     });
   }, []);
+  const removeRecentProduct = useCallback((productId: string) => {
+    setRecentProducts(prev => {
+      const next = prev.filter(p => p.productId !== productId);
+      // If we removed the currently-selected product, switch to the next one or close
+      setSelected(cur => {
+        if (cur && cur.productId === productId) {
+          const fallback = next[0];
+          return fallback
+            ? { instrument: fallback.instrument, productId: fallback.productId, lat: fallback.lat, lon: fallback.lon, title: fallback.title }
+            : null;
+        }
+        return cur;
+      });
+      return next;
+    });
+  }, []);
 
   // Line profile state: two endpoints
   const [linePoints, setLinePoints] = useState<ProfilePoint[]>([]);
   const [lineProfileData, setLineProfileData] = useState<{ start: ProfilePoint; end: ProfilePoint } | null>(null);
+
+  // Measurement tools visibility toggle
+  const [showMeasurementTools, setShowMeasurementTools] = useState(false);
+  const handleMeasurementPinNote = useCallback((lat: number, lon: number, text: string) => {
+    // Create a field note via the existing field notes system
+    import("../api/fieldnotes").then(({ createFieldNote }) => {
+      createFieldNote({
+        product_id: "ANNOTATION",
+        instrument: "PIN",
+        lat,
+        lon,
+        tags: ["annotation", "measurement"],
+        memo: text,
+      }).then(() => {
+        refreshFieldNotes();
+      }).catch((err) => {
+        console.error("Failed to save pin note:", err);
+      });
+    });
+  }, [refreshFieldNotes]);
 
   // Base layer selection
   const [baseLayer, setBaseLayer] = useState<BaseLayerType>("MOLA");
@@ -321,30 +391,51 @@ export default function MainPage() {
   const [filteredProductIds, setFilteredProductIds] = useState<Set<string> | null>(null);
 
   // Field Notes state
-  const [fieldNotes, setFieldNotes] = useState<FieldNote[]>([]);
-  const [showFieldNoteModal, setShowFieldNoteModal] = useState<{
-    productId: string; instrument: string; lat: number; lon: number;
-  } | null>(null);
-  const [showFieldNotesOnMap, setShowFieldNotesOnMap] = useState(false);
-  const [fieldNoteActiveTag, setFieldNoteActiveTag] = useState<string | null>(null);
-
-  // Notes to show on map: only those matching the active tag (none if no tag selected)
-  const mapFieldNotes = useMemo(
-    () => fieldNoteActiveTag
-      ? fieldNotes.filter(n => n.tags.includes(fieldNoteActiveTag))
-      : [],
-    [fieldNotes, fieldNoteActiveTag]
-  );
-
-  // Stable reference for field notes passed to MapView (avoids new [] on every render)
-  const EMPTY_NOTES: FieldNote[] = useMemo(() => [], []);
-  const mapFieldNotesForView = useMemo(
-    () => showFieldNotesOnMap ? mapFieldNotes : EMPTY_NOTES,
-    [showFieldNotesOnMap, mapFieldNotes, EMPTY_NOTES]
-  );
+  // (field notes state moved to useFieldNotes hook)
 
   // Coordinate grid
   const [showGrid, setShowGrid] = useState(false);
+
+  // Region Dashboard overlay
+  const [showRegionDashboard, setShowRegionDashboard] = useState(false);
+
+  // Easter egg game
+  const [showGame, setShowGame] = useState(false);
+
+  // Region Stats polygon vertices
+  const [regionVertices, setRegionVertices] = useState<{lat: number; lon: number}[]>([]);
+
+  // Temporal Change Detection modal
+  const [showTemporalComparison, setShowTemporalComparison] = useState<{lat: number; lon: number} | null>(null);
+
+  // Keyboard shortcuts help modal
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+
+  // Onboarding tour (force re-trigger)
+  const [showTourForced, setShowTourForced] = useState(false);
+
+  // Pinned spectra for comparison tool
+  const [pinnedSpectra, setPinnedSpectra] = useState<PinnedSpectrum[]>([]);
+  const [showSpectralComparison, setShowSpectralComparison] = useState(false);
+
+  const SPECTRUM_COLORS = ['#00FFFF', '#FF6B6B', '#4ADE80', '#FBBF24', '#A78BFA'];
+
+  const handlePinSpectrum = useCallback((spectrum: { productId: string; lat: number; lon: number; wavelengths: number[]; reflectance: (number | null)[] }) => {
+    setPinnedSpectra(prev => {
+      if (prev.length >= 5) {
+        toast.error("Maximum 5 pinned spectra");
+        return prev;
+      }
+      if (prev.some(s => s.productId === spectrum.productId)) {
+        toast("Spectrum already pinned");
+        return prev;
+      }
+      const color = SPECTRUM_COLORS[prev.length % SPECTRUM_COLORS.length];
+      return [...prev, { ...spectrum, id: `${spectrum.productId}-${Date.now()}`, color }];
+    });
+    setShowSpectralComparison(true);
+    toast.success("Spectrum pinned for comparison");
+  }, []);
 
   // Memoized inspected product ID for MapView (avoids re-render on unrelated state changes)
   const inspectedProductId = useMemo(() => selected?.productId ?? null, [selected?.productId]);
@@ -394,6 +485,11 @@ export default function MainPage() {
   // Set overlay for a product (or clear if type is null)
   // This enforces single-overlay-per-product rule
   const handleSetOverlay = useCallback((productId: string, type: OverlayType | null, opacity?: number) => {
+    // Capture previous state for undo
+    const prevOverlay = activeOverlaysRef.current.get(productId) ?? null;
+    const prevType = prevOverlay?.type ?? null;
+
+    // Apply the change
     setActiveOverlays((prev) => {
       const newMap = new Map(prev);
 
@@ -411,7 +507,36 @@ export default function MainPage() {
 
       return newMap;
     });
-  }, []);
+
+    // Push undo action
+    pushAction({
+      type: "overlay",
+      description: type ? `Set ${type} overlay on ${productId.slice(0, 12)}` : `Remove overlay from ${productId.slice(0, 12)}`,
+      undo: () => {
+        setActiveOverlays((prev) => {
+          const newMap = new Map(prev);
+          if (prevType === null) {
+            newMap.delete(productId);
+          } else {
+            newMap.set(productId, prevOverlay!);
+          }
+          return newMap;
+        });
+      },
+      redo: () => {
+        setActiveOverlays((prev) => {
+          const newMap = new Map(prev);
+          if (type === null) {
+            newMap.delete(productId);
+          } else {
+            const existingOpacity = prev.get(productId)?.opacity ?? DEFAULT_OPACITY;
+            newMap.set(productId, { type, opacity: opacity ?? existingOpacity });
+          }
+          return newMap;
+        });
+      },
+    });
+  }, [pushAction]);
 
   // Update opacity for a product's overlay
   const handleSetOpacity = useCallback((productId: string, opacity: number) => {
@@ -514,16 +639,102 @@ export default function MainPage() {
   // Track whether the current fly-to was triggered by a deep-link
   const deepLinkFlyToRef = useRef(false);
 
-  // Handle deep-link: /?flyTo=PRODUCT_ID&instrument=INST
+  // --- URL State: Restore on mount ---
+  // Read URL params once and apply them to app state.
+  const urlStateAppliedRef = useRef(false);
   useEffect(() => {
-    const flyTo = searchParams.get("flyTo");
-    if (flyTo) {
-      deepLinkFlyToRef.current = true;
-      setFlyToProductId(flyTo);
-      // Clean up URL params after consuming them
-      setSearchParams({}, { replace: true });
+    if (urlStateAppliedRef.current) return;
+    urlStateAppliedRef.current = true;
+
+    // Restore lat/lon → fly to coordinates
+    if (urlState.lat !== undefined && urlState.lon !== undefined) {
+      setFlyToCoords({ lat: urlState.lat, lon: urlState.lon });
     }
-  }, []); // Run once on mount
+
+    // Restore instruments → enable visibility + trigger footprint loading
+    if (urlState.instruments && urlState.instruments.length > 0) {
+      const newVisibility: Partial<Record<InstrumentId, boolean>> = {};
+      for (const id of urlState.instruments) {
+        newVisibility[id] = true;
+      }
+      setInstrumentVisibility(prev => ({ ...prev, ...newVisibility }));
+      // Stagger load triggers so each one is processed by MapView's useEffect.
+      // loadFootprintsTrigger is a single-value state, so rapid synchronous calls
+      // get batched and only the last one takes effect. Using setTimeout(_, i*100)
+      // ensures each trigger fires in a separate React commit.
+      urlState.instruments.forEach((id, i) => {
+        setTimeout(() => {
+          setLoadFootprintsTrigger({ instrument: id.toUpperCase() as any, timestamp: Date.now() });
+        }, i * 100);
+      });
+    }
+
+    // Restore product → fly to product (deep-link)
+    if (urlState.product) {
+      deepLinkFlyToRef.current = true;
+      setFlyToProductId(urlState.product);
+    }
+
+    // Restore analysis mode
+    if (urlState.mode) {
+      setAnalysisMode(urlState.mode as AnalysisMode);
+    }
+
+    // Restore base layer
+    if (urlState.base === "MOLA" || urlState.base === "HRSC") {
+      setBaseLayer(urlState.base);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally run once on mount
+
+  // --- URL State: Write on state change (debounced) ---
+  // Skip writes until the initial URL state has been applied to avoid
+  // overwriting URL params with default state during the first render.
+  const urlWriteReadyRef = useRef(false);
+  useEffect(() => {
+    // Wait one tick after mount effects have run before enabling writes.
+    const id = setTimeout(() => { urlWriteReadyRef.current = true; }, 600);
+    return () => clearTimeout(id);
+  }, []);
+
+  // Sync flyToCoords → lat/lon in URL.
+  // Only write when flyToCoords is set (not when cleared to null after fly-to
+  // completes), so the URL retains the last navigated position for bookmarking.
+  useEffect(() => {
+    if (!urlWriteReadyRef.current) return;
+    if (flyToCoords) {
+      updateUrl({
+        lat: flyToCoords.lat,
+        lon: flyToCoords.lon,
+      });
+    }
+  }, [flyToCoords, updateUrl]);
+
+  // Sync instrumentVisibility → instruments in URL
+  useEffect(() => {
+    if (!urlWriteReadyRef.current) return;
+    const active = (Object.entries(instrumentVisibility) as [InstrumentId, boolean][])
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    updateUrl({ instruments: active.length > 0 ? active : undefined });
+  }, [instrumentVisibility, updateUrl]);
+
+  // Sync selected product → product in URL
+  useEffect(() => {
+    if (!urlWriteReadyRef.current) return;
+    updateUrl({ product: selected?.productId ?? undefined });
+  }, [selected?.productId, updateUrl]);
+
+  // Sync analysisMode → mode in URL
+  useEffect(() => {
+    if (!urlWriteReadyRef.current) return;
+    updateUrl({ mode: analysisMode ?? undefined });
+  }, [analysisMode, updateUrl]);
+
+  // Sync baseLayer → base in URL (only write non-default)
+  useEffect(() => {
+    if (!urlWriteReadyRef.current) return;
+    updateUrl({ base: baseLayer !== "MOLA" ? baseLayer : undefined });
+  }, [baseLayer, updateUrl]);
 
   // Track recently inspected products
   useEffect(() => {
@@ -532,21 +743,7 @@ export default function MainPage() {
     }
   }, [selected, addRecentProduct]);
 
-  // Field Notes handlers
-  useEffect(() => {
-    listFieldNotes().then(setFieldNotes).catch(console.error);
-  }, []);
-
-  const refreshFieldNotes = useCallback(() => {
-    listFieldNotes().then((notes) => {
-      setFieldNotes(notes);
-      toast.success("Field note saved");
-    }).catch(console.error);
-  }, []);
-
-  const handleOpenFieldNote = useCallback((productId: string, instrument: string, lat: number, lon: number) => {
-    setShowFieldNoteModal({ productId, instrument, lat, lon });
-  }, []);
+  // (field notes handlers moved to useFieldNotes hook)
 
   // Handle field note marker click from map - fly to and open inspector
   const handleFieldNoteClick = useCallback(async (note: FieldNote) => {
@@ -814,6 +1011,14 @@ export default function MainPage() {
       setSelected(null);
       setAiAnalysisPin({ lat, lon });
     }
+    if (analysisMode === "guided") {
+      // Guided workflow mode: update selected location
+      setGuidedLocation({ lat, lon });
+    }
+    if (analysisMode === "region_stats") {
+      // Region Stats mode: add vertex to polygon
+      setRegionVertices((prev) => [...prev, { lat, lon }]);
+    }
   }, [analysisMode]);
 
   // When a product is selected, clear terrain point
@@ -843,7 +1048,225 @@ export default function MainPage() {
     if (mode !== "ai_analysis") {
       setAiAnalysisPin(null);
     }
+    if (mode !== "guided") {
+      setGuidedLocation(null);
+    }
+    if (mode !== "region_stats") {
+      setRegionVertices([]);
+    }
   }, []);
+
+  // Guided Workflow action handler
+  const handleWorkflowAction = useCallback((action: WorkflowAction) => {
+    switch (action.type) {
+      case "fly_to":
+        setFlyToCoords({ lat: action.lat, lon: action.lon });
+        break;
+      case "load_instrument": {
+        const inst = action.instrument as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM";
+        const id = inst.toLowerCase() as InstrumentId;
+        setInstrumentVisibility(prev => ({ ...prev, [id]: true }));
+        setLoadFootprintsTrigger({ instrument: inst, timestamp: Date.now() });
+        break;
+      }
+      case "set_analysis_mode":
+        // Temporarily switch to the requested analysis mode, but keep guided active
+        // For now, just trigger slope if that is what is requested
+        if (action.mode === "slope" && guidedLocation) {
+          setTerrainPoint({ lat: guidedLocation.lat, lon: guidedLocation.lon });
+        }
+        break;
+      case "run_agentic":
+        toast.success("Launching Agentic AI analysis...");
+        break;
+      case "show_results":
+        toast.success("Step completed. Results available in the relevant panel.");
+        break;
+    }
+  }, [guidedLocation]);
+
+  // Command Palette action handler
+  const handleCommandAction = useCallback((cmd: CommandAction) => {
+    const { action } = cmd;
+    switch (action.type) {
+      case "fly_to":
+        setFlyToCoords({ lat: action.lat, lon: action.lon });
+        break;
+      case "toggle_instrument":
+        if (isInstrumentId(action.instrumentId)) {
+          setInstrumentVisibility((prev) => ({
+            ...prev,
+            [action.instrumentId]: !prev[action.instrumentId as InstrumentId],
+          }));
+        }
+        break;
+      case "set_analysis":
+        handleAnalysisModeChange(action.mode as AnalysisMode);
+        break;
+      case "set_map_mode":
+        setMapMode(action.mode);
+        break;
+      case "toggle_grid":
+        setShowGrid((prev) => !prev);
+        break;
+      case "navigate_page":
+        navigate(action.path);
+        break;
+      case "show_keyboard_shortcuts":
+        setShowKeyboardHelp(true);
+        break;
+      case "show_tour":
+        setShowTourForced(true);
+        break;
+    }
+  }, [handleAnalysisModeChange, navigate]);
+
+  // Copilot dispatch handler — translates copilot actions into app state changes
+  const handleCopilotAction = useCallback((action: CopilotDispatch) => {
+    switch (action.type) {
+      case "load_instrument": {
+        const id = action.instrument.toLowerCase();
+        if (isInstrumentId(id)) {
+          setInstrumentVisibility((prev) => ({ ...prev, [id]: true }));
+          setLoadFootprintsTrigger({
+            instrument: action.instrument.toUpperCase() as any,
+            timestamp: Date.now(),
+          });
+        }
+        break;
+      }
+      case "run_analysis":
+        handleAnalysisModeChange(action.mode as AnalysisMode);
+        break;
+      case "fly_to":
+        setFlyToCoords({ lat: action.lat, lon: action.lon });
+        break;
+      case "show_product": {
+        const product = visibleProductsRef.current.find(
+          (p: VisibleProduct) => p.productId === action.productId,
+        );
+        if (product) {
+          handleSelectProduct(product);
+        }
+        break;
+      }
+    }
+  }, [handleAnalysisModeChange, handleSelectProduct]);
+
+  // Keyboard shortcut handler
+  useEffect(() => {
+    const INSTRUMENT_KEY_MAP: Record<string, InstrumentId> = {
+      "1": "crism",
+      "2": "hirise",
+      "3": "sharad",
+      "4": "sharad_highres",
+      "5": "ctx",
+      "6": "hirise_dtm",
+      "7": "crism_trr3",
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't fire when typing in an input or textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Don't fire if Command Palette is open
+      if (commandPalette.isOpen) return;
+
+      // Ctrl+Z / Cmd+Z — undo; Ctrl+Shift+Z / Cmd+Shift+Z — redo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+
+      // ? or Shift+/ — toggle keyboard shortcuts help
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setShowKeyboardHelp((prev) => !prev);
+        return;
+      }
+
+      // Escape — close current panel/modal
+      if (e.key === "Escape") {
+        if (showKeyboardHelp) {
+          setShowKeyboardHelp(false);
+          return;
+        }
+        if (sharadHiresProductId) {
+          setSharadHiresProductId(null);
+          setSharadTracePin(null);
+          return;
+        }
+        if (selected) {
+          setSelected(null);
+          return;
+        }
+        if (analysisMode) {
+          setAnalysisMode(null);
+          return;
+        }
+        if (sharadPopup) {
+          setSharadPopup(null);
+          return;
+        }
+        return;
+      }
+
+      // n — select next product
+      if (e.key === "n" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const products = visibleProductsRef.current;
+        if (products.length === 0) return;
+        const currentIdx = selected
+          ? products.findIndex((p: VisibleProduct) => p.productId === selected.productId)
+          : -1;
+        const nextIdx = currentIdx < products.length - 1 ? currentIdx + 1 : 0;
+        const next = products[nextIdx];
+        if (next) {
+          handleSelectProduct(next);
+        }
+        return;
+      }
+
+      // p — select previous product
+      if (e.key === "p" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const products = visibleProductsRef.current;
+        if (products.length === 0) return;
+        const currentIdx = selected
+          ? products.findIndex((p: VisibleProduct) => p.productId === selected.productId)
+          : -1;
+        const prevIdx = currentIdx > 0 ? currentIdx - 1 : products.length - 1;
+        const prev = products[prevIdx];
+        if (prev) {
+          handleSelectProduct(prev);
+        }
+        return;
+      }
+
+      // g — toggle coordinate grid
+      if (e.key === "g" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setShowGrid((prev) => !prev);
+        return;
+      }
+
+      // 1-7 — toggle instrument visibility
+      if (INSTRUMENT_KEY_MAP[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const instId = INSTRUMENT_KEY_MAP[e.key];
+        setInstrumentVisibility((prev) => ({ ...prev, [instId]: !prev[instId] }));
+        return;
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [commandPalette.isOpen, showKeyboardHelp, sharadHiresProductId, selected, analysisMode, sharadPopup, handleSelectProduct, undo, redo]);
 
   // Fly to lat/lon coordinates (for search results not on map)
   const [flyToCoords, setFlyToCoords] = useState<{ lat: number; lon: number } | null>(null);
@@ -902,11 +1325,22 @@ export default function MainPage() {
     }
   }, [handleSelectProduct]);
 
+  // Memoized props for ContextCopilot to avoid unnecessary re-renders
+  const copilotSelectedProduct = useMemo(
+    () => selected ? { productId: selected.productId, instrument: selected.instrument } : null,
+    [selected?.productId, selected?.instrument],
+  );
+  const copilotVisibleInstruments = useMemo(
+    () => Object.entries(instrumentVisibility).filter(([, v]) => v).map(([k]) => k),
+    [instrumentVisibility],
+  );
+
   // Derive legacy overlay formats for MapView compatibility
   // These will be replaced when MapView is updated to use unified format
   const derivedOverlays = useMemo(() => {
     const quickviewOverlays: string[] = [];
     const highResOverlays: string[] = [];
+    const mineralOverlays: string[] = [];
     const browseOverlays = new Map<string, Set<"HYD" | "ICE" | "IC2">>();
     const scoreOverlays = new Map<string, Set<"score_ice" | "score_hyd">>();
     const opacities = new Map<string, number>();
@@ -918,6 +1352,8 @@ export default function MainPage() {
         quickviewOverlays.push(productId);
       } else if (overlay.type === "highres") {
         highResOverlays.push(productId);
+      } else if (overlay.type === "mineral_cnn") {
+        mineralOverlays.push(productId);
       } else if (isBrowseOverlay(overlay.type)) {
         const browseType = getBrowseType(overlay.type);
         if (browseType) {
@@ -935,7 +1371,7 @@ export default function MainPage() {
       }
     }
 
-    return { quickviewOverlays, highResOverlays, browseOverlays, scoreOverlays, opacities };
+    return { quickviewOverlays, highResOverlays, mineralOverlays, browseOverlays, scoreOverlays, opacities };
   }, [activeOverlays]);
 
   // --- Panel content (shared between desktop sidebar & mobile bottom sheet) ---
@@ -981,6 +1417,8 @@ export default function MainPage() {
       // Analysis mode
       analysisMode={analysisMode}
       onAnalysisModeChange={handleAnalysisModeChange}
+      // Region Dashboard
+      onShowRegionDashboard={() => setShowRegionDashboard(true)}
       // Fly-To navigation
       onFlyToCoords={handleFlyToCoords}
       // View bound selection mode
@@ -999,6 +1437,9 @@ export default function MainPage() {
       overlapFilter={overlapFilter}
       onOverlapFilterChange={setOverlapFilter}
       overlapStats={overlapStats}
+      // Measurement Tools
+      showMeasurementTools={showMeasurementTools}
+      onToggleMeasurementTools={setShowMeasurementTools}
     />
   );
 
@@ -1027,6 +1468,7 @@ export default function MainPage() {
         onOpenFieldNote={handleOpenFieldNote}
         recentProducts={recentProducts}
         onSelectRecent={handleSelectRecent}
+        onRemoveRecent={removeRecentProduct}
         onShow3DView={async (productId, lat, lon) => {
           setSelected(null);
           const center = await getDTMCenter(productId);
@@ -1038,6 +1480,8 @@ export default function MainPage() {
           window.open(`/download?tab=product&product_id=${encodeURIComponent(productId)}&instrument=${encodeURIComponent(instrument)}`, "_self");
         }}
         onDownloadProduct={handleDownloadProduct}
+        onPinSpectrum={handlePinSpectrum}
+        onFindTemporalPairs={(lat, lon) => setShowTemporalComparison({ lat, lon })}
       />
     ) : terrainPoint ? (
       <SlopeAnalysis
@@ -1078,7 +1522,32 @@ export default function MainPage() {
       <Suspense fallback={<div className="flex items-center justify-center h-full text-[#6b7c9c] text-xs">Loading...</div>}>
         <ReportPanel onClose={() => setAnalysisMode(null)} isMobile={isMobile} />
       </Suspense>
-    ) : null;
+    ) : analysisMode === "guided" ? (
+      <GuidedWorkflows
+        isOpen={true}
+        onClose={() => { setAnalysisMode(null); setGuidedLocation(null); }}
+        onAction={handleWorkflowAction}
+        currentLocation={guidedLocation}
+      />
+    ) : analysisMode === "region_stats" ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading region analysis...</div>}>
+        <RegionStatsPanel
+          vertices={regionVertices}
+          onClose={() => { setAnalysisMode(null); setRegionVertices([]); }}
+          onClearPolygon={() => setRegionVertices([])}
+        />
+      </Suspense>
+    ) : (
+      <div className="h-full flex items-center justify-center bg-[#101622]">
+        <EmptyState
+          icon="explore"
+          title="No product selected"
+          description="Click a footprint on the map or search for a product to inspect it. Load instrument layers from the Layers panel to get started."
+          actionLabel="Open Agentic AI"
+          onAction={() => handleAnalysisModeChange("agentic")}
+        />
+      </div>
+    );
 
   return (
     <AppShell
@@ -1087,6 +1556,12 @@ export default function MainPage() {
         <TopBar
           isMobile={isMobile}
           onSelectResult={handleSearchSelect}
+          onEasterEgg={() => setShowGame(true)}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          lastActionDescription={lastAction?.description}
+          onUndo={undo}
+          onRedo={redo}
         />
       }
       leftPanel={isMobile ? null : layerPanelContent}
@@ -1134,6 +1609,7 @@ export default function MainPage() {
         onToggleOverlay={(productId, type) => handleSetOverlay(productId, type)}
         quickviewOverlays={derivedOverlays.quickviewOverlays}
         highResOverlays={derivedOverlays.highResOverlays}
+        mineralOverlays={derivedOverlays.mineralOverlays}
         browseOverlays={derivedOverlays.browseOverlays}
         scoreOverlays={derivedOverlays.scoreOverlays}
         overlayOpacities={derivedOverlays.opacities}
@@ -1166,7 +1642,41 @@ export default function MainPage() {
         onHighlightComplete={handleHighlightComplete}
         inspectedProductId={inspectedProductId}
         sharadTracePin={sharadTracePin}
+        showMeasurementTools={showMeasurementTools}
+        onMeasurementPinNote={handleMeasurementPinNote}
       />
+
+      {/* Smart Context Copilot */}
+      {!isMobile && (
+        <ContextCopilot
+          selectedProduct={copilotSelectedProduct}
+          visibleInstruments={copilotVisibleInstruments}
+          currentLocation={null}
+          analysisMode={analysisMode}
+          overlayCount={activeOverlays.size}
+          overlapFilterEnabled={overlapFilter.enabled}
+          onAction={handleCopilotAction}
+        />
+      )}
+
+      {/* Spectral Comparison Panel (floating, bottom-right) */}
+      {showSpectralComparison && pinnedSpectra.length > 0 && (
+        <SpectralComparison
+          spectra={pinnedSpectra}
+          onRemove={(id) =>
+            setPinnedSpectra((prev) => {
+              const next = prev.filter((s) => s.id !== id);
+              if (next.length === 0) setShowSpectralComparison(false);
+              return next;
+            })
+          }
+          onClear={() => {
+            setPinnedSpectra([]);
+            setShowSpectralComparison(false);
+          }}
+          onClose={() => setShowSpectralComparison(false)}
+        />
+      )}
 
       {/* Mobile Bottom Sheets */}
       {isMobile && (
@@ -1256,6 +1766,17 @@ export default function MainPage() {
         </div>
       )}
 
+      {/* Temporal Comparison Modal */}
+      {showTemporalComparison && (
+        <Suspense fallback={null}>
+          <TemporalComparison
+            lat={showTemporalComparison.lat}
+            lon={showTemporalComparison.lon}
+            onClose={() => setShowTemporalComparison(null)}
+          />
+        </Suspense>
+      )}
+
       {/* Field Note Modal */}
       {showFieldNoteModal && (
         <FieldNoteModal
@@ -1267,6 +1788,50 @@ export default function MainPage() {
           onNoteSaved={refreshFieldNotes}
         />
       )}
+
+      {/* Command Palette (Cmd+K) — renders via portal to document.body */}
+      <CommandPalette
+        isOpen={commandPalette.isOpen}
+        onClose={commandPalette.close}
+        onAction={handleCommandAction}
+      />
+
+      {/* Region Dashboard full-viewport overlay */}
+      {showRegionDashboard && (
+        <Suspense fallback={null}>
+          <RegionDashboard
+            isOpen={showRegionDashboard}
+            onClose={() => setShowRegionDashboard(false)}
+            onFlyTo={(lat, lon) => {
+              setShowRegionDashboard(false);
+              setFlyToCoords({ lat, lon });
+            }}
+            onRunReport={() => {
+              setShowRegionDashboard(false);
+              setAnalysisMode("report");
+            }}
+          />
+        </Suspense>
+      )}
+
+      {/* Easter egg: Space Shooter Game */}
+      {showGame && (
+        <Suspense fallback={null}>
+          <SpaceGame onClose={() => setShowGame(false)} />
+        </Suspense>
+      )}
+
+      {/* Keyboard Shortcuts Help Modal */}
+      <KeyboardShortcuts
+        isOpen={showKeyboardHelp}
+        onClose={() => setShowKeyboardHelp(false)}
+      />
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        forceOpen={showTourForced}
+        onComplete={() => setShowTourForced(false)}
+      />
     </AppShell>
   );
 }
