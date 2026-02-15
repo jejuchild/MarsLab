@@ -44,6 +44,7 @@ const OVERLAY_LABELS: Record<OverlayType, { short: string; full: string; color: 
   browse_IC2: { short: "IC2", full: "CO2 Ice", color: "cyan" },
   score_ice: { short: "S-ICE", full: "Ice Score", color: "sky" },
   score_hyd: { short: "S-HYD", full: "Hydration Score", color: "rose" },
+  mineral_cnn: { short: "MIN", full: "Mineral CNN", color: "amber" },
 };
 
 // Multi-Instrument Overlap Filter Section Component

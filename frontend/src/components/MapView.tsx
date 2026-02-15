@@ -1,10 +1,12 @@
 // src/MapView.tsx
 import { useCallback, useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import FootprintManager from "../utils/FootprintManager";
 import { normalizeLonForMap } from "../utils/coordinates";
 import DTMHoverReadout, { type DTMHoverReadoutHandle } from "./DTMHoverReadout";
+import MeasurementTools from "./MeasurementTools";
 import {
   loadDTMElevationGrid,
   getElevationFromGrid,
@@ -15,6 +17,7 @@ import {
 import type { FieldNote } from "../api/fieldnotes";
 import { computeOverlapFilter, type OverlapResult, type OverlapStats } from "../utils/overlapFilter";
 import type { InstrumentType as FPInstrumentType } from "../utils/FootprintManager";
+import { getInstrumentCesiumColor } from "../config/instrumentRegistry";
 
 
 /* ==================================================
@@ -102,6 +105,7 @@ type MapViewProps = {
   onToggleOverlay?: (productId: string, type: "quickview" | null) => void;
   quickviewOverlays?: string[];
   highResOverlays?: string[];
+  mineralOverlays?: string[];
   browseOverlays?: Map<string, Set<BrowseProductType>>;
   scoreOverlays?: Map<string, Set<ScoreProductType>>;
   overlayOpacities?: Map<string, number>; // Per-product opacity (0-1)
@@ -159,6 +163,9 @@ type MapViewProps = {
   inspectedProductId?: string | null;
   // SHARAD radargram trace pin — show clicked radargram location on map
   sharadTracePin?: { lat: number; lon: number } | null;
+  // Measurement & annotation tools
+  showMeasurementTools?: boolean;
+  onMeasurementPinNote?: (lat: number, lon: number, text: string) => void;
 };
 
 /* ==================================================
@@ -329,6 +336,21 @@ async function loadCRISMLBL(id: string): Promise<string | null> {
 
 // Cache for HiRISE DTM index
 let hiriseDTMIndexCache: any = null;
+// Cache for CRISM TRR3 index
+let crismTRR3IndexCache: any = null;
+
+// Compute bounding box from GeoJSON polygon coordinates
+function boundsFromPolygon(coords: number[][]): ProductBounds | null {
+  if (!coords || coords.length < 3) return null;
+  let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+  for (const [lon, lat] of coords) {
+    if (lon < west) west = lon;
+    if (lon > east) east = lon;
+    if (lat < south) south = lat;
+    if (lat > north) north = lat;
+  }
+  return { west, east, south, north };
+}
 
 // Get cached bounds or parse from LBL
 async function getProductBounds(productId: string): Promise<ProductBounds | null> {
@@ -370,6 +392,35 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
     return null;
   }
 
+  // Check for CRISM TRR3 products — bounds from index.geojson polygon
+  const isTRR3 = /^(frs|msv|frt|hrl|hrs|arl|atl)[0-9a-f]+_\d{2}$/i.test(productId);
+  if (isTRR3) {
+    if (!crismTRR3IndexCache) {
+      try {
+        const res = await fetch("/crism_trr3_index.geojson");
+        if (res.ok) {
+          crismTRR3IndexCache = await res.json();
+        }
+      } catch {
+        return null;
+      }
+    }
+
+    if (crismTRR3IndexCache?.features) {
+      for (const feature of crismTRR3IndexCache.features) {
+        if (feature.properties?.product_id === productId) {
+          const coords = feature.geometry?.coordinates?.[0];
+          const bounds = boundsFromPolygon(coords);
+          if (bounds) {
+            boundsCache.set(productId, bounds);
+            return bounds;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   const isHiRISE = productId.startsWith("ESP_");
   const lbl = isHiRISE ? await loadHiRISELBL(productId) : await loadCRISMLBL(productId);
   if (!lbl) return null;
@@ -398,6 +449,35 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
   return bounds;
 }
 
+/**
+ * Fallback: extract bounds from an existing footprint entity's rectangle coordinates.
+ * Tries all instrument prefixes to find the entity.
+ */
+function getFootprintBounds(viewer: Cesium.Viewer, productId: string): ProductBounds | null {
+  const prefixes: string[] = ["CRISM", "HIRISE", "CTX", "HIRISE_DTM", "CRISM_TRR3", "SHARAD", "SHARAD_HIGHRES"];
+  for (const prefix of prefixes) {
+    const ent = viewer.entities.getById(`${prefix}_FP_${productId}`);
+    if (!ent?.rectangle?.coordinates) continue;
+    try {
+      const rect = (ent.rectangle.coordinates as any).getValue?.(Cesium.JulianDate.now()) ??
+                   (ent.rectangle.coordinates as any);
+      if (rect instanceof Cesium.Rectangle) {
+        const bounds: ProductBounds = {
+          west: Cesium.Math.toDegrees(rect.west),
+          east: Cesium.Math.toDegrees(rect.east),
+          south: Cesium.Math.toDegrees(rect.south),
+          north: Cesium.Math.toDegrees(rect.north),
+        };
+        boundsCache.set(productId, bounds);
+        return bounds;
+      }
+    } catch {
+      // Entity may have been removed between check and access
+    }
+  }
+  return null;
+}
+
 /* ==================================================
  * Hover highlight state type
  * ==================================================*/
@@ -421,11 +501,32 @@ const HILITE_RECT_MATERIAL_CRISM = new Cesium.ColorMaterialProperty(
 const HILITE_RECT_MATERIAL_CUSTOM = new Cesium.ColorMaterialProperty(
   Cesium.Color.FUCHSIA.withAlpha(0.3)
 );
+const HILITE_RECT_MATERIAL_CTX = new Cesium.ColorMaterialProperty(
+  Cesium.Color.fromCssColorString("#FF69B4").withAlpha(0.6)
+);
+const HILITE_RECT_MATERIAL_DTM = new Cesium.ColorMaterialProperty(
+  Cesium.Color.fromCssColorString("#d97706").withAlpha(0.6)
+);
+const HILITE_RECT_MATERIAL_TRR3 = new Cesium.ColorMaterialProperty(
+  Cesium.Color.fromCssColorString("#00CED1").withAlpha(0.6)
+);
+
+function getHiliteMaterial(inst: string): Cesium.ColorMaterialProperty {
+  switch (inst) {
+    case "HIRISE": return HILITE_RECT_MATERIAL_HIRISE;
+    case "CUSTOM": return HILITE_RECT_MATERIAL_CUSTOM;
+    case "CTX": return HILITE_RECT_MATERIAL_CTX;
+    case "HIRISE_DTM": return HILITE_RECT_MATERIAL_DTM;
+    case "CRISM_TRR3": return HILITE_RECT_MATERIAL_TRR3;
+    default: return HILITE_RECT_MATERIAL_CRISM;
+  }
+}
 
 function getEntityInstrument(e: Cesium.Entity): InstrumentType | null {
   const p: any = e.properties;
   const inst = p?.instrument?.getValue?.();
-  return inst === "HIRISE" || inst === "CRISM" ? inst : null;
+  if (typeof inst === "string" && inst.length > 0) return inst as InstrumentType;
+  return null;
 }
 
 function getEntityProductId(e: Cesium.Entity): string | null {
@@ -483,6 +584,7 @@ export default function MapView({
   onToggleOverlay,
   quickviewOverlays = [],
   highResOverlays = [],
+  mineralOverlays = [],
   browseOverlays = new Map(),
   scoreOverlays = new Map(),
   overlayOpacities = new Map(),
@@ -518,6 +620,8 @@ export default function MapView({
   onHighlightComplete,
   inspectedProductId,
   sharadTracePin = null,
+  showMeasurementTools = false,
+  onMeasurementPinNote,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -558,7 +662,7 @@ export default function MapView({
           : isTRR3 ? Cesium.Color.fromCssColorString("#00CED1")
           : Cesium.Color.CYAN;
         fpEnt.rectangle.material = new Cesium.ColorMaterialProperty(
-          color.withAlpha(0.4)
+          color.withAlpha(0.10)
         );
       }
     }
@@ -581,6 +685,21 @@ export default function MapView({
   const dtmHoverReadoutRef = useRef<DTMHoverReadoutHandle>(null);
   const dtmHoverMarkerRef = useRef<Cesium.Entity | null>(null);
   const dtmGridCacheRef = useRef<Map<string, DTMElevationGrid>>(new Map());
+  const DTM_GRID_CACHE_MAX = 4;
+  const setDtmGrid = useCallback((productId: string, grid: DTMElevationGrid) => {
+    const cache = dtmGridCacheRef.current;
+    cache.set(productId, grid);
+    // Evict oldest entries if cache exceeds limit (keep active product)
+    if (cache.size > DTM_GRID_CACHE_MAX) {
+      const active = activeDTMProductRef.current;
+      for (const key of cache.keys()) {
+        if (key !== active && key !== productId) {
+          cache.delete(key);
+          if (cache.size <= DTM_GRID_CACHE_MAX) break;
+        }
+      }
+    }
+  }, []);
   const dtmHoverModeRef = useRef<"hover" | "click">("hover");
   const [dtmHoverMode, setDtmHoverMode] = useState<"hover" | "click">("hover");
   const activeDTMProductRef = useRef<string | null>(null);
@@ -667,6 +786,8 @@ export default function MapView({
     const viewer = new Cesium.Viewer(ref.current, {
       sceneMode: Cesium.SceneMode.SCENE2D,
       mapProjection: new Cesium.GeographicProjection(MARS_ELLIPSOID),
+      requestRenderMode: true,
+      maximumRenderTimeChange: Infinity,
       animation: false,
       timeline: false,
       baseLayerPicker: false,
@@ -741,11 +862,8 @@ export default function MapView({
     // HiRISE footprints are now loaded via FootprintManager (viewport-based)
     // Legacy global loading disabled for performance
     // Footprints are loaded via FootprintManager (viewport-based)
-    console.log("[HIRISE] Footprints will be loaded via FootprintManager (viewport-based)");
-    console.log("[CRISM] Footprints will be loaded via FootprintManager (viewport-based)");
 
     // SHARAD footprints are now loaded via FootprintManager (explicit loading)
-    console.log("[SHARAD] Footprints will be loaded via FootprintManager (viewport-based)");
 
     const hoverHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 
@@ -818,12 +936,9 @@ export default function MapView({
             rectFallback = viewer.entities.getById(`CUSTOM_FP_${pid}`) || null;
           } else {
             rectFallback =
+              viewer.entities.getById(`${inst}_FP_${pid}`) ||
               viewer.entities.getById(`${inst}_VP_${pid}`) ||
               viewer.entities.getById(`${inst}_VP_${pid}_1`) ||
-              viewer.entities.getById(`${inst}_VP_${pid}_2`) ||
-              viewer.entities.getById(`${inst}_VP_${pid}_3`) ||
-              viewer.entities.getById(`${inst === "HIRISE" ? "HIRISE" : "CRISM"}_${pid}_0`) ||
-              viewer.entities.getById(`${inst === "HIRISE" ? "HIRISE" : "CRISM"}_${pid}_1`) ||
               null;
           }
 
@@ -832,7 +947,8 @@ export default function MapView({
 
           const labelEnt = inst === "CUSTOM"
             ? viewer.entities.getById(`CUSTOM_LABEL_${pid}`) || null
-            : viewer.entities.getById(`${inst}_VP_LABEL_${pid}`) ||
+            : viewer.entities.getById(`${inst}_LBL_${pid}`) ||
+              viewer.entities.getById(`${inst}_VP_LABEL_${pid}`) ||
               viewer.entities.getById(`${inst}_LABEL_${pid}`) || null;
           const pointEnt = inst === "CUSTOM"
             ? null
@@ -855,12 +971,7 @@ export default function MapView({
               hs.origOutlineColor = ocVal;
             }
 
-            rectTarget.rectangle.material =
-              inst === "HIRISE"
-                ? HILITE_RECT_MATERIAL_HIRISE
-                : inst === "CUSTOM"
-                  ? HILITE_RECT_MATERIAL_CUSTOM
-                  : HILITE_RECT_MATERIAL_CRISM;
+            rectTarget.rectangle.material = getHiliteMaterial(inst);
 
             rectTarget.rectangle.outlineColor = new Cesium.ConstantProperty(
               Cesium.Color.WHITE
@@ -922,7 +1033,6 @@ export default function MapView({
         const clickLon = Cesium.Math.toDegrees(clickCarto.longitude);
         const clickLat = Cesium.Math.toDegrees(clickCarto.latitude);
 
-        console.log(`[Click] Position: lat=${clickLat.toFixed(4)}, lon=${clickLon.toFixed(4)}`);
 
         // PRIORITY 1: Check if click is within any active overlay bounds
         // This is more reliable than Cesium picking for image overlays
@@ -932,18 +1042,11 @@ export default function MapView({
         const highResIds = highResOverlaysRef.current;
         const quickviewIds = quickviewOverlaysRef.current;
         const allOverlayIds = [...highResIds, ...quickviewIds];
-        console.log("[Click] Active overlays:", { highRes: highResIds, quickview: quickviewIds });
 
         for (const productId of allOverlayIds) {
           const highResEnt = viewer.entities.getById(`HIGHRES_OVERLAY_${productId}`);
           const quickviewEnt = viewer.entities.getById(`QUICKVIEW_OVERLAY_${productId}`);
           const overlayEnt = highResEnt || quickviewEnt;
-          console.log(`[Click] Checking overlay ${productId}:`, {
-            highResEntExists: !!highResEnt,
-            quickviewEntExists: !!quickviewEnt,
-            hasRectangle: !!overlayEnt?.rectangle,
-            hasCoordinates: !!overlayEnt?.rectangle?.coordinates
-          });
 
           if (overlayEnt?.rectangle?.coordinates) {
             const rect = overlayEnt.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle;
@@ -954,7 +1057,6 @@ export default function MapView({
 
             if (clickLon >= west && clickLon <= east && clickLat >= south && clickLat <= north) {
               const instrument = (overlayEnt.properties as any)?.instrument?.getValue?.() as InstrumentType;
-              console.log("[Click] Found overlay via bounds:", productId, instrument);
               overlayProduct = { productId, instrument: instrument || (productId.startsWith("ESP_") ? "HIRISE" : "CRISM") };
               break;
             }
@@ -994,8 +1096,29 @@ export default function MapView({
                 pixelLine = Math.max(0, Math.min(lines - 1, pixelLine));
                 pixelSample = Math.max(0, Math.min(samples - 1, pixelSample));
 
-                console.log(`[CRISM Overlay Click] -> line=${pixelLine}, sample=${pixelSample}`);
               }
+            }
+          }
+
+          // For CRISM TRR3, get shape from backend and compute pixel coords
+          if (instrument === "CRISM_TRR3") {
+            try {
+              const obsId = productId.replace(/_\d{2}$/, "");
+              const shapeRes = await fetch(`/api/crism-trr3/${obsId}/shape`);
+              if (shapeRes.ok) {
+                const shape = await shapeRes.json();
+                const bounds = await getProductBounds(productId);
+                if (bounds && shape.rows && shape.cols) {
+                  const latFrac = (bounds.north - clickLat) / (bounds.north - bounds.south);
+                  const lonFrac = (clickLon - bounds.west) / (bounds.east - bounds.west);
+                  pixelLine = Math.floor(latFrac * shape.rows);
+                  pixelSample = Math.floor(lonFrac * shape.cols);
+                  pixelLine = Math.max(0, Math.min(shape.rows - 1, pixelLine));
+                  pixelSample = Math.max(0, Math.min(shape.cols - 1, pixelSample));
+                }
+              }
+            } catch (e) {
+              console.warn("[TRR3] Failed to get shape for pixel coords:", e);
             }
           }
 
@@ -1025,18 +1148,18 @@ export default function MapView({
                 pixelLine = Math.max(0, Math.min(lines - 1, pixelLine));
                 pixelSample = Math.max(0, Math.min(samples - 1, pixelSample));
 
-                console.log(`[HiRISE Overlay Click] -> line=${pixelLine}, sample=${pixelSample}`);
               }
             }
           }
 
-          console.log(`[Click] Overlay: ${instrument} ${productId}`);
 
           // Compute footprint center for accurate lat/lon
           let overlayLat = clickLat;
           let overlayLon = clickLon;
+          const isTRR3Product = /^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(productId);
           const fpInst = productId.startsWith("DTE") ? "HIRISE_DTM"
-            : productId.startsWith("ESP_") ? "HIRISE" : "CRISM";
+            : productId.startsWith("ESP_") ? "HIRISE"
+            : isTRR3Product ? "CRISM_TRR3" : "CRISM";
           const fpEnt = viewer.entities.getById(`${fpInst}_FP_${productId}`);
           if (fpEnt?.rectangle?.coordinates) {
             const fpRect = fpEnt.rectangle.coordinates.getValue(Cesium.JulianDate.now()) as Cesium.Rectangle;
@@ -1060,7 +1183,6 @@ export default function MapView({
 
         // PRIORITY 2: No overlay clicked, try Cesium entity picking for footprints
         const pickedList = viewer.scene.drillPick(m.position);
-        console.log("[Click] Picked entities:", pickedList.length, pickedList.map((p: any) => p.id?.id || "unknown"));
 
         // PRIORITY 2a: Check for field note markers first
         const pickedFieldNote = pickedList.find((p: any) => {
@@ -1075,7 +1197,6 @@ export default function MapView({
           const fnProductId = fnEnt.properties?.productId?.getValue?.();
           const fnInstrument = fnEnt.properties?.instrument?.getValue?.();
 
-          console.log(`[Click] Field Note: ${noteId}, product=${fnProductId}, instrument=${fnInstrument}`);
 
           // Find the full note data from fieldNotesRef
           const note = fieldNotesRef.current.find(n => n.id === noteId);
@@ -1092,7 +1213,6 @@ export default function MapView({
         });
 
         if (!picked || !(picked.id instanceof Cesium.Entity)) {
-          console.log("[Click] No valid entity picked – terrain click");
           onTerrainClickRef.current?.(clickLat, clickLon);
           return;
         }
@@ -1105,7 +1225,6 @@ export default function MapView({
 
         if (!productId || !instrument) return;
 
-        console.log(`[Click] Footprint: ${instrument} ${productId}`);
 
         // Handle CUSTOM datasets - fly to bounds
         if (instrument === "CUSTOM") {
@@ -1163,8 +1282,7 @@ export default function MapView({
           activeDTMProductRef.current = productId;
           loadDTMElevationGrid(productId).then((grid) => {
             if (grid) {
-              dtmGridCacheRef.current.set(productId, grid);
-              console.log(`[DTMHover] Grid loaded for ${productId}`);
+              setDtmGrid(productId, grid);
             }
           });
           return;
@@ -1206,9 +1324,7 @@ export default function MapView({
 
         // Compute footprint center for accurate lat/lon (click position can be offset)
         const rectEntId = `${instrument}_FP_${productId}`;
-        console.log("[Click] Looking for rectangle entity:", rectEntId);
         const rectEnt = viewer.entities.getById(rectEntId);
-        console.log("[Click] Rectangle entity found:", !!rectEnt);
 
         let selectLat = clickLat;
         let selectLon = clickLon;
@@ -1238,7 +1354,6 @@ export default function MapView({
           });
         } else if (instrument === "HIRISE" || instrument === "CRISM") {
           // Fallback: load LBL directly to get bounds for fly-to (HIRISE/CRISM only)
-          console.log("[Click] No rectangle entity found, loading LBL for fly-to:", productId);
           const isHiRISE = instrument === "HIRISE";
           const lbl = isHiRISE
             ? await loadHiRISELBL(productId)
@@ -1486,7 +1601,6 @@ export default function MapView({
         const lonSpan = eastLon - westLon;
         const latSpan = maxLat - minLat;
         if (lonSpan > 0.1 && latSpan > 0.1) {
-          console.log(`[ViewBoundSelection] Selected: lat=[${minLat.toFixed(2)}, ${maxLat.toFixed(2)}], lon=[${westLon.toFixed(2)}, ${eastLon.toFixed(2)}]`);
           onViewBoundSelectedRef.current?.({ minLat, maxLat, westLon, eastLon });
         }
 
@@ -1533,15 +1647,16 @@ export default function MapView({
     if (show && overlapPassing) {
       // Overlap filter active: per-entity visibility
       const features = fm.getFeatures(instrument);
+      viewer.entities.suspendEvents();
       for (const feature of features) {
         const pid = feature.properties.product_id;
         if (!pid) continue;
         const visible = overlapPassing.has(pid);
         const fpEntity = viewer.entities.getById(`${instrument}_FP_${pid}`);
-        const lblEntity = viewer.entities.getById(`${instrument}_LBL_${pid}`);
         if (fpEntity) fpEntity.show = visible;
-        if (lblEntity) lblEntity.show = visible;
+        // Labels stay hidden (hover-only)
       }
+      viewer.entities.resumeEvents();
     } else {
       fm.setVisible(instrument, show);
     }
@@ -1550,11 +1665,7 @@ export default function MapView({
     const ipid = inspectedProductIdRef.current;
     if (ipid) {
       const fpEntity = viewer.entities.getById(`${instrument}_FP_${ipid}`);
-      if (fpEntity) {
-        fpEntity.show = true;
-        const lblEntity = viewer.entities.getById(`${instrument}_LBL_${ipid}`);
-        if (lblEntity) lblEntity.show = true;
-      }
+      if (fpEntity) fpEntity.show = true;
     }
 
     viewer.scene.requestRender();
@@ -1566,11 +1677,8 @@ export default function MapView({
   }, [showHiRISE, applyInstrumentVisibility]);
 
   useEffect(() => {
-    if (footprintManagerRef.current) {
-      footprintManagerRef.current.setVisible("CRISM", showCRISM);
-    }
-    viewerRef.current?.scene.requestRender();
-  }, [showCRISM]);
+    applyInstrumentVisibility("CRISM", showCRISM);
+  }, [showCRISM, applyInstrumentVisibility]);
 
   // Explicit footprint loading - triggered by loadFootprintsTrigger prop
   // After loading completes, ensure visibility is set correctly (fixes reload visibility bug)
@@ -1581,21 +1689,21 @@ export default function MapView({
     const fm = footprintManagerRef.current;
     let cancelled = false;
 
-    console.log(`[MapView] Loading ${instrument} footprints on explicit trigger`);
 
     // Load footprints and then ensure visibility is set correctly
     // This fixes the issue where reloading doesn't show footprints because
     // the visibility effect doesn't re-run (show state unchanged)
     (async () => {
-      const result = await fm.loadFootprints(instrument);
-      if (cancelled) return; // Effect was cleaned up, don't update
-      if (result && result.count > 0) {
-        // Re-apply visibility based on current show state
-        // The show state is always true when Load is clicked (handleLoadFootprints sets it)
-        fm.setVisible(instrument, true);
-        // Trigger overlap filter recomputation
-        setFootprintVersion(v => v + 1);
-        console.log(`[MapView] Applied visibility for ${instrument} after load (${result.count} features)`);
+      try {
+        const result = await fm.loadFootprints(instrument);
+        if (cancelled) return;
+        if (result && result.count > 0) {
+          fm.setVisible(instrument, true);
+          setFootprintVersion(v => v + 1);
+        }
+      } catch (e) {
+        if (!cancelled) toast.error(`Failed to load ${instrument} footprints`);
+        console.error("Footprint load error:", e);
       }
     })();
 
@@ -1604,48 +1712,92 @@ export default function MapView({
     };
   }, [loadFootprintsTrigger]);
 
-  // Update CRISM footprint visibility when ice score filter or overlap filter changes
+  // Render loaded footprint bounding boxes as dashed rectangles on the map
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const fm = footprintManagerRef.current;
+    if (!viewer || !fm) return;
+
+    // Remove old bbox entities
+    const toRemove: string[] = [];
+    for (let i = 0; i < viewer.entities.values.length; i++) {
+      const e = viewer.entities.values[i];
+      if (e.id && typeof e.id === "string" && e.id.startsWith("BBOX_")) {
+        toRemove.push(e.id);
+      }
+    }
+    for (const id of toRemove) {
+      viewer.entities.removeById(id);
+    }
+
+    // Add bbox rectangles for all loaded instruments
+    const bboxes = fm.getAllLoadedBboxes();
+    const BBOX_COLORS: Record<string, Cesium.Color> = {
+      CRISM: Cesium.Color.CYAN.withAlpha(0.35),
+      HIRISE: Cesium.Color.YELLOW.withAlpha(0.35),
+      SHARAD: Cesium.Color.ORANGE.withAlpha(0.35),
+      SHARAD_HIGHRES: Cesium.Color.fromCssColorString("#FFD700").withAlpha(0.35),
+      CTX: Cesium.Color.fromCssColorString("#FF1493").withAlpha(0.35),
+      HIRISE_DTM: Cesium.Color.fromCssColorString("#B8860B").withAlpha(0.35),
+      CRISM_TRR3: Cesium.Color.TEAL.withAlpha(0.35),
+    };
+
+    for (const [instrument, bbox] of bboxes) {
+      const [west, south, east, north] = bbox;
+      const color = BBOX_COLORS[instrument] || Cesium.Color.WHITE.withAlpha(0.3);
+      viewer.entities.add({
+        id: `BBOX_${instrument}`,
+        rectangle: {
+          coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
+          material: Cesium.Color.TRANSPARENT,
+          outline: true,
+          outlineColor: color,
+          outlineWidth: 2,
+          height: 0,
+        },
+        properties: new Cesium.PropertyBag({ isBbox: true, instrument }),
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [footprintVersion]);
+
+  // Update CRISM footprint visibility when ice score filter changes
   useEffect(() => {
     const viewer = viewerRef.current;
     const footprintManager = footprintManagerRef.current;
     if (!viewer || !footprintManager || !showCRISM) return;
+    if (crismFilteredIds === null) return; // No ice filter active — let applyInstrumentVisibility handle it
 
-    // Get all CRISM features
     const crismFeatures = footprintManager.getFeatures("CRISM");
     const overlapPassingCrism = overlapResultRef.current?.get("CRISM" as FPInstrumentType);
 
+    viewer.entities.suspendEvents();
     for (const feature of crismFeatures) {
       const pid = feature.properties.product_id;
       if (!pid) continue;
 
       const entity = viewer.entities.getById(`CRISM_FP_${pid}`);
-      const labelEntity = viewer.entities.getById(`CRISM_LBL_${pid}`);
 
       // Compose filters: ice score AND overlap
       let visible = true;
-      if (crismFilteredIds !== null) {
-        const obsId = extractCrismObsId(pid);
-        visible = crismFilteredIds.has(obsId);
-      }
+      const obsId = extractCrismObsId(pid);
+      visible = crismFilteredIds.has(obsId);
       if (visible && overlapPassingCrism) {
         visible = overlapPassingCrism.has(pid);
       }
 
       if (entity) entity.show = visible;
-      if (labelEntity) labelEntity.show = visible;
+      // Labels stay hidden (hover-only) — never set show=true here
     }
 
     // Force-show inspected product's CRISM footprint
     const ipid = inspectedProductIdRef.current;
     if (ipid) {
       const fpEnt = viewer.entities.getById(`CRISM_FP_${ipid}`);
-      if (fpEnt) {
-        fpEnt.show = true;
-        const lblEnt = viewer.entities.getById(`CRISM_LBL_${ipid}`);
-        if (lblEnt) lblEnt.show = true;
-      }
+      if (fpEnt) fpEnt.show = true;
     }
 
+    viewer.entities.resumeEvents();
     viewer.scene.requestRender();
   }, [crismFilteredIds, showCRISM]);
 
@@ -1723,16 +1875,17 @@ export default function MapView({
       // Re-apply CRISM ice score filter if active
       if (crismFilteredIds !== null && showCRISM) {
         const crismFeatures = fm.getFeatures("CRISM");
+        viewer.entities.suspendEvents();
         for (const feature of crismFeatures) {
           const pid = feature.properties.product_id;
           if (!pid) continue;
           const obsId = extractCrismObsId(pid);
           const visible = crismFilteredIds.has(obsId);
           const fpEnt = viewer.entities.getById(`CRISM_FP_${pid}`);
-          const lblEnt = viewer.entities.getById(`CRISM_LBL_${pid}`);
           if (fpEnt) fpEnt.show = visible;
-          if (lblEnt) lblEnt.show = visible;
+          // Labels stay hidden (hover-only)
         }
+        viewer.entities.resumeEvents();
       }
       viewer.scene.requestRender();
       return;
@@ -1762,7 +1915,8 @@ export default function MapView({
     overlapResultRef.current = result;
     onOverlapStatsChange?.(stats);
 
-    // Apply visibility for each selected instrument
+    // Apply visibility for each selected instrument (batched)
+    viewer.entities.suspendEvents();
     for (const inst of selectedInstruments) {
       const passingIds = result.get(inst);
       const features = fm.getFeatures(inst);
@@ -1788,11 +1942,11 @@ export default function MapView({
           visible = crismFilteredIds.has(obsId);
         }
         const fpEnt = viewer.entities.getById(`${inst}_FP_${pid}`);
-        const lblEnt = viewer.entities.getById(`${inst}_LBL_${pid}`);
         if (fpEnt) fpEnt.show = visible;
-        if (lblEnt) lblEnt.show = visible;
+        // Labels stay hidden (hover-only)
       }
     }
+    viewer.entities.resumeEvents();
 
     viewer.scene.requestRender();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1951,7 +2105,6 @@ export default function MapView({
 
     if (viewBounds) {
       const { westLon, eastLon, minLat, maxLat } = viewBounds;
-      console.log("[DEBUG] viewBounds:", viewBounds);
 
       // Convert to radians for Cesium (normalize longitude to -180 to 180 first)
       const west = Cesium.Math.toRadians(normalizeLonTo180(westLon));
@@ -1961,7 +2114,6 @@ export default function MapView({
 
       // Create rectangle
       const rect = new Cesium.Rectangle(west, south, east, north);
-      console.log("[DEBUG] rect:", rect);
 
       // For 2D mode, use setView for immediate positioning
       viewer.camera.setView({
@@ -1992,7 +2144,7 @@ export default function MapView({
 
       // Try to find entity from FootprintManager (works for all instruments)
       // Entity ID format: INSTRUMENT_FP_productId
-      const instruments = ["HIRISE", "CRISM", "CTX", "SHARAD", "SHARAD_HIGHRES", "HIRISE_DTM", "CUSTOM"];
+      const instruments = ["HIRISE", "CRISM", "CTX", "SHARAD", "SHARAD_HIGHRES", "HIRISE_DTM", "CRISM_TRR3", "CUSTOM"];
       let foundEntity: Cesium.Entity | null = null;
 
       for (const inst of instruments) {
@@ -2172,7 +2324,7 @@ export default function MapView({
     if (!viewer) return;
 
     const pid = highlightProductId;
-    const instruments = ["HIRISE", "CRISM", "CTX", "SHARAD", "SHARAD_HIGHRES", "HIRISE_DTM", "CUSTOM"];
+    const instruments = ["HIRISE", "CRISM", "CTX", "SHARAD", "SHARAD_HIGHRES", "HIRISE_DTM", "CRISM_TRR3", "CUSTOM"];
     let entity: Cesium.Entity | null = null;
 
     for (const inst of instruments) {
@@ -2319,7 +2471,10 @@ export default function MapView({
 
   // Refs to track current overlays
   const quickviewOverlayIdsRef = useRef<Set<string>>(new Set());
+  const quickviewBlobUrlsRef = useRef<Map<string, string>>(new Map());
   const highResOverlayIdsRef = useRef<Set<string>>(new Set());
+  const mineralOverlayIdsRef = useRef<Set<string>>(new Set());
+  const mineralBlobUrlsRef = useRef<Map<string, string>>(new Map());
   const browseOverlayIdsRef = useRef<Map<string, Set<BrowseProductType>>>(new Map());
   const scoreOverlayIdsRef = useRef<Map<string, Set<ScoreProductType>>>(new Map());
 
@@ -2384,6 +2539,12 @@ export default function MapView({
         ent.show = false;
         needsRender = true;
       }
+      // Clean up quickview blob URL
+      const qvBlobUrl = quickviewBlobUrlsRef.current.get(id);
+      if (qvBlobUrl) {
+        URL.revokeObjectURL(qvBlobUrl);
+        quickviewBlobUrlsRef.current.delete(id);
+      }
       // Clear active DTM if this was a DTM product being hidden
       if (id.startsWith("DTE") && activeDTMProductRef.current === id) {
         activeDTMProductRef.current = null;
@@ -2424,8 +2585,7 @@ export default function MapView({
           if (!dtmGridCacheRef.current.has(productId)) {
             loadDTMElevationGrid(productId).then((grid) => {
               if (grid) {
-                dtmGridCacheRef.current.set(productId, grid);
-                console.log(`[DTMHover] Grid loaded for ${productId} (re-enabled)`);
+                setDtmGrid(productId, grid);
               }
             });
           }
@@ -2470,8 +2630,16 @@ export default function MapView({
       // Pre-fetch bounds in parallel for faster creation
       Promise.all(imageToCreate.map(async (productId) => {
         try {
-          const bounds = await getProductBounds(productId);
-          if (!bounds || !viewerRef.current) return null;
+          let bounds = await getProductBounds(productId);
+          // Fallback: extract bounds from existing footprint entity
+          if (!bounds && viewerRef.current) {
+            bounds = getFootprintBounds(viewerRef.current, productId);
+            if (bounds) console.warn(`[Overlay] Using footprint bounds fallback for ${productId}`);
+          }
+          if (!bounds || !viewerRef.current) {
+            console.warn(`[Overlay] No bounds for quickview: ${productId}`);
+            return null;
+          }
 
           const isHiRISE = productId.startsWith("ESP_");
           const isHiRISEDTM = productId.startsWith("DTE");
@@ -2489,17 +2657,24 @@ export default function MapView({
             imageUrl = `/hirise/quickview/${productId}.png`;
             instrument = "HIRISE";
           } else if (isTRR3) {
-            imageUrl = `/api/mineral-cnn/quickview/${productId}`;
+            const obsId = productId.replace(/_\d{2}$/, "");
+            imageUrl = `/api/mineral-cnn/quickview/${obsId}`;
             instrument = "CRISM_TRR3";
-          } else if (productId.includes("_brcarj_")) {
-            const baseObsId = productId.split("_")[0];
-            imageUrl = `/crism/quickview/${baseObsId}_VNIR.png`;
           } else {
-            // Browse files are in /crism/browse/
-            imageUrl = `/crism/browse/${productId.replace(/_if[0-9a-z]+_mtr3$/i, "_brvnaj_mtr3")}.png`;
+            // Smart backend endpoint handles all naming patterns
+            // Pass obs_id (e.g. frt00008a1e_07) so backend can search crism_quickview/ + crism_data/
+            const parts = productId.split("_");
+            const base = parts.length >= 2 ? `${parts[0]}_${parts[1]}` : productId;
+            imageUrl = `/crism/quickview/${base}.png`;
           }
 
-          return { productId, bounds, imageUrl, instrument };
+          // Fetch image first to avoid gray rectangles from 404 URLs
+          const imgRes = await fetch(imageUrl);
+          if (!imgRes.ok) return null;
+          const blob = await imgRes.blob();
+          const blobUrl = URL.createObjectURL(blob);
+
+          return { productId, bounds, imageUrl: blobUrl, instrument };
         } catch {
           return null;
         }
@@ -2534,6 +2709,11 @@ export default function MapView({
             },
           });
 
+          // Track blob URL for cleanup
+          if (imageUrl.startsWith("blob:")) {
+            quickviewBlobUrlsRef.current.set(productId, imageUrl);
+          }
+
           // Make footprint fill transparent so overlay image is clearly visible
           setFootprintTransparent(v, productId, true);
           quickviewOverlayIdsRef.current.add(productId);
@@ -2543,8 +2723,7 @@ export default function MapView({
             activeDTMProductRef.current = productId;
             loadDTMElevationGrid(productId).then((grid) => {
               if (grid) {
-                dtmGridCacheRef.current.set(productId, grid);
-                console.log(`[DTMHover] Grid loaded for ${productId} (via quickview)`);
+                setDtmGrid(productId, grid);
               }
             });
           }
@@ -2616,8 +2795,15 @@ export default function MapView({
     if (toCreate.length > 0) {
       Promise.all(toCreate.map(async (productId) => {
         try {
-          const bounds = await getProductBounds(productId);
-          if (!bounds || !viewerRef.current) return null;
+          let bounds = await getProductBounds(productId);
+          if (!bounds && viewerRef.current) {
+            bounds = getFootprintBounds(viewerRef.current, productId);
+            if (bounds) console.warn(`[Overlay] Using footprint bounds fallback for ${productId}`);
+          }
+          if (!bounds || !viewerRef.current) {
+            console.warn(`[Overlay] No bounds for highres: ${productId}`);
+            return null;
+          }
 
           const isHiRISE = productId.startsWith("ESP_");
           let imageUrl: string;
@@ -2625,8 +2811,17 @@ export default function MapView({
           if (isHiRISE) {
             imageUrl = `/hirise/overlay/${productId}.png`;
           } else {
-            // CRISM RGB request
-            const response = await fetch(`/crism/${productId}/rgb`, {
+            // CRISM / TRR3 RGB request
+            const isTRR3 = /^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(productId);
+            let rgbUrl: string;
+            if (isTRR3) {
+              const obsId = productId.replace(/_\d{2}$/, "");
+              rgbUrl = `/api/crism-trr3/${obsId}/rgb`;
+            } else {
+              rgbUrl = `/crism/${productId}/rgb`;
+            }
+
+            const response = await fetch(rgbUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -2672,7 +2867,7 @@ export default function MapView({
             },
             properties: {
               product_id: productId,
-              instrument: isHiRISE ? "HIRISE" : "CRISM",
+              instrument: isHiRISE ? "HIRISE" : /^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(productId) ? "CRISM_TRR3" : "CRISM",
               kind: "OVERLAY",
             },
           });
@@ -2703,7 +2898,6 @@ export default function MapView({
       return;
     }
 
-    console.log("[RGB] Wavelengths changed, refreshing CRISM overlays", rgbWavelengths);
     prevRgbRef.current = rgbWavelengths;
 
     // Find CRISM products in highResOverlays and refresh them
@@ -2771,34 +2965,54 @@ export default function MapView({
         if (existingTypes.has(browseType)) continue;
 
         try {
-          // Load LBL for bounds
-          const lbl = await loadCRISMLBL(productId);
-          if (!lbl) {
-            console.warn("[Browse] No LBL for", productId);
-            continue;
+          // Try getProductBounds first, then footprint fallback
+          let west: number, east: number, south: number, north: number;
+          let bounds = await getProductBounds(productId);
+          if (!bounds && viewerRef.current) {
+            bounds = getFootprintBounds(viewerRef.current, productId);
+            if (bounds) console.warn(`[Browse] Using footprint bounds fallback for ${productId}`);
           }
 
-          const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
-          const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
-          const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
-          const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
+          if (bounds) {
+            west = bounds.west;
+            east = bounds.east;
+            south = bounds.south;
+            north = bounds.north;
+          } else {
+            // Last resort: try LBL directly
+            const lbl = await loadCRISMLBL(productId);
+            if (!lbl) {
+              console.warn("[Browse] No bounds for", productId);
+              continue;
+            }
 
-          if (minLat == null || maxLat == null || westLon360 == null || eastLon360 == null) {
-            console.warn("[Browse] Missing bounds for", productId);
-            continue;
+            const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
+            const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
+            const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
+            const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
+
+            if (minLat == null || maxLat == null || westLon360 == null || eastLon360 == null) {
+              console.warn("[Browse] Missing bounds for", productId);
+              continue;
+            }
+
+            west = normalizeLonTo180(westLon360);
+            east = normalizeLonTo180(eastLon360);
+            south = Math.min(minLat, maxLat);
+            north = Math.max(minLat, maxLat);
           }
-
-          const west = normalizeLonTo180(westLon360);
-          const east = normalizeLonTo180(eastLon360);
-          const south = Math.min(minLat, maxLat);
-          const north = Math.max(minLat, maxLat);
 
           // Construct browse image URL
           // Arcadia products: frt00003156_07_brcarj_mtr3 -> frt00003156_HYD.png
           const baseObsId = productId.split("_")[0];
           const imageUrl = `/crism/browse/${baseObsId}_${browseType}.png`;
 
-          console.log("[Browse] Adding overlay:", productId, browseType, imageUrl);
+          // Pre-validate image exists to avoid gray rectangles
+          const headRes = await fetch(imageUrl, { method: "HEAD" });
+          if (!headRes.ok) {
+            console.warn(`[Browse] Image not found: ${imageUrl}`);
+            continue;
+          }
 
           if (!viewerRef.current) return;
 
@@ -2904,7 +3118,12 @@ export default function MapView({
           const baseObsId = productId.split("_")[0];
           const imageUrl = `/crism/browse/${baseObsId}_${scoreType}.png`;
 
-          console.log("[Score] Adding overlay:", productId, scoreType, imageUrl);
+          // Pre-validate image exists to avoid gray rectangles
+          const headRes = await fetch(imageUrl, { method: "HEAD" });
+          if (!headRes.ok) {
+            console.warn(`[Score] Image not found: ${imageUrl}`);
+            continue;
+          }
 
           if (!viewerRef.current) return;
 
@@ -2939,6 +3158,98 @@ export default function MapView({
 
     viewer.scene.requestRender();
   }, [scoreOverlays, overlayOpacities]);
+
+  // Mineral classification overlays effect (CNN mineral map on TRR3)
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const currentIds = new Set(mineralOverlays);
+    const existingIds = mineralOverlayIdsRef.current;
+
+    let needsRender = false;
+
+    // STEP 1: Remove overlays no longer in list
+    for (const id of Array.from(existingIds)) {
+      if (!currentIds.has(id)) {
+        const ent = viewer.entities.getById(`MINERAL_OVERLAY_${id}`);
+        if (ent) {
+          viewer.entities.remove(ent);
+          needsRender = true;
+        }
+        setFootprintTransparent(viewer, id, false);
+        existingIds.delete(id);
+        // Clean up blob URL
+        const blobUrl = mineralBlobUrlsRef.current.get(id);
+        if (blobUrl) {
+          URL.revokeObjectURL(blobUrl);
+          mineralBlobUrlsRef.current.delete(id);
+        }
+      }
+    }
+
+    // STEP 2: Create new overlays
+    const toCreate = mineralOverlays.filter((id) => !existingIds.has(id));
+    if (toCreate.length > 0) {
+      Promise.all(toCreate.map(async (productId) => {
+        try {
+          const bounds = await getProductBounds(productId);
+          if (!bounds || !viewerRef.current) return null;
+
+          // obs_id: strip _NN suffix (e.g. frt0000c702_07 → frt0000c702)
+          const obsId = productId.replace(/_\d{2}$/, "");
+          const mapUrl = `/api/mineral-cnn/result/${obsId}/mineral-map.png`;
+
+          const res = await fetch(mapUrl);
+          if (!res.ok) return null;
+
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+
+          return { productId, bounds, blobUrl };
+        } catch {
+          return null;
+        }
+      })).then((results) => {
+        const v = viewerRef.current;
+        if (!v) return;
+
+        v.entities.suspendEvents();
+        for (const result of results) {
+          if (!result) continue;
+          const { productId, bounds, blobUrl } = result;
+
+          v.entities.add({
+            id: `MINERAL_OVERLAY_${productId}`,
+            rectangle: {
+              coordinates: Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north),
+              material: new Cesium.ImageMaterialProperty({
+                image: blobUrl,
+                transparent: true,
+                color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
+              }),
+              height: 0,
+            },
+            properties: {
+              product_id: productId,
+              instrument: "CRISM_TRR3",
+              kind: "MINERAL_OVERLAY",
+            },
+          });
+
+          mineralBlobUrlsRef.current.set(productId, blobUrl);
+          setFootprintTransparent(v, productId, true);
+          mineralOverlayIdsRef.current.add(productId);
+        }
+        v.entities.resumeEvents();
+        v.scene.requestRender();
+      });
+    }
+
+    if (needsRender) {
+      viewer.scene.requestRender();
+    }
+  }, [mineralOverlays, overlayOpacities]);
 
   // PERFORMANCE OPTIMIZED: Track visible products in current view
   // Reduced polling frequency and removed excessive logging
@@ -3098,15 +3409,14 @@ export default function MapView({
     const removeListener = viewer.camera.moveEnd.addEventListener(updateVisibleProducts);
 
     // Initial update with delay for FootprintManager initialization
-    const initTimeout = setTimeout(updateVisibleProducts, 1000);
+    const initTimeout = setTimeout(updateVisibleProducts, 500);
 
-    // Reduced polling frequency (5s instead of 2s) - just a fallback
-    const interval = setInterval(updateVisibleProducts, 5000);
+    // Run once immediately when deps change (e.g., footprint load, filter toggle)
+    updateVisibleProducts();
 
     return () => {
       removeListener();
       clearTimeout(initTimeout);
-      clearInterval(interval);
     };
   }, [showHiRISE, showCRISM, showCTX, showHiRISEDTM, showCRISM_TRR3, showCustomData, customDatasets, onVisibleProductsChange, crismFilteredIds, overlapEnabled, footprintVersion]);
 
@@ -3155,6 +3465,11 @@ export default function MapView({
       }
     }
 
+    // Update mineral classification overlays
+    for (const productId of mineralOverlayIdsRef.current) {
+      updateMaterial(viewer.entities.getById(`MINERAL_OVERLAY_${productId}`), productId);
+    }
+
     viewer.scene.requestRender();
   }, [overlayOpacities]);
 
@@ -3169,23 +3484,32 @@ export default function MapView({
     const viewer = viewerRef.current;
     if (!viewer) return;
 
+    // Detect instrument by trying _FP_ entity lookup across all instruments
+    const detectInstrument = (pid: string): InstrumentType => {
+      const candidates: InstrumentType[] = ["HIRISE", "CRISM", "CTX", "HIRISE_DTM", "CRISM_TRR3", "SHARAD", "SHARAD_HIGHRES"];
+      for (const inst of candidates) {
+        if (viewer.entities.getById(`${inst}_FP_${pid}`)) return inst;
+      }
+      // Fallback heuristics
+      if (pid.startsWith("ESP_")) return "HIRISE";
+      if (pid.startsWith("DTE")) return "HIRISE_DTM";
+      if (/^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(pid)) return "CRISM_TRR3";
+      return "CRISM";
+    };
+
     // Helper to apply/remove highlight to an entity
     const setEntityHighlight = (entity: Cesium.Entity | undefined, highlighted: boolean, instrument: InstrumentType) => {
       if (!entity?.rectangle) return;
 
       if (highlighted) {
-        entity.rectangle.material = instrument === "HIRISE"
-          ? HILITE_RECT_MATERIAL_HIRISE
-          : HILITE_RECT_MATERIAL_CRISM;
+        entity.rectangle.material = getHiliteMaterial(instrument);
         entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE) as any;
       } else {
-        // Restore original appearance
-        entity.rectangle.material = (instrument === "HIRISE"
-          ? Cesium.Color.YELLOW.withAlpha(0.3)
-          : Cesium.Color.CYAN.withAlpha(0.35)) as any;
-        entity.rectangle.outlineColor = (instrument === "HIRISE"
-          ? Cesium.Color.YELLOW
-          : Cesium.Color.BLACK) as any;
+        // Restore to original light fill using instrument color
+        const rgb = getInstrumentCesiumColor(instrument.toLowerCase() as any);
+        const baseColor = new Cesium.Color(rgb.r, rgb.g, rgb.b, 1.0);
+        entity.rectangle.material = new Cesium.ColorMaterialProperty(baseColor.withAlpha(0.10));
+        entity.rectangle.outlineColor = new Cesium.ConstantProperty(baseColor) as any;
       }
     };
 
@@ -3196,27 +3520,21 @@ export default function MapView({
     }
 
     // Find and highlight the hovered product
-    const isHiRISE = hoveredProductId.startsWith("ESP_");
-    const instrument: InstrumentType = isHiRISE ? "HIRISE" : "CRISM";
+    const instrument = detectInstrument(hoveredProductId);
 
-    // Try FootprintManager entity IDs first, then legacy IDs
+    // Try FootprintManager entity IDs first (_FP_), then legacy _VP_ IDs
     const entityIds: string[] = [];
-    const vpPrefix = `${instrument}_VP_${hoveredProductId}`;
-    const legacyPrefix = `${instrument}_${hoveredProductId}`;
-
-    // Try FootprintManager IDs first
-    for (const id of [vpPrefix, `${vpPrefix}_1`, `${vpPrefix}_2`, `${vpPrefix}_3`]) {
-      const entity = viewer.entities.getById(id);
-      if (entity) {
-        setEntityHighlight(entity, true, instrument);
-        entityIds.push(id);
-      }
+    const fpId = `${instrument}_FP_${hoveredProductId}`;
+    const fpEntity = viewer.entities.getById(fpId);
+    if (fpEntity) {
+      setEntityHighlight(fpEntity, true, instrument);
+      entityIds.push(fpId);
     }
 
-    // Also try legacy IDs
+    // Fallback to legacy VP IDs if no FP entity found
     if (entityIds.length === 0) {
-      for (let i = 0; i < 4; i++) {
-        const id = `${legacyPrefix}_${i}`;
+      const vpPrefix = `${instrument}_VP_${hoveredProductId}`;
+      for (const id of [vpPrefix, `${vpPrefix}_1`, `${vpPrefix}_2`, `${vpPrefix}_3`]) {
         const entity = viewer.entities.getById(id);
         if (entity) {
           setEntityHighlight(entity, true, instrument);
@@ -3225,11 +3543,13 @@ export default function MapView({
       }
     }
 
-    // Also highlight label and point if they exist (try VP IDs first)
-    const labelEnt = viewer.entities.getById(`${instrument}_VP_LABEL_${hoveredProductId}`) ||
+    // Also highlight label if it exists (try _LBL_ first, then legacy)
+    const labelEnt = viewer.entities.getById(`${instrument}_LBL_${hoveredProductId}`) ||
+                     viewer.entities.getById(`${instrument}_VP_LABEL_${hoveredProductId}`) ||
                      viewer.entities.getById(`${instrument}_LABEL_${hoveredProductId}`);
-    if (labelEnt?.label) {
-      (labelEnt.label.scale as any) = 1.3;
+    if (labelEnt) {
+      labelEnt.show = true;
+      if (labelEnt.label) (labelEnt.label.scale as any) = 1.3;
     }
 
     const pointEnt = viewer.entities.getById(`${instrument}_VP_POINT_${hoveredProductId}`) ||
@@ -3249,8 +3569,9 @@ export default function MapView({
         }
       }
 
-      if (labelEnt?.label) {
-        (labelEnt.label.scale as any) = 1.0;
+      if (labelEnt) {
+        labelEnt.show = false;
+        if (labelEnt.label) (labelEnt.label.scale as any) = 1.0;
       }
 
       if (pointEnt?.point) {
@@ -3532,8 +3853,7 @@ export default function MapView({
       if (!dtmGridCacheRef.current.has(activeDTMProductId)) {
         loadDTMElevationGrid(activeDTMProductId).then((grid) => {
           if (grid) {
-            dtmGridCacheRef.current.set(activeDTMProductId, grid);
-            console.log(`[DTMHover] Grid loaded for ${activeDTMProductId} (via prop)`);
+            setDtmGrid(activeDTMProductId, grid);
           }
         });
       }
@@ -3856,16 +4176,16 @@ export default function MapView({
     // Build immediately
     rebuildGrid();
 
-    // Rebuild on camera move (spacing may change, or viewport-clipped lines need update)
-    const removeListener = viewer.camera.moveEnd.addEventListener(() => {
-      // For coarse spacing (global), only rebuild if tier changes
-      // For fine spacing (viewport-clipped), always rebuild to cover new viewport
+    // Rebuild on camera move — throttled to avoid excessive entity churn
+    const throttledRebuild = throttle(() => {
       const newSpacing = getSpacing();
       if (newSpacing !== gridSpacingRef.current || newSpacing <= 1) {
         gridSpacingRef.current = null; // force rebuild
         rebuildGrid();
       }
-    });
+    }, 300);
+
+    const removeListener = viewer.camera.moveEnd.addEventListener(throttledRebuild);
 
     return () => {
       removeListener();
@@ -3940,6 +4260,13 @@ export default function MapView({
         ref={dtmHoverReadoutRef}
         mode={dtmHoverMode}
         onModeChange={handleDTMHoverModeChange}
+      />
+
+      {/* Measurement & Annotation Tools */}
+      <MeasurementTools
+        viewer={viewerRef.current}
+        isVisible={showMeasurementTools}
+        onPinNote={onMeasurementPinNote}
       />
     </>
   );

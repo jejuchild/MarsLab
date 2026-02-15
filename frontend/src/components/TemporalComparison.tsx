@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 interface TemporalComparisonProps {
   lat: number;
   lon: number;
+  /** Pre-select instrument from the Inspector context */
+  initialInstrument?: string;
   onClose: () => void;
 }
 
@@ -27,18 +29,54 @@ type TemporalResult = {
   error?: string;
 };
 
+/** All instruments supported by the backend temporal endpoint */
+const ALL_INSTRUMENTS = [
+  "HIRISE",
+  "CTX",
+  "CRISM",
+  "CRISM_TRR3",
+  "SHARAD",
+  "SHARAD_HIGHRES",
+  "HIRISE_DTM",
+] as const;
+
+type TemporalInstrument = (typeof ALL_INSTRUMENTS)[number];
+
+/** Short display labels for instrument buttons */
+const INSTRUMENT_LABELS: Record<TemporalInstrument, string> = {
+  HIRISE: "HiRISE",
+  CTX: "CTX",
+  CRISM: "CRISM",
+  CRISM_TRR3: "CRISM TRR3",
+  SHARAD: "SHARAD",
+  SHARAD_HIGHRES: "SHARAD HR",
+  HIRISE_DTM: "HiRISE DTM",
+};
+
+function resolveInitialInstrument(raw?: string): TemporalInstrument {
+  if (!raw) return "HIRISE";
+  const upper = raw.toUpperCase();
+  for (const inst of ALL_INSTRUMENTS) {
+    if (inst === upper) return inst;
+  }
+  return "HIRISE";
+}
+
 /* =========================================================
  * TemporalComparison Component
  * =======================================================*/
 export default function TemporalComparison({
   lat,
   lon,
+  initialInstrument,
   onClose,
 }: TemporalComparisonProps) {
   const [result, setResult] = useState<TemporalResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [instrument, setInstrument] = useState<"HIRISE" | "CTX">("HIRISE");
+  const [instrument, setInstrument] = useState<TemporalInstrument>(
+    resolveInitialInstrument(initialInstrument),
+  );
   const [selectedPair, setSelectedPair] = useState<TemporalPair | null>(null);
 
   // Fetch temporal pairs
@@ -112,10 +150,10 @@ export default function TemporalComparison({
         </div>
 
         {/* Instrument selector */}
-        <div className="px-5 py-3 border-b border-[#232f48] flex items-center gap-3">
+        <div className="px-5 py-3 border-b border-[#232f48] flex items-center gap-3 flex-wrap">
           <span className="text-[10px] text-[#6b7c9c] uppercase font-bold">Instrument</span>
-          <div className="flex gap-1.5">
-            {(["HIRISE", "CTX"] as const).map((inst) => (
+          <div className="flex gap-1.5 flex-wrap">
+            {ALL_INSTRUMENTS.map((inst) => (
               <button
                 key={inst}
                 onClick={() => setInstrument(inst)}
@@ -125,7 +163,7 @@ export default function TemporalComparison({
                     : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-amber-500/30"
                 }`}
               >
-                {inst}
+                {INSTRUMENT_LABELS[inst]}
               </button>
             ))}
           </div>
@@ -146,7 +184,7 @@ export default function TemporalComparison({
               </span>
               <p className="text-sm text-slate-400">Finding temporal pairs...</p>
               <p className="text-[10px] text-slate-600 mt-1">
-                Querying ODE for {instrument} products near this location
+                Querying ODE for {INSTRUMENT_LABELS[instrument]} products near this location
               </p>
             </div>
           )}
@@ -165,14 +203,17 @@ export default function TemporalComparison({
           )}
 
           {/* No pairs found */}
-          {result && result.pairs.length === 0 && !loading && (
+          {result && result.pairs.length === 0 && !loading && !error && (
             <div className="flex flex-col items-center justify-center py-20">
               <span className="material-symbols-outlined text-4xl text-[#3a4a68] mb-3">
                 search_off
               </span>
               <p className="text-sm text-slate-400 mb-1">No temporal pairs found</p>
               <p className="text-[11px] text-slate-500 text-center max-w-xs">
-                No repeat {instrument} observations were found within 50 km of this location. Try a different instrument or location.
+                No repeat {INSTRUMENT_LABELS[instrument]} observations were found within 50 km of this location.
+                {result.total_products > 0
+                  ? ` Found ${result.total_products} product(s) but all on the same date.`
+                  : " Try a different instrument or location."}
               </p>
             </div>
           )}

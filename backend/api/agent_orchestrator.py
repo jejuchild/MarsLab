@@ -13,6 +13,7 @@ Falls back to rule-based planning if Ollama is unavailable.
 import json
 import logging
 import asyncio
+import fcntl
 import os
 import uuid
 import re
@@ -36,6 +37,9 @@ from .agent_tasks import (
     mineral_analysis,
     mineral_cnn_classify,
     dielectric_analysis,
+    terrace_dielectric_analysis,
+    sharad_physics_inversion,
+    crism_spectral_analysis,
     synthesize_results,
     recommend_site,
 )
@@ -47,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 # Ollama config
 OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.3"
+OLLAMA_MODEL = "llama3.1:8b"
 
 
 # =============================================================================
@@ -131,6 +135,11 @@ class AgentSession:
             "narrative": self.narrative,
             "synthesis": self.synthesis,
             "figures": self.figures,
+            "all_results": {
+                k: {"task_type": v.task_type, "success": v.success, "data": v.data,
+                     "error": v.error, "summary": v.summary}
+                for k, v in self.all_results.items()
+            },
             "error": self.error,
             "created_at": self.created_at,
         }
@@ -182,6 +191,17 @@ def _load_sessions():
             if rec.get("bbox"):
                 b = rec["bbox"]
                 bbox = RegionBBox(b["min_lat"], b["max_lat"], b["min_lon"], b["max_lon"])
+            # Reconstruct all_results from saved data
+            all_results: Dict[str, TaskResult] = {}
+            for k, v in rec.get("all_results", {}).items():
+                if isinstance(v, dict):
+                    all_results[k] = TaskResult(
+                        task_type=v.get("task_type", ""),
+                        success=v.get("success", True),
+                        data=v.get("data", {}),
+                        error=v.get("error"),
+                        summary=v.get("summary"),
+                    )
             session = AgentSession(
                 session_id=sid,
                 objective=rec.get("objective", ""),
@@ -189,8 +209,10 @@ def _load_sessions():
                 region_name=rec.get("region_name"),
                 bbox=bbox,
                 steps=steps,
+                all_results=all_results,
                 narrative=rec.get("narrative", ""),
                 synthesis=rec.get("synthesis"),
+                figures=rec.get("figures"),
                 error=rec.get("error"),
                 created_at=rec.get("created_at", ""),
             )
@@ -223,12 +245,7 @@ def _save_session(session: AgentSession):
 
     record = session.to_dict()
     record["steps"] = step_records
-    # Strip base64 image data from figures to keep JSON file small
-    if record.get("figures"):
-        record["figures"] = [
-            {k: v for k, v in fig.items() if k != "base64"}
-            for fig in record["figures"]
-        ]
+    # Keep figures with base64 data — they're small evidence PNGs (~10-50KB each)
     if session.bbox:
         record["bbox"] = {
             "min_lat": session.bbox.min_lat,
@@ -237,34 +254,43 @@ def _save_session(session: AgentSession):
             "max_lon": session.bbox.max_lon,
         }
 
-    # Load existing, replace or append, write back
-    existing: list = []
-    if os.path.exists(_SESSIONS_FILE):
-        try:
-            with open(_SESSIONS_FILE, "r") as f:
-                existing = json.load(f)
-        except Exception:
-            existing = []
-
-    # Update in place or append
-    found = False
-    for i, rec in enumerate(existing):
-        if rec.get("session_id") == session.session_id:
-            existing[i] = record
-            found = True
-            break
-    if not found:
-        existing.append(record)
-
-    # Keep only latest MAX_SESSIONS
-    if len(existing) > MAX_SESSIONS:
-        existing.sort(key=lambda r: r.get("created_at", ""))
-        existing = existing[-MAX_SESSIONS:]
-
+    # Load existing, replace or append, write back — with file locking
+    lock_file = _SESSIONS_FILE + ".lock"
     try:
-        with open(_SESSIONS_FILE, "w") as f:
-            json.dump(existing, f, indent=2, default=str)
-        logger.info(f"Saved agent session {session.session_id} to disk")
+        with open(lock_file, "w") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                existing: list = []
+                if os.path.exists(_SESSIONS_FILE):
+                    try:
+                        with open(_SESSIONS_FILE, "r") as f:
+                            existing = json.load(f)
+                    except Exception:
+                        existing = []
+
+                # Update in place or append
+                found = False
+                for i, rec in enumerate(existing):
+                    if rec.get("session_id") == session.session_id:
+                        existing[i] = record
+                        found = True
+                        break
+                if not found:
+                    existing.append(record)
+
+                # Keep only latest MAX_SESSIONS
+                if len(existing) > MAX_SESSIONS:
+                    existing.sort(key=lambda r: r.get("created_at", ""))
+                    existing = existing[-MAX_SESSIONS:]
+
+                # Atomic write: write to temp file then rename
+                tmp_file = _SESSIONS_FILE + ".tmp"
+                with open(tmp_file, "w") as f:
+                    json.dump(existing, f, indent=2, default=str)
+                os.replace(tmp_file, _SESSIONS_FILE)
+                logger.info(f"Saved agent session {session.session_id} to disk")
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
     except Exception as e:
         logger.error(f"Failed to save agent session: {e}")
 
@@ -321,6 +347,24 @@ async def cancel_session(session_id: str) -> bool:
 # =============================================================================
 # Ollama LLM Integration
 # =============================================================================
+
+HEARTBEAT_INTERVAL = 15.0  # seconds between SSE keepalive events
+
+
+async def _drain_queue_with_heartbeat(queue: asyncio.Queue):
+    """Drain an asyncio.Queue, yielding items as they arrive.
+    Sends heartbeat events every HEARTBEAT_INTERVAL seconds to keep SSE alive
+    when Ollama is slow (CPU-only, model loading, long prompts)."""
+    while True:
+        try:
+            item = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_INTERVAL)
+        except asyncio.TimeoutError:
+            yield {"event": "heartbeat", "data": {"message": "Waiting for LLM..."}}
+            continue
+        if item is None:
+            break
+        yield item
+
 
 async def _check_ollama() -> bool:
     """Check if Ollama is running."""
@@ -425,7 +469,7 @@ async def _call_ollama_streaming(
 # ReAct Agent — Tool Registry
 # =============================================================================
 
-MAX_ITERATIONS = 15
+MAX_ITERATIONS = 30
 
 
 def _format_tool_descriptions() -> str:
@@ -468,14 +512,16 @@ STRATEGY:
 2. Search ALL relevant instruments one by one: CRISM, HIRISE, SHARAD, SHARAD_HIGHRES, CTX, HIRISE_DTM. Each search_products call handles one instrument.
 3. Call check_local_data to see what is available locally, then download_products for missing data.
 4. Run analyses: analyze_subsurface, analyze_minerals, analyze_slope, classify_minerals_cnn, estimate_dielectric.
-5. Call recommend_site to cross-reference everything into a landing site recommendation.
-6. Call finish with your final summary and recommendation.
+5. **MANDATORY PHYSICS INVERSION**: After analyze_subsurface, you MUST attempt run_sharad_inversion if SHARAD_HIGHRES data exists. If it fails, attempt terrace_dielectric. You MUST report the εr source (physics-based or assumed fallback) in your reasoning. NEVER silently assume εr = 3.15 as evidence of ice.
+6. Call recommend_site to cross-reference everything into a landing site recommendation.
+7. Call finish with your final summary and recommendation.
 
 RULES:
 - Output Thought: and Action: on EVERY turn. Nothing else.
 - One action per turn.
 - Call check_local_data before download_products.
-- Be adaptive: if something returns 0 results, try a different approach."""
+- Be adaptive: if something returns 0 results, try a different approach.
+- NEVER report assumed-εr depth as physical evidence of ice. Always state whether εr was measured or assumed."""
 
 
 async def _tool_resolve_region(session: "AgentSession", params: dict):
@@ -534,13 +580,13 @@ async def _tool_download(session: "AgentSession", params: dict):
                           data={}), \
             "Error: Run check_local_data first to identify missing products."
     missing = check_result.data.get("missing", [])
-    max_count = params.get("max_count", MAX_DOWNLOADS_PER_RUN)
-    to_download, strategy = _select_downloads(missing, session.bbox, max_total=min(max_count, MAX_DOWNLOADS_PER_RUN))
+    max_per_inst = params.get("max_per_instrument", MAX_DOWNLOADS_PER_INSTRUMENT)
+    to_download, strategy = _select_downloads(missing, session.bbox, max_per_instrument=max_per_inst)
     result = await download_data(to_download)
     session.all_results["download"] = result
     downloaded = result.data.get("downloaded_count", 0)
     failed = result.data.get("failed_count", 0)
-    return result, f"Downloaded {downloaded} products ({strategy} strategy). {failed} failed. {len(missing) - len(to_download)} skipped (over limit)."
+    return result, f"Downloaded {downloaded} products ({strategy} strategy). {failed} failed. {len(missing) - len(to_download)} skipped (over per-instrument limit of {max_per_inst})."
 
 
 async def _tool_download_with_progress(session: "AgentSession", params: dict, on_progress=None):
@@ -555,15 +601,15 @@ async def _tool_download_with_progress(session: "AgentSession", params: dict, on
                           data={}), \
             "Error: Run check_local_data first to identify missing products."
     missing = check_result.data.get("missing", [])
-    max_count = params.get("max_count", MAX_DOWNLOADS_PER_RUN)
+    max_per_inst = params.get("max_per_instrument", MAX_DOWNLOADS_PER_INSTRUMENT)
     to_download, strategy = _select_downloads(
-        missing, session.bbox, max_total=min(max_count, MAX_DOWNLOADS_PER_RUN)
+        missing, session.bbox, max_per_instrument=max_per_inst
     )
     result = await download_data(to_download, on_progress=on_progress)
     session.all_results["download"] = result
     downloaded = result.data.get("downloaded_count", 0)
     failed = result.data.get("failed_count", 0)
-    return result, f"Downloaded {downloaded} products ({strategy} strategy). {failed} failed. {len(missing) - len(to_download)} skipped (over limit)."
+    return result, f"Downloaded {downloaded} products ({strategy} strategy). {failed} failed. {len(missing) - len(to_download)} skipped (over per-instrument limit of {max_per_inst})."
 
 
 async def _tool_slope(session: "AgentSession", params: dict):
@@ -615,18 +661,40 @@ async def _tool_minerals(session: "AgentSession", params: dict):
 
 
 async def _tool_mineral_cnn(session: "AgentSession", params: dict):
-    """Run CNN mineral classification."""
+    """Run CNN mineral classification on TRR3 data."""
     products = getattr(session, "_all_products", [])
     result = await mineral_cnn_classify(products)
     session.all_results["mineral_cnn"] = result
     data = result.data
     classified = data.get("classified_count", 0)
-    ice_detected = data.get("ice_detected", False)
     top_minerals = data.get("top_minerals", [])[:3]
     top_str = ", ".join(f"{m['name']} ({m['total_pixels']} px)" for m in top_minerals)
-    obs = f"CNN classified {classified} observations. Ice detected: {ice_detected}."
+
+    # Build detailed H2O / CO2 observation for Llama reasoning
+    h2o_px = data.get("h2o_total_pixels", 0)
+    co2_px = data.get("co2_total_pixels", 0)
+    h2o_rich_n = data.get("h2o_rich_observations", 0)
+    h2o_obs_n = data.get("h2o_observations", 0)
+    h2o_hotspot = data.get("h2o_hotspot")
+
+    obs = f"CNN classified {classified} observations."
     if top_str:
         obs += f" Top minerals: {top_str}."
+    if h2o_px > 0:
+        obs += (
+            f" SURFACE H2O ICE DETECTED: {h2o_px:,} pixels across {h2o_obs_n} "
+            f"observation(s), {h2o_rich_n} H2O-rich (≥1% of image)."
+        )
+        if h2o_hotspot:
+            obs += (
+                f" H2O hotspot at ({h2o_hotspot['center_lat']:.2f}°N, "
+                f"{h2o_hotspot['center_lon']:.2f}°E), max {h2o_hotspot['max_h2o_percent']:.1f}%."
+            )
+        obs += " This is a strong direct surface ice signal at 95% CNN confidence."
+    elif co2_px > 0:
+        obs += f" CO2 frost detected ({co2_px:,} pixels) but NO H2O ice — seasonal only."
+    else:
+        obs += " No ice phases detected by CNN."
     return result, obs
 
 
@@ -647,6 +715,74 @@ async def _tool_dielectric(session: "AgentSession", params: dict):
             f"Mean er={data.get('mean_epsilon_r', '?'):.2f}, interpretation: {data.get('interpretation', '?')}."
         )
     return result, "No dielectric estimates possible (need both SHARAD reflectors and nearby DTM data)."
+
+
+async def _tool_terrace_dielectric(session: "AgentSession", params: dict):
+    """Estimate εr via terraced crater depth + SHARAD travel time."""
+    sub_result = session.all_results.get("subsurface")
+    products = getattr(session, "_all_products", [])
+    if not session.bbox:
+        return TaskResult(task_type="terrace_dielectric", success=False, summary="No region", data={}), \
+            "Error: No region resolved."
+    result = terrace_dielectric_analysis(sub_result, products, session.bbox)
+    session.all_results["terrace_dielectric"] = result
+    data = result.data
+    count = data.get("estimates_count", 0)
+    if count > 0:
+        return result, (
+            f"Terraced crater εr analysis: {count} estimates. "
+            f"Median εr={data.get('median_epsilon_r', '?')}, "
+            f"interpretation: {data.get('interpretation', '?')}."
+        )
+    return result, f"No reliable terrace εr estimates (need SHARAD subsurface reflectors near terraced crater DTMs)."
+
+
+async def _tool_sharad_physics(session: "AgentSession", params: dict):
+    """Run physics-based SHARAD dielectric inversion."""
+    products = getattr(session, "_all_products", [])
+    if not session.bbox:
+        return TaskResult(task_type="sharad_physics_inversion", success=False, summary="No region", data={}), \
+            "Error: No region resolved."
+    result = sharad_physics_inversion(products, session.bbox)
+    session.all_results["sharad_physics_inversion"] = result
+    data = result.data
+    n_inv = data.get("inversions_completed", 0)
+    if n_inv > 0:
+        return result, (
+            f"Physics-based SHARAD inversion: {n_inv} successful inversions. "
+            f"Best εr={data.get('best_epsilon_r', '?')}, "
+            f"confidence={data.get('reflector_confidence', '?')}. "
+            f"Methodology: depth from DTM geometry, εr computed (never assumed)."
+        )
+    return result, (
+        f"SHARAD physics inversion: {data.get('sharad_products_analyzed', 0)} tracks analyzed, "
+        f"{data.get('dtm_intersections_found', 0)} DTM intersections. "
+        f"No successful inversions. {data.get('physics_note', data.get('reason', ''))}"
+    )
+
+
+async def _tool_crism_spectral(session: "AgentSession", params: dict):
+    """Run CRISM spectral analysis with SAM classification."""
+    products = getattr(session, "_all_products", [])
+    result = crism_spectral_analysis(products)
+    session.all_results["crism_spectral"] = result
+    data = result.data
+    n_obs = data.get("observations_analyzed", 0)
+    if n_obs > 0:
+        water_frac = data.get("water_ice_overall_fraction", 0)
+        bd1500 = data.get("mean_band_params", {}).get("BD1500")
+        obs_text = (
+            f"CRISM spectral analysis: {n_obs} observations classified. "
+            f"Water ice fraction: {water_frac:.1%}. "
+        )
+        if bd1500 is not None:
+            obs_text += f"Mean BD1500 (1.5µm ice absorption): {bd1500:.3f}. "
+        obs_text += "Method: continuum removal → band parameters → SAM vs USGS endmembers."
+        return result, obs_text
+    return result, (
+        f"CRISM spectral analysis: no TRR3 data available for classification. "
+        f"{data.get('physics_note', data.get('reason', ''))}"
+    )
 
 
 async def _tool_recommend(session: "AgentSession", params: dict):
@@ -710,6 +846,118 @@ async def _tool_thermal_inertia(session: "AgentSession", params: dict):
     return result, data.get("ti_explanation", "TI analysis complete")
 
 
+async def _tool_ice_evidence(session: "AgentSession", params: dict):
+    """Evaluate multi-criteria ice probability using SHARAD+CRISM+DTM evidence synthesis."""
+    if not session.bbox:
+        return TaskResult(task_type="ice_evidence", success=False, error="No bbox"), "No region defined"
+
+    try:
+        from analysis.ice_evidence.models import (
+            IceEvidenceRequest, CandidateLocation, RegionSpec,
+            SharadSpec, CrismSpec, DtmSpec, EvidenceParams,
+        )
+        from analysis.ice_evidence.sharad_reflectors import evaluate_reflector_evidence
+        from analysis.ice_evidence.terrain_proxy import evaluate_terrain_evidence
+        from analysis.ice_evidence.crism_proxy import evaluate_crism_evidence
+        from analysis.ice_evidence.hyperbola_fit import auto_detect_apexes, fit_hyperbola
+        from analysis.ice_evidence.fusion import fuse_evidence
+        from analysis.ice_evidence.io import save_evidence_result
+        from analysis.ice_evidence.models import E1Hyperbola, HyperbolaFitRequest
+
+        b = session.bbox
+        candidate = CandidateLocation(
+            lat=b.center_lat, lon=b.center_lon,
+            id=session.region_name or f"cand_{b.center_lat:.1f}_{b.center_lon:.1f}",
+        )
+
+        # Gather SHARAD tracks from previous results
+        products = getattr(session, "_all_products", [])
+        sharad_pids = [p["product_id"] for p in products if p.get("instrument") == "SHARAD_HIGHRES"]
+
+        # E1: Try auto-fit hyperbolas on best tracks
+        e1 = E1Hyperbola(score=0.0, notes="No hyperbola fits attempted")
+        if sharad_pids:
+            best_epsr = None
+            for pid in sharad_pids[:2]:
+                try:
+                    apexes = auto_detect_apexes(pid, n_candidates=2)
+                    for apex in apexes[:1]:
+                        req = HyperbolaFitRequest(
+                            product_id=pid,
+                            apex_trace=apex["trace"],
+                            apex_bin=apex["bin"],
+                        )
+                        fit_result = fit_hyperbola(req)
+                        if fit_result.epsr > 0 and "INSUFFICIENT_POINTS" not in fit_result.flags:
+                            if best_epsr is None or fit_result.quality.snr > (best_epsr.get("snr") or 0):
+                                best_epsr = {
+                                    "epsr": fit_result.epsr,
+                                    "ci": fit_result.epsr_ci95,
+                                    "flags": fit_result.flags,
+                                    "snr": fit_result.quality.snr,
+                                }
+                except Exception as ex:
+                    logger.warning(f"Auto hyperbola fit failed for {pid}: {ex}")
+
+            if best_epsr:
+                epsr = best_epsr["epsr"]
+                ice_lo, ice_hi = 2.7, 3.4
+                if ice_lo <= epsr <= ice_hi:
+                    score = 0.9
+                elif epsr < ice_lo:
+                    score = max(0.0, 0.9 - (ice_lo - epsr) / 2.0)
+                else:
+                    score = max(0.0, 0.9 - (epsr - ice_hi) / 3.0)
+                if "CLUTTER_RISK_HIGH" in best_epsr["flags"]:
+                    score *= 0.5
+                e1 = E1Hyperbola(
+                    score=round(score, 3), epsr=epsr,
+                    ci=best_epsr["ci"], flags=best_epsr["flags"],
+                    notes=f"Auto-fit εr={epsr:.2f}, SNR={best_epsr['snr']:.1f}",
+                )
+
+        # E2: Reflector evidence
+        e2 = evaluate_reflector_evidence(candidate.lat, candidate.lon, sharad_pids[:5] or None)
+
+        # E3: Terrain
+        dtm_pids = [p["product_id"] for p in products if p.get("instrument") == "HIRISE_DTM"]
+        e3 = evaluate_terrain_evidence(candidate.lat, candidate.lon, dtm_pids or None)
+
+        # E4: CRISM
+        crism_pids = [p["product_id"] for p in products if p.get("instrument") == "CRISM"]
+        e4 = evaluate_crism_evidence(candidate.lat, candidate.lon, crism_pids or None)
+
+        # Fuse
+        evidence_result = fuse_evidence(candidate, e1, e2, e3, e4, EvidenceParams())
+        json_path = save_evidence_result(evidence_result)
+
+        session.all_results["ice_evidence"] = TaskResult(
+            task_type="ice_evidence",
+            success=True,
+            data=evidence_result.model_dump(),
+            summary=f"Ice probability={evidence_result.ice_probability:.0%} "
+                    f"(confidence={evidence_result.confidence:.0%})",
+        )
+
+        obs = (
+            f"Ice Evidence Synthesis complete for {candidate.id}. "
+            f"Ice probability: {evidence_result.ice_probability:.0%} "
+            f"(confidence: {evidence_result.confidence:.0%}). "
+            f"E1(hyperbola)={e1.score:.2f}, E2(reflector)={e2.score:.2f}, "
+            f"E3(terrain)={e3.score:.2f}, E4(CRISM)={e4.score:.2f}. "
+        )
+        if evidence_result.consistency.conflicts:
+            obs += f"CONFLICTS: {'; '.join(evidence_result.consistency.conflicts)}. "
+        obs += f"Saved to {json_path}."
+
+        return session.all_results["ice_evidence"], obs
+
+    except Exception as e:
+        logger.exception(f"Ice evidence tool failed: {e}")
+        return TaskResult(task_type="ice_evidence", success=False, error=str(e),
+                          summary=f"Ice evidence failed: {e}"), f"Error: {e}"
+
+
 # Tool registry — maps name → {description, params, executor}
 AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
     "resolve_region": {
@@ -757,6 +1005,11 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
         "params": {},
         "executor": _tool_dielectric,
     },
+    "terrace_dielectric": {
+        "description": "Estimate εr via terraced crater morphology (HiRISE DTM terrace depth + SHARAD two-way travel time). More rigorous than basic dielectric.",
+        "params": {},
+        "executor": _tool_terrace_dielectric,
+    },
     "recommend_site": {
         "description": "Cross-reference all collected data to identify optimal landing/rover site.",
         "params": {},
@@ -771,6 +1024,21 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
         "description": "Analyze TES thermal inertia to assess surface consolidation and ice-cemented regolith.",
         "params": {},
         "executor": _tool_thermal_inertia,
+    },
+    "evaluate_ice_evidence": {
+        "description": "Multi-criteria ice probability synthesis: combines SHARAD hyperbola εr, subsurface reflectors, terrain proxy, and CRISM ice/hydration into unified ice probability score with explainability.",
+        "params": {},
+        "executor": _tool_ice_evidence,
+    },
+    "run_sharad_inversion": {
+        "description": "Run physics-based SHARAD dielectric inversion. Uses DTM depth constraints (never assumes εr=3.15). Includes clutter filtering and hyperbola validation.",
+        "params": {},
+        "executor": _tool_sharad_physics,
+    },
+    "run_crism_spectral": {
+        "description": "Run CRISM spectral analysis: continuum removal, band parameters (BD1500/BD1900/BD2100/BD2200), and SAM mineral classification against USGS endmembers.",
+        "params": {},
+        "executor": _tool_crism_spectral,
     },
     "finish": {
         "description": "Call when analysis is complete. Provide summary and recommendation.",
@@ -980,6 +1248,10 @@ def _infer_tool_from_text(text: str, session: "AgentSession") -> dict:
         return {"tool": "classify_minerals_cnn", "params": {}}
     if any(kw in t for kw in ["dielectric", "permittivity", "ice vs rock"]):
         return {"tool": "estimate_dielectric", "params": {}}
+    if any(kw in t for kw in ["physics inversion", "sharad inversion", "dielectric inversion", "compute epsilon"]):
+        return {"tool": "run_sharad_inversion", "params": {}}
+    if any(kw in t for kw in ["spectral analysis", "sam classification", "band parameter", "continuum removal"]):
+        return {"tool": "run_crism_spectral", "params": {}}
     if any(kw in t for kw in ["climate", "temperature", "dust", "wind", "frost"]):
         return {"tool": "analyze_climate", "params": {}}
     if any(kw in t for kw in ["thermal inertia", "surface consolidation", "tes"]):
@@ -1116,12 +1388,12 @@ def _generate_plan_rules(objective: str) -> Dict[str, Any]:
     general_keywords = ["ice", "rover", "traverse", "landing", "feasibility", "shallow ice",
                         "engineering", "mission", "explore", "survey"]
     if any(kw in obj_lower for kw in general_keywords) and len(instruments) < 3:
-        for default in ["CRISM", "SHARAD", "SHARAD_HIGHRES", "CTX", "HIRISE_DTM"]:
+        for default in ["CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES", "CTX", "HIRISE_DTM"]:
             if default not in instruments:
                 instruments.append(default)
 
     if not instruments:
-        instruments = ["CRISM", "SHARAD", "SHARAD_HIGHRES", "CTX", "HIRISE_DTM"]
+        instruments = ["CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES", "CTX", "HIRISE_DTM"]
 
     # Build steps
     steps = []
@@ -1164,6 +1436,11 @@ def _generate_plan_rules(objective: str) -> Dict[str, Any]:
                 "type": "dielectric",
                 "description": "Estimate dielectric constant using SHARAD radar + HiRISE DTM elevation",
             })
+            # Physics-based inversion after basic dielectric
+            steps.append({
+                "type": "sharad_physics_inversion",
+                "description": "Run physics-based SHARAD dielectric inversion with DTM depth constraints",
+            })
 
     if "CRISM" in instruments or any(kw in obj_lower for kw in ["mineral", "ice", "hydration", "composition"]):
         steps.append({
@@ -1174,6 +1451,11 @@ def _generate_plan_rules(objective: str) -> Dict[str, Any]:
         steps.append({
             "type": "mineral_cnn",
             "description": "Run 1D CNN-Attention mineral classification on CRISM TRR3 data",
+        })
+        # CRISM spectral analysis
+        steps.append({
+            "type": "crism_spectral",
+            "description": "Run CRISM spectral analysis: continuum removal + SAM classification",
         })
 
     # 5. Climate + Thermal Inertia (always run for comprehensive assessment)
@@ -1210,27 +1492,21 @@ def _generate_plan_rules(objective: str) -> Dict[str, Any]:
 # Download Strategy
 # =============================================================================
 
-MAX_DOWNLOADS_PER_RUN = 30
+MAX_DOWNLOADS_PER_INSTRUMENT = 30
 
 
 def _select_downloads(
     missing: List[Dict[str, Any]],
     bbox: Optional["RegionBBox"],
-    max_total: int = MAX_DOWNLOADS_PER_RUN,
+    max_per_instrument: int = MAX_DOWNLOADS_PER_INSTRUMENT,
 ) -> Tuple[List[Dict[str, Any]], str]:
     """
-    Select up to *max_total* products to download using sparse or dense strategy.
+    Select up to *max_per_instrument* products per instrument to download.
 
     Strategy:
     - **dense** (region area ≤ 10 deg²): prioritize products closest to center
     - **sparse** (region area > 10 deg²): prioritize spatial spread for broad coverage
-
-    Priority tiers (science-critical first):
-      SHARAD_HIGHRES > CRISM > SHARAD > HIRISE > CTX/HIRISE_DTM
     """
-    if len(missing) <= max_total:
-        return missing, "all"
-
     # Determine strategy from region size
     if bbox:
         lat_span = bbox.max_lat - bbox.min_lat
@@ -1243,76 +1519,78 @@ def _select_downloads(
 
     strategy = "sparse" if area > 10 else "dense"
 
-    PRIORITY = {
-        "SHARAD_HIGHRES": 0, "CRISM": 1, "SHARAD": 2,
-        "HIRISE": 3, "CTX": 4, "HIRISE_DTM": 4,
-    }
-
     def _dist(p: Dict) -> float:
         lat = p.get("lat") or center_lat
         lon = p.get("lon") or center_lon
         return ((lat - center_lat) ** 2 + (lon - center_lon) ** 2) ** 0.5
 
-    # Group by priority tier
-    by_tier: Dict[int, List[Dict]] = {}
+    # Group by instrument
+    by_instrument: Dict[str, List[Dict]] = {}
     for p in missing:
-        tier = PRIORITY.get(p.get("instrument", "").upper(), 5)
-        by_tier.setdefault(tier, []).append(p)
+        inst = p.get("instrument", "UNKNOWN").upper()
+        by_instrument.setdefault(inst, []).append(p)
 
-    # Sort within each tier by distance (ascending for dense, descending for sparse)
-    for tier_key in by_tier:
-        by_tier[tier_key].sort(key=_dist, reverse=(strategy == "sparse"))
+    # Sort within each instrument by distance (ascending for dense, descending for sparse)
+    for inst in by_instrument:
+        by_instrument[inst].sort(key=_dist, reverse=(strategy == "sparse"))
 
-    # Allocate budget across tiers proportionally, minimum 1 per tier
+    # Select up to max_per_instrument from each instrument
     selected: List[Dict] = []
-    remaining = max_total
-    total_missing = len(missing)
 
-    for tier_key in sorted(by_tier.keys()):
-        if remaining <= 0:
-            break
-        tier_products = by_tier[tier_key]
-        # Proportional allocation
-        alloc = max(1, round(remaining * len(tier_products) / max(1, total_missing)))
-        alloc = min(alloc, len(tier_products), remaining)
+    for inst in sorted(by_instrument.keys()):
+        inst_products = by_instrument[inst]
+        cap = min(max_per_instrument, len(inst_products))
 
-        if strategy == "sparse" and alloc < len(tier_products):
+        if strategy == "sparse" and cap < len(inst_products):
             # Evenly sample across the spatial spread
-            step = len(tier_products) / alloc
-            tier_selected = [tier_products[int(i * step)] for i in range(alloc)]
+            step = len(inst_products) / cap
+            inst_selected = [inst_products[int(i * step)] for i in range(cap)]
         else:
-            tier_selected = tier_products[:alloc]
+            inst_selected = inst_products[:cap]
 
-        selected.extend(tier_selected)
-        remaining -= len(tier_selected)
-        total_missing -= len(tier_products)
+        selected.extend(inst_selected)
 
-    return selected[:max_total], strategy
+    return selected, strategy
 
 
 # =============================================================================
 # Narrative Generation
 # =============================================================================
 
-NARRATIVE_SYSTEM_PROMPT = """You are a Mars mission assessment analyst producing a decision-oriented report.
-Write like a mission assessment document, not a summary or blog post.
+NARRATIVE_SYSTEM_PROMPT = """You are a Mars mission geophysical analyst producing a scientific assessment report.
+Write like a geophysical journal paper, not a dashboard summary or blog post.
 
 STRUCTURE (follow this order strictly):
 1. **Objective** — Paraphrase the user's request in scientific language. Do NOT copy verbatim.
-2. **Subsurface Potential** — SHARAD analysis first. Cite εr, depth in meters, detection confidence.
-3. **Surface Composition** — CRISM ice/hydration. Spatial distribution, ranked candidates.
-4. **Cross-Instrument Consistency** — Where SHARAD + CRISM agree or disagree spatially.
-   State distances, whether evidence is direct (SHARAD) or indirect (CRISM proxy).
-5. **Engineering Feasibility** — Slope/terrain as a FINAL FILTER, not an initial driver.
-6. **Landing Site Decision** — State a single Primary Landing Site coordinate.
-   Optionally a Secondary/Backup site. For each: location, why chosen, what was sacrificed.
+2. **Methodology** — For EACH analysis performed, state:
+   - The physical equation used (e.g., εr = (c·Δt / 2d)²)
+   - Input data sources and their uncertainties
+   - Any assumptions made and whether they were MEASURED or ASSUMED
+3. **Subsurface Characterization** — SHARAD analysis first. If physics inversion was performed,
+   cite the measured εr with confidence interval. If εr was assumed, explicitly state "εr ASSUMED = 3.15".
+   Include derivation steps showing how depth was computed.
+4. **Surface Composition** — CRISM spectral analysis. Report SAM classification results,
+   band parameter values (BD1500, BD1900), and mineral class fractions.
+5. **Cross-Instrument Consistency** — Stratigraphic interpretation:
+   - Does SHARAD deep reservoir agree with CRISM shallow exposure?
+   - Consider obliquity-driven ice stability, lateral heterogeneity, dune cover
+6. **Uncertainty Propagation** — Quantify how input uncertainties affect final scores.
+   List assumptions that were measured vs assumed. Flag any results that depend on assumed parameters.
+7. **Engineering Feasibility** — Slope/terrain as a FINAL FILTER, not an initial driver.
+8. **Alternative Hypotheses** — For each positive ice detection, state at least one
+   alternative explanation (clutter, atmospheric artifact, seasonal frost).
+9. **Landing Site Decision** — State a single Primary Landing Site coordinate.
+   For each: location, why chosen, what was sacrificed.
+10. **Engineering Implications** — What the results mean for mission planning:
+    drilling depth, ISRU feasibility, EDL constraints.
 
 RULES:
-- Be explicit about uncertainty. Use trade-off language ("we prioritize X over Y").
-- Do NOT emphasize coverage counts (product numbers) as primary results.
-- Do NOT default to maximum optimism. Acknowledge gaps and limitations.
-- Include specific numbers: coordinates, slope degrees, depth meters, ice percentages.
-- End with a clear, concrete recommendation tied to a single coordinate."""
+- Include explicit equations for any derived quantity.
+- State whether εr was MEASURED (physics inversion) or ASSUMED.
+- Do NOT emphasize coverage counts as primary results.
+- Include specific numbers: coordinates, slope degrees, depth meters, εr values with CI.
+- For every physical assumption, cite source: "measured", "DTM_inversion", "curvature_fit", or "assumed".
+- End with concrete recommendation tied to coordinates and numerical evidence."""
 
 
 async def _generate_narrative(
@@ -1353,6 +1631,18 @@ Objective to paraphrase (DO NOT copy verbatim): {session.objective}
 
 --- Cross-Instrument Consistency ---
 {json.dumps(cross, indent=2)}
+
+--- SHARAD Physics Inversion ---
+{json.dumps(synthesis.get("sharad_physics_inversion", {"status": "not_performed"}), indent=2)}
+
+--- CRISM Spectral Analysis ---
+{json.dumps(synthesis.get("crism_spectral_analysis", {"status": "not_performed"}), indent=2)}
+
+--- Stratigraphic Interpretation ---
+{json.dumps(synthesis.get("cross_instrument", {}).get("stratigraphic_interpretation", {"status": "not_computed"}), indent=2)}
+
+--- Physics Pipeline Warnings ---
+{json.dumps(synthesis.get("physics_pipeline_warnings", []), indent=2)}
 
 --- Engineering / Slope (final filter) ---
 {json.dumps(eng, indent=2)}
@@ -1397,6 +1687,59 @@ def _generate_narrative_fallback(session: AgentSession) -> str:
         f"prioritizing subsurface ice potential and surface composition evidence before "
         f"applying engineering terrain constraints as a final filter.\n"
     )
+
+    # ── 0. Methodology ──
+    inv_data = synthesis.get("sharad_physics_inversion", {})
+    spec_data = synthesis.get("crism_spectral_analysis", {})
+    physics_warnings = synthesis.get("physics_pipeline_warnings", [])
+
+    parts.append("### Methodology\n")
+    if inv_data.get("inversions_completed", 0) > 0:
+        parts.append(
+            "**SHARAD Dielectric Inversion**: "
+            "\u03b5r = (c \u00b7 \u0394t / (2 \u00b7 d))\u00b2, "
+            "where depth d is measured independently from HiRISE DTM terrace "
+            "geometry. Two-way travel time \u0394t measured from SHARAD radargram "
+            "subsurface picks. Clutter filtered via cluttergram comparison. "
+            "Cross-validated with hyperbola curvature fitting "
+            "t(x) = \u221a(t\u2080\u00b2 + (2x/v)\u00b2)."
+        )
+        for assumption in inv_data.get("assumptions", [])[:5]:
+            source = assumption.get("source", "unknown")
+            parts.append(
+                f"  - **{assumption.get('param', '?')}** = "
+                f"{assumption.get('value', '?')} (source: {source})"
+            )
+    else:
+        parts.append(
+            "**SHARAD Subsurface**: Depth estimated assuming "
+            "\u03b5r = 3.15 (pure water ice). "
+            "\u26a0 This is an ASSUMED value, not independently measured."
+        )
+
+    if spec_data.get("observations_analyzed", 0) > 0:
+        parts.append(
+            "\n**CRISM Spectral Analysis**: Continuum removal "
+            "(convex hull upper envelope) \u2192 diagnostic band parameter "
+            "extraction (BD1500: 1.5\u00b5m H\u2082O ice, BD1900: "
+            "1.9\u00b5m H\u2082O/OH, BD2100: 2.1\u00b5m shifted water, "
+            "BD2200: 2.2\u00b5m Al-OH) \u2192 Spectral Angle Mapper (SAM) "
+            "classification against synthetic USGS endmember library "
+            "(water ice, gypsum, polyhydrated sulfate, basalt)."
+        )
+    else:
+        parts.append(
+            "\n**CRISM Ice Detection**: Threshold-based ice scoring "
+            "(\u22655% pixels above 0.3 index). "
+            "Physics-based spectral analysis was not performed."
+        )
+
+    if physics_warnings:
+        parts.append("\n**\u26a0 Physics Pipeline Warnings:**")
+        for w in physics_warnings:
+            parts.append(f"  - {w}")
+
+    parts.append("")
 
     # ── 1. Subsurface Potential (SHARAD) ──
     sub = synthesis.get("subsurface_coverage", {})
@@ -1509,6 +1852,15 @@ def _generate_narrative_fallback(session: AgentSession) -> str:
             )
         parts.append("")
 
+    # ── Stratigraphic Interpretation ──
+    strat = cross.get("stratigraphic_interpretation", {})
+    if strat and strat.get("interpretation") != "insufficient_data":
+        parts.append("### Stratigraphic Interpretation")
+        interp = strat.get("interpretation", "")
+        for note in strat.get("notes", []):
+            parts.append(note)
+        parts.append("")
+
     # ── 4. Engineering Feasibility (slope — final filter) ──
     eng = synthesis.get("engineering_feasibility", {})
     if eng:
@@ -1595,6 +1947,109 @@ def _generate_narrative_fallback(session: AgentSession) -> str:
                 parts.append(f"  - {t}")
         parts.append("")
 
+    # ── Alternative Hypotheses ──
+    parts.append("### Alternative Hypotheses")
+    sub_detect = synthesis.get("subsurface_coverage", {}).get(
+        "subsurface_detections", 0
+    )
+    if sub_detect > 0:
+        parts.append(
+            "**SHARAD reflectors**: Could represent "
+            "(a) ice-regolith interface (primary hypothesis), "
+            "(b) off-nadir surface clutter (mitigated by coherence filtering "
+            "and cluttergram comparison), "
+            "or (c) lithologic boundary (basalt flow contact). "
+            "Dielectric constant constraints help discriminate: "
+            "\u03b5r < 4 favors ice, \u03b5r > 5 favors rock."
+        )
+    ice_count = synthesis.get("mineral_signatures", {}).get(
+        "high_ice_count", 0
+    )
+    if ice_count > 0:
+        parts.append(
+            "**CRISM ice signatures**: Could represent "
+            "(a) surface/near-surface water ice (primary), "
+            "(b) atmospheric CO\u2082 ice contamination (mitigated by checking "
+            "mean/max ratio uniformity), "
+            "or (c) hydrated minerals mimicking ice absorptions at 1.5\u00b5m."
+        )
+    if sub_detect == 0 and ice_count == 0:
+        parts.append(
+            "No significant ice detections from either instrument. "
+            "Absence of evidence does not preclude subsurface ice below "
+            "SHARAD resolution (~15m) "
+            "or surface ice obscured by dust mantling."
+        )
+    parts.append("")
+
+    # ── Engineering Implications ──
+    parts.append("### Engineering Implications")
+    depth_summary = synthesis.get("subsurface_coverage", {}).get(
+        "depth_summary", {}
+    )
+    median_depth = depth_summary.get("median_depth_m") if depth_summary else None
+    inv_completed = synthesis.get("sharad_physics_inversion", {}).get(
+        "inversions_completed", 0
+    )
+
+    if median_depth is not None:
+        try:
+            md = float(median_depth)
+        except (TypeError, ValueError):
+            md = None
+        if md is not None:
+            if md <= 5:
+                parts.append(
+                    f"Estimated ice depth ~{md:.0f}m: accessible via "
+                    "trenching or shallow excavation."
+                )
+            elif md <= 20:
+                parts.append(
+                    f"Estimated ice depth ~{md:.0f}m: requires mechanical "
+                    "drilling capability."
+                )
+            elif md <= 50:
+                parts.append(
+                    f"Estimated ice depth ~{md:.0f}m: significant drilling "
+                    "infrastructure needed."
+                )
+            else:
+                parts.append(
+                    f"Estimated ice depth ~{md:.0f}m: impractical for "
+                    "near-term ISRU missions."
+                )
+
+    safety = synthesis.get("engineering_feasibility", {}).get(
+        "safety", "UNKNOWN"
+    )
+    if safety == "FAVORABLE":
+        parts.append(
+            "Terrain is favorable for EDL \u2014 "
+            "standard landing ellipse achievable."
+        )
+    elif safety == "MARGINAL":
+        parts.append(
+            "Terrain is marginal \u2014 precision landing or "
+            "hazard avoidance may be required."
+        )
+    elif safety == "UNFAVORABLE":
+        parts.append(
+            "Terrain is unfavorable \u2014 significant EDL risk. "
+            "Consider alternative landing zones."
+        )
+
+    if inv_completed > 0:
+        eps = synthesis.get("sharad_physics_inversion", {}).get(
+            "best_epsilon_r"
+        )
+        if eps is not None:
+            parts.append(
+                f"Physics-based \u03b5r={eps:.2f}: mission design can use "
+                "this measured value for ISRU volume estimates instead of "
+                "the commonly assumed \u03b5r=3.15."
+            )
+    parts.append("")
+
     # ── Score + strengths/uncertainties ──
     score_range = synthesis.get("score_range", {})
     strengths = synthesis.get("strengths", [])
@@ -1615,6 +2070,66 @@ def _generate_narrative_fallback(session: AgentSession) -> str:
             parts.append(f"  - {u}")
 
     return "\n".join(parts)
+
+
+# =============================================================================
+# Physics Pipeline Verification
+# =============================================================================
+
+def _verify_physics_pipeline(session: "AgentSession") -> List[str]:
+    """Verify that mandatory physics pipeline steps were executed.
+
+    Returns a list of warning strings for any missing steps.
+    The report MUST include these warnings if any physics steps were skipped.
+    """
+    warnings = []
+
+    # Check SHARAD physics inversion
+    inv = session.all_results.get("sharad_physics_inversion")
+    if not inv:
+        warnings.append(
+            "SHARAD physics-based dielectric inversion was NOT performed. "
+            "εr values are based on assumed dielectric constants, not measured."
+        )
+    elif not inv.success:
+        warnings.append(
+            f"SHARAD physics inversion failed: {inv.error}. "
+            "Subsurface characterization relies on heuristic methods only."
+        )
+    elif inv.data.get("inversions_completed", 0) == 0:
+        reason = inv.data.get("reason", inv.data.get("physics_note", "unknown"))
+        warnings.append(
+            f"SHARAD physics inversion found no valid inversions: {reason}. "
+            "No independent εr measurement available."
+        )
+
+    # Check CRISM spectral analysis
+    spec = session.all_results.get("crism_spectral")
+    if not spec:
+        warnings.append(
+            "CRISM spectral analysis (SAM + band parameters) was NOT performed. "
+            "Mineral classification relies on threshold-based scoring only."
+        )
+    elif not spec.success:
+        warnings.append(
+            f"CRISM spectral analysis failed: {spec.error}. "
+            "Ice/mineral identification uses heuristic scoring."
+        )
+    elif spec.data.get("observations_analyzed", 0) == 0:
+        reason = spec.data.get("reason", spec.data.get("physics_note", "unknown"))
+        warnings.append(
+            f"CRISM spectral analysis classified no observations: {reason}."
+        )
+
+    # Check DTM availability
+    dtm_products = [p for p in getattr(session, "_all_products", []) if p.get("instrument") == "HIRISE_DTM"]
+    if not dtm_products:
+        warnings.append(
+            "No HiRISE DTM products found. Terraced crater depth constraints unavailable. "
+            "Dielectric inversion cannot be performed without independent depth measurements."
+        )
+
+    return warnings
 
 
 # =============================================================================
@@ -1711,10 +2226,7 @@ async def run_agent(
                 await reasoning_queue.put(None)  # sentinel
 
             think_task = asyncio.create_task(_do_think())
-            while True:
-                item = await reasoning_queue.get()
-                if item is None:
-                    break
+            async for item in _drain_queue_with_heartbeat(reasoning_queue):
                 yield item
             await think_task
 
@@ -1847,6 +2359,8 @@ async def run_agent(
                 )
                 session.steps.append(step)
 
+            except asyncio.CancelledError:
+                raise  # propagate to outer handler
             except Exception as e:
                 observation = f"Error executing {tool_name}: {e}"
                 logger.error(f"Tool {tool_name} failed: {e}")
@@ -1951,6 +2465,11 @@ async def run_agent(
             session.synthesis = synth_result.data
             session.all_results["synthesize"] = synth_result
 
+        # Physics pipeline verification
+        physics_warnings = _verify_physics_pipeline(session)
+        if physics_warnings:
+            session.synthesis["physics_pipeline_warnings"] = physics_warnings
+
         # ── Generate evidence figures ──
         try:
             from .agentic_router import generate_evidence_figures
@@ -1974,10 +2493,7 @@ async def run_agent(
             await reasoning_queue.put(None)  # sentinel
 
         narr_task = asyncio.create_task(_do_narrative())
-        while True:
-            item = await reasoning_queue.get()
-            if item is None:
-                break
+        async for item in _drain_queue_with_heartbeat(reasoning_queue):
             yield item
         await narr_task
 
@@ -1987,6 +2503,14 @@ async def run_agent(
         # ── Done ──
         session.status = "done"
         yield {"event": "done", "data": session.to_dict()}
+
+    except asyncio.CancelledError:
+        session.status = "error"
+        session.error = "Cancelled by user"
+        logger.info(f"Agent session {session_id} cancelled by user")
+        yield {"event": "error", "data": {
+            "error": "Agent stopped by user", "session_id": session_id,
+        }}
 
     except Exception as e:
         session.status = "error"
@@ -2065,10 +2589,7 @@ async def _run_agent_rules(
 
             plan_task = asyncio.create_task(_do_plan())
             # Drain reasoning chunks while plan generation runs
-            while True:
-                item = await reasoning_queue.get()
-                if item is None:
-                    break
+            async for item in _drain_queue_with_heartbeat(reasoning_queue):
                 yield item
             await plan_task  # ensure completion
 
@@ -2154,6 +2675,17 @@ async def _run_agent_rules(
                         plan_steps.insert(i + 1, {
                             "type": "dielectric",
                             "description": "Estimate dielectric constant using SHARAD radar + HiRISE DTM elevation",
+                        })
+                        break
+        # Add terrace-based dielectric after standard dielectric if SHARAD_HIGHRES present
+        planned_types = {s.get("type") for s in plan_steps}
+        if "dielectric" in planned_types and "terrace_dielectric" not in planned_types:
+            if "SHARAD_HIGHRES" in instruments_upper and "HIRISE_DTM" in instruments_upper:
+                for i, s in enumerate(plan_steps):
+                    if s.get("type") == "dielectric":
+                        plan_steps.insert(i + 1, {
+                            "type": "terrace_dielectric",
+                            "description": "Estimate εr via terraced crater depth + SHARAD travel time",
                         })
                         break
 
@@ -2280,6 +2812,27 @@ async def _run_agent_rules(
                     step.result = result
                     session.all_results["dielectric"] = result
 
+                elif step.type == "terrace_dielectric":
+                    sub_result = session.all_results.get("subsurface")
+                    result = terrace_dielectric_analysis(sub_result, all_products, session.bbox)
+                    step.result = result
+                    session.all_results["terrace_dielectric"] = result
+
+                elif step.type == "sharad_physics_inversion":
+                    result = sharad_physics_inversion(
+                        all_products,
+                        session.bbox,
+                    )
+                    step.result = result
+                    session.all_results["sharad_physics_inversion"] = result
+
+                elif step.type == "crism_spectral":
+                    result = crism_spectral_analysis(
+                        all_products,
+                    )
+                    step.result = result
+                    session.all_results["crism_spectral"] = result
+
                 elif step.type == "recommend":
                     result = recommend_site(session.all_results)
                     step.result = result
@@ -2323,7 +2876,12 @@ async def _run_agent_rules(
                 logger.error(f"Step {step.type} failed: {e}")
                 yield {"event": "step_failed", "data": step.to_dict()}
 
-        # ── Phase 2.5: Generate evidence figures ──────────
+        # ── Phase 2.5: Physics pipeline verification ──────────
+        physics_warnings = _verify_physics_pipeline(session)
+        if physics_warnings and hasattr(session, "synthesis") and session.synthesis:
+            session.synthesis["physics_pipeline_warnings"] = physics_warnings
+
+        # ── Phase 2.6: Generate evidence figures ──────────
         try:
             from .agentic_router import generate_evidence_figures
             figures_data = generate_evidence_figures(session)
@@ -2344,10 +2902,7 @@ async def _run_agent_rules(
                 await reasoning_queue.put(None)  # sentinel
 
             narr_task = asyncio.create_task(_do_narrative())
-            while True:
-                item = await reasoning_queue.get()
-                if item is None:
-                    break
+            async for item in _drain_queue_with_heartbeat(reasoning_queue):
                 yield item
             await narr_task
 

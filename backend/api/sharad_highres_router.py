@@ -27,6 +27,7 @@ import numpy as np
 from PIL import Image
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import Response, JSONResponse
+from cachetools import LRUCache
 
 router = APIRouter(prefix="/api/sharad_highres", tags=["SHARAD High-Res"])
 
@@ -48,8 +49,10 @@ LON_OFFSET = 5637            # SUB_SC_EAST_LONGITUDE, float64
 LAT_OFFSET = 5645            # SUB_SC_PLANETOCENTRIC_LATITUDE, float64
 ALT_OFFSET = 5629            # SPACECRAFT_ALTITUDE, float64
 
-# SHARAD timing: 1/20 MHz sample interval → 0.0375 µs per range bin
-SHARAD_SAMPLE_INTERVAL_US = 1.0 / 20.0 * 0.75  # ~0.0375 µs
+# SHARAD timing: ADC samples at 26.67 MHz (80/3 MHz) via bandpass undersampling.
+# Sample interval = 1 / 26.67e6 = 3/80 µs = 0.0375 µs two-way travel time per range bin.
+# Ref: Seu et al. 2007; PDS SHARAD Radargram V1.0.
+SHARAD_SAMPLE_INTERVAL_US = 3.0 / 80.0  # 0.0375 µs (= 1/26.67 MHz)
 SPEED_OF_LIGHT = 299792458.0  # m/s
 
 
@@ -156,26 +159,31 @@ def _parse_and_cache(cache: dict):
     if not os.path.exists(dat_path):
         raise FileNotFoundError(f"SHARAD RDR .dat not found: {dat_path}")
 
-    # Allocate arrays
-    power = np.empty((total_rows, N_RANGE_BINS), dtype=np.float32)
-    lats = np.empty(total_rows, dtype=np.float64)
-    lons = np.empty(total_rows, dtype=np.float64)
-    alts = np.empty(total_rows, dtype=np.float64)
+    # Vectorized parsing: read entire file as raw bytes, then extract fields
+    raw = np.fromfile(dat_path, dtype=np.uint8)
+    actual_rows = len(raw) // ROW_BYTES
+    if actual_rows < total_rows:
+        total_rows = actual_rows
+    raw = raw[:total_rows * ROW_BYTES].reshape(total_rows, ROW_BYTES)
 
-    with open(dat_path, "rb") as f:
-        for i in range(total_rows):
-            row = f.read(ROW_BYTES)
-            if len(row) < ROW_BYTES:
-                power[i:] = 0
-                break
+    # Extract real/imag echo columns via view (zero-copy slice)
+    real = np.ndarray((total_rows, N_RANGE_BINS), dtype="<f4",
+                      buffer=raw, offset=0,
+                      strides=(ROW_BYTES, 4))
+    # offset within each row for real part
+    real = np.frombuffer(raw[:, ECHO_REAL_OFFSET:ECHO_REAL_OFFSET + ECHO_BYTES].tobytes(),
+                         dtype="<f4").reshape(total_rows, N_RANGE_BINS)
+    imag = np.frombuffer(raw[:, ECHO_IMAG_OFFSET:ECHO_IMAG_OFFSET + ECHO_BYTES].tobytes(),
+                         dtype="<f4").reshape(total_rows, N_RANGE_BINS)
+    power = (real ** 2 + imag ** 2).astype(np.float32)
 
-            real = np.frombuffer(row, dtype="<f4", offset=ECHO_REAL_OFFSET, count=N_RANGE_BINS)
-            imag = np.frombuffer(row, dtype="<f4", offset=ECHO_IMAG_OFFSET, count=N_RANGE_BINS)
-            power[i] = real ** 2 + imag ** 2
-
-            lons[i] = struct.unpack_from("<d", row, LON_OFFSET)[0]
-            lats[i] = struct.unpack_from("<d", row, LAT_OFFSET)[0]
-            alts[i] = struct.unpack_from("<d", row, ALT_OFFSET)[0]
+    # Extract geometry columns
+    lons = np.frombuffer(raw[:, LON_OFFSET:LON_OFFSET + 8].tobytes(),
+                         dtype="<f8").copy()
+    lats = np.frombuffer(raw[:, LAT_OFFSET:LAT_OFFSET + 8].tobytes(),
+                         dtype="<f8").copy()
+    alts = np.frombuffer(raw[:, ALT_OFFSET:ALT_OFFSET + 8].tobytes(),
+                         dtype="<f8").copy()
 
     np.save(power_path, power)
     np.savez_compressed(geom_path, lat=lats, lon=lons, alt=alts)
@@ -203,6 +211,28 @@ def _get_geometry(product_id: str) -> tuple[dict, int]:
 def _lon_to_180(lon: np.ndarray) -> np.ndarray:
     """Convert 0..360 East-positive longitude to -180..180."""
     return np.where(lon > 180, lon - 360, lon)
+
+
+# Mars IAU 2000 ellipsoid radii (meters)
+_MARS_A = 3396190.0   # equatorial radius
+_MARS_B = 3376200.0   # polar radius
+_MARS_AB2 = (_MARS_A / _MARS_B) ** 2   # ≈ 1.01184
+
+
+def _centric_to_graphic(lat_centric: np.ndarray) -> np.ndarray:
+    """Convert planetocentric latitude (from SHARAD RDR) to planetographic
+    (geodetic) latitude expected by Cesium's oblate Mars ellipsoid.
+
+    tan(lat_graphic) = (a/b)^2 * tan(lat_centric)
+    """
+    rad = np.radians(lat_centric)
+    return np.degrees(np.arctan(_MARS_AB2 * np.tan(rad)))
+
+
+def _centric_to_graphic_scalar(lat_centric: float) -> float:
+    """Scalar version for single latitude values."""
+    rad = math.radians(lat_centric)
+    return math.degrees(math.atan(_MARS_AB2 * math.tan(rad)))
 
 
 # ── Surface picking ───────────────────────────────────
@@ -278,33 +308,426 @@ def _pick_surface(
     return surface
 
 
+# ── Global percentile cache (for consistent tile brightness) ──
+_percentile_cache: dict[str, tuple[float, float]] = {}
+
+
+def _get_global_percentiles(
+    product_id: str,
+    use_log: bool = True,
+    amplitude: bool = False,
+    pmin: float = 1.0,
+    pmax: float = 99.0,
+) -> tuple[float, float]:
+    """Compute and cache (vmin, vmax) from the full power array.
+
+    These percentiles are used for tile rendering so that all tiles
+    have identical contrast regardless of their local data range.
+    """
+    key = f"{product_id.upper()}_{use_log}_{amplitude}_{pmin}_{pmax}"
+    if key in _percentile_cache:
+        return _percentile_cache[key]
+
+    power, _ = _get_power(product_id)
+    # Subsample for speed: take every 10th trace (still representative)
+    step = max(1, power.shape[0] // 10000)
+    p = np.array(power[::step], dtype=np.float32)
+
+    if amplitude:
+        np.maximum(p, 0, out=p)
+        np.sqrt(p, out=p)
+    if use_log:
+        p = np.log10(np.maximum(p, 1e-12))
+
+    vmin = float(np.percentile(p, pmin))
+    vmax = float(np.percentile(p, pmax))
+    if vmax <= vmin:
+        vmax = vmin + 1
+
+    _percentile_cache[key] = (vmin, vmax)
+    return (vmin, vmax)
+
+
 # ── Radargram rendering ───────────────────────────────
+_png_cache: LRUCache = LRUCache(maxsize=20)  # key -> PNG bytes (bounded LRU)
+
+
 def _render_radargram_png(
     power: np.ndarray,
     downsample: int = 1,
     use_log: bool = True,
     pmin: float = 1.0,
     pmax: float = 99.0,
+    amplitude: bool = False,
+    per_trace: bool = False,
+    cache_key: str = "",
+    global_vmin: float | None = None,
+    global_vmax: float | None = None,
 ) -> bytes:
-    """Render the radargram as a grayscale PNG."""
+    """Render the radargram as a grayscale PNG (cached by params).
+
+    amplitude: if True, use sqrt(power) instead of raw power.
+    per_trace: if True, normalize each trace independently (like PDS browse images).
+    global_vmin/global_vmax: if provided, use these for normalization instead of
+      computing percentiles from the tile data (for consistent tile brightness).
+    """
+    if cache_key and cache_key in _png_cache:
+        return _png_cache[cache_key]
+
     if downsample > 1:
         n = power.shape[0] // downsample * downsample
         p = power[:n].reshape(-1, downsample, power.shape[1]).mean(axis=1)
     else:
-        p = power.copy() if not np.isfortran(power) else np.ascontiguousarray(power)
+        p = np.array(power, dtype=np.float32)
+
+    if amplitude:
+        np.maximum(p, 0, out=p)
+        np.sqrt(p, out=p)
 
     if use_log:
         p = np.log10(np.maximum(p, 1e-12))
 
-    vmin = np.percentile(p, pmin)
-    vmax = np.percentile(p, pmax)
-    if vmax <= vmin:
-        vmax = vmin + 1
+    if per_trace:
+        # Per-trace normalization (vectorized) — matches PDS browse image style
+        vmins = np.percentile(p, pmin, axis=1, keepdims=True)
+        vmaxs = np.percentile(p, pmax, axis=1, keepdims=True)
+        vmaxs = np.where(vmaxs <= vmins, vmins + 1, vmaxs)
+        img = ((p - vmins) / (vmaxs - vmins) * 255).clip(0, 255).astype(np.uint8)
+    else:
+        if global_vmin is not None and global_vmax is not None:
+            vmin, vmax = global_vmin, global_vmax
+        else:
+            vmin = np.percentile(p, pmin)
+            vmax = np.percentile(p, pmax)
+        if vmax <= vmin:
+            vmax = vmin + 1
+        img = ((p - vmin) / (vmax - vmin) * 255).clip(0, 255).astype(np.uint8)
 
-    img = ((p - vmin) / (vmax - vmin) * 255).clip(0, 255).astype(np.uint8)
     img = img.T
 
     pil_img = Image.fromarray(img, mode="L")
+    buf = io.BytesIO()
+    pil_img.save(buf, format="PNG", optimize=False)
+    png_bytes = buf.getvalue()
+
+    if cache_key:
+        _png_cache[cache_key] = png_bytes
+
+    return png_bytes
+
+
+# ── Cluttergram (surface clutter simulation) ─────────
+_clutter_caches: dict[str, dict] = {}
+
+
+def _obs_id_from_product(product_id: str) -> str:
+    """Extract observation ID from RDR product ID. R_0277201_... -> 0277201"""
+    parts = product_id.upper().split("_")
+    return parts[1] if len(parts) >= 2 else ""
+
+
+def _resolve_cluttergram(product_id: str) -> dict | None:
+    """
+    Find cluttergram sim file for a given RDR product.
+    Returns dict with 'sim_path', 'xml_path', 'lines', 'samples',
+    'combined_offset', and start/stop coordinates from the XML geometry.
+    """
+    obs_id = _obs_id_from_product(product_id)
+    if not obs_id:
+        return None
+
+    sim_id = obs_id.zfill(8)
+    sim_path = os.path.join(SHARAD_HR_DIR, f"s_{sim_id}_sim.img")
+    xml_path = os.path.join(SHARAD_HR_DIR, f"s_{sim_id}_sim.xml")
+
+    if not os.path.exists(sim_path):
+        return None
+
+    # Parse XML label for dimensions, offset, and geometry
+    lines = 0
+    samples = 0
+    combined_offset = -1
+    start_lat = start_lon = stop_lat = stop_lon = None
+
+    if os.path.exists(xml_path):
+        try:
+            import xml.etree.ElementTree as ET
+            with open(xml_path, "r") as f:
+                root = ET.fromstring(f.read())
+
+            ns = "{http://pds.nasa.gov/pds4/pds/v1}"
+            for arr in root.iter(f"{ns}Array_2D_Image"):
+                lid = arr.find(f"{ns}local_identifier")
+                if lid is not None and "Combined" in lid.text:
+                    offset_el = arr.find(f"{ns}offset")
+                    if offset_el is not None:
+                        combined_offset = int(offset_el.text)
+                    for ax in arr.findall(f"{ns}Axis_Array"):
+                        ax_name = ax.find(f"{ns}axis_name")
+                        ax_elems = ax.find(f"{ns}elements")
+                        if ax_name is not None and ax_elems is not None:
+                            if ax_name.text == "Line":
+                                lines = int(ax_elems.text)
+                            elif ax_name.text == "Sample":
+                                samples = int(ax_elems.text)
+                    break
+
+            # Parse start/stop coordinates from geometry section
+            geom_ns = "{http://pds.nasa.gov/pds4/geom/v1}"
+            for sg in root.iter(f"{geom_ns}Surface_Geometry_Start_Stop"):
+                try:
+                    start_lat = float(sg.find(f"{geom_ns}start_subspacecraft_latitude").text)
+                    stop_lat = float(sg.find(f"{geom_ns}stop_subspacecraft_latitude").text)
+                    start_lon = float(sg.find(f"{geom_ns}start_subspacecraft_longitude").text)
+                    stop_lon = float(sg.find(f"{geom_ns}stop_subspacecraft_longitude").text)
+                except (AttributeError, ValueError):
+                    pass
+                break
+        except Exception:
+            pass
+
+    # Fallback: infer from file size (3 equal sections of float32)
+    if lines == 0 or samples == 0:
+        file_size = os.path.getsize(sim_path)
+        n_floats_per_section = file_size // (3 * 4)
+        # Try common sample counts
+        for s in [3600, 1433, 2048, 1024]:
+            if n_floats_per_section % s == 0:
+                samples = s
+                lines = n_floats_per_section // s
+                break
+        else:
+            # Last resort: assume square-ish
+            samples = int(n_floats_per_section ** 0.5)
+            lines = n_floats_per_section // samples
+
+    if combined_offset < 0:
+        combined_offset = 2 * lines * samples * 4
+
+    return {
+        "sim_path": sim_path,
+        "xml_path": xml_path,
+        "lines": lines,
+        "samples": samples,
+        "combined_offset": combined_offset,
+        "start_lat": start_lat,
+        "stop_lat": stop_lat,
+        "start_lon": start_lon,
+        "stop_lon": stop_lon,
+    }
+
+
+def _get_cluttergram(product_id: str) -> np.ndarray | None:
+    """Load and cache the combined cluttergram power array."""
+    pid = product_id.upper()
+    if pid in _clutter_caches and _clutter_caches[pid] is not None:
+        return _clutter_caches[pid]
+
+    info = _resolve_cluttergram(pid)
+    if info is None:
+        return None
+
+    cache_dir = os.path.join(SHARAD_HR_DIR, ".cache", pid)
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_path = os.path.join(cache_dir, "cluttergram.npy")
+
+    if os.path.exists(cache_path):
+        arr = np.load(cache_path, mmap_mode="r")
+        _clutter_caches[pid] = arr
+        return arr
+
+    # Read combined section from sim.img
+    sim_path = info["sim_path"]
+    lines = info["lines"]
+    samples = info["samples"]
+    offset = info["combined_offset"]
+    n_floats = lines * samples
+
+    try:
+        with open(sim_path, "rb") as f:
+            f.seek(offset)
+            raw = f.read(n_floats * 4)
+        arr = np.frombuffer(raw, dtype="<f4").reshape(lines, samples)
+        np.save(cache_path, arr)
+        arr = np.load(cache_path, mmap_mode="r")
+        _clutter_caches[pid] = arr
+        return arr
+    except Exception as e:
+        print(f"Error loading cluttergram: {e}")
+        return None
+
+
+def _compute_trace_mapping(
+    clutter_info: dict,
+    rdr_geometry: dict,
+    rdr_total_traces: int,
+) -> np.ndarray:
+    """Map each cluttergram trace to the nearest RDR trace by lat/lon proximity.
+
+    Uses linearly interpolated cluttergram coordinates from XML start/stop
+    and KD-tree nearest-neighbor lookup against RDR per-trace coordinates.
+
+    Returns int array of shape (n_clutter_traces,) with RDR trace indices.
+    Falls back to simple linear mapping if cluttergram coordinates unavailable.
+    """
+    n_clutter_traces = clutter_info["samples"]
+
+    start_lat = clutter_info.get("start_lat")
+    start_lon = clutter_info.get("start_lon")
+    stop_lat = clutter_info.get("stop_lat")
+    stop_lon = clutter_info.get("stop_lon")
+
+    if start_lat is None or start_lon is None:
+        # Fallback: simple linear trace ratio
+        trace_ratio = rdr_total_traces / n_clutter_traces
+        return np.clip(
+            (np.arange(n_clutter_traces) * trace_ratio).astype(int),
+            0, rdr_total_traces - 1,
+        )
+
+    # Interpolate cluttergram trace coordinates
+    clutter_lats = np.linspace(start_lat, stop_lat, n_clutter_traces)
+    clutter_lons = np.linspace(start_lon, stop_lon, n_clutter_traces)
+
+    # KD-tree nearest-neighbor against RDR per-trace coordinates
+    from scipy.spatial import cKDTree
+    rdr_coords = np.column_stack([rdr_geometry["lat"], rdr_geometry["lon"]])
+    tree = cKDTree(rdr_coords)
+
+    clutter_coords = np.column_stack([clutter_lats, clutter_lons])
+    _, indices = tree.query(clutter_coords)
+
+    return indices.astype(np.int32)
+
+
+def _get_aligned_cluttergram(product_id: str) -> np.ndarray | None:
+    """Load cluttergram aligned to RDR bin space using coordinate-based trace
+    mapping and robust median-anchored vertical alignment.
+
+    Horizontal: cluttergram traces are mapped to RDR traces by interpolating
+    the XML start/stop coordinates and KD-tree nearest-neighbor lookup.
+
+    Vertical: smoothed cluttergram surface peaks (argmax + median filter) are
+    shifted to match the RDR's median surface bin position — avoids unreliable
+    per-trace RDR surface detection.
+
+    Result shape: (667, n_clutter_traces), cached as cluttergram_aligned_v2.npy.
+    """
+    pid = product_id.upper()
+
+    info = _resolve_product(product_id)
+    cache_dir = info["cache_dir"]
+    aligned_path = os.path.join(cache_dir, "cluttergram_aligned_v2.npy")
+
+    if os.path.exists(aligned_path):
+        return np.load(aligned_path, mmap_mode="r")
+
+    # Load raw cluttergram
+    clutter_info = _resolve_cluttergram(product_id)
+    if clutter_info is None:
+        return None
+
+    clutter = _get_cluttergram(product_id)
+    if clutter is None:
+        return None
+
+    clutter_bins, n_clutter_traces = clutter.shape
+    if clutter_bins == N_RANGE_BINS:
+        return clutter
+
+    # --- Horizontal alignment: coordinate-based trace mapping ---
+    geom, rdr_total_traces = _get_geometry(product_id)
+    trace_map = _compute_trace_mapping(clutter_info, geom, rdr_total_traces)
+
+    # --- Vertical alignment: smoothed peak + median anchor ---
+    # 1. Cluttergram surface peaks (reliable on clean simulation data)
+    clutter_peaks = np.argmax(clutter, axis=0)
+    from scipy.ndimage import median_filter
+    kernel = min(31, n_clutter_traces if n_clutter_traces % 2 == 1 else n_clutter_traces - 1)
+    kernel = max(kernel, 1)
+    smooth_peaks = median_filter(clutter_peaks, size=kernel).astype(np.int32)
+
+    # 2. RDR surface anchor: use coordinate-mapped RDR traces to get a
+    #    robust surface estimate.  For each cluttergram trace, look at
+    #    the matched RDR trace's coarse surface (argmax in first 200 bins),
+    #    then take the median as the anchor.
+    power, _ = _get_power(product_id)
+    mapped_rdr_surface = np.argmax(power[trace_map, :200], axis=1)
+    rdr_surface_median = int(np.median(mapped_rdr_surface))
+    if rdr_surface_median <= 0:
+        rdr_surface_median = int(N_RANGE_BINS * 0.22)
+
+    # 3. Per-trace vertical offset
+    per_trace_offset = smooth_peaks - rdr_surface_median
+
+    # Sanity: offsets should be positive and leave room for 667 bins
+    median_offset = int(np.median(per_trace_offset))
+    median_offset = max(1, min(median_offset, clutter_bins - N_RANGE_BINS))
+    sane = (per_trace_offset > 0) & (per_trace_offset + N_RANGE_BINS <= clutter_bins)
+    if not sane.all():
+        per_trace_offset = np.where(sane, per_trace_offset, median_offset)
+
+    # --- Extract aligned array ---
+    row_grid = np.arange(N_RANGE_BINS)[:, None] + per_trace_offset[None, :]
+    valid = (row_grid >= 0) & (row_grid < clutter_bins)
+    row_clipped = np.clip(row_grid, 0, clutter_bins - 1)
+    col_grid = np.arange(n_clutter_traces)[None, :]
+
+    aligned = np.where(valid, clutter[row_clipped, col_grid], 0.0).astype(np.float32)
+
+    np.save(aligned_path, aligned)
+    aligned = np.load(aligned_path, mmap_mode="r")
+
+    print(f"[SHARAD] Coord-aligned cluttergram for {pid}: "
+          f"smooth_peak median={int(np.median(smooth_peaks))}, "
+          f"rdr_surface median={rdr_surface_median}, "
+          f"offset range=[{per_trace_offset.min()}, {per_trace_offset.max()}], "
+          f"{clutter_bins}->{N_RANGE_BINS} bins, "
+          f"trace mapping: {n_clutter_traces} clutter -> {rdr_total_traces} RDR")
+
+    return aligned
+
+
+def _render_cluttergram_png(
+    clutter: np.ndarray,
+    downsample: int = 1,
+    pmin: float = 1.0,
+    pmax: float = 99.0,
+    global_vmin: float | None = None,
+    global_vmax: float | None = None,
+) -> bytes:
+    """Render cluttergram as a grayscale PNG (log-scaled).
+
+    Clutter simulation values are very small floats (~1e-13).
+    Uses adaptive floor based on actual data range.
+    global_vmin/global_vmax: if provided, use for normalization (for consistent tiles).
+    """
+    # Cluttergram layout: (range_bins, traces) — downsample along axis 1 (traces)
+    if downsample > 1:
+        n = clutter.shape[1] // downsample * downsample
+        p = clutter[:, :n].reshape(clutter.shape[0], -1, downsample).mean(axis=2)
+    else:
+        p = np.ascontiguousarray(clutter).astype(np.float32)
+
+    # Adaptive floor: use the smallest positive value as reference
+    pos_vals = p[p > 0]
+    if pos_vals.size > 0:
+        floor = float(pos_vals.min()) * 0.1
+    else:
+        floor = 1e-30
+    p = np.log10(np.maximum(p, floor))
+
+    if global_vmin is not None and global_vmax is not None:
+        vmin, vmax = global_vmin, global_vmax
+    else:
+        vmin = np.percentile(p, pmin)
+        vmax = np.percentile(p, pmax)
+    if vmax <= vmin:
+        vmax = vmin + 1
+
+    gray = ((p - vmin) / (vmax - vmin) * 180).clip(0, 180).astype(np.uint8)
+
+    pil_img = Image.fromarray(gray, mode="L")
     buf = io.BytesIO()
     pil_img.save(buf, format="PNG", optimize=False)
     return buf.getvalue()
@@ -346,6 +769,7 @@ async def get_metadata(
     try:
         geom, total_rows = _get_geometry(product_id)
         lons180 = _lon_to_180(geom["lon"])
+        lats_graphic = _centric_to_graphic(geom["lat"])
         return JSONResponse(content={
             "product_id": product_id.upper(),
             "instrument": "SHARAD_HIGHRES",
@@ -353,11 +777,11 @@ async def get_metadata(
             "range_bins": N_RANGE_BINS,
             "row_bytes": ROW_BYTES,
             "sample_interval_us": SHARAD_SAMPLE_INTERVAL_US,
-            "lat_range": [float(geom["lat"].min()), float(geom["lat"].max())],
+            "lat_range": [float(lats_graphic.min()), float(lats_graphic.max())],
             "lon_range": [float(lons180.min()), float(lons180.max())],
-            "start_lat": float(geom["lat"][0]),
+            "start_lat": float(lats_graphic[0]),
             "start_lon": float(lons180[0]),
-            "stop_lat": float(geom["lat"][-1]),
+            "stop_lat": float(lats_graphic[-1]),
             "stop_lon": float(lons180[-1]),
             "alt_range_km": [float(geom["alt"].min()), float(geom["alt"].max())],
             "display": {
@@ -376,17 +800,43 @@ async def get_metadata(
 @router.get("/radargram")
 async def get_radargram(
     product_id: str = Query(..., description="Product ID"),
-    downsample: int = Query(50, ge=1, le=500, description="Along-track downsample factor"),
+    downsample: int = Query(1, ge=1, le=500, description="Along-track downsample factor"),
     log: int = Query(1, ge=0, le=1, description="Log10 scale (1=yes, 0=no)"),
     pmin: float = Query(1.0, ge=0, le=50, description="Lower percentile clip"),
     pmax: float = Query(99.0, ge=50, le=100, description="Upper percentile clip"),
+    amplitude: int = Query(1, ge=0, le=1, description="Amplitude mode (1=sqrt(power), 0=power)"),
+    per_trace: int = Query(1, ge=0, le=1, description="Per-trace normalization (1=yes, 0=global)"),
+    start_trace: int = Query(0, ge=0, description="First trace index (full-res, for tiled rendering)"),
+    end_trace: int = Query(-1, description="Last trace index exclusive (-1 = all)"),
 ):
-    """Return radargram as PNG image."""
+    """Return radargram as PNG image. Supports tiled rendering via start_trace/end_trace."""
     try:
-        power, _ = _get_power(product_id)
-        png = _render_radargram_png(power, downsample=downsample, use_log=bool(log),
-                                    pmin=pmin, pmax=pmax)
-        n_traces_out = power.shape[0] // downsample
+        power, total_rows = _get_power(product_id)
+
+        # Resolve trace range
+        st = max(0, min(start_trace, total_rows))
+        et = total_rows if end_trace < 0 else max(st, min(end_trace, total_rows))
+        is_tile = (st > 0 or et < total_rows)
+
+        tile_power = power[st:et] if is_tile else power
+
+        # For tiles with global normalization, pre-compute percentiles from full array
+        gvmin, gvmax = (None, None)
+        if is_tile and not bool(per_trace):
+            gvmin, gvmax = _get_global_percentiles(
+                product_id, use_log=bool(log), amplitude=bool(amplitude),
+                pmin=pmin, pmax=pmax,
+            )
+
+        ckey = f"{product_id}_{downsample}_{log}_{pmin}_{pmax}_{amplitude}_{per_trace}_{st}_{et}"
+        png = _render_radargram_png(
+            tile_power, downsample=downsample, use_log=bool(log),
+            pmin=pmin, pmax=pmax,
+            amplitude=bool(amplitude), per_trace=bool(per_trace),
+            cache_key=ckey,
+            global_vmin=gvmin, global_vmax=gvmax,
+        )
+        n_traces_out = tile_power.shape[0] // max(downsample, 1)
         return Response(
             content=png,
             media_type="image/png",
@@ -394,6 +844,10 @@ async def get_radargram(
                 "X-Traces": str(n_traces_out),
                 "X-Range-Bins": str(N_RANGE_BINS),
                 "X-Downsample": str(downsample),
+                "X-Start-Trace": str(st),
+                "X-End-Trace": str(et),
+                "X-Total-Traces": str(total_rows),
+                "Cache-Control": "public, max-age=3600",
             },
         )
     except FileNotFoundError as e:
@@ -413,7 +867,7 @@ async def get_radargram_meta(
         n_traces_out = total_rows // downsample
 
         indices = np.arange(0, total_rows, downsample)[:n_traces_out]
-        lats = geom["lat"][indices]
+        lats = _centric_to_graphic(geom["lat"][indices])
         lons = _lon_to_180(geom["lon"][indices])
 
         return JSONResponse(content={
@@ -550,13 +1004,93 @@ async def depth_conversion(
             "epsilon_r2": epsilon_r2,
             "boundary_m": boundary_m,
             "depth_m": round(float(depth_m), 1),
-            "lat": round(float(geom["lat"][full_idx]), 4),
+            "lat": round(_centric_to_graphic_scalar(float(geom["lat"][full_idx])), 4),
             "lon": round(float(lons180[full_idx]), 4),
         })
     except FileNotFoundError as e:
         return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+# ── Cluttergram endpoints ──────────────────────────────
+
+@router.get("/cluttergram")
+async def get_cluttergram(
+    product_id: str = Query(..., description="Product ID (e.g. R_0277201_001_SS19_700_A)"),
+    downsample: int = Query(50, ge=1, le=500, description="Along-track downsample factor"),
+    pmin: float = Query(1.0, ge=0, le=50, description="Lower percentile clip"),
+    pmax: float = Query(99.0, ge=50, le=100, description="Upper percentile clip"),
+    start_trace: int = Query(0, ge=0, description="First trace index (in RDR space, for tiled rendering)"),
+    end_trace: int = Query(-1, description="Last trace index exclusive (-1 = all)"),
+):
+    """Return surface clutter simulation aligned and resampled to match the RDR as PNG."""
+    try:
+        from scipy.ndimage import zoom
+
+        # Use aligned cluttergram (667 bins, surface-matched to RDR)
+        clutter = _get_aligned_cluttergram(product_id)
+        if clutter is None:
+            return JSONResponse(
+                content={"error": f"No cluttergram available for {product_id}"},
+                status_code=404,
+            )
+
+        # Resample traces to match the RDR total trace count so the
+        # cluttergram PNG has the same width as the radargram PNG.
+        _, rdr_total_traces = _get_power(product_id)
+        clutter_traces = clutter.shape[1]
+        if clutter_traces != rdr_total_traces:
+            trace_ratio = rdr_total_traces / clutter_traces
+            # zoom: axis 0 (bins) = 1.0, axis 1 (traces) = ratio
+            clutter = zoom(clutter, (1.0, trace_ratio), order=1).astype(np.float32)
+
+        # Slice to requested trace range (in RDR-space after resampling)
+        total_clutter_traces = clutter.shape[1]
+        st = max(0, min(start_trace, total_clutter_traces))
+        et = total_clutter_traces if end_trace < 0 else max(st, min(end_trace, total_clutter_traces))
+        if st > 0 or et < total_clutter_traces:
+            clutter = clutter[:, st:et]
+
+        png = _render_cluttergram_png(clutter, downsample=downsample, pmin=pmin, pmax=pmax)
+        n_traces_out = clutter.shape[1] // max(downsample, 1)
+        return Response(
+            content=png,
+            media_type="image/png",
+            headers={
+                "X-Traces": str(n_traces_out),
+                "X-Range-Bins": str(clutter.shape[0]),
+                "X-Downsample": str(downsample),
+                "X-Start-Trace": str(st),
+                "X-End-Trace": str(et),
+                "X-Total-Traces": str(total_clutter_traces),
+                "X-Source": "aligned_clutter_simulation",
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
+@router.get("/cluttergram_meta")
+async def get_cluttergram_meta(
+    product_id: str = Query(..., description="Product ID"),
+):
+    """Return cluttergram metadata (availability, dimensions)."""
+    info = _resolve_cluttergram(product_id)
+    if info is None:
+        return JSONResponse(content={"available": False})
+
+    aligned = _get_aligned_cluttergram(product_id)
+    raw = _get_cluttergram(product_id)
+    return JSONResponse(content={
+        "available": True,
+        "raw_range_bins": info["lines"],
+        "raw_traces": info["samples"],
+        "range_bins": aligned.shape[0] if aligned is not None else info["lines"],
+        "total_traces": aligned.shape[1] if aligned is not None else info["samples"],
+        "aligned": aligned is not None and aligned.shape[0] == N_RANGE_BINS,
+    })
 
 
 # ── Ground track coordinates ───────────────────────────
@@ -570,7 +1104,7 @@ async def get_track(
         geom, total_rows = _get_geometry(product_id)
         n = total_rows // downsample
         indices = np.arange(0, total_rows, downsample)[:n]
-        lats = geom["lat"][indices]
+        lats = _centric_to_graphic(geom["lat"][indices])
         lons = _lon_to_180(geom["lon"][indices])
 
         return JSONResponse(content={
@@ -606,14 +1140,18 @@ def _get_dem():
     return _dem_ds
 
 
-def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Great-circle distance on Mars (metres)."""
-    lat1_r, lon1_r = math.radians(lat1), math.radians(lon1)
-    lat2_r, lon2_r = math.radians(lat2), math.radians(lon2)
-    dlat = lat2_r - lat1_r
-    dlon = lon2_r - lon1_r
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1_r) * math.cos(lat2_r) * math.sin(dlon / 2) ** 2
-    return MARS_MEAN_RADIUS * 2 * math.asin(math.sqrt(min(a, 1.0)))
+def _haversine_vec(lats: np.ndarray, lons: np.ndarray) -> np.ndarray:
+    """Cumulative great-circle distance on Mars (metres), vectorized with numpy."""
+    lat_r = np.radians(lats)
+    lon_r = np.radians(lons)
+    dlat = np.diff(lat_r)
+    dlon = np.diff(lon_r)
+    a = np.sin(dlat / 2) ** 2 + np.cos(lat_r[:-1]) * np.cos(lat_r[1:]) * np.sin(dlon / 2) ** 2
+    seg_dist = MARS_MEAN_RADIUS * 2 * np.arcsin(np.sqrt(np.minimum(a, 1.0)))
+    return np.concatenate([[0.0], np.cumsum(seg_dist)])
+
+
+_mola_cache: LRUCache = LRUCache(maxsize=30)  # key: f"{product_id}_{downsample}" -> response dict
 
 
 @router.get("/mola_profile")
@@ -629,6 +1167,10 @@ async def get_mola_profile(
       - elevation_m: MOLA elevation at each trace
       - lats / lons: coordinates of each sample (in -180..180 lon)
     """
+    cache_key = f"{product_id.upper()}_{downsample}"
+    if cache_key in _mola_cache:
+        return JSONResponse(content=_mola_cache[cache_key])
+
     try:
         from rasterio.windows import Window
 
@@ -637,13 +1179,13 @@ async def get_mola_profile(
 
         n_traces = total_rows // downsample
         indices = np.arange(0, total_rows, downsample)[:n_traces]
-        lats = geom["lat"][indices]
+        lats_centric = geom["lat"][indices]
         # Convert 0-360 → -180..180 to match DEM coordinate system
         lons = _lon_to_180(geom["lon"][indices])
 
-        # Convert lat/lon to pixel coordinates
+        # Convert lat/lon to pixel coordinates (DEM is planetocentric)
         inv_transform = ~ds.transform
-        cols, rows = inv_transform * (lons, lats)
+        cols, rows = inv_transform * (lons, lats_centric)
         cols = np.round(cols).astype(int)
         rows = np.round(rows).astype(int)
         cols = np.clip(cols, 0, ds.width - 1)
@@ -662,23 +1204,26 @@ async def get_mola_profile(
         local_cols = cols - col_min
         elevations = elev_block[local_rows, local_cols]
 
-        # Cumulative along-track distance
-        distances_m = np.zeros(n_traces)
-        for i in range(1, n_traces):
-            distances_m[i] = distances_m[i - 1] + _haversine(
-                float(lats[i - 1]), float(lons[i - 1]),
-                float(lats[i]), float(lons[i]),
-            )
+        # Cumulative along-track distance (vectorized, uses planetocentric for accuracy)
+        distances_m = _haversine_vec(lats_centric, lons)
 
-        return JSONResponse(content={
+        # Convert to planetographic for frontend/Cesium display
+        lats_graphic = _centric_to_graphic(lats_centric)
+
+        result = {
             "distance_km": [round(d / 1000.0, 3) for d in distances_m],
             "elevation_m": [round(float(e), 1) if not np.isnan(e) else None for e in elevations],
-            "lats": [round(float(v), 4) for v in lats],
+            "lats": [round(float(v), 4) for v in lats_graphic],
             "lons": [round(float(v), 4) for v in lons],
             "n_traces": n_traces,
             "downsample": downsample,
             "total_distance_km": round(float(distances_m[-1] / 1000.0), 3) if n_traces > 0 else 0,
-        })
+        }
+
+        # Cache result (bounded by LRUCache maxsize=30)
+        _mola_cache[cache_key] = result
+
+        return JSONResponse(content=result)
     except FileNotFoundError as e:
         return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:

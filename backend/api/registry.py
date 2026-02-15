@@ -105,7 +105,7 @@ class InstrumentRegistry:
                 data_directory=inst_data["data_directory"],
                 index_file=inst_data["index_file"],
                 product_id_pattern=inst_data["product_id_pattern"],
-                quickview_path=inst_data["quickview_path"],
+                quickview_path=inst_data.get("quickview_path", ""),
                 supports_spectrum=inst_data["supports_spectrum"],
                 supports_rgb=inst_data["supports_rgb"],
                 file_types=inst_data.get("file_types", {}),

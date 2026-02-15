@@ -51,6 +51,24 @@ interface HiRiseDTM3DViewerProps {
   onClose: () => void;
 }
 
+interface FootprintOverlay {
+  instrument: string;
+  productId: string;
+  coords: number[][][]; // [lon, lat][] per ring/segment
+  type: string;
+  color: string;
+}
+
+const FOOTPRINT_COLORS: Record<string, string> = {
+  CRISM: "#00FFFF",
+  HIRISE: "#FFFF00",
+  SHARAD: "#FFA500",
+  SHARAD_HIGHRES: "#FFD700",
+  CTX: "#FF69B4",
+};
+
+const INSTRUMENTS_TO_QUERY = ["CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES", "CTX"];
+
 // =============================================================================
 // API Functions
 // =============================================================================
@@ -402,6 +420,73 @@ function HoverMarker({
 }
 
 // =============================================================================
+// Footprint Lines Component - Renders overlapping footprints on 3D terrain
+// =============================================================================
+
+function FootprintLines({
+  footprints,
+  data,
+  verticalExaggeration,
+}: {
+  footprints: FootprintOverlay[];
+  data: DEMPatchData;
+  verticalExaggeration: number;
+}) {
+  const lines = useMemo(() => {
+    const { bounds, radius_m, min_elevation_m, max_elevation_m } = data;
+    const centerElev = (min_elevation_m + max_elevation_m) / 2;
+    const lonRange = bounds.east - bounds.west;
+    const latRange = bounds.north - bounds.south;
+    // Slight Y offset above terrain surface
+    const yOffset = (max_elevation_m - centerElev + 5) * verticalExaggeration;
+
+    const result: { points: Float32Array; color: string; key: string }[] = [];
+
+    for (const fp of footprints) {
+      for (let ri = 0; ri < fp.coords.length; ri++) {
+        const ring = fp.coords[ri];
+        if (!ring || ring.length < 2) continue;
+
+        const pts: number[] = [];
+        for (const coord of ring) {
+          const lon = coord[0];
+          const lat = coord[1];
+          // Convert lat/lon to mesh coords
+          const x = ((lon - bounds.west) / lonRange) * radius_m * 2 - radius_m;
+          const z = radius_m - ((lat - bounds.south) / latRange) * radius_m * 2;
+          pts.push(x, yOffset, z);
+        }
+
+        if (pts.length >= 6) {
+          result.push({
+            points: new Float32Array(pts),
+            color: fp.color,
+            key: `${fp.productId}_${ri}`,
+          });
+        }
+      }
+    }
+    return result;
+  }, [footprints, data, verticalExaggeration]);
+
+  return (
+    <>
+      {lines.map(({ points, color, key }) => (
+        <line key={key}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              args={[points, 3]}
+            />
+          </bufferGeometry>
+          <lineBasicMaterial color={color} linewidth={2} transparent opacity={0.9} />
+        </line>
+      ))}
+    </>
+  );
+}
+
+// =============================================================================
 // Main Component
 // =============================================================================
 
@@ -410,12 +495,17 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Controls - smaller patch sizes for HiRISE DTM (1m resolution)
-  const [patchSizeM, setPatchSizeM] = useState(200); // 50, 100, 200, 500 meters
+  // Controls - patch sizes for HiRISE DTM
+  const [patchSizeM, setPatchSizeM] = useState(1000); // 1km, 5km, 10km, or full
   const [verticalExaggeration, setVerticalExaggeration] = useState(2);
   const [showWireframe, setShowWireframe] = useState(false);
   const [showBoundingBox, setShowBoundingBox] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+
+  // Footprint overlay state
+  const [showFootprints, setShowFootprints] = useState(false);
+  const [footprintData, setFootprintData] = useState<FootprintOverlay[]>([]);
+  const [footprintsLoading, setFootprintsLoading] = useState(false);
 
   // Hover state (for 3D terrain probing)
   const [hoverMode, setHoverMode] = useState<"hover" | "click">("hover");
@@ -456,12 +546,14 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
 
       try {
         const radiusM = patchSizeM / 2;
+        // Use higher grid resolution for larger patches
+        const gridSize = patchSizeM >= 10000 ? 256 : patchSizeM >= 5000 ? 192 : 128;
         const patchData = await fetchHiRiseDTMPatch(
           point.productId,
           point.lat,
           point.lon,
           radiusM,
-          128
+          gridSize
         );
 
         if (!cancelled) {
@@ -511,6 +603,83 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
     };
   }, [point.lat, point.lon, point.productId, patchSizeM]);
 
+  // Fetch overlapping footprints when toggle is on
+  useEffect(() => {
+    if (!showFootprints || !data) {
+      setFootprintData([]);
+      return;
+    }
+
+    let cancelled = false;
+    async function fetchFootprints() {
+      setFootprintsLoading(true);
+      try {
+        const { west, south, east, north } = data!.bounds;
+        const bbox = `${west},${south},${east},${north}`;
+        const allOverlays: FootprintOverlay[] = [];
+
+        const fetches = INSTRUMENTS_TO_QUERY.map(async (inst) => {
+          try {
+            const res = await fetch(
+              `/api/footprints?instrument=${inst}&bbox=${bbox}&lod=poly`
+            );
+            if (!res.ok) return [];
+            const geojson = await res.json();
+            if (!geojson.features) return [];
+
+            const overlays: FootprintOverlay[] = [];
+            for (const feature of geojson.features) {
+              const geomType = feature.geometry?.type;
+              const productId = feature.properties?.product_id || feature.properties?.id || "unknown";
+              let coords: number[][][] = [];
+
+              if (geomType === "Polygon") {
+                coords = feature.geometry.coordinates; // [[lon,lat], ...][]
+              } else if (geomType === "MultiPolygon") {
+                // Flatten multi-polygon rings
+                for (const poly of feature.geometry.coordinates) {
+                  coords.push(...poly);
+                }
+              } else if (geomType === "LineString") {
+                coords = [feature.geometry.coordinates]; // wrap single line
+              } else if (geomType === "MultiLineString") {
+                coords = feature.geometry.coordinates;
+              } else {
+                continue; // skip Points etc.
+              }
+
+              overlays.push({
+                instrument: inst,
+                productId,
+                coords,
+                type: geomType,
+                color: FOOTPRINT_COLORS[inst] || "#FFFFFF",
+              });
+            }
+            return overlays;
+          } catch {
+            return [];
+          }
+        });
+
+        const results = await Promise.all(fetches);
+        for (const r of results) allOverlays.push(...r);
+
+        if (!cancelled) {
+          setFootprintData(allOverlays);
+          console.log(`[HiRiseDTM3D] Loaded ${allOverlays.length} footprints`);
+        }
+      } catch (e) {
+        console.error("[HiRiseDTM3D] Footprint fetch error:", e);
+      } finally {
+        if (!cancelled) setFootprintsLoading(false);
+      }
+    }
+
+    fetchFootprints();
+    return () => { cancelled = true; };
+  }, [showFootprints, data]);
+
   return (
     <div className="relative flex flex-col h-full bg-[#0a0f18]" style={{ width: panelWidth }}>
       {/* Resize handle (left edge) */}
@@ -546,21 +715,26 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
 
       {/* Controls */}
       <div className="px-4 py-3 border-b border-[#232f48] space-y-3">
-        {/* Patch Size - smaller sizes for HiRISE DTM */}
+        {/* Patch Size */}
         <div className="flex items-center gap-3">
           <span className="text-[10px] uppercase text-[#6b7c9c] w-20">Patch Size</span>
           <div className="flex gap-1">
-            {[50, 100, 200, 500].map((size) => (
+            {([
+              { value: 1000, label: "1 km" },
+              { value: 5000, label: "5 km" },
+              { value: 10000, label: "10 km" },
+              { value: 100000, label: "Full" },
+            ] as const).map(({ value, label }) => (
               <button
-                key={size}
-                onClick={() => setPatchSizeM(size)}
+                key={value}
+                onClick={() => setPatchSizeM(value)}
                 className={`px-3 py-1 text-[10px] font-bold rounded transition-colors ${
-                  patchSizeM === size
+                  patchSizeM === value
                     ? "bg-amber-600/20 text-amber-600 border border-amber-600/50"
                     : "bg-[#1a2333] text-[#92a4c9] border border-[#232f48] hover:border-amber-600/30"
                 }`}
               >
-                {size}m
+                {label}
               </button>
             ))}
           </div>
@@ -619,6 +793,22 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
             }`}
           >
             Debug
+          </button>
+          <button
+            onClick={() => setShowFootprints(!showFootprints)}
+            className={`px-2 py-1 text-[9px] font-bold rounded transition-colors ${
+              showFootprints
+                ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
+                : "bg-[#1a2333] text-[#6b7c9c] border border-[#232f48]"
+            }`}
+          >
+            Footprints
+            {footprintsLoading && (
+              <span className="ml-1 inline-block animate-spin text-[8px]">&#9696;</span>
+            )}
+            {!footprintsLoading && showFootprints && footprintData.length > 0 && (
+              <span className="ml-1 text-[8px] opacity-70">({footprintData.length})</span>
+            )}
           </button>
         </div>
       </div>
@@ -721,12 +911,44 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
             {/* Center marker */}
             <CenterMarker data={data} verticalExaggeration={verticalExaggeration} />
 
+            {/* Footprint overlays */}
+            {showFootprints && footprintData.length > 0 && (
+              <FootprintLines
+                footprints={footprintData}
+                data={data}
+                verticalExaggeration={verticalExaggeration}
+              />
+            )}
+
             {/* Ground reference plane */}
             <gridHelper
               args={[data.radius_m * 4, 20, "#333333", "#222222"]}
               position={[0, (data.min_elevation_m - (data.min_elevation_m + data.max_elevation_m) / 2) * verticalExaggeration - 5, 0]}
             />
           </Canvas>
+        )}
+
+        {/* Footprint Legend Overlay */}
+        {showFootprints && footprintData.length > 0 && (
+          <div className="absolute top-3 right-3 z-20 bg-[#0a0f18]/85 backdrop-blur-sm rounded border border-[#232f48] px-2 py-1.5">
+            <p className="text-[8px] uppercase text-[#6b7c9c] mb-1">Footprints</p>
+            {(() => {
+              const instruments = [...new Set(footprintData.map((f) => f.instrument))];
+              return instruments.map((inst) => {
+                const count = footprintData.filter((f) => f.instrument === inst).length;
+                return (
+                  <div key={inst} className="flex items-center gap-1.5 py-0.5">
+                    <span
+                      className="inline-block w-3 h-[2px] rounded"
+                      style={{ backgroundColor: FOOTPRINT_COLORS[inst] || "#fff" }}
+                    />
+                    <span className="text-[9px] text-white">{inst}</span>
+                    <span className="text-[8px] text-[#6b7c9c]">({count})</span>
+                  </div>
+                );
+              });
+            })()}
+          </div>
         )}
 
         {/* Hover Info Overlay */}

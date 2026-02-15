@@ -336,3 +336,558 @@ export function isHiriseProductId(productId: string): boolean {
 export function isSharadProductId(productId: string): boolean {
   return detectInstrument(productId) === "sharad";
 }
+
+// =============================================================================
+// Download Cancellation API
+// =============================================================================
+
+/**
+ * Cancel a specific download task.
+ *
+ * @param taskId - Task identifier
+ */
+export async function cancelDownload(taskId: string): Promise<{ status: string; task_id: string }> {
+  const res = await fetch(`/api/download/${taskId}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to cancel download");
+  }
+
+  return res.json();
+}
+
+/**
+ * Retry a failed download task.
+ */
+export async function retryDownload(taskId: string): Promise<DownloadTask> {
+  const res = await fetch(`/api/download/${taskId}/retry`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Retry failed" }));
+    throw new Error(error.detail || "Retry failed");
+  }
+  return res.json();
+}
+
+/**
+ * Cancel all active download tasks.
+ */
+export async function cancelAllDownloads(): Promise<{ status: string; cancelled_count: number }> {
+  const res = await fetch("/api/download", {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to cancel downloads");
+  }
+
+  return res.json();
+}
+
+/**
+ * Clear all completed and failed download tasks from history.
+ */
+export async function clearDownloadHistory(): Promise<{ status: string; removed_count: number }> {
+  const res = await fetch("/api/download/history", {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to clear download history");
+  }
+
+  return res.json();
+}
+
+// =============================================================================
+// AI Search API
+// =============================================================================
+
+/**
+ * Parsed intent from natural language query.
+ */
+export interface ParsedIntent {
+  instruments: string[];
+  region_name: string | null;
+  region_lat: number | null;
+  region_lon: number | null;
+  radius_deg: number;
+  raw_query: string;
+}
+
+/**
+ * Single AI search result.
+ */
+export interface AISearchResult {
+  product_id: string;
+  instrument: string;
+  lat: number | null;
+  lon: number | null;
+  distance_km: number | null;
+  exists: boolean;
+  has_core: boolean;
+  has_browse: boolean;
+  missing_files: string[];
+}
+
+/**
+ * Response from AI search.
+ */
+export interface AISearchResponse {
+  parsed_intent: ParsedIntent;
+  total_count: number;
+  shown_count: number;
+  truncated: boolean;
+  results: AISearchResult[];
+  message: string;
+}
+
+/**
+ * AI-assisted natural language search.
+ *
+ * @param query - Natural language query (e.g., "Download CRISM data over Arcadia Planitia")
+ * @param maxResults - Maximum number of results to return (default 10)
+ */
+export async function aiSearch(query: string, maxResults: number = 10): Promise<AISearchResponse> {
+  const res = await fetch("/api/ai/search", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      max_results: maxResults,
+    }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "AI search failed" }));
+    throw new Error(error.detail || "AI search failed");
+  }
+
+  return res.json();
+}
+
+// =============================================================================
+// Gemini AI Search API (Two-step: Preview + Execute)
+// =============================================================================
+
+/**
+ * Preview response from Gemini parsing.
+ */
+export interface GeminiSearchPreview {
+  success: boolean;
+  instruments: string[];
+  region_type: string;
+  region_name: string | null;
+  region_lat: number | null;
+  region_lon: number | null;
+  region_bbox: { minLat: number; maxLat: number; minLon: number; maxLon: number } | null;
+  radius_km: number;
+  max_results: number;
+  spatial_predicate: string;
+  distribution: string;
+  terrain_hint: string | null;
+  cross_instrument: string | null;
+  cross_title_filter: string | null;
+  message: string;
+  error: string | null;
+}
+
+/**
+ * Single result from Gemini search execution.
+ */
+export interface GeminiSearchResult {
+  product_id: string;
+  instrument: string;
+  lat: number | null;
+  lon: number | null;
+  distance_km: number | null;
+  exists: boolean;
+  has_core: boolean;
+  has_browse: boolean;
+  missing_files: string[];
+}
+
+/**
+ * Full response from Gemini search execution.
+ */
+export interface GeminiSearchResponse {
+  preview: GeminiSearchPreview;
+  total_count: number;
+  shown_count: number;
+  truncated: boolean;
+  results: GeminiSearchResult[];
+}
+
+/**
+ * Get Gemini API status.
+ */
+export async function getGeminiStatus(): Promise<{ available: boolean; api_key_set: boolean; models: string[] }> {
+  const res = await fetch("/api/ai/gemini/status");
+  if (!res.ok) {
+    throw new Error("Failed to get Gemini status");
+  }
+  return res.json();
+}
+
+/**
+ * Step 1: Parse query with Gemini and get a preview (no search execution).
+ * User should confirm before calling geminiExecute().
+ */
+export async function geminiPreview(query: string, maxResults: number = 20): Promise<GeminiSearchPreview> {
+  const res = await fetch("/api/ai/gemini/preview", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      max_results: maxResults,
+    }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Gemini preview failed" }));
+    throw new Error(error.detail || "Gemini preview failed");
+  }
+
+  return res.json();
+}
+
+/**
+ * Step 2: Parse query with Gemini AND execute the search.
+ * Should only be called after user confirms the preview.
+ * Pass the `plan` from preview to avoid re-parsing with Gemini.
+ */
+export async function geminiExecute(query: string, maxResults: number = 20, plan?: Record<string, unknown>): Promise<GeminiSearchResponse> {
+  const res = await fetch("/api/ai/gemini/execute", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      max_results: maxResults,
+      plan: plan ?? null,
+    }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Gemini search failed" }));
+    throw new Error(error.detail || "Gemini search failed");
+  }
+
+  return res.json();
+}
+
+// =============================================================================
+// Point Search API (Coordinate-based)
+// =============================================================================
+
+/**
+ * Result from point-based coordinate search (ODE).
+ */
+export interface PointSearchResult {
+  product_id: string;
+  instrument: string;
+  lat: number | null;
+  lon: number | null;
+  distance_km: number | null;  // Distance from query point in km
+  exists: boolean;
+  has_core: boolean;
+  has_browse: boolean;
+  missing_files: string[];
+}
+
+/**
+ * Response from point search endpoint.
+ */
+export interface PointSearchResponse {
+  query: {
+    lat: number;
+    lon: number;
+    lon_360: number;
+    radius_deg: number;
+  };
+  total_count: number;
+  results: {
+    CRISM: PointSearchResult[];
+    HIRISE: PointSearchResult[];
+    SHARAD: PointSearchResult[];
+    SHARAD_HIGHRES: PointSearchResult[];
+    HIRISE_DTM: PointSearchResult[];
+  };
+}
+
+/**
+ * Search ODE for all datasets that cover a given coordinate.
+ *
+ * Creates a bounding box around the point and queries ODE for each instrument type.
+ *
+ * @param lat - Latitude in degrees (-90 to 90)
+ * @param lon - Longitude in degrees (any range, normalized internally)
+ * @param radius - Search radius in degrees (default 1.0, roughly 60km)
+ */
+export async function searchByPoint(
+  lat: number,
+  lon: number,
+  radius: number = 1
+): Promise<PointSearchResponse> {
+  const params = new URLSearchParams({
+    lat: lat.toString(),
+    lon: lon.toString(),
+    radius: radius.toString(),
+  });
+
+  const res = await fetch(`/api/search/point?${params}`);
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Point search failed" }));
+    throw new Error(error.detail || error.error || "Point search failed");
+  }
+
+  return res.json();
+}
+
+// =============================================================================
+// Product Proximity / Overlap Search API
+// =============================================================================
+
+export interface ProximityResult {
+  product_id: string;
+  instrument: string;
+  lat: number | null;
+  lon: number | null;
+  distance_km: number | null;
+  overlap: boolean;
+}
+
+export interface ProximityResponse {
+  source_product_id: string;
+  source_instrument: string;
+  source_bbox: { lat_min: number; lat_max: number; lon_min: number; lon_max: number } | null;
+  query_mode: string;
+  target_instruments: string[];
+  results: ProximityResult[];
+  total_count: number;
+}
+
+/**
+ * Search for products overlapping with or near a given product.
+ */
+export async function searchProximity(
+  productId: string,
+  instrument: string,
+  mode: "overlap" | "nearest" = "overlap",
+  targetInstruments: string = "all",
+  limit: number = 50,
+  searchRadiusDeg: number = 5.0,
+): Promise<ProximityResponse> {
+  const params = new URLSearchParams({
+    product_id: productId,
+    instrument,
+    mode,
+    target_instruments: targetInstruments,
+    limit: limit.toString(),
+    search_radius_deg: searchRadiusDeg.toString(),
+  });
+
+  const res = await fetch(`/api/proximity/search?${params}`);
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Proximity search failed" }));
+    throw new Error(error.detail || "Proximity search failed");
+  }
+  return res.json();
+}
+
+// =============================================================================
+// Region Lookup API
+// =============================================================================
+
+export interface MarsRegionInfo {
+  region_id: string;
+  display_name: string;
+  lat_min: number;
+  lat_max: number;
+  lon_min: number;
+  lon_max: number;
+  description: string;
+  tags: string[];
+}
+
+/**
+ * List all Mars regions with bounding boxes.
+ */
+export async function listRegions(
+  tag?: string,
+  query?: string,
+): Promise<MarsRegionInfo[]> {
+  const params = new URLSearchParams();
+  if (tag) params.set("tag", tag);
+  if (query) params.set("query", query);
+
+  const res = await fetch(`/api/proximity/regions?${params}`);
+  if (!res.ok) {
+    throw new Error("Failed to list regions");
+  }
+  return res.json();
+}
+
+/**
+ * Get a specific region by ID.
+ */
+export async function getRegion(regionId: string): Promise<MarsRegionInfo> {
+  const res = await fetch(`/api/proximity/regions/${regionId}`);
+  if (!res.ok) {
+    throw new Error(`Region '${regionId}' not found`);
+  }
+  return res.json();
+}
+
+// =============================================================================
+// Smart AI Search API (Llama-powered, single-step)
+// =============================================================================
+
+/**
+ * A product selected by Llama with reasoning.
+ */
+export interface SmartProductSelection {
+  product_id: string;
+  instrument: string;
+  lat: number | null;
+  lon: number | null;
+  distance_km: number | null;
+  reason: string;
+  already_local: boolean;
+  download_task_id: string | null;
+}
+
+/**
+ * Full response from smart search.
+ */
+export interface SmartSearchResponse {
+  session_id: string;
+  query: string;
+  reasoning: string;
+  selected_products: SmartProductSelection[];
+  download_tasks: string[];
+  search_summary: string;
+  total_found: number;
+  total_selected: number;
+  total_downloading: number;
+  total_already_local: number;
+}
+
+/**
+ * SSE event from smart search stream.
+ */
+export interface SmartSearchEvent {
+  event: string;
+  data: Record<string, unknown>;
+}
+
+/**
+ * Check Llama/Ollama availability for smart search.
+ */
+export async function getSmartSearchStatus(): Promise<{
+  ollama_available: boolean;
+  model: string;
+  message: string;
+}> {
+  const res = await fetch("/api/ai/smart/status");
+  if (!res.ok) {
+    throw new Error("Failed to get smart search status");
+  }
+  return res.json();
+}
+
+/**
+ * Start a smart search session. Returns session_id immediately.
+ * Use streamSmartSearch() to get real-time events.
+ */
+export async function startSmartSearch(
+  query: string,
+  maxResults: number = 20
+): Promise<{ session_id: string; status: string }> {
+  const res = await fetch("/api/ai/smart/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, max_results: maxResults }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Smart search failed" }));
+    throw new Error(error.detail || "Smart search failed");
+  }
+  return res.json();
+}
+
+/**
+ * Stream SSE events from a smart search session.
+ * Calls onEvent for each event, onDone when stream ends.
+ */
+export function streamSmartSearch(
+  sessionId: string,
+  onEvent: (event: SmartSearchEvent) => void,
+  onDone: (response: SmartSearchResponse | null) => void,
+  onError: (error: string) => void,
+): () => void {
+  const eventSource = new EventSource(`/api/ai/smart/stream/${sessionId}`);
+  let finalResponse: SmartSearchResponse | null = null;
+  let finished = false;
+
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    eventSource.close();
+    onDone(finalResponse);
+  };
+
+  eventSource.onmessage = (msg) => {
+    try {
+      const parsed = JSON.parse(msg.data) as SmartSearchEvent;
+
+      if (parsed.event === "stream_end" || parsed.event === "timeout") {
+        finish();
+        return;
+      }
+
+      if (parsed.event === "done") {
+        finalResponse = parsed.data as unknown as SmartSearchResponse;
+      }
+
+      onEvent(parsed);
+    } catch {
+      // ignore parse errors
+    }
+  };
+
+  eventSource.onerror = () => {
+    if (!finished && !finalResponse) {
+      onError("Connection lost to search stream");
+    }
+    finish();
+  };
+
+  // Return cleanup function
+  return () => {
+    finished = true;
+    eventSource.close();
+  };
+}
+
+/**
+ * Get smart search session state (polling fallback).
+ */
+export async function getSmartSearchSession(
+  sessionId: string,
+): Promise<SmartSearchResponse> {
+  const res = await fetch(`/api/ai/smart/session/${sessionId}`);
+  if (!res.ok) {
+    throw new Error("Failed to get session");
+  }
+  return res.json();
+}

@@ -195,7 +195,7 @@ export default function AiAnalysisPanel({
               <span className="material-symbols-outlined text-lg">psychology</span>
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">AI Analysis</h2>
+              <h2 className="text-sm font-bold text-white">AI Analysis <span className="text-[8px] px-1 py-0.5 rounded bg-violet-500/20 text-violet-400 border border-violet-500/30 font-bold align-middle">BETA</span></h2>
               <span className="text-[10px] text-slate-500">
                 {pin.lat.toFixed(3)}°, {pin.lon.toFixed(3)}°
               </span>

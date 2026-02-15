@@ -10,6 +10,18 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/api/temporal", tags=["Temporal"])
 
+# ODE instrument mapping: instrument_name -> (ihid, iid, product_types[])
+# product_types is a list so we can query multiple ODE product types per instrument
+_INSTRUMENT_MAP = {
+    "HIRISE":        ("MRO", "HIRISE", ["RDRV11"]),
+    "CTX":           ("MRO", "CTX",    ["EDR"]),
+    "CRISM":         ("MRO", "CRISM",  ["MTRDR"]),
+    "CRISM_TRR3":    ("MRO", "CRISM",  ["TRDR"]),
+    "SHARAD":        ("MRO", "SHARAD", ["USRDRV2"]),
+    "SHARAD_HIGHRES":("MRO", "SHARAD", ["RDR"]),
+    "HIRISE_DTM":    ("MRO", "HIRISE", ["DTM"]),
+}
+
 
 @router.post("/find_pairs")
 async def find_temporal_pairs(
@@ -36,57 +48,56 @@ async def find_temporal_pairs(
             status_code=400,
         )
 
-    target = "mars"
-    if instrument == "HIRISE":
-        ihid = "MRO"
-        iid = "HIRISE"
-        pt = "RDRV11"
-    elif instrument == "CTX":
-        ihid = "MRO"
-        iid = "CTX"
-        pt = "EDR"
-    else:
+    inst_upper = instrument.upper()
+    if inst_upper not in _INSTRUMENT_MAP:
         return JSONResponse(
-            {"error": f"Unsupported instrument: {instrument}"},
+            {"error": f"Unsupported instrument: {instrument}. "
+             f"Supported: {', '.join(sorted(_INSTRUMENT_MAP))}"},
             status_code=400,
         )
 
-    url = (
-        f"https://oderest.rsl.wustl.edu/live2/?target={target}"
-        f"&query=product&results=p&output=JSON"
-        f"&ihid={ihid}&iid={iid}&pt={pt}"
-        f"&lat={lat}&lon={lon % 360}&loc=o&r={radius_km}"
-        f"&limit=50"
-    )
-
-    async with httpx.AsyncClient(timeout=30) as client:
-        try:
-            resp = await client.get(url)
-        except Exception as e:
-            return JSONResponse(
-                {"pairs": [], "error": f"ODE query failed: {e}", "total_products": 0}
-            )
-        if resp.status_code != 200:
-            return JSONResponse(
-                {"pairs": [], "error": "ODE query failed", "total_products": 0}
-            )
-
-        data = resp.json()
+    ihid, iid, product_types = _INSTRUMENT_MAP[inst_upper]
+    target = "mars"
+    ode_lon = lon % 360  # ODE expects 0-360
 
     products = []
-    items = data.get("ODEResults", {}).get("Products", {}).get("Product", [])
-    if isinstance(items, dict):
-        items = [items]
 
-    for item in items:
-        pid = item.get("pdsid", item.get("product_id", ""))
-        ut_time = item.get("UTC_start_time", "")
+    async with httpx.AsyncClient(timeout=30) as client:
+        for pt in product_types:
+            url = (
+                f"https://oderest.rsl.wustl.edu/live2/?target={target}"
+                f"&query=product&results=p&output=JSON"
+                f"&ihid={ihid}&iid={iid}&pt={pt}"
+                f"&lat={lat}&lon={ode_lon}&loc=o&r={radius_km}"
+                f"&limit=50"
+            )
 
-        products.append({
-            "product_id": pid,
-            "date": ut_time[:10] if ut_time else "Unknown",
-            "full_date": ut_time,
-        })
+            try:
+                resp = await client.get(url)
+            except Exception as e:
+                return JSONResponse(
+                    {"pairs": [], "error": f"ODE query failed: {e}", "total_products": 0}
+                )
+            if resp.status_code != 200:
+                continue
+
+            data = resp.json()
+
+            items = data.get("ODEResults", {}).get("Products", {})
+            if items is None:
+                continue
+            item_list = items.get("Product", [])
+            if isinstance(item_list, dict):
+                item_list = [item_list]
+
+            for item in item_list:
+                pid = item.get("pdsid", item.get("product_id", ""))
+                ut_time = item.get("UTC_start_time", "")
+                products.append({
+                    "product_id": pid,
+                    "date": ut_time[:10] if ut_time else "Unknown",
+                    "full_date": ut_time,
+                })
 
     # Sort by date
     products.sort(key=lambda p: p["date"])

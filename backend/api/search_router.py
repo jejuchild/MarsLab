@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
 import asyncio
+import os
 
 from .ode_client import (
     Instrument,
@@ -27,6 +28,9 @@ from .ode_client import (
     is_hirise_product_id,
     is_sharad_product_id,
     is_sharad_highres_product_id,
+    is_hirise_dtm_product_id,
+    _parse_ode_rest_response,
+    ODE_REST_BASE,
 )
 import json
 from pathlib import Path
@@ -38,7 +42,91 @@ from .download_manager import (
 )
 
 
+import aiohttp
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api", tags=["Search & Download"])
+
+
+def _ode_products_to_trr3_results(ode_products: list, limit: int) -> List["SearchResult"]:
+    """Convert ODE products to TRR3 SearchResults, deduplicated by base_key."""
+    results = []
+    seen = set()
+    for p in ode_products:
+        pid = p.product_id.lower()
+        # Filter to FRT (Full Resolution Targeted) only
+        if not pid.startswith("frt"):
+            continue
+        # Base key = first two underscore-separated tokens (e.g. frt0000951f_07)
+        parts = pid.split("_")
+        base_key = "_".join(parts[:2]) if len(parts) >= 2 else pid
+        if base_key in seen:
+            continue
+        seen.add(base_key)
+        lon = p.lon
+        if lon is not None and lon > 180:
+            lon -= 360
+        results.append(SearchResult(
+            product_id=base_key,
+            instrument="crism_trr3",
+            base_key=base_key,
+            lat=p.lat, lon=lon,
+            exists=False, has_core=False, has_browse=False,
+            missing_files=[],
+        ))
+        if len(results) >= limit:
+            break
+    return results
+
+
+async def _search_ode_trr3_by_id(query: str, limit: int = 10) -> List["SearchResult"]:
+    """Search ODE for CRISM TRDR (TRR3) products by product ID."""
+    url = (
+        f"{ODE_REST_BASE}?"
+        f"target=mars&ihid=mro&iid=crism&pt=TRDR&"
+        f"productid={query}*&output=json&results=pmf&limit={max(limit * 10, 100)}"
+    )
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    ode_prods = _parse_ode_rest_response(data, Instrument.CRISM)
+                    return _ode_products_to_trr3_results(ode_prods, limit)
+    except Exception as e:
+        logger.warning(f"ODE TRR3 ID search failed: {e}")
+    return []
+
+
+async def _search_ode_trr3_spatial(
+    minlat: float, maxlat: float, westernlon: float, easternlon: float, limit: int = 10
+) -> List["SearchResult"]:
+    """Search ODE for CRISM TRDR (TRR3) products within a bounding box."""
+    # ODE works best with 0-360 longitude
+    wlon = westernlon if westernlon >= 0 else westernlon + 360
+    elon = easternlon if easternlon >= 0 else easternlon + 360
+    url = (
+        f"{ODE_REST_BASE}?"
+        f"target=mars&ihid=mro&iid=crism&pt=TRDR&"
+        f"minlat={minlat}&maxlat={maxlat}&"
+        f"westernlon={wlon}&easternlon={elon}&"
+        f"output=json&results=pmf&limit={max(limit * 20, 400)}"
+    )
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    ode_prods = _parse_ode_rest_response(data, Instrument.CRISM)
+                    logger.info(f"ODE TRR3 spatial: {len(ode_prods)} raw, filtering to targeted")
+                    return _ode_products_to_trr3_results(ode_prods, limit)
+                else:
+                    logger.warning(f"ODE TRR3 spatial returned {resp.status}")
+    except Exception as e:
+        logger.warning(f"ODE TRR3 spatial search failed: {e}")
+    return []
 
 # SHARAD index path
 SHARAD_INDEX_PATH = Path(__file__).parent.parent / "sharad_data" / "index.geojson"
@@ -51,6 +139,8 @@ _LOCAL_INDICES = {
     "SHARAD":         _BACKEND_DIR / "sharad_data"         / "index.geojson",
     "SHARAD_HIGHRES": _BACKEND_DIR / "sharad_highres_data" / "index.geojson",
     "CTX":            _BACKEND_DIR / "ctx_data"            / "index.geojson",
+    "HIRISE_DTM":     _BACKEND_DIR / "hirise_dtm_data"     / "index.geojson",
+    "CRISM_TRR3":     _BACKEND_DIR / "mineral_cnn_data"    / "index.geojson",
 }
 
 # Cached product list (loaded once on first search)
@@ -166,6 +256,240 @@ def search_local_sharad(query: str, limit: int = 10) -> List[SearchResult]:
     return results[:limit]
 
 
+def search_local_index(instrument_key: str, instrument_value: str, query: str, limit: int = 10) -> List[SearchResult]:
+    """Search a local GeoJSON index for matching products by product ID substring."""
+    index_path = _LOCAL_INDICES.get(instrument_key)
+    if not index_path or not index_path.exists():
+        return []
+
+    try:
+        with open(index_path) as f:
+            data = json.load(f)
+    except Exception:
+        return []
+
+    results = []
+    query_upper = query.upper()
+
+    for feature in data.get("features", []):
+        props = feature.get("properties", {})
+        product_id = (props.get("product_id") or props.get("ProductId") or
+                      props.get("id") or props.get("PRODUCT_ID") or "")
+        if not product_id:
+            continue
+
+        if query_upper in product_id.upper():
+            # Extract lat/lon from properties or geometry centroid
+            lat = props.get("center_latitude") or props.get("start_lat")
+            lon = props.get("center_longitude") or props.get("start_lon")
+            if lat is None or lon is None:
+                geom = feature.get("geometry", {})
+                coords = geom.get("coordinates", [])
+                if geom.get("type") == "Polygon" and coords:
+                    ring = coords[0]
+                    lat = sum(c[1] for c in ring) / len(ring)
+                    lon = sum(c[0] for c in ring) / len(ring)
+
+            results.append(SearchResult(
+                product_id=product_id,
+                instrument=instrument_value,
+                base_key=product_id,
+                lat=lat,
+                lon=lon,
+                exists=True,
+                has_core=True,
+                has_browse=True,
+                missing_files=[],
+            ))
+
+        if len(results) >= limit:
+            break
+
+    results.sort(key=lambda r: (
+        0 if r.product_id.upper().startswith(query_upper) else 1,
+        r.product_id
+    ))
+
+    return results[:limit]
+
+
+def _liang_barsky_clip(
+    x1: float, y1: float, x2: float, y2: float,
+    xmin: float, ymin: float, xmax: float, ymax: float,
+) -> bool:
+    """Test if line segment (x1,y1)-(x2,y2) intersects axis-aligned box.
+
+    Same algorithm as frontend overlapFilter.ts `liangBarskyClip`.
+    """
+    dx = x2 - x1
+    dy = y2 - y1
+    t0, t1 = 0.0, 1.0
+
+    for p, q in [(-dx, x1 - xmin), (dx, xmax - x1),
+                 (-dy, y1 - ymin), (dy, ymax - y1)]:
+        if p == 0:
+            if q < 0:
+                return False
+        else:
+            r = q / p
+            if p < 0:
+                t0 = max(t0, r)
+            else:
+                t1 = min(t1, r)
+            if t0 > t1:
+                return False
+    return True
+
+
+def _geometry_intersects_bbox(
+    geom: dict,
+    minlat: float, maxlat: float,
+    westernlon: float, easternlon: float,
+) -> bool:
+    """Test if a GeoJSON geometry intersects a search bounding box.
+
+    Uses the same approach as the frontend overlay filter:
+    - Polygon: AABB intersection (bbox of polygon vs search bbox)
+    - LineString: Liang-Barsky segment clipping against search bbox
+    - Point: point-in-bbox test with small buffer
+
+    Handles antimeridian crossing (westernlon > easternlon).
+    """
+    gtype = geom.get("type", "")
+    coords = geom.get("coordinates", [])
+    if not coords:
+        return False
+
+    # Build feature AABB
+    if gtype == "Polygon" and coords:
+        ring = coords[0]
+        if not ring:
+            return False
+        feat_west = min(c[0] for c in ring)
+        feat_east = max(c[0] for c in ring)
+        feat_south = min(c[1] for c in ring)
+        feat_north = max(c[1] for c in ring)
+
+        # AABB vs search bbox intersection
+        if feat_north < minlat or feat_south > maxlat:
+            return False
+        if westernlon <= easternlon:
+            return not (feat_east < westernlon or feat_west > easternlon)
+        else:
+            # Search bbox crosses antimeridian
+            return feat_east >= westernlon or feat_west <= easternlon
+
+    elif gtype == "LineString" and coords:
+        # Liang-Barsky: test each segment against search bbox
+        for i in range(len(coords) - 1):
+            x1, y1 = coords[i][0], coords[i][1]
+            x2, y2 = coords[i + 1][0], coords[i + 1][1]
+            # Skip antimeridian-crossing segments (orbital dateline transition)
+            if abs(x2 - x1) > 180:
+                continue
+            if westernlon <= easternlon:
+                if _liang_barsky_clip(x1, y1, x2, y2,
+                                      westernlon, minlat, easternlon, maxlat):
+                    return True
+            else:
+                # Antimeridian: test both sides
+                if _liang_barsky_clip(x1, y1, x2, y2,
+                                      westernlon, minlat, 180.0, maxlat):
+                    return True
+                if _liang_barsky_clip(x1, y1, x2, y2,
+                                      -180.0, minlat, easternlon, maxlat):
+                    return True
+        return False
+
+    elif gtype == "Point" and coords:
+        lon, lat = coords[0], coords[1]
+        if lat < minlat or lat > maxlat:
+            return False
+        if westernlon <= easternlon:
+            return westernlon <= lon <= easternlon
+        else:
+            return lon >= westernlon or lon <= easternlon
+
+    return False
+
+
+def _geometry_centroid(geom: dict) -> tuple:
+    """Extract centroid (lat, lon) from a GeoJSON geometry."""
+    gtype = geom.get("type", "")
+    coords = geom.get("coordinates", [])
+    if gtype == "Polygon" and coords:
+        ring = coords[0]
+        return (sum(c[1] for c in ring) / len(ring),
+                sum(c[0] for c in ring) / len(ring))
+    elif gtype == "LineString" and coords:
+        mid = len(coords) // 2
+        return (coords[mid][1], coords[mid][0])
+    elif gtype == "Point" and coords:
+        return (coords[1], coords[0])
+    return (None, None)
+
+
+def search_local_spatial(instrument_key: str, instrument_value: str,
+                         minlat: float, maxlat: float,
+                         westernlon: float, easternlon: float,
+                         limit: int = 10) -> List[SearchResult]:
+    """Search a local GeoJSON index for products intersecting a bounding box.
+
+    Uses the same spatial logic as the frontend overlay filter:
+    - Polygon: AABB intersection
+    - LineString: Liang-Barsky segment-vs-bbox clipping
+    - Point: point-in-bbox test
+    """
+    index_path = _LOCAL_INDICES.get(instrument_key)
+    if not index_path or not index_path.exists():
+        return []
+
+    try:
+        with open(index_path) as f:
+            data = json.load(f)
+    except Exception:
+        return []
+
+    results = []
+
+    for feature in data.get("features", []):
+        props = feature.get("properties", {})
+        product_id = (props.get("product_id") or props.get("ProductId") or
+                      props.get("id") or props.get("PRODUCT_ID") or "")
+        if not product_id:
+            continue
+
+        geom = feature.get("geometry", {})
+        if not geom:
+            continue
+
+        # Use proper geometry intersection (same as overlay filter)
+        if not _geometry_intersects_bbox(geom, minlat, maxlat,
+                                         westernlon, easternlon):
+            continue
+
+        lat, lon = _geometry_centroid(geom)
+        if lat is None:
+            continue
+
+        results.append(SearchResult(
+            product_id=product_id,
+            instrument=instrument_value,
+            base_key=product_id,
+            lat=lat,
+            lon=lon,
+            exists=True,
+            has_core=True,
+            has_browse=True,
+            missing_files=[],
+        ))
+
+        if len(results) >= limit:
+            break
+
+    return results[:limit]
+
+
 class SearchResponse(BaseModel):
     """Search response with multiple results."""
     query: str
@@ -251,13 +575,26 @@ async def search_products(
 
     Returns CRISM products with IDs containing "frt00009".
     """
+    # Handle CRISM_TRR3 search - local index + ODE TRDR
+    if instrument and instrument.lower() == "crism_trr3":
+        local_results = search_local_index("CRISM_TRR3", "crism_trr3", q, limit)
+        ode_results = await _search_ode_trr3_by_id(q, limit)
+        # Merge: local results first (exist=True), then ODE results not in local
+        local_keys = {r.base_key for r in local_results}
+        merged = list(local_results)
+        for r in ode_results:
+            if r.base_key not in local_keys:
+                merged.append(r)
+        merged = merged[:limit]
+        return SearchResponse(query=q, results=merged, count=len(merged))
+
     # Parse instrument filter
     inst_filter = None
     if instrument:
         try:
             inst_filter = Instrument(instrument.lower())
         except ValueError:
-            raise HTTPException(400, f"Invalid instrument: {instrument}. Use 'crism', 'hirise', or 'sharad'.")
+            raise HTTPException(400, f"Invalid instrument: {instrument}. Use: {', '.join(e.value for e in Instrument)}.")
 
     # Auto-detect instrument from query if not specified
     if inst_filter is None:
@@ -269,6 +606,17 @@ async def search_products(
             inst_filter = Instrument.SHARAD_HIGHRES
         elif is_sharad_product_id(q):
             inst_filter = Instrument.SHARAD
+        elif is_hirise_dtm_product_id(q):
+            inst_filter = Instrument.HIRISE_DTM
+
+    # Handle HIRISE_DTM search - local index only
+    if inst_filter == Instrument.HIRISE_DTM:
+        dtm_results = search_local_index("HIRISE_DTM", "hirise_dtm", q, limit)
+        return SearchResponse(
+            query=q,
+            results=dtm_results,
+            count=len(dtm_results),
+        )
 
     # Handle SHARAD High-Res search via ODE
     if inst_filter == Instrument.SHARAD_HIGHRES:
@@ -477,12 +825,40 @@ async def search_spatial(
     if minlat > maxlat:
         raise HTTPException(400, "minlat must be less than or equal to maxlat")
 
+    # Handle CRISM_TRR3 spatial search - local index + ODE TRDR
+    if instrument and instrument.lower() == "crism_trr3":
+        local_results = search_local_spatial(
+            "CRISM_TRR3", "crism_trr3", minlat, maxlat, westernlon, easternlon, limit
+        )
+        ode_results = await _search_ode_trr3_spatial(minlat, maxlat, westernlon, easternlon, limit)
+        local_keys = {r.base_key for r in local_results}
+        merged = list(local_results)
+        for r in ode_results:
+            if r.base_key not in local_keys:
+                merged.append(r)
+        merged = merged[:limit]
+        return SearchResponse(
+            query=f"lat=[{minlat}, {maxlat}], lon=[{westernlon}, {easternlon}]",
+            results=merged, count=len(merged),
+        )
+
     inst_filter = None
     if instrument:
         try:
             inst_filter = Instrument(instrument.lower())
         except ValueError:
             raise HTTPException(400, f"Invalid instrument: {instrument}")
+
+    # HIRISE_DTM: search local index instead of ODE
+    if inst_filter == Instrument.HIRISE_DTM:
+        dtm_results = search_local_spatial(
+            "HIRISE_DTM", "hirise_dtm", minlat, maxlat, westernlon, easternlon, limit
+        )
+        return SearchResponse(
+            query=f"lat=[{minlat}, {maxlat}], lon=[{westernlon}, {easternlon}]",
+            results=dtm_results,
+            count=len(dtm_results),
+        )
 
     try:
         products = await search_ode_spatial(minlat, maxlat, westernlon, easternlon, inst_filter, limit)
@@ -548,10 +924,35 @@ async def check_exists(instrument: str, product_id: str):
     GET /api/exists/crism/frt00009312_07_if165l_trr3
     ```
     """
+    # Handle crism_trr3 separately (not in Instrument enum — uses mineral_cnn_data/)
+    if instrument.lower() == "crism_trr3":
+        from .mineral_cnn.constants import TRR_DATA_DIR
+        obs_dir = os.path.join(TRR_DATA_DIR, product_id)
+        if not os.path.isdir(obs_dir):
+            # Try with _07 suffix
+            obs_dir = os.path.join(TRR_DATA_DIR, f"{product_id}_07")
+        has_data = os.path.isdir(obs_dir)
+        has_trr = False
+        if has_data:
+            files = os.listdir(obs_dir)
+            has_trr = any(f.upper().endswith("_TRR3.IMG") for f in files)
+        return {
+            "exists": has_data and has_trr,
+            "product_id": product_id,
+            "base_key": product_id,
+            "instrument": "crism_trr3",
+            "has_core": has_trr,
+            "has_header": has_data and any(f.upper().endswith("_TRR3.LBL") for f in (os.listdir(obs_dir) if has_data else [])),
+            "has_wavelength": False,
+            "has_browse": False,
+            "missing_files": [],
+            "existing_files": os.listdir(obs_dir) if has_data else [],
+        }
+
     try:
         inst = Instrument(instrument.lower())
     except ValueError:
-        raise HTTPException(400, f"Invalid instrument: {instrument}. Valid options: crism, hirise, sharad, sharad_highres")
+        raise HTTPException(400, f"Invalid instrument: {instrument}. Valid options: crism, hirise, sharad, sharad_highres, crism_trr3")
 
     if inst == Instrument.CRISM:
         base_key = parse_crism_base_key(product_id)
@@ -634,7 +1035,7 @@ async def start_download(request: DownloadRequest):
     try:
         inst = Instrument(request.instrument.lower())
     except ValueError:
-        raise HTTPException(400, f"Invalid instrument: {request.instrument}. Valid options: crism, hirise, sharad, sharad_highres")
+        raise HTTPException(400, f"Invalid instrument: {request.instrument}. Valid options: {', '.join(e.value for e in Instrument)}.")
 
     # Check detailed existence - allow downloading missing files
     existence = check_local_existence_detailed(request.product_id, inst)
@@ -695,6 +1096,29 @@ async def get_download_status(task_id: str):
     if not task:
         raise HTTPException(404, f"Download task not found: {task_id}")
 
+    return DownloadResponse(**task.to_dict())
+
+
+@router.delete("/download/history")
+async def clear_download_history():
+    """
+    Clear all completed and failed download tasks from history.
+    Active downloads are not affected.
+    """
+    removed = download_manager.clear_history()
+    return {
+        "status": "cleared",
+        "removed_count": removed,
+        "message": f"Cleared {removed} task(s) from history"
+    }
+
+
+@router.post("/download/{task_id}/retry", response_model=DownloadResponse)
+async def retry_download(task_id: str):
+    """Retry a failed download task. Creates a new task with the same parameters."""
+    task = await download_manager.retry_task(task_id)
+    if not task:
+        raise HTTPException(400, "Task not found or not in failed state")
     return DownloadResponse(**task.to_dict())
 
 

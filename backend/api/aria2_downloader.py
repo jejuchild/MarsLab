@@ -35,8 +35,8 @@ from enum import Enum
 
 # aria2c default options for maximum throughput
 ARIA2_OPTS = [
-    "-x", "20",           # Max connections per server
-    "-s", "20",           # Split file into 20 segments
+    "-x", "16",           # Max connections per server (aria2 max is 16)
+    "-s", "16",           # Split file into 16 segments (aria2 max is 16)
     "-k", "1M",           # Min split size 1MB
     "--continue=true",    # Resume partial downloads
     "--file-allocation=trunc",  # Fast file allocation
@@ -48,6 +48,74 @@ ARIA2_OPTS = [
 
 MAX_RETRIES = 3
 MAX_CONCURRENT_DOWNLOADS = 4  # -j option for batch downloads
+
+
+# =============================================================================
+# Process Tracking for Cancellation
+# =============================================================================
+
+# Global registry of active aria2 processes
+# Maps task_id -> asyncio.subprocess.Process
+_active_processes: Dict[str, asyncio.subprocess.Process] = {}
+_process_lock = asyncio.Lock() if hasattr(asyncio, 'Lock') else None
+
+
+async def register_process(task_id: str, process: asyncio.subprocess.Process):
+    """Register an active aria2 process for a task."""
+    _active_processes[task_id] = process
+
+
+async def unregister_process(task_id: str):
+    """Unregister a completed/cancelled process."""
+    _active_processes.pop(task_id, None)
+
+
+async def cancel_task(task_id: str) -> bool:
+    """
+    Cancel a specific download task.
+
+    Args:
+        task_id: Task ID to cancel
+
+    Returns:
+        True if process was found and terminated, False otherwise
+    """
+    process = _active_processes.get(task_id)
+    if process and process.returncode is None:
+        try:
+            process.terminate()
+            # Give it a moment to terminate gracefully
+            try:
+                await asyncio.wait_for(process.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                process.kill()
+            return True
+        except Exception as e:
+            print(f"Error cancelling task {task_id}: {e}")
+            return False
+    return False
+
+
+async def cancel_all_tasks() -> int:
+    """
+    Cancel all active download tasks.
+
+    Returns:
+        Number of tasks cancelled
+    """
+    cancelled = 0
+    task_ids = list(_active_processes.keys())
+
+    for task_id in task_ids:
+        if await cancel_task(task_id):
+            cancelled += 1
+
+    return cancelled
+
+
+def get_active_task_ids() -> List[str]:
+    """Get list of active task IDs."""
+    return [tid for tid, proc in _active_processes.items() if proc.returncode is None]
 
 
 # =============================================================================
@@ -107,6 +175,7 @@ async def download_single_file(
     output_dir: str,
     filename: Optional[str] = None,
     progress_callback: Optional[Callable[[int, int], None]] = None,
+    task_id: Optional[str] = None,
 ) -> Aria2File:
     """
     Download a single file using aria2c.
@@ -116,6 +185,7 @@ async def download_single_file(
         output_dir: Directory to save the file
         filename: Optional filename (auto-detected from URL if not provided)
         progress_callback: Optional callback(bytes_downloaded, bytes_total)
+        task_id: Optional task ID for cancellation tracking
 
     Returns:
         Aria2File with download result
@@ -151,7 +221,35 @@ async def download_single_file(
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            stdout, stderr = await process.communicate()
+            # Register process for cancellation tracking
+            if task_id:
+                await register_process(task_id, process)
+
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(), timeout=600  # 10 min timeout
+                )
+            except asyncio.TimeoutError:
+                # aria2 hung — kill it and check if file is complete
+                process.kill()
+                await process.wait()
+                if os.path.exists(output_path):
+                    file_info.status = Aria2Status.COMPLETED
+                    file_info.bytes_total = os.path.getsize(output_path)
+                    file_info.bytes_downloaded = file_info.bytes_total
+                    return file_info
+                file_info.error = "Download timed out"
+                break
+            finally:
+                # Unregister process when done
+                if task_id:
+                    await unregister_process(task_id)
+
+            # Check if cancelled (returncode -15 = SIGTERM, -9 = SIGKILL)
+            if process.returncode in (-15, -9, 255):
+                file_info.status = Aria2Status.FAILED
+                file_info.error = "Cancelled"
+                return file_info
 
             if process.returncode == 0 and os.path.exists(output_path):
                 file_info.status = Aria2Status.COMPLETED
@@ -166,6 +264,10 @@ async def download_single_file(
                 if "404" in error_msg or "403" in error_msg:
                     break
 
+        except asyncio.CancelledError:
+            file_info.status = Aria2Status.FAILED
+            file_info.error = "Cancelled"
+            return file_info
         except Exception as e:
             file_info.error = str(e)
 

@@ -33,6 +33,7 @@ from .download_manager import (
 from .ai_search import _search_local_index, haversine_distance_km
 from .terrain_router import compute_slope_stats
 from .mars_regions import find_region
+from .scoring_methodology import compute_composite_score, classify_evidence_strength, classify_recommendation
 
 logger = logging.getLogger(__name__)
 
@@ -149,47 +150,76 @@ async def search_region(
                     "local": True,
                 })
         else:
-            # ODE-based instruments
-            async with aiohttp.ClientSession() as session:
-                products = []
-                if instrument_upper == "CRISM":
-                    products = await search_ode_spatial(
-                        bbox.min_lat, bbox.max_lat,
-                        bbox.western_lon_360, bbox.eastern_lon_360,
-                        Instrument.CRISM,
-                        max_results=max_results,
-                        session=session,
-                    )
-                elif instrument_upper == "HIRISE":
-                    products = await search_ode_spatial(
-                        bbox.min_lat, bbox.max_lat,
-                        bbox.western_lon_360, bbox.eastern_lon_360,
-                        Instrument.HIRISE,
-                        max_results=max_results,
-                        session=session,
-                    )
-                elif instrument_upper == "SHARAD":
-                    products = await search_sharad_spatial(
-                        bbox.min_lat, bbox.max_lat,
-                        bbox.western_lon_360, bbox.eastern_lon_360,
-                        max_results=max_results,
-                        session=session,
-                    )
+            # ODE-based instruments — with fallback to local index on failure
+            ode_failed = False
+            try:
+                async with aiohttp.ClientSession() as session:
+                    products = []
+                    if instrument_upper == "CRISM":
+                        products = await search_ode_spatial(
+                            bbox.min_lat, bbox.max_lat,
+                            bbox.western_lon_360, bbox.eastern_lon_360,
+                            Instrument.CRISM,
+                            max_results=max_results,
+                            session=session,
+                        )
+                    elif instrument_upper == "HIRISE":
+                        products = await search_ode_spatial(
+                            bbox.min_lat, bbox.max_lat,
+                            bbox.western_lon_360, bbox.eastern_lon_360,
+                            Instrument.HIRISE,
+                            max_results=max_results,
+                            session=session,
+                        )
+                    elif instrument_upper == "SHARAD":
+                        products = await search_sharad_spatial(
+                            bbox.min_lat, bbox.max_lat,
+                            bbox.western_lon_360, bbox.eastern_lon_360,
+                            max_results=max_results,
+                            session=session,
+                        )
 
-                for p in products:
-                    dist = None
-                    if p.lat is not None and p.lon is not None:
-                        dist = round(haversine_distance_km(
-                            bbox.center_lat, bbox.center_lon, p.lat, p.lon
-                        ), 2)
-                    results.append({
-                        "product_id": p.product_id,
-                        "instrument": instrument_upper,
-                        "lat": p.lat,
-                        "lon": p.lon,
-                        "distance_km": dist,
-                        "local": False,
-                    })
+                    for p in products:
+                        dist = None
+                        if p.lat is not None and p.lon is not None:
+                            dist = round(haversine_distance_km(
+                                bbox.center_lat, bbox.center_lon, p.lat, p.lon
+                            ), 2)
+                        results.append({
+                            "product_id": p.product_id,
+                            "instrument": instrument_upper,
+                            "lat": p.lat,
+                            "lon": p.lon,
+                            "distance_km": dist,
+                            "local": False,
+                        })
+            except Exception as ode_err:
+                logger.warning(f"ODE search failed for {instrument_upper}, trying local index: {ode_err}")
+                ode_failed = True
+
+            # Fallback: try local index if ODE returned nothing or failed
+            if ode_failed or len(results) == 0:
+                try:
+                    local_results = _search_local_index(
+                        instrument_upper,
+                        bbox.min_lat, bbox.max_lat,
+                        bbox.min_lon, bbox.max_lon,
+                        bbox.center_lat, bbox.center_lon,
+                        max_results,
+                    )
+                    for r in local_results:
+                        results.append({
+                            "product_id": r.product_id,
+                            "instrument": r.instrument,
+                            "lat": r.lat,
+                            "lon": r.lon,
+                            "distance_km": r.distance_km,
+                            "local": True,
+                        })
+                    if local_results:
+                        logger.info(f"Local index fallback found {len(local_results)} {instrument_upper} products")
+                except Exception:
+                    pass  # No local index for this instrument
 
         return TaskResult(
             task_type="search_region",
@@ -319,34 +349,42 @@ async def download_data(
                     await on_progress(len(downloaded), len(failed), len(skipped), len(products))
                 return
 
-            try:
-                task = await download_manager.start_download(
-                    product_id=pid,
-                    instrument=inst_enum,
-                    lat=p.get("lat"),
-                    lon=p.get("lon"),
-                )
+            max_retries = 2
+            for attempt in range(max_retries + 1):
+                try:
+                    task = await download_manager.start_download(
+                        product_id=pid,
+                        instrument=inst_enum,
+                        lat=p.get("lat"),
+                        lon=p.get("lon"),
+                    )
 
-                # Poll until complete (max 10 min per product)
-                for _ in range(600):
-                    t = download_manager.get_task(task.task_id)
-                    if not t:
-                        break
-                    if t.status == DownloadStatus.COMPLETED:
-                        downloaded.append(pid)
-                        if on_progress:
-                            await on_progress(len(downloaded), len(failed), len(skipped), len(products))
-                        return
-                    if t.status == DownloadStatus.FAILED:
-                        failed.append({"product_id": pid, "error": t.error})
-                        if on_progress:
-                            await on_progress(len(downloaded), len(failed), len(skipped), len(products))
-                        return
-                    await asyncio.sleep(1)
+                    # Poll until complete (max 10 min per product)
+                    for _ in range(600):
+                        t = download_manager.get_task(task.task_id)
+                        if not t:
+                            break
+                        if t.status == DownloadStatus.COMPLETED:
+                            downloaded.append(pid)
+                            if on_progress:
+                                await on_progress(len(downloaded), len(failed), len(skipped), len(products))
+                            return
+                        if t.status == DownloadStatus.FAILED:
+                            raise RuntimeError(t.error or "Download failed")
+                        await asyncio.sleep(1)
+                    else:
+                        raise RuntimeError("Timeout")
 
-                failed.append({"product_id": pid, "error": "Timeout"})
-            except Exception as e:
-                failed.append({"product_id": pid, "error": str(e)})
+                    # If we got here without returning, task disappeared
+                    raise RuntimeError("Download task vanished")
+
+                except Exception as e:
+                    if attempt < max_retries:
+                        wait = 2 ** (attempt + 1)  # 2s, 4s
+                        logger.warning(f"Download {pid} failed (attempt {attempt + 1}), retrying in {wait}s: {e}")
+                        await asyncio.sleep(wait)
+                        continue
+                    failed.append({"product_id": pid, "error": str(e)})
             if on_progress:
                 await on_progress(len(downloaded), len(failed), len(skipped), len(products))
 
@@ -399,8 +437,8 @@ def slope_analysis(
         grid_points = []
 
         if bbox:
-            # Sample a 5×5 grid across the bounding box
-            n_lat, n_lon = 5, 5
+            # Sample a 15×15 grid across the bounding box (225 points)
+            n_lat, n_lon = 15, 15
             lat_step = (bbox.max_lat - bbox.min_lat) / (n_lat - 1) if n_lat > 1 else 0
             lon_step = (bbox.max_lon - bbox.min_lon) / (n_lon - 1) if n_lon > 1 else 0
             for i in range(n_lat):
@@ -425,6 +463,13 @@ def slope_analysis(
                 safety = _assess_safety(stats)
                 pct_safe = stats["distribution"]["0_3"] + stats["distribution"]["3_5"]
 
+                # Roughness: use std_slope if available, else proxy estimate
+                roughness = stats.get("std_slope", 0)
+                if roughness == 0:
+                    # Proxy from distribution buckets
+                    dist = stats["distribution"]
+                    roughness = (dist.get("5_plus", 0) * 10 + dist.get("3_5", 0) * 4 + dist.get("0_3", 0) * 1.5) / 100.0
+
                 point_data = {
                     "lat": g_lat,
                     "lon": g_lon,
@@ -433,6 +478,7 @@ def slope_analysis(
                     "elevation_m": stats["elevation_m"],
                     "pct_below_5deg": round(pct_safe, 1),
                     "safety": safety,
+                    "roughness": round(roughness, 3),
                 }
                 grid_results.append(point_data)
 
@@ -455,6 +501,18 @@ def slope_analysis(
                          "MARGINAL" if (favorable_count + marginal_count) > len(grid_results) * 0.5 else \
                          "UNFAVORABLE"
 
+        # Roughness statistics across grid
+        roughness_values = [p.get("roughness", 0) for p in grid_results]
+        roughness_stats = {
+            "mean": round(sum(roughness_values) / len(roughness_values), 3) if roughness_values else 0,
+            "max": round(max(roughness_values), 3) if roughness_values else 0,
+        }
+
+        # Hazard density: fraction of grid points with >5° mean slope
+        hazard_density = round(
+            sum(1 for p in grid_results if p["mean_slope"] > 5) / len(grid_results), 4
+        )
+
         result_data = {
             "grid_points": grid_results,
             "grid_size": len(grid_results),
@@ -471,6 +529,8 @@ def slope_analysis(
                 "3_5": round(sum(p["pct_below_5deg"] for p in grid_results) / len(grid_results) * 0.4, 1),
                 "5_plus": round(100 - sum(p["pct_below_5deg"] for p in grid_results) / len(grid_results), 1),
             },
+            "roughness_stats": roughness_stats,
+            "hazard_density": hazard_density,
         }
 
         summary = (
@@ -591,7 +651,7 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
 
             # Sample every 10th valid trace for speed
             valid_indices = np.where(valid_surface)[0]
-            sample_step = max(1, len(valid_indices) // 100)
+            sample_step = max(1, len(valid_indices) // 10)
             sampled = valid_indices[::sample_step]
 
             for idx in sampled:
@@ -607,19 +667,56 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
                 peak_val = float(band[peak_idx])
                 snr = peak_val / noise
 
-                if snr >= 2.5:  # subsurface reflector threshold
+                if snr >= 4.0:  # subsurface reflector threshold (strict to reduce false positives)
                     sub_detect_count += 1
                     delta_bins = (search_lo + peak_idx) - s_bin
-                    dt_s = delta_bins * _SHARAD_DT_US * 1e-6
-                    v_ice = _SPEED_OF_LIGHT / np.sqrt(_ICE_EPSILON)
-                    depth_m = v_ice * dt_s / 2.0
+
+                    # Three dielectric scenarios for depth estimation
+                    DIELECTRIC_SCENARIOS = [
+                        {"epsilon_r": 2.8, "label": "porous_ice", "description": "Porous ice/regolith mix"},
+                        {"epsilon_r": 3.15, "label": "pure_ice", "description": "Pure water ice"},
+                        {"epsilon_r": 4.0, "label": "basaltic", "description": "Basaltic contrast interface"},
+                    ]
+                    depths_multi = {}
+                    for scenario in DIELECTRIC_SCENARIOS:
+                        eps_r = scenario["epsilon_r"]
+                        d_m = (_SPEED_OF_LIGHT * delta_bins * _SHARAD_DT_US * 1e-6) / (2.0 * np.sqrt(eps_r))
+                        depths_multi[scenario["label"]] = round(float(d_m), 1)
+
+                    # Keep pure_ice as the backward-compat default depth
+                    depth_m = depths_multi["pure_ice"]
                     depth_estimates.append(float(depth_m))
                     subsurface_picks.append({
                         "trace_idx": int(idx),
                         "bin_idx": search_lo + peak_idx,
-                        "depth_m": round(float(depth_m), 1),
+                        "delta_bins": delta_bins,
                         "snr": round(float(snr), 2),
+                        "depths": depths_multi,
+                        # backward compat
+                        "depth_m": round(float(depth_m), 1),
+                        "epsilon_r_source": "assumed",
                     })
+
+            # Coherence filter: real subsurface interfaces have consistent depth
+            # Discard if depth varies too wildly (noise, not a real horizontal interface)
+            if len(depth_estimates) >= 3:
+                depth_arr = np.array(depth_estimates)
+                depth_std = float(np.std(depth_arr))
+                depth_median = float(np.median(depth_arr))
+                # Keep only picks within 2 std of median depth (remove outliers)
+                if depth_std > 0 and depth_median > 0:
+                    mask = np.abs(depth_arr - depth_median) <= 2.0 * depth_std
+                    depth_estimates = depth_arr[mask].tolist()
+                    subsurface_picks = [p for p, m in zip(subsurface_picks, mask) if m]
+                    sub_detect_count = len(subsurface_picks)
+                # If remaining depths still too scattered (CV > 30%), likely noise
+                if len(depth_estimates) >= 3:
+                    final_std = float(np.std(depth_estimates))
+                    final_mean = float(np.mean(depth_estimates))
+                    if final_mean > 0 and (final_std / final_mean) > 0.30:
+                        depth_estimates = []
+                        subsurface_picks = []
+                        sub_detect_count = 0
 
             detection_pct = round(sub_detect_count / len(sampled) * 100, 1) if sampled.size > 0 else 0
 
@@ -637,6 +734,7 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
                     "max": round(max(depth_estimates), 1),
                     "median": round(float(np.median(depth_estimates)), 1),
                     "epsilon_r": _ICE_EPSILON,
+                    "epsilon_r_source": "assumed",
                 }
                 subsurface_detections += 1
             if subsurface_picks:
@@ -660,21 +758,105 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
     n_analyzed = sum(1 for t in analyzed_tracks if t.get("analyzed"))
     n_with_subsurface = sum(1 for t in analyzed_tracks if t.get("subsurface_detected"))
 
-    # Compute depth summary across all tracks
+    # ── SNR Distribution across all detected reflectors ──
+    all_snr = [pick["snr"] for t in analyzed_tracks for pick in t.get("subsurface_picks", [])]
+    snr_distribution = None
+    if all_snr:
+        snr_distribution = {
+            "mean": round(float(np.mean(all_snr)), 2),
+            "median": round(float(np.median(all_snr)), 2),
+            "std": round(float(np.std(all_snr)), 2),
+            "min": round(float(min(all_snr)), 2),
+            "max": round(float(max(all_snr)), 2),
+            "histogram": np.histogram(all_snr, bins=[4, 6, 8, 10, 15, 20, 50])[0].tolist(),
+        }
+
+    # ── Reflector Spatial Density (detections per km of analyzed track) ──
+    total_track_km = 0
+    for t in analyzed_tracks:
+        if t.get("analyzed") and t.get("lat_range"):
+            lat_span = abs(t["lat_range"][1] - t["lat_range"][0])
+            track_km = lat_span * 59.27  # 1 deg lat ~ 59.27 km on Mars
+            total_track_km += track_km
+    reflector_density = round(n_with_subsurface / total_track_km, 3) if total_track_km > 0 else 0
+
+    # ── Multi-scenario depth summary ──
+    DIELECTRIC_SCENARIOS_SUMMARY = [
+        {"epsilon_r": 2.8, "label": "porous_ice", "description": "Porous ice/regolith mix"},
+        {"epsilon_r": 3.15, "label": "pure_ice", "description": "Pure water ice"},
+        {"epsilon_r": 4.0, "label": "basaltic", "description": "Basaltic contrast interface"},
+    ]
+
+    # Collect per-scenario depths from all picks across all tracks
+    all_depths_by_scenario: Dict[str, List[float]] = {"porous_ice": [], "pure_ice": [], "basaltic": []}
+    for t in analyzed_tracks:
+        for pick in t.get("subsurface_picks", []):
+            depths_dict = pick.get("depths", {})
+            for label in all_depths_by_scenario:
+                val = depths_dict.get(label)
+                if val is not None:
+                    all_depths_by_scenario[label].append(float(val))
+
+    # Also collect backward-compat median depths per track
     all_depths = []
     for t in analyzed_tracks:
         if "estimated_depth_m" in t:
             all_depths.append(t["estimated_depth_m"]["median"])
 
     depth_summary = None
-    if all_depths:
+    if all_depths_by_scenario["pure_ice"]:
+        depth_ranges = {}
+        for scenario in DIELECTRIC_SCENARIOS_SUMMARY:
+            label = scenario["label"]
+            vals = all_depths_by_scenario.get(label, [])
+            if vals:
+                depth_ranges[label] = {
+                    "min": round(min(vals), 1),
+                    "max": round(max(vals), 1),
+                    "median": round(float(np.median(vals)), 1),
+                    "epsilon_r": scenario["epsilon_r"],
+                }
+        pure_vals = all_depths_by_scenario["pure_ice"]
+        depth_summary = {
+            "dielectric_scenarios": DIELECTRIC_SCENARIOS_SUMMARY,
+            "depth_ranges": depth_ranges,
+            "n_tracks": len(all_depths) if all_depths else len(pure_vals),
+            # Backward-compat fields (using pure_ice scenario)
+            "min_depth_m": round(min(pure_vals), 1),
+            "max_depth_m": round(max(pure_vals), 1),
+            "median_depth_m": round(float(np.median(pure_vals)), 1),
+            "epsilon_r_assumed": _ICE_EPSILON,
+            "epsilon_r_source": "assumed",
+            "physics_warning": (
+                "Depth computed from assumed εr=3.15 (water-ice). "
+                "This is NOT an independent physical measurement. "
+                "Physics-based dielectric inversion required for validated depth."
+            ),
+        }
+    elif all_depths:
+        # Fallback: no multi-scenario picks but old-style depths exist
         depth_summary = {
             "min_depth_m": round(min(all_depths), 1),
             "max_depth_m": round(max(all_depths), 1),
             "median_depth_m": round(float(np.median(all_depths)), 1),
             "n_tracks": len(all_depths),
             "epsilon_r_assumed": _ICE_EPSILON,
+            "epsilon_r_source": "assumed",
+            "physics_warning": (
+                "Depth computed from assumed εr=3.15 (water-ice). "
+                "This is NOT an independent physical measurement. "
+                "Physics-based dielectric inversion required for validated depth."
+            ),
         }
+
+    # ── Clutter rejection methodology note ──
+    clutter_rejection = (
+        "Subsurface reflectors are identified by SNR >= 4.0 threshold relative to "
+        "local noise floor (median power in search window). Coherence filtering "
+        "removes detections with coefficient of variation > 30% across sampled traces "
+        "to reject off-nadir surface clutter. Remaining outliers beyond 2 sigma of median "
+        "depth are removed."
+    )
 
     summary_parts = [f"SHARAD: {coverage} ({total} tracks)"]
     if n_analyzed > 0:
@@ -699,6 +881,9 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
             "subsurface_detections": n_with_subsurface,
             "depth_summary": depth_summary,
             "tracks": analyzed_tracks,
+            "snr_distribution": snr_distribution,
+            "clutter_rejection": clutter_rejection,
+            "reflector_density_per_km": reflector_density,
         },
         summary=", ".join(summary_parts),
     )
@@ -799,6 +984,92 @@ def mineral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
             "max_ice_pct": top_ice[0]["ice_percent"],
         }
 
+    # ── Threshold Statistical Justification ──
+    import numpy as np
+    all_ice_means = [
+        s.get("ice", {}).get("mean_score", 0)
+        for s in score_stats.values()
+        if s.get("ice", {}).get("valid_pixels", 0) > 0
+    ]
+    threshold_justification = None
+    if all_ice_means:
+        bg_mean = float(np.mean(all_ice_means))
+        bg_std = float(np.std(all_ice_means))
+        sigma_above = (0.3 - bg_mean) / bg_std if bg_std > 0 else float('inf')
+        threshold_justification = {
+            "threshold": 0.3,
+            "background_mean": round(bg_mean, 4),
+            "background_std": round(bg_std, 4),
+            "sigma_above_background": round(sigma_above, 2),
+            "note": f"Threshold 0.3 is {sigma_above:.1f} sigma above the global background mean ({bg_mean:.4f})",
+        }
+
+    # ── False Positive Estimate ──
+    all_ice_pcts = [s["ice_percent"] for s in scored_products if s["has_score"]]
+    false_positive_rate = 0.0
+    if all_ice_pcts:
+        q25 = float(np.percentile(all_ice_pcts, 25)) if len(all_ice_pcts) >= 4 else 0
+        false_positive_products = [p for p in all_ice_pcts if p < q25 and p > 0]
+        false_positive_rate = (
+            len([p for p in false_positive_products if p >= 5]) / max(len(false_positive_products), 1)
+        )
+
+    # ── Spatial Coherence (connected-component proxy) ──
+    high_ice_products = [
+        p for p in scored_products
+        if p["ice_percent"] >= 5 and p.get("lat") is not None and p.get("lon") is not None
+    ]
+    clusters: List[List[Dict[str, Any]]] = []
+    used: set = set()
+    for i, p in enumerate(high_ice_products):
+        if i in used:
+            continue
+        cluster = [p]
+        used.add(i)
+        for j, q in enumerate(high_ice_products):
+            if j in used:
+                continue
+            d = haversine_distance_km(p["lat"], p["lon"], q["lat"], q["lon"])
+            if d < 50:
+                cluster.append(q)
+                used.add(j)
+        clusters.append(cluster)
+
+    largest_cluster_extent_km = 0.0
+    if clusters:
+        largest = max(clusters, key=len)
+        if len(largest) >= 2:
+            for ci in range(len(largest)):
+                for cj in range(ci + 1, len(largest)):
+                    d = haversine_distance_km(
+                        largest[ci]["lat"], largest[ci]["lon"],
+                        largest[cj]["lat"], largest[cj]["lon"],
+                    )
+                    largest_cluster_extent_km = max(largest_cluster_extent_km, d)
+
+    spatial_coherence = {
+        "cluster_count": len(clusters),
+        "largest_cluster_size": max(len(c) for c in clusters) if clusters else 0,
+        "largest_cluster_extent_km": round(largest_cluster_extent_km, 1),
+    }
+
+    # ── Evidence Separation ──
+    evidence_separation: Dict[str, List[str]] = {
+        "spectral_hydration": [],   # products with hyd_pct >= 5 but ice_pct < 5
+        "water_ice": [],            # products with ice_pct >= 5
+        "atmospheric_suspect": [],  # products where ice score is suspiciously uniform
+    }
+    for s in scored_products:
+        if s["ice_percent"] >= 5:
+            evidence_separation["water_ice"].append(s["obs_id"])
+        elif s["hyd_percent"] >= 5:
+            evidence_separation["spectral_hydration"].append(s["obs_id"])
+        # Atmospheric suspect: ice_mean close to ice_max (uniform = atmospheric artifact)
+        if s["ice_mean_score"] > 0 and s["ice_max_score"] > 0:
+            ratio = s["ice_mean_score"] / s["ice_max_score"] if s["ice_max_score"] > 0 else 0
+            if ratio > 0.85 and s["ice_percent"] >= 5:
+                evidence_separation["atmospheric_suspect"].append(s["obs_id"])
+
     summary_parts = [f"{len(crism)} CRISM: {high_ice} high-ice, {high_hyd} high-hyd"]
     if top_ice:
         best = top_ice[0]
@@ -821,6 +1092,10 @@ def mineral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
             "scored_count": sum(1 for s in scored_products if s["has_score"]),
             "top_ice_candidates": top_ice,
             "ice_hotspot": ice_hotspot,
+            "threshold_justification": threshold_justification,
+            "false_positive_rate": round(false_positive_rate, 4),
+            "spatial_coherence": spatial_coherence,
+            "evidence_separation": evidence_separation,
         },
         summary=", ".join(summary_parts),
     )
@@ -869,6 +1144,11 @@ async def mineral_cnn_classify(products: List[Dict[str, Any]]) -> TaskResult:
     classified_obs: List[Dict[str, Any]] = []
     total_mineral_pixels: Dict[int, int] = {}  # class_id -> pixel count
     ice_types_found: List[str] = []
+
+    # H2O / CO2 Ice tracking (class IDs: H2O=2, CO2=1)
+    H2O_ICE_ID, CO2_ICE_ID = 2, 1
+    h2o_total_pixels = 0
+    co2_total_pixels = 0
 
     for p in crism:
         pid = p["product_id"]
@@ -920,11 +1200,20 @@ async def mineral_cnn_classify(products: List[Dict[str, Any]]) -> TaskResult:
                     top_class_id = cls_id
 
             # Check for ice
-            for ice_id, ice_name in [(1, "CO2 Ice"), (2, "H2O Ice")]:
+            for ice_id, ice_name in [(CO2_ICE_ID, "CO2 Ice"), (H2O_ICE_ID, "H2O Ice")]:
                 ice_str = str(ice_id)
                 if ice_str in result.class_stats and result.class_stats[ice_str] > 0:
                     if ice_name not in ice_types_found:
                         ice_types_found.append(ice_name)
+
+            # Per-observation H2O / CO2 pixel counts
+            obs_h2o = int(result.class_stats.get(str(H2O_ICE_ID), 0))
+            obs_co2 = int(result.class_stats.get(str(CO2_ICE_ID), 0))
+            h2o_pct = round(obs_h2o / total_classified * 100, 2) if total_classified > 0 else 0.0
+            co2_pct = round(obs_co2 / total_classified * 100, 2) if total_classified > 0 else 0.0
+
+            h2o_total_pixels += obs_h2o
+            co2_total_pixels += obs_co2
 
             classified_obs.append({
                 "obs_id": obs_id,
@@ -933,6 +1222,11 @@ async def mineral_cnn_classify(products: List[Dict[str, Any]]) -> TaskResult:
                 "total_classified_pixels": total_classified,
                 "top_mineral": CLASS_NAME.get(top_class_id, "Unknown"),
                 "top_mineral_pixels": top_class_count,
+                "h2o_pixels": obs_h2o,
+                "h2o_percent": h2o_pct,
+                "co2_pixels": obs_co2,
+                "co2_percent": co2_pct,
+                "h2o_rich": h2o_pct >= 1.0,
             })
 
         except Exception as e:
@@ -948,10 +1242,29 @@ async def mineral_cnn_classify(products: List[Dict[str, Any]]) -> TaskResult:
 
     ice_detected = bool(ice_types_found)
 
+    # H2O spatial aggregation
+    h2o_obs = [o for o in classified_obs if o["h2o_pixels"] > 0]
+    h2o_rich_obs = [o for o in classified_obs if o.get("h2o_rich")]
+    h2o_hotspot = None
+    if h2o_rich_obs:
+        lats = [o["lat"] for o in h2o_rich_obs if o.get("lat") is not None]
+        lons = [o["lon"] for o in h2o_rich_obs if o.get("lon") is not None]
+        if lats and lons:
+            h2o_hotspot = {
+                "center_lat": round(sum(lats) / len(lats), 4),
+                "center_lon": round(sum(lons) / len(lons), 4),
+                "n_observations": len(h2o_rich_obs),
+                "max_h2o_percent": max(o["h2o_percent"] for o in h2o_rich_obs),
+            }
+
     summary_parts = [f"CNN classified {len(classified_obs)}/{len(crism)} CRISM observations"]
     if top_minerals:
         summary_parts.append(f"Top: {top_minerals[0]['name']} ({top_minerals[0]['total_pixels']} px)")
-    if ice_detected:
+    if h2o_total_pixels > 0:
+        summary_parts.append(f"H2O Ice: {h2o_total_pixels} px across {len(h2o_obs)} obs ({len(h2o_rich_obs)} H2O-rich)")
+    if co2_total_pixels > 0:
+        summary_parts.append(f"CO2 Ice: {co2_total_pixels} px (seasonal frost)")
+    if ice_detected and not h2o_total_pixels and not co2_total_pixels:
         summary_parts.append(f"Ice detected: {', '.join(ice_types_found)}")
 
     return TaskResult(
@@ -965,6 +1278,12 @@ async def mineral_cnn_classify(products: List[Dict[str, Any]]) -> TaskResult:
             "ice_detected": ice_detected,
             "ice_types": ice_types_found,
             "total_mineral_pixels": {str(k): v for k, v in total_mineral_pixels.items()},
+            # H2O-specific fields
+            "h2o_total_pixels": h2o_total_pixels,
+            "co2_total_pixels": co2_total_pixels,
+            "h2o_observations": len(h2o_obs),
+            "h2o_rich_observations": len(h2o_rich_obs),
+            "h2o_hotspot": h2o_hotspot,
         },
         summary=", ".join(summary_parts),
     )
@@ -1170,6 +1489,470 @@ def dielectric_analysis(
 
 
 # =============================================================================
+# Task: Terraced Crater Dielectric Estimation (SHARAD + HiRISE DTM)
+# =============================================================================
+
+def terrace_dielectric_analysis(
+    subsurface_result: Optional[TaskResult],
+    products: List[Dict[str, Any]],
+    bbox: "RegionBBox",
+) -> TaskResult:
+    """
+    Estimate dielectric constant using terraced craters as "true depth" constraints.
+
+    This is a more rigorous version of dielectric_analysis that:
+    1. Finds HiRISE DTMs with terraced morphology near SHARAD tracks
+    2. Extracts radial elevation profiles and identifies terrace benches
+    3. Uses terrace-to-floor depth as a geometric depth proxy
+    4. Picks SHARAD subsurface reflector two-way travel time near the crater
+    5. Back-computes εr = (c * t / (2 * depth))²
+
+    Quality flags indicate whether the terrace boundary plausibly corresponds
+    to the SHARAD reflector (εr in 2-8 range = plausible).
+    """
+    import os
+
+    if not subsurface_result or not subsurface_result.success:
+        return TaskResult(
+            task_type="terrace_dielectric",
+            success=True,
+            data={"estimates_count": 0},
+            summary="No subsurface data for terrace dielectric analysis",
+        )
+
+    tracks = subsurface_result.data.get("tracks", [])
+    tracks_with_reflectors = [
+        t for t in tracks
+        if t.get("subsurface_detected") and t.get("estimated_depth_m")
+    ]
+
+    if not tracks_with_reflectors:
+        return TaskResult(
+            task_type="terrace_dielectric",
+            success=True,
+            data={"estimates_count": 0, "reason": "no_subsurface_reflectors"},
+            summary="No SHARAD subsurface reflectors for terrace analysis",
+        )
+
+    # Find SHARAD hi-res products
+    sharad_products = [p for p in products if p.get("instrument") == "SHARAD_HIGHRES"]
+    if not sharad_products:
+        return TaskResult(
+            task_type="terrace_dielectric",
+            success=True,
+            data={"estimates_count": 0, "reason": "no_sharad_highres"},
+            summary="No SHARAD high-res products for terrace analysis",
+        )
+
+    try:
+        from backend.analysis.epsilon_terrace.run import run_pipeline
+    except ImportError:
+        try:
+            from analysis.epsilon_terrace.run import run_pipeline
+        except ImportError:
+            return TaskResult(
+                task_type="terrace_dielectric",
+                success=False,
+                error="epsilon_terrace module not available",
+                summary="Terrace dielectric module unavailable",
+            )
+
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dtm_dir = os.path.join(backend_dir, "hirise_dtm_data")
+    output_dir = os.path.join(dtm_dir, "epsilon_results")
+
+    if not os.path.isdir(dtm_dir):
+        return TaskResult(
+            task_type="terrace_dielectric",
+            success=True,
+            data={"estimates_count": 0, "reason": "no_dtm_dir"},
+            summary="No HiRISE DTM directory for terrace analysis",
+        )
+
+    all_estimates = []
+    analyzed_tracks = []
+
+    for sp in sharad_products[:3]:  # Limit to 3 tracks for speed
+        pid = sp["product_id"]
+        try:
+            result = run_pipeline(
+                sharad_product_id=pid,
+                dtm_dir=dtm_dir,
+                buffer_km=30,
+                output_dir=output_dir,
+            )
+            estimates = result.get("epsilon_estimates", [])
+            # Only keep good/marginal quality estimates
+            good_estimates = [e for e in estimates if e.get("quality") != "unreliable"]
+            all_estimates.extend(good_estimates)
+            analyzed_tracks.append({
+                "product_id": pid,
+                "dtms_found": result.get("dtms_found", 0),
+                "estimates": len(estimates),
+                "good_estimates": len(good_estimates),
+            })
+        except Exception as e:
+            logger.warning(f"Terrace dielectric failed for {pid}: {e}")
+            analyzed_tracks.append({
+                "product_id": pid,
+                "error": str(e),
+            })
+
+    if not all_estimates:
+        return TaskResult(
+            task_type="terrace_dielectric",
+            success=True,
+            data={
+                "estimates_count": 0,
+                "tracks_analyzed": analyzed_tracks,
+                "reason": "no_reliable_estimates",
+            },
+            summary=f"No reliable terrace εr estimates from {len(analyzed_tracks)} tracks",
+        )
+
+    eps_values = [e["epsilon_r"] for e in all_estimates]
+    import numpy as np
+    mean_eps = round(float(np.mean(eps_values)), 2)
+    median_eps = round(float(np.median(eps_values)), 2)
+
+    if median_eps < 2.5:
+        interp = "dry regolith or porous ice"
+    elif median_eps < 3.5:
+        interp = "ice-rich subsurface (consistent with water ice)"
+    elif median_eps < 5.0:
+        interp = "ice-cemented regolith"
+    else:
+        interp = "basaltic regolith or dense rock"
+
+    return TaskResult(
+        task_type="terrace_dielectric",
+        success=True,
+        data={
+            "estimates_count": len(all_estimates),
+            "mean_epsilon_r": mean_eps,
+            "median_epsilon_r": median_eps,
+            "min_epsilon_r": round(min(eps_values), 2),
+            "max_epsilon_r": round(max(eps_values), 2),
+            "interpretation": interp,
+            "estimates": all_estimates,
+            "tracks_analyzed": analyzed_tracks,
+        },
+        summary=f"Terrace εr = {median_eps} (median, {len(all_estimates)} estimates): {interp}",
+    )
+
+
+# =============================================================================
+# Task: SHARAD Physics-Based Inversion
+# =============================================================================
+
+def sharad_physics_inversion(
+    products: List[Dict[str, Any]],
+    bbox: "RegionBBox",
+) -> TaskResult:
+    """
+    Physics-based SHARAD dielectric inversion using terraced crater depth constraints.
+
+    Mandatory pipeline: DTM geometry → SHARAD travel time → εr = (c·Δt / 2d)²
+    Depth MUST come from DTM measurement, εr is NEVER assumed as 3.15.
+    Includes clutter filtering and hyperbola curvature validation.
+    """
+    import os
+
+    sharad_pids = [p["product_id"] for p in products if p.get("instrument") == "SHARAD_HIGHRES"]
+    if not sharad_pids:
+        return TaskResult(
+            task_type="sharad_physics_inversion",
+            success=True,
+            data={
+                "inversions_completed": 0,
+                "reason": "no_sharad_highres_products",
+                "physics_note": "Inversion cannot proceed without SHARAD_HIGHRES radargram data.",
+            },
+            summary="No SHARAD_HIGHRES products for physics-based inversion",
+        )
+
+    try:
+        from analysis.sharad_inversion import run_inversion_pipeline
+    except ImportError:
+        try:
+            from backend.analysis.sharad_inversion import run_inversion_pipeline
+        except ImportError:
+            return TaskResult(
+                task_type="sharad_physics_inversion",
+                success=False,
+                error="sharad_inversion module not available",
+                summary="SHARAD physics inversion module unavailable",
+            )
+
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dtm_dir = os.path.join(backend_dir, "hirise_dtm_data")
+
+    if not os.path.isdir(dtm_dir):
+        return TaskResult(
+            task_type="sharad_physics_inversion",
+            success=True,
+            data={
+                "inversions_completed": 0,
+                "reason": "no_dtm_directory",
+                "physics_note": "DTM data directory not found. Cannot perform inversion without independent depth constraints.",
+            },
+            summary="No DTM directory for physics-based inversion",
+        )
+
+    try:
+        pipeline_result = run_inversion_pipeline(
+            sharad_product_ids=sharad_pids[:5],
+            dtm_dir=dtm_dir,
+            buffer_km=30,
+            min_snr=3.0,
+            do_hyperbola_validation=True,
+            do_clutter_filter=True,
+        )
+
+        # Convert Pydantic models to serializable dicts
+        assumptions_list = []
+        for a in pipeline_result.assumptions:
+            assumptions_list.append({
+                "param": a.param,
+                "value": a.value,
+                "source": a.source,
+                "justification": a.justification,
+                "uncertainty": a.uncertainty,
+            })
+
+        derivation_log = []
+        for d in pipeline_result.derivation_log:
+            derivation_log.append({
+                "step": d.step,
+                "equation": d.equation,
+                "inputs": d.inputs,
+                "output": d.output,
+                "notes": d.notes,
+            })
+
+        inversion_details = []
+        for inv in pipeline_result.results:
+            detail = {
+                "sharad_product_id": inv.sharad_product_id,
+                "dtm_product_id": inv.dtm_product_id,
+                "epsilon_r": inv.epsilon_r,
+                "epsilon_r_ci": inv.epsilon_r_ci,
+                "depth_m": inv.depth_m,
+                "twt_us": inv.twt_us,
+                "quality": inv.quality,
+                "material_interpretation": inv.material_interpretation,
+            }
+            if inv.hyperbola_validation:
+                detail["hyperbola_validation"] = {
+                    "epsilon_r_hyperbola": inv.hyperbola_validation.epsilon_r_hyperbola,
+                    "agreement": inv.hyperbola_validation.agreement,
+                    "delta_epsilon": inv.hyperbola_validation.delta_epsilon,
+                }
+            if inv.clutter_assessment:
+                detail["clutter_assessment"] = {
+                    "is_clutter": inv.clutter_assessment.is_clutter,
+                    "clutter_score": inv.clutter_assessment.clutter_score,
+                    "snr_at_pick": inv.clutter_assessment.snr_at_pick,
+                }
+            inversion_details.append(detail)
+
+        data = {
+            "inversions_completed": pipeline_result.inversions_completed,
+            "sharad_products_analyzed": pipeline_result.sharad_products_analyzed,
+            "dtm_intersections_found": pipeline_result.dtm_intersections_found,
+            "best_epsilon_r": pipeline_result.best_epsilon_r,
+            "best_epsilon_r_ci": pipeline_result.best_epsilon_r_ci,
+            "reflector_confidence": pipeline_result.reflector_confidence,
+            "assumptions": assumptions_list,
+            "derivation_log": derivation_log,
+            "inversion_details": inversion_details,
+            "methodology": (
+                "Physics-based inversion: depth from DTM terrace geometry (independent measurement), "
+                "εr = (c · Δt / (2 · depth))². Clutter filtered via cluttergram comparison. "
+                "Cross-validated with hyperbola curvature fitting."
+            ),
+        }
+
+        # Build summary
+        if pipeline_result.inversions_completed > 0:
+            summary = (
+                f"Physics inversion: {pipeline_result.inversions_completed} estimates, "
+                f"best εr={pipeline_result.best_epsilon_r:.2f} "
+                f"(CI: {pipeline_result.best_epsilon_r_ci}), "
+                f"confidence={pipeline_result.reflector_confidence}"
+            )
+        else:
+            summary = (
+                f"Analyzed {pipeline_result.sharad_products_analyzed} SHARAD products, "
+                f"found {pipeline_result.dtm_intersections_found} DTM intersections, "
+                f"but no successful inversions"
+            )
+
+        return TaskResult(
+            task_type="sharad_physics_inversion",
+            success=True,
+            data=data,
+            summary=summary,
+        )
+
+    except Exception as e:
+        logger.error(f"SHARAD physics inversion failed: {e}")
+        return TaskResult(
+            task_type="sharad_physics_inversion",
+            success=False,
+            error=str(e),
+            summary=f"SHARAD physics inversion failed: {e}",
+        )
+
+
+# =============================================================================
+# Task: CRISM Spectral Analysis (SAM + Band Parameters)
+# =============================================================================
+
+def crism_spectral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
+    """
+    CRISM spectral analysis with continuum removal, band parameters, and SAM classification.
+
+    Replaces threshold-based ice scoring with physics-based mineral classification:
+    1. Continuum removal (convex hull)
+    2. Band parameter extraction (BD1500, BD1900, BD2100, BD2200)
+    3. Spectral Angle Mapper against USGS endmembers
+    4. Per-pixel classification with mineral class and probability
+    """
+    import re
+
+    crism = [p for p in products if p.get("instrument") == "CRISM"]
+    if not crism:
+        return TaskResult(
+            task_type="crism_spectral",
+            success=True,
+            data={"observations_analyzed": 0, "reason": "no_crism_products"},
+            summary="No CRISM products for spectral analysis",
+        )
+
+    try:
+        from analysis.crism_spectral import run_spectral_analysis
+    except ImportError:
+        try:
+            from backend.analysis.crism_spectral import run_spectral_analysis
+        except ImportError:
+            return TaskResult(
+                task_type="crism_spectral",
+                success=False,
+                error="crism_spectral module not available",
+                summary="CRISM spectral analysis module unavailable",
+            )
+
+    analyzed = []
+    aggregate_class_counts: Dict[str, int] = {}
+    total_water_ice_pixels = 0
+    total_pixels_analyzed = 0
+    all_bd1500 = []
+    all_bd1900 = []
+
+    for p in crism:
+        pid = p["product_id"]
+        match = re.match(r'^([a-z]{3}[0-9a-f]{8})', pid.lower())
+        obs_id = match.group(1) if match else pid.lower()
+
+        try:
+            result = run_spectral_analysis(obs_id, max_sam_angle=0.3, subsample=1)
+
+            obs_data = {
+                "obs_id": result.obs_id,
+                "lat": p.get("lat"),
+                "lon": p.get("lon"),
+                "class_counts": result.class_counts,
+                "class_fractions": result.class_fractions,
+                "water_ice_fraction": result.water_ice_fraction,
+                "water_ice_pixel_count": result.water_ice_pixel_count,
+                "mean_band_params": {
+                    "BD1500": result.mean_band_params.BD1500,
+                    "BD1900": result.mean_band_params.BD1900,
+                    "BD2100": result.mean_band_params.BD2100,
+                    "BD2200": result.mean_band_params.BD2200,
+                },
+                "atmospheric_uncertainty_notes": result.atmospheric_uncertainty_notes,
+            }
+            analyzed.append(obs_data)
+
+            # Aggregate
+            for cls, count in result.class_counts.items():
+                aggregate_class_counts[cls] = aggregate_class_counts.get(cls, 0) + count
+            total_water_ice_pixels += result.water_ice_pixel_count
+            total_pixels_analyzed += sum(result.class_counts.values())
+            if result.mean_band_params.BD1500 is not None:
+                all_bd1500.append(result.mean_band_params.BD1500)
+            if result.mean_band_params.BD1900 is not None:
+                all_bd1900.append(result.mean_band_params.BD1900)
+
+        except Exception as e:
+            logger.warning(f"CRISM spectral analysis failed for {obs_id}: {e}")
+            continue
+
+    if not analyzed:
+        return TaskResult(
+            task_type="crism_spectral",
+            success=True,
+            data={
+                "observations_analyzed": 0,
+                "reason": "no_trr3_data_available",
+                "physics_note": "No TRR3 cube data available locally for spectral analysis.",
+            },
+            summary="No TRR3 data available for spectral analysis",
+        )
+
+    # Compute aggregate fractions
+    aggregate_fractions = {}
+    if total_pixels_analyzed > 0:
+        for cls, count in aggregate_class_counts.items():
+            aggregate_fractions[cls] = round(count / total_pixels_analyzed, 4)
+
+    water_ice_overall_fraction = (
+        round(total_water_ice_pixels / total_pixels_analyzed, 4)
+        if total_pixels_analyzed > 0 else 0.0
+    )
+
+    # Mean band parameters across all observations
+    import numpy as np
+    mean_bd1500 = round(float(np.mean(all_bd1500)), 4) if all_bd1500 else None
+    mean_bd1900 = round(float(np.mean(all_bd1900)), 4) if all_bd1900 else None
+
+    data = {
+        "observations_analyzed": len(analyzed),
+        "total_pixels_analyzed": total_pixels_analyzed,
+        "observations": analyzed,
+        "aggregate_class_counts": aggregate_class_counts,
+        "aggregate_class_fractions": aggregate_fractions,
+        "water_ice_total_pixels": total_water_ice_pixels,
+        "water_ice_overall_fraction": water_ice_overall_fraction,
+        "mean_band_params": {
+            "BD1500": mean_bd1500,
+            "BD1900": mean_bd1900,
+        },
+        "methodology": (
+            "Continuum removal (convex hull) → band parameter extraction (BD1500, BD1900, BD2100, BD2200) "
+            "→ Spectral Angle Mapper classification against synthetic USGS endmembers "
+            "(water ice, gypsum, polyhydrated sulfate, basalt). "
+            "Band strengths cross-validate SAM mineral ID."
+        ),
+    }
+
+    summary_parts = [f"Spectral analysis: {len(analyzed)}/{len(crism)} CRISM observations"]
+    if water_ice_overall_fraction > 0:
+        summary_parts.append(f"water ice {water_ice_overall_fraction:.1%} of pixels")
+    if mean_bd1500 is not None:
+        summary_parts.append(f"mean BD1500={mean_bd1500:.3f}")
+
+    return TaskResult(
+        task_type="crism_spectral",
+        success=True,
+        data=data,
+        summary=", ".join(summary_parts),
+    )
+
+
+# =============================================================================
 # Task: Synthesize Results
 # =============================================================================
 
@@ -1226,6 +2009,8 @@ def synthesize_results(
             "elevation_m": slope.get("elevation_m", 0),
             "favorable_zones": slope.get("favorable_zones", 0),
             "grid_size": slope.get("grid_size", 0),
+            "hazard_density": slope.get("hazard_density"),
+            "roughness_stats": slope.get("roughness_stats"),
             "best_site": {
                 "lat": best_pt.get("lat"),
                 "lon": best_pt.get("lon"),
@@ -1244,6 +2029,10 @@ def synthesize_results(
             "analyzed_count": sub.get("analyzed_count", 0),
             "subsurface_detections": sub.get("subsurface_detections", 0),
             "depth_summary": depth,
+            "snr_distribution": sub.get("snr_distribution"),
+            "clutter_rejection": sub.get("clutter_rejection"),
+            "reflector_density_per_km": sub.get("reflector_density_per_km"),
+            "epsilon_r_source": depth.get("epsilon_r_source", "assumed") if depth else "no_data",
         }
 
     # CRISM mineral analysis (now with spatial data)
@@ -1257,7 +2046,7 @@ def synthesize_results(
             "ice_hotspot": mineral.get("ice_hotspot"),
         }
 
-    # CNN mineral classification (deep learning)
+    # CNN mineral classification (deep learning) — with H2O detail
     if "mineral_cnn" in all_results and all_results["mineral_cnn"].success:
         cnn = all_results["mineral_cnn"].data
         synthesis["cnn_mineral_classification"] = {
@@ -1265,6 +2054,11 @@ def synthesize_results(
             "top_minerals": cnn.get("top_minerals", []),
             "ice_detected": cnn.get("ice_detected", False),
             "ice_types": cnn.get("ice_types", []),
+            "h2o_total_pixels": cnn.get("h2o_total_pixels", 0),
+            "co2_total_pixels": cnn.get("co2_total_pixels", 0),
+            "h2o_observations": cnn.get("h2o_observations", 0),
+            "h2o_rich_observations": cnn.get("h2o_rich_observations", 0),
+            "h2o_hotspot": cnn.get("h2o_hotspot"),
         }
 
     # Dielectric constant estimation (SHARAD + DTM)
@@ -1275,6 +2069,121 @@ def synthesize_results(
             "mean_epsilon_r": diel.get("mean_epsilon_r"),
             "median_epsilon_r": diel.get("median_epsilon_r"),
             "interpretation": diel.get("interpretation", ""),
+        }
+
+    # Terrace-based dielectric estimation (more rigorous)
+    if "terrace_dielectric" in all_results and all_results["terrace_dielectric"].success:
+        tdiel = all_results["terrace_dielectric"].data
+        synthesis["terrace_dielectric"] = {
+            "estimates_count": tdiel.get("estimates_count", 0),
+            "mean_epsilon_r": tdiel.get("mean_epsilon_r"),
+            "median_epsilon_r": tdiel.get("median_epsilon_r"),
+            "interpretation": tdiel.get("interpretation", ""),
+            "estimates": tdiel.get("estimates", []),
+        }
+        # Override basic dielectric if terrace version has estimates
+        if tdiel.get("estimates_count", 0) > 0:
+            synthesis["dielectric_analysis"] = {
+                "estimates_count": tdiel.get("estimates_count", 0),
+                "mean_epsilon_r": tdiel.get("mean_epsilon_r"),
+                "median_epsilon_r": tdiel.get("median_epsilon_r"),
+                "interpretation": tdiel.get("interpretation", ""),
+                "method": "terraced_crater",
+            }
+
+    # SHARAD Physics Inversion (new physics-based pipeline)
+    if "sharad_physics_inversion" in all_results and all_results["sharad_physics_inversion"].success:
+        inv = all_results["sharad_physics_inversion"].data
+        synthesis["sharad_physics_inversion"] = {
+            "inversions_completed": inv.get("inversions_completed", 0),
+            "best_epsilon_r": inv.get("best_epsilon_r"),
+            "best_epsilon_r_ci": inv.get("best_epsilon_r_ci"),
+            "reflector_confidence": inv.get("reflector_confidence"),
+            "assumptions": inv.get("assumptions", []),
+            "derivation_log": inv.get("derivation_log", []),
+            "methodology": inv.get("methodology", ""),
+        }
+        # Override dielectric_analysis if physics inversion succeeded
+        if inv.get("inversions_completed", 0) > 0:
+            synthesis["dielectric_analysis"] = {
+                "estimates_count": inv.get("inversions_completed", 0),
+                "mean_epsilon_r": inv.get("best_epsilon_r"),
+                "median_epsilon_r": inv.get("best_epsilon_r"),
+                "interpretation": f"Physics-based inversion εr={inv.get('best_epsilon_r')}",
+                "method": "physics_inversion",
+                "assumptions": inv.get("assumptions", []),
+            }
+
+    # ── Dielectric Method Hierarchy: track what was attempted and outcomes ──
+    method_hierarchy = []
+    physics_inv_data = synthesis.get("sharad_physics_inversion", {})
+    terrace_diel_data = synthesis.get("terrace_dielectric", {})
+    basic_diel_data = synthesis.get("dielectric_analysis", {})
+
+    if physics_inv_data.get("inversions_completed", 0) > 0:
+        method_hierarchy.append({
+            "method": "physics_inversion",
+            "status": "success",
+            "epsilon_r": physics_inv_data.get("best_epsilon_r"),
+        })
+    elif "sharad_physics_inversion" in all_results:
+        method_hierarchy.append({
+            "method": "physics_inversion",
+            "status": "attempted_failed",
+            "reason": all_results["sharad_physics_inversion"].data.get("reason", "unknown"),
+        })
+
+    if terrace_diel_data.get("estimates_count", 0) > 0:
+        method_hierarchy.append({
+            "method": "terraced_crater",
+            "status": "success",
+            "epsilon_r": terrace_diel_data.get("median_epsilon_r"),
+        })
+    elif "terrace_dielectric" in all_results:
+        method_hierarchy.append({
+            "method": "terraced_crater",
+            "status": "attempted_failed",
+            "reason": all_results["terrace_dielectric"].data.get("reason", "unknown"),
+        })
+
+    if basic_diel_data.get("estimates_count", 0) > 0 and basic_diel_data.get("method") not in ("physics_inversion", "terraced_crater"):
+        method_hierarchy.append({
+            "method": "standard_dtm_relief",
+            "status": "success",
+            "epsilon_r": basic_diel_data.get("median_epsilon_r"),
+        })
+
+    # Determine effective εr source for the entire synthesis
+    successful_physics = [m for m in method_hierarchy if m["status"] == "success" and m["method"] in ("physics_inversion", "terraced_crater")]
+    if successful_physics:
+        synthesis["epsilon_r_source"] = successful_physics[0]["method"]
+        synthesis["is_fallback"] = False
+        # Update subsurface_coverage source to reflect physics override
+        if synthesis.get("subsurface_coverage"):
+            synthesis["subsurface_coverage"]["epsilon_r_source"] = successful_physics[0]["method"]
+    else:
+        synthesis["epsilon_r_source"] = "assumed"
+        synthesis["is_fallback"] = True
+        # Check if physics was attempted but failed
+        attempted_methods = [m for m in method_hierarchy if m["status"] == "attempted_failed"]
+        synthesis["physics_inversion_attempted"] = len(attempted_methods) > 0
+
+    synthesis["dielectric_method_hierarchy"] = method_hierarchy
+
+    # Propagate physics_attempted flag into dielectric_analysis for scoring
+    if synthesis.get("dielectric_analysis") is not None:
+        synthesis["dielectric_analysis"]["physics_attempted"] = synthesis.get("physics_inversion_attempted", False)
+
+    # CRISM Spectral Analysis (new physics-based pipeline)
+    if "crism_spectral" in all_results and all_results["crism_spectral"].success:
+        spec = all_results["crism_spectral"].data
+        synthesis["crism_spectral_analysis"] = {
+            "observations_analyzed": spec.get("observations_analyzed", 0),
+            "aggregate_class_fractions": spec.get("aggregate_class_fractions", {}),
+            "water_ice_total_pixels": spec.get("water_ice_total_pixels", 0),
+            "water_ice_overall_fraction": spec.get("water_ice_overall_fraction", 0.0),
+            "mean_band_params": spec.get("mean_band_params", {}),
+            "methodology": spec.get("methodology", ""),
         }
 
     # Climate analysis (MCD parametric model)
@@ -1307,163 +2216,125 @@ def synthesize_results(
     cross = _compute_cross_instrument(all_results)
     synthesis["cross_instrument"] = cross
 
-    # ── Composite scoring (max ~95, never 100) ──
-    # Rebalanced weights:
-    #   SHARAD 0-18, CRISM 0-18, CNN 0-5, Dielectric 0-5,
-    #   Cross-inst 0-13, Engineering 0-22, Data 0-9,
-    #   Climate 0-10, Thermal Inertia 0-10  → max 110, capped at 95
-    score = 0
+    # ── Science Distance Computation ──
+    # Distance between best landing site and nearest science target
+    science_distance = None
+    best_site = synthesis.get("engineering_feasibility", {}).get("best_site")
+    if best_site and best_site.get("lat") is not None:
+        # Distance to nearest SHARAD reflector
+        subsurface_tracks = all_results.get("subsurface", TaskResult(task_type="subsurface_scan")).data.get("tracks", [])
+        for t in subsurface_tracks:
+            if t.get("subsurface_detected") and t.get("lat") is not None:
+                d = haversine_distance_km(best_site["lat"], best_site["lon"], t["lat"], t["lon"])
+                if science_distance is None or d < science_distance:
+                    science_distance = d
+        # Distance to CRISM ice hotspot
+        hotspot = synthesis.get("mineral_signatures", {}).get("ice_hotspot")
+        if hotspot:
+            d = haversine_distance_km(best_site["lat"], best_site["lon"], hotspot["center_lat"], hotspot["center_lon"])
+            if science_distance is None or d < science_distance:
+                science_distance = d
+
+    # ── Composite Scoring v2 (weighted, transparent, multi-dimensional) ──
+    scoring_result = compute_composite_score(
+        subsurface_data=synthesis["subsurface_coverage"],
+        dielectric_data=synthesis.get("dielectric_analysis", {}),
+        cross_instrument_data=cross,
+        mineral_data=synthesis.get("mineral_signatures", {}),
+        cnn_data=synthesis.get("cnn_mineral_classification", {}),
+        engineering_data=synthesis.get("engineering_feasibility", {}),
+        climate_data=synthesis.get("climate", {}),
+        science_distance_km=science_distance,
+    )
+
+    evidence_strength = classify_evidence_strength(
+        scoring_result["sub_scores"],
+        cross,
+    )
+
+    recommendation = classify_recommendation(
+        scoring_result["final_score"],
+        evidence_strength,
+        cross.get("evidence_consistency", "insufficient_data"),
+    )
+
+    synthesis["scoring_model"] = scoring_result
+    synthesis["evidence_strength"] = evidence_strength
+    synthesis["recommendation_v2"] = recommendation
+
+    # Backward-compat: overall_score as integer 0-95
+    score = min(scoring_result["final_score_100"], 95)
+    synthesis["overall_score"] = score
+
+    # Generate strengths and uncertainties from sub-score breakdown
     strengths = []
     uncertainties = []
+    sub = scoring_result["sub_scores"]
 
-    # SHARAD subsurface (0-18) — direct ice evidence, depth-weighted
-    sub_cov = synthesis["subsurface_coverage"]
-    n_detections = sub_cov.get("subsurface_detections", 0)
-    depth_summary = sub_cov.get("depth_summary", {})
-    median_depth = depth_summary.get("median_depth_m")
+    def _extract_notes(sub_key):
+        """Extract notes from a sub-score breakdown."""
+        entry = sub.get(sub_key, {})
+        bd = entry.get("breakdown", {})
+        return bd.get("notes", [])
 
-    if n_detections >= 1:
-        if median_depth is not None:
-            try:
-                d = float(median_depth)
-            except (TypeError, ValueError):
-                d = 50.0
-            if d <= 10:
-                depth_score = 18 if n_detections >= 2 else 14
-                strengths.append(
-                    f"Shallow subsurface ice detected at ~{d:.0f} m depth "
-                    f"({n_detections} track(s)) — accessible for extraction"
-                )
-            elif d <= 30:
-                depth_score = 12 if n_detections >= 2 else 9
-                strengths.append(
-                    f"Subsurface reflector at ~{d:.0f} m depth ({n_detections} track(s)) "
-                    f"— moderate drilling required"
-                )
-            elif d <= 80:
-                depth_score = 5
-                uncertainties.append(
-                    f"Subsurface reflector at ~{d:.0f} m depth — deep, "
-                    f"significant drilling infrastructure required"
-                )
-            else:
-                depth_score = 2
-                uncertainties.append(
-                    f"Subsurface reflector at ~{d:.0f} m depth — too deep "
-                    f"for practical ice extraction"
-                )
-        else:
-            depth_score = 9 if n_detections >= 2 else 6
-            strengths.append(f"SHARAD subsurface reflector detected ({n_detections} track(s)), depth unknown")
-        score += depth_score
-    elif sub_cov.get("analyzed_count", 0) > 0:
-        score += 3
-        uncertainties.append("SHARAD radargrams analyzed but no subsurface reflectors detected")
+    # Subsurface
+    sub_score_val = sub.get("subsurface_potential", {}).get("score", 0)
+    sub_notes = _extract_notes("subsurface_potential")
+    if sub_score_val >= 0.5:
+        strengths.append(f"SHARAD subsurface: {' '.join(sub_notes)}" if sub_notes else "SHARAD subsurface reflectors detected")
+    elif sub_score_val > 0:
+        uncertainties.append(f"Limited subsurface evidence: {' '.join(sub_notes)}" if sub_notes else "Limited subsurface evidence")
     else:
         uncertainties.append("No SHARAD radargram data available for direct subsurface analysis")
 
-    # CRISM ice/hydration (0-18) — indirect/proxy evidence
-    ice_count = synthesis["mineral_signatures"].get("high_ice_count", 0)
-    if ice_count >= 3:
-        score += 18
-        strengths.append(f"Strong CRISM spectral ice signatures ({ice_count} products above threshold)")
-    elif ice_count >= 1:
-        score += 10
-        strengths.append(f"CRISM ice signatures present ({ice_count} product(s))")
+    # Surface ice (CRISM + CNN combined)
+    ice_score_val = sub.get("surface_ice", {}).get("score", 0)
+    ice_notes = _extract_notes("surface_ice")
+    if ice_score_val >= 0.5:
+        strengths.append(f"Surface ice evidence: {' '.join(ice_notes)}" if ice_notes else "Strong surface ice evidence")
+    elif ice_score_val > 0:
+        uncertainties.append(f"Weak surface ice signal: {' '.join(ice_notes)}" if ice_notes else "Weak surface ice signal")
     else:
-        uncertainties.append("No significant CRISM ice signatures detected")
+        uncertainties.append("No significant surface ice signatures detected")
 
-    # CNN mineral classification bonus (0-5)
-    cnn_data = synthesis.get("cnn_mineral_classification", {})
-    if cnn_data.get("ice_detected"):
-        score += 5
-        ice_types = ", ".join(cnn_data.get("ice_types", []))
-        strengths.append(f"CNN mineral classifier detected ice phases: {ice_types}")
-
-    # Dielectric constant bonus (0-5)
-    diel_data = synthesis.get("dielectric_analysis", {})
-    if diel_data.get("estimates_count", 0) > 0:
-        eps = diel_data.get("median_epsilon_r", 0)
-        interp = diel_data.get("interpretation", "")
-        if 2.5 <= eps <= 3.5:
-            score += 5
-            strengths.append(f"Dielectric constant εr={eps} consistent with ice-rich subsurface")
-        elif eps > 5.0:
-            uncertainties.append(f"Dielectric constant εr={eps} suggests rock/basalt ({interp})")
-        else:
-            strengths.append(f"Dielectric constant εr={eps} measured ({interp})")
-
-    # Cross-instrument consistency (0-13)
-    consistency = cross.get("evidence_consistency", "insufficient_data")
-    if consistency == "consistent":
-        score += 13
-        strengths.append("SHARAD and CRISM ice evidence spatially consistent")
-    elif consistency == "partial":
-        score += 7
-    elif consistency in ("sharad_only", "crism_only"):
-        score += 4
-        uncertainties.append(f"Ice evidence from single instrument only ({consistency.replace('_', ' ')})")
-    else:
-        uncertainties.append("No cross-instrument corroboration available")
-
-    # Engineering feasibility (0-22) — final filter, not driver
-    safety = synthesis["engineering_feasibility"].get("safety", "UNKNOWN")
-    if safety == "FAVORABLE":
-        score += 22
-        strengths.append("Terrain engineering assessment: FAVORABLE (majority below 5 deg)")
-    elif safety == "MARGINAL":
-        score += 10
-        uncertainties.append("Terrain is marginal — some zones exceed 5 deg slope threshold")
-    elif safety == "UNFAVORABLE":
-        score += 3
-        uncertainties.append("Terrain is largely unfavorable for landing (steep slopes)")
+    # Terrain
+    terrain_score_val = sub.get("terrain_safety", {}).get("score", 0)
+    terrain_notes = _extract_notes("terrain_safety")
+    if terrain_score_val >= 0.5:
+        strengths.append(f"Terrain: {' '.join(terrain_notes)}" if terrain_notes else "Favorable terrain for landing")
+    elif terrain_score_val > 0:
+        uncertainties.append(f"Terrain challenges: {' '.join(terrain_notes)}" if terrain_notes else "Terrain is marginal")
     else:
         uncertainties.append("Slope data unavailable for engineering assessment")
 
-    # Data confidence (0-9) — de-emphasized
-    total = synthesis["total_products_found"]
-    if total >= 20:
-        score += 9
-    elif total >= 10:
-        score += 6
-    elif total >= 5:
-        score += 3
-    else:
-        uncertainties.append(f"Low data coverage ({total} products) limits confidence")
+    # Climate
+    climate_score_val = sub.get("climate", {}).get("score", 0)
+    climate_notes = _extract_notes("climate")
+    if climate_score_val >= 0.5:
+        strengths.append(f"Climate: {' '.join(climate_notes)}" if climate_notes else "Favorable climate")
+    elif climate_score_val > 0:
+        uncertainties.append(f"Climate: {' '.join(climate_notes)}" if climate_notes else "Climate challenges noted")
 
-    # Climate assessment (0-10) — NEW
-    clim_data = synthesis.get("climate", {})
-    if clim_data:
-        clim_score = clim_data.get("climate_score", 0)
-        score += clim_score
-        clim_summary = clim_data.get("climate_summary", "")
-        if clim_score >= 8:
-            strengths.append(f"Favorable climate conditions: {clim_summary}")
-        elif clim_score >= 5:
-            strengths.append(f"Acceptable climate: {clim_summary}")
-        elif clim_score > 0:
-            uncertainties.append(f"Climate challenges: {clim_summary}")
-        else:
-            uncertainties.append(f"Harsh climate conditions: {clim_summary}")
+    # Cross-instrument consistency (from cross dict, not sub-scores)
+    consistency = cross.get("evidence_consistency", "insufficient_data")
+    if consistency in ("consistent", "surface_multi"):
+        strengths.append(f"Cross-instrument: {consistency.replace('_', ' ')}")
+    elif consistency in ("partial",):
+        uncertainties.append("Partial cross-instrument agreement")
+    elif consistency != "insufficient_data":
+        uncertainties.append(f"Cross-instrument: {consistency.replace('_', ' ')}")
 
-    # Thermal inertia (0-10) — NEW
+    # Thermal inertia (from synthesis, not in scoring_methodology)
     ti_data = synthesis.get("thermal_inertia", {})
     if ti_data:
-        ti_score = ti_data.get("ti_score", 0)
-        score += ti_score
         ti_expl = ti_data.get("ti_explanation", "")
-        if ti_score >= 8:
-            strengths.append(ti_expl)
-        elif ti_score >= 4:
+        ti_score = ti_data.get("ti_score", 0)
+        if ti_score >= 4:
             strengths.append(ti_expl)
         elif ti_score > 0:
             uncertainties.append(ti_expl)
-        # Score 0 with explanation means unfavorable
         elif ti_expl:
             uncertainties.append(ti_expl)
-
-    # Cap at 95 — always leave room for uncertainty
-    score = min(score, 95)
 
     # Score range: +/- based on uncertainty count
     uncertainty_margin = min(len(uncertainties) * 3, 12)
@@ -1471,20 +2342,19 @@ def synthesize_results(
     score_low = max(0, score - uncertainty_margin)
     score_high = min(95, score + confidence_bonus)
 
-    synthesis["overall_score"] = score
     synthesis["score_range"] = {"low": score_low, "high": score_high}
     synthesis["strengths"] = strengths
     synthesis["uncertainties"] = uncertainties
 
-    # Recommendation — nuanced labels
-    if score >= 75:
-        synthesis["recommendation"] = "STRONG_CANDIDATE"
-    elif score >= 55:
-        synthesis["recommendation"] = "PROMISING_WITH_CAVEATS"
-    elif score >= 35:
-        synthesis["recommendation"] = "REQUIRES_FURTHER_INVESTIGATION"
-    else:
-        synthesis["recommendation"] = "LOW_PRIORITY"
+    # Backward-compat recommendation (map new classification to old labels)
+    classification = recommendation.get("classification", "Low priority")
+    _classification_to_label = {
+        "Science-ready candidate": "STRONG_CANDIDATE",
+        "Screening-level": "PROMISING_WITH_CAVEATS",
+        "Engineering-safe only": "REQUIRES_FURTHER_INVESTIGATION",
+        "Low priority": "LOW_PRIORITY",
+    }
+    synthesis["recommendation"] = _classification_to_label.get(classification, "REQUIRES_FURTHER_INVESTIGATION")
 
     # Extract ice_confidence from region context if available
     if region_context and "Ice confidence:" in region_context:
@@ -1676,15 +2546,21 @@ def recommend_site(all_results: Dict[str, TaskResult]) -> TaskResult:
 
 def _compute_cross_instrument(all_results: Dict[str, 'TaskResult']) -> Dict[str, Any]:
     """
-    Compute spatial consistency between SHARAD subsurface detections
-    and CRISM ice/hydration signatures.
+    Compute spatial consistency between SHARAD subsurface detections,
+    CRISM ice/hydration signatures, and CNN H2O Ice classification.
+
+    Three evidence lines:
+    - SHARAD reflectors (direct subsurface)
+    - CRISM spectral ice indices (indirect proxy)
+    - CNN H2O Ice classification on TRR3 (direct surface, 95% confidence)
 
     Returns a dict with:
     - sharad_crism_min_distance_km: closest approach
     - evidence_consistency: consistent / partial / inconsistent / *_only / insufficient
-    - direct_ice_evidence: list of SHARAD reflector detections (direct)
+    - direct_ice_evidence: list of SHARAD reflector detections (direct subsurface)
     - indirect_ice_evidence: list of CRISM spectral indicators (proxy)
-    - coincident_detections: count of SHARAD tracks near CRISM ice
+    - cnn_surface_ice_evidence: list of CNN H2O detections (direct surface)
+    - coincident_detections: count of SHARAD tracks near CRISM/CNN ice
     - notes: explanatory text for the report
     """
     cross: Dict[str, Any] = {
@@ -1692,6 +2568,7 @@ def _compute_cross_instrument(all_results: Dict[str, 'TaskResult']) -> Dict[str,
         "evidence_consistency": "insufficient_data",
         "direct_ice_evidence": [],
         "indirect_ice_evidence": [],
+        "cnn_surface_ice_evidence": [],
         "coincident_detections": 0,
         "notes": [],
     }
@@ -1710,10 +2587,10 @@ def _compute_cross_instrument(all_results: Dict[str, 'TaskResult']) -> Dict[str,
                     "depth_m": t.get("estimated_depth_m", {}).get("median"),
                 })
 
-    # CRISM ice data
+    # CRISM spectral ice data
     ice_hotspot = None
     top_ice = []
-    crism_has_ice = False  # true if any CRISM ice detected (even without coordinates)
+    crism_has_ice = False
     if "mineral" in all_results and all_results["mineral"].success:
         ice_hotspot = all_results["mineral"].data.get("ice_hotspot")
         top_ice = all_results["mineral"].data.get("top_ice_candidates", [])
@@ -1727,82 +2604,295 @@ def _compute_cross_instrument(all_results: Dict[str, 'TaskResult']) -> Dict[str,
                 "ice_percent": c.get("ice_percent"),
             })
 
-    # Compute spatial proximity
-    if sharad_detections and ice_hotspot:
-        min_dist = float("inf")
-        for t in sharad_detections:
-            d = haversine_distance_km(
-                t["lat"], t["lon"],
-                ice_hotspot["center_lat"], ice_hotspot["center_lon"],
-            )
-            min_dist = min(min_dist, d)
+    # CNN H2O Ice detections (direct surface evidence from TRR3 classification)
+    cnn_h2o_hotspot = None
+    cnn_h2o_obs = []
+    cnn_has_h2o = False
+    if "mineral_cnn" in all_results and all_results["mineral_cnn"].success:
+        cnn_data = all_results["mineral_cnn"].data
+        cnn_has_h2o = cnn_data.get("h2o_total_pixels", 0) > 0
+        cnn_h2o_hotspot = cnn_data.get("h2o_hotspot")
+        for obs in cnn_data.get("observations", []):
+            if obs.get("h2o_pixels", 0) > 0:
+                cnn_h2o_obs.append(obs)
+                cross["cnn_surface_ice_evidence"].append({
+                    "type": "CNN_H2O_Ice",
+                    "obs_id": obs["obs_id"],
+                    "lat": obs.get("lat"),
+                    "lon": obs.get("lon"),
+                    "h2o_pixels": obs["h2o_pixels"],
+                    "h2o_percent": obs["h2o_percent"],
+                    "h2o_rich": obs.get("h2o_rich", False),
+                })
+
+    # Combine all surface ice reference points (CRISM spectral + CNN H2O)
+    # for proximity computation against SHARAD
+    all_surface_ice_points = []
+    if ice_hotspot:
+        all_surface_ice_points.append({
+            "source": "CRISM_spectral",
+            "lat": ice_hotspot["center_lat"],
+            "lon": ice_hotspot["center_lon"],
+        })
+    if cnn_h2o_hotspot:
+        all_surface_ice_points.append({
+            "source": "CNN_H2O",
+            "lat": cnn_h2o_hotspot["center_lat"],
+            "lon": cnn_h2o_hotspot["center_lon"],
+        })
+
+    # ── Multi-Scale Proximity Test ──
+    PROXIMITY_SCALES = [25, 50, 100, 200]  # km
+    SCALE_WEIGHTS = {25: 0.4, 50: 0.3, 100: 0.2, 200: 0.1}
+
+    multi_scale_results = {}
+    min_dist = float("inf")
+
+    if sharad_detections and all_surface_ice_points:
+        for scale in PROXIMITY_SCALES:
+            coincidences = 0
+            possible_pairs = 0
+            for t in sharad_detections:
+                for pt in all_surface_ice_points:
+                    possible_pairs += 1
+                    d = haversine_distance_km(t["lat"], t["lon"], pt["lat"], pt["lon"])
+                    min_dist = min(min_dist, d)
+                    if d <= scale:
+                        coincidences += 1
+            multi_scale_results[scale] = {
+                "coincidences": coincidences,
+                "possible_pairs": possible_pairs,
+                "fraction": round(coincidences / max(possible_pairs, 1), 4),
+            }
 
         cross["sharad_crism_min_distance_km"] = round(min_dist, 1)
+        cross["multi_scale_proximity"] = multi_scale_results
 
-        # Count SHARAD tracks within 100 km of any CRISM high-ice observation
+        # Count SHARAD tracks within 100 km of any surface ice observation (backward compat)
+        all_surface_obs = top_ice + cnn_h2o_obs
         for t in sharad_detections:
-            for c in top_ice:
+            for c in all_surface_obs:
                 if c.get("lat") is not None:
                     d = haversine_distance_km(t["lat"], t["lon"], c["lat"], c["lon"])
                     if d < 100:
                         cross["coincident_detections"] += 1
                         break
 
-        if min_dist < 50:
-            cross["evidence_consistency"] = "consistent"
+    # ── Probabilistic Consistency Score (0-1) ──
+    consistency_score = 0.0
+    if sharad_detections and all_surface_ice_points and multi_scale_results:
+        consistency_score = sum(
+            SCALE_WEIGHTS[scale] * multi_scale_results[scale]["fraction"]
+            for scale in PROXIMITY_SCALES
+        )
+    cross["consistency_score"] = round(consistency_score, 4)
+
+    # ── Instrument Consistency Matrix ──
+    # Compute pairwise min distances between instrument detections
+    def _min_pairwise_dist(points_a, points_b):
+        """Compute minimum pairwise distance between two lists of {lat,lon} dicts."""
+        best = float("inf")
+        for a in points_a:
+            if a.get("lat") is None:
+                continue
+            for b in points_b:
+                if b.get("lat") is None:
+                    continue
+                d = haversine_distance_km(a["lat"], a["lon"], b["lat"], b["lon"])
+                best = min(best, d)
+        return best if best < float("inf") else None
+
+    sharad_pts = [{"lat": t["lat"], "lon": t["lon"]} for t in sharad_detections]
+    crism_pts = [{"lat": c.get("lat"), "lon": c.get("lon")} for c in top_ice]
+    cnn_pts = [{"lat": o.get("lat"), "lon": o.get("lon")} for o in cnn_h2o_obs]
+
+    sharad_crism_dist = _min_pairwise_dist(sharad_pts, crism_pts)
+    sharad_cnn_dist = _min_pairwise_dist(sharad_pts, cnn_pts)
+    crism_cnn_dist = _min_pairwise_dist(crism_pts, cnn_pts)
+
+    instrument_matrix = {
+        "SHARAD_CRISM": {
+            "distance_km": round(sharad_crism_dist, 1) if sharad_crism_dist is not None else None,
+            "coincident": sharad_crism_dist is not None and sharad_crism_dist < 100,
+        },
+        "SHARAD_CNN": {
+            "distance_km": round(sharad_cnn_dist, 1) if sharad_cnn_dist is not None else None,
+            "coincident": sharad_cnn_dist is not None and sharad_cnn_dist < 100,
+        },
+        "CRISM_CNN": {
+            "distance_km": round(crism_cnn_dist, 1) if crism_cnn_dist is not None else None,
+            "coincident": crism_cnn_dist is not None and crism_cnn_dist < 100,
+        },
+    }
+    cross["instrument_matrix"] = instrument_matrix
+
+    # ── Non-Correlated Classification ──
+    if multi_scale_results and all(
+        multi_scale_results[s]["coincidences"] == 0 for s in PROXIMITY_SCALES
+    ):
+        cross["evidence_consistency"] = "non_correlated"
+        consistency_score = 0.0
+        cross["consistency_score"] = 0.0
+
+    # ── Separate System Flag ──
+    cross["separate_system"] = False
+    if min_dist > 300 and min_dist < float("inf"):
+        cross["separate_system"] = True
+        cross["notes"].append(
+            "CRISM ice cluster >300 km from nearest SHARAD reflector — "
+            "classified as separate system"
+        )
+
+    # Determine evidence consistency (only if not already set to non_correlated)
+    has_sharad = bool(sharad_detections)
+    has_crism = crism_has_ice
+    has_cnn_h2o = cnn_has_h2o
+    surface_ice = has_crism or has_cnn_h2o  # any surface evidence
+
+    if cross["evidence_consistency"] != "non_correlated":
+        if has_sharad and surface_ice and min_dist < float("inf"):
+            if min_dist < 50:
+                cross["evidence_consistency"] = "consistent"
+                sources = []
+                if has_crism:
+                    sources.append("CRISM spectral")
+                if has_cnn_h2o:
+                    sources.append("CNN H2O classification")
+                src_str = " and ".join(sources)
+                cross["notes"].append(
+                    f"SHARAD subsurface reflectors and surface ice evidence ({src_str}) "
+                    f"spatially coincide (within {min_dist:.0f} km), providing strong "
+                    f"mutual corroboration of an ice deposit extending from the surface "
+                    f"to the subsurface."
+                )
+            elif min_dist < 200:
+                cross["evidence_consistency"] = "partial"
+                cross["notes"].append(
+                    f"SHARAD and surface ice evidence are moderately correlated "
+                    f"({min_dist:.0f} km separation). The ice deposit may be laterally "
+                    f"discontinuous, or the surface expression may not directly "
+                    f"overlie the subsurface interface."
+                )
+            else:
+                cross["evidence_consistency"] = "inconsistent"
+                cross["notes"].append(
+                    f"SHARAD reflectors and surface ice signatures do not spatially coincide "
+                    f"({min_dist:.0f} km apart). This may indicate distinct ice reservoirs."
+                )
+        elif has_sharad and not surface_ice:
+            cross["evidence_consistency"] = "sharad_only"
             cross["notes"].append(
-                f"SHARAD subsurface reflectors and CRISM ice signatures spatially coincide "
-                f"(within {min_dist:.0f} km), providing strong mutual corroboration. "
-                f"The SHARAD reflectors represent direct evidence of a dielectric interface "
-                f"consistent with buried ice, while CRISM detections indicate surface or "
-                f"near-surface ice/hydration signatures."
+                "Subsurface reflectors detected by SHARAD but no corresponding surface "
+                "ice signatures from CRISM spectral or CNN classification. This is "
+                "consistent with buried ice beneath a protective regolith layer."
             )
-        elif min_dist < 200:
+        elif has_sharad and surface_ice and min_dist == float("inf"):
+            # Surface ice detected but without usable coordinates
             cross["evidence_consistency"] = "partial"
             cross["notes"].append(
-                f"SHARAD and CRISM evidence are moderately correlated "
-                f"({min_dist:.0f} km separation). The ice deposit may be laterally "
-                f"discontinuous, or the surface expression (CRISM) may not directly "
-                f"overlie the subsurface interface (SHARAD)."
+                "Both SHARAD subsurface reflectors and surface ice evidence are present, "
+                "but spatial coordinates are insufficient for proximity analysis."
             )
+        elif surface_ice and not has_sharad:
+            if has_cnn_h2o and has_crism:
+                cross["evidence_consistency"] = "surface_multi"
+                cross["notes"].append(
+                    "Both CRISM spectral indices and CNN H2O classification confirm surface "
+                    "ice, but no SHARAD subsurface reflectors were detected. The ice may be "
+                    "too shallow or too thin for SHARAD vertical resolution (~15 m). "
+                    "The CNN confirmation at 95% confidence strengthens the surface ice case."
+                )
+            elif has_cnn_h2o:
+                cross["evidence_consistency"] = "cnn_h2o_only"
+                cross["notes"].append(
+                    "CNN mineral classifier detected surface H2O ice on TRR3 data (95% "
+                    "confidence), but no SHARAD subsurface reflectors or CRISM spectral "
+                    "ice indices were found. This indicates exposed water ice visible "
+                    "in the infrared spectrum."
+                )
+            else:
+                cross["evidence_consistency"] = "crism_only"
+                cross["notes"].append(
+                    "CRISM spectral signatures suggest surface or near-surface ice/hydration, "
+                    "but no SHARAD subsurface reflectors were detected. The ice may be too "
+                    "shallow or too thin for SHARAD vertical resolution (~15 m)."
+                )
         else:
-            cross["evidence_consistency"] = "inconsistent"
             cross["notes"].append(
-                f"SHARAD reflectors and CRISM ice signatures do not spatially coincide "
-                f"({min_dist:.0f} km apart). This may indicate distinct ice reservoirs — "
-                f"a buried deposit detected by radar and a separate surface/near-surface "
-                f"exposure detected spectrally."
+                "Insufficient data for cross-instrument comparison. Neither SHARAD "
+                "subsurface reflectors nor surface ice signatures were identified."
             )
 
-    elif sharad_detections and not top_ice and not crism_has_ice:
-        cross["evidence_consistency"] = "sharad_only"
+    # CNN H2O + CRISM spectral mutual reinforcement note
+    if has_cnn_h2o and has_crism:
         cross["notes"].append(
-            "Subsurface reflectors detected by SHARAD but no corresponding CRISM surface "
-            "ice signatures. This is consistent with buried ice beneath a protective "
-            "regolith layer that masks the spectral signature."
+            "CNN H2O classification and CRISM spectral ice indices independently "
+            "confirm surface ice presence — two distinct detection methods agree, "
+            "increasing confidence in surface water ice."
         )
 
-    elif sharad_detections and crism_has_ice and not ice_hotspot:
-        # CRISM detected ice but without spatial coordinates for proximity analysis
-        cross["evidence_consistency"] = "partial"
-        cross["notes"].append(
-            "Both SHARAD subsurface reflectors and CRISM ice signatures are present, "
-            "but CRISM ice candidates lack spatial coordinates for proximity analysis. "
-            "Cross-instrument spatial correlation cannot be fully evaluated."
+    # ── Stratigraphic Interpretation (physics-based cross-instrument) ──
+    sharad_inv = all_results.get("sharad_physics_inversion")
+    crism_spec = all_results.get("crism_spectral")
+
+    stratigraphic = {"interpretation": "insufficient_data", "notes": []}
+
+    has_sharad_inversion = (
+        sharad_inv and sharad_inv.success
+        and sharad_inv.data.get("inversions_completed", 0) > 0
+    )
+    has_crism_spectral = (
+        crism_spec and crism_spec.success
+        and crism_spec.data.get("observations_analyzed", 0) > 0
+    )
+
+    if has_sharad_inversion and has_crism_spectral:
+        eps_r = sharad_inv.data.get("best_epsilon_r")
+        water_frac = crism_spec.data.get("water_ice_overall_fraction", 0)
+
+        if eps_r is not None and eps_r < 4.0 and water_frac > 0.01:
+            stratigraphic["interpretation"] = "deep_reservoir_shallow_exposure"
+            stratigraphic["notes"].append(
+                f"SHARAD εr={eps_r:.2f} indicates ice-rich subsurface (deep reservoir). "
+                f"CRISM water ice fraction={water_frac:.1%} confirms shallow surface exposure. "
+                f"Consistent with obliquity-driven ice deposition model."
+            )
+        elif eps_r is not None and eps_r < 4.0 and water_frac <= 0.01:
+            stratigraphic["interpretation"] = "buried_ice_no_surface_exposure"
+            stratigraphic["notes"].append(
+                f"SHARAD εr={eps_r:.2f} suggests subsurface ice, but CRISM shows no surface "
+                f"water ice (fraction={water_frac:.1%}). Lateral heterogeneity or dune cover "
+                f"may obscure surface expression."
+            )
+        elif eps_r is not None and eps_r >= 4.0 and water_frac > 0.01:
+            stratigraphic["interpretation"] = "surface_ice_rocky_subsurface"
+            stratigraphic["notes"].append(
+                f"SHARAD εr={eps_r:.2f} indicates rocky/basaltic subsurface. "
+                f"CRISM water ice fraction={water_frac:.1%} shows surface ice present "
+                f"but not extending to depth. Thin ice veneer or seasonal frost."
+            )
+        elif eps_r is not None and eps_r >= 4.0:
+            stratigraphic["interpretation"] = "no_ice_evidence"
+            stratigraphic["notes"].append(
+                f"Neither instrument supports ice presence: SHARAD εr={eps_r:.2f} (rocky), "
+                f"CRISM water ice fraction={water_frac:.1%} (negligible)."
+            )
+    elif has_sharad_inversion:
+        eps_r = sharad_inv.data.get("best_epsilon_r")
+        if eps_r is not None:
+            stratigraphic["interpretation"] = "sharad_only"
+            stratigraphic["notes"].append(
+                f"SHARAD physics inversion: εr={eps_r:.2f}. "
+                f"No CRISM spectral data to cross-validate surface composition."
+            )
+    elif has_crism_spectral:
+        water_frac = crism_spec.data.get("water_ice_overall_fraction", 0)
+        stratigraphic["interpretation"] = "crism_only"
+        stratigraphic["notes"].append(
+            f"CRISM spectral analysis: water ice fraction={water_frac:.1%}. "
+            f"No SHARAD physics inversion to constrain subsurface."
         )
 
-    elif (top_ice or crism_has_ice) and not sharad_detections:
-        cross["evidence_consistency"] = "crism_only"
-        cross["notes"].append(
-            "CRISM spectral signatures suggest surface or near-surface ice/hydration, "
-            "but no SHARAD subsurface reflectors were detected. The ice may be too "
-            "shallow or too thin for SHARAD vertical resolution (~15 m)."
-        )
-
-    else:
-        cross["notes"].append(
-            "Insufficient data for cross-instrument comparison. Neither SHARAD "
-            "subsurface reflectors nor CRISM ice signatures were identified."
-        )
+    cross["stratigraphic_interpretation"] = stratigraphic
 
     return cross

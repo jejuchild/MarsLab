@@ -38,10 +38,11 @@ type PageTab = "search" | "downloads";
 type SearchMode = "id" | "spatial" | "point" | "ai" | "product";
 
 // Dataset types for selection
-type DatasetType = "crism" | "hirise" | "sharad" | "sharad_highres" | "hirise_dtm";
+type DatasetType = "crism" | "crism_trr3" | "hirise" | "sharad" | "sharad_highres" | "hirise_dtm";
 
 interface DatasetSelection {
   crism: boolean;
+  crism_trr3: boolean;
   hirise: boolean;
   sharad: boolean;
   sharad_highres: boolean;
@@ -139,6 +140,7 @@ function DatasetSelector({
 }) {
   const datasets: { key: DatasetType; label: string; icon: string }[] = [
     { key: "crism", label: "CRISM", icon: "satellite_alt" },
+    { key: "crism_trr3", label: "CRISM TRR3", icon: "science" },
     { key: "hirise", label: "HiRISE", icon: "photo_camera" },
     { key: "sharad", label: "SHARAD", icon: "radar" },
     { key: "sharad_highres", label: "SHARAD Hi-Res", icon: "science" },
@@ -1754,6 +1756,7 @@ export default function DataDownloadPage() {
   // Dataset selection state - all enabled by default
   const [datasetSelection, setDatasetSelection] = useState<DatasetSelection>({
     crism: true,
+    crism_trr3: true,
     hirise: true,
     sharad: true,
     sharad_highres: true,
@@ -1802,15 +1805,39 @@ export default function DataDownloadPage() {
     };
   }, []);
 
-  // Handle deep-link from Inspector "Find Related Products" button
+  // Handle deep-link from Inspector
   useEffect(() => {
     const tab = searchParams.get("tab");
     const pid = searchParams.get("product_id");
     const inst = searchParams.get("instrument");
-    if (tab === "product" && pid) {
+    const autoDownload = searchParams.get("autoDownload") === "true";
+
+    if (!pid) return;
+
+    if (autoDownload && inst) {
+      // Auto-download: start download immediately and switch to downloads tab
+      (async () => {
+        try {
+          const task = await startDownload(pid, inst.toLowerCase() as Instrument);
+          setDownloadTask(task);
+          setPageTab("downloads");
+          setDownloadRefreshTrigger(t => t + 1);
+          startPolling(task.task_id);
+          toast.success(`Downloading ${pid}`);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "Download failed";
+          if (msg.toLowerCase().includes("already")) {
+            toast.success(`${pid} is already downloaded`);
+            setPageTab("downloads");
+          } else {
+            toast.error(msg);
+          }
+        }
+      })();
+    } else if (tab === "product") {
+      // Proximity search mode
       setSearchMode("product");
       setProductSearchId(pid);
-      // Auto-execute search
       (async () => {
         setIsProximitySearching(true);
         setProximityError(null);
@@ -1826,6 +1853,7 @@ export default function DataDownloadPage() {
         }
       })();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // Escape key to close detail/manifest panels → then back to search tab
@@ -2206,7 +2234,7 @@ export default function DataDownloadPage() {
       const pid = productSearchId.trim();
       let instrument = "HIRISE";
       const pidLower = pid.toLowerCase();
-      if (pidLower.startsWith("frt") || pidLower.startsWith("hrl") || pidLower.startsWith("hrs") || pidLower.startsWith("frs")) {
+      if (pidLower.startsWith("frt")) {
         instrument = "CRISM";
       } else if (pidLower.startsWith("s_")) {
         instrument = "SHARAD";

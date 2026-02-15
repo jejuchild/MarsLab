@@ -53,6 +53,8 @@ from .aria2_downloader import (
 # =============================================================================
 
 BASE_DIR = Path(__file__).parent.parent
+DATA_DIR = BASE_DIR / "data"
+HISTORY_FILE = DATA_DIR / "download_history.json"
 CRISM_DATA_DIR = BASE_DIR / "crism_data"
 HIRISE_DATA_DIR = BASE_DIR / "hirise_data"
 SHARAD_DATA_DIR = BASE_DIR / "sharad_data"
@@ -201,6 +203,94 @@ class DownloadManager:
         self._progress_callbacks: Dict[str, Callable] = {}
         self._index_lock = asyncio.Lock()  # Prevent concurrent index updates
         self._initialized = True
+        self._load_history()
+
+    # ── Persistence ─────────────────────────────────────
+    def _load_history(self):
+        """Load completed/failed tasks from disk on startup."""
+        if not HISTORY_FILE.exists():
+            return
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                records = json.load(f)
+            for rec in records:
+                # Reconstruct DownloadTask from saved dict
+                files = [
+                    FileProgress(
+                        filename=fp["filename"],
+                        url=fp.get("url", ""),
+                        status=DownloadStatus(fp["status"]),
+                        bytes_downloaded=fp.get("bytes_downloaded", 0),
+                        bytes_total=fp.get("bytes_total"),
+                        error=fp.get("error"),
+                    )
+                    for fp in rec.get("files", [])
+                ]
+                # Tasks that were active when server died → mark failed
+                raw_status = rec.get("status", "failed")
+                if raw_status in ("pending", "queued", "downloading", "processing"):
+                    status = DownloadStatus.FAILED
+                    error = rec.get("error") or "Server restarted during download"
+                else:
+                    status = DownloadStatus(raw_status)
+                    error = rec.get("error")
+
+                task = DownloadTask(
+                    task_id=rec["task_id"],
+                    product_id=rec["product_id"],
+                    base_key=rec.get("base_key", rec["product_id"]),
+                    instrument=Instrument(rec["instrument"]),
+                    status=status,
+                    files=files,
+                    target_dir=rec.get("target_dir", ""),
+                    created_at=rec.get("created_at", ""),
+                    completed_at=rec.get("completed_at"),
+                    error=error,
+                    lat=rec.get("lat"),
+                    lon=rec.get("lon"),
+                )
+                self.tasks[task.task_id] = task
+            print(f"Loaded {len(records)} download task(s) from history")
+        except Exception as e:
+            print(f"Warning: could not load download history: {e}")
+
+    def _save_history(self):
+        """Persist all tasks to disk."""
+        try:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            records = []
+            for task in self.tasks.values():
+                d = task.to_dict()
+                # Include file URLs for completeness
+                d["files"] = [
+                    {
+                        "filename": fp.filename,
+                        "url": fp.url,
+                        "status": fp.status.value,
+                        "bytes_downloaded": fp.bytes_downloaded,
+                        "bytes_total": fp.bytes_total,
+                        "error": fp.error,
+                    }
+                    for fp in task.files
+                ]
+                d["lat"] = task.lat
+                d["lon"] = task.lon
+                records.append(d)
+            with open(HISTORY_FILE, "w") as f:
+                json.dump(records, f, indent=2)
+        except Exception as e:
+            print(f"Warning: could not save download history: {e}")
+
+    def clear_history(self) -> int:
+        """Remove all completed and failed tasks. Returns count removed."""
+        to_remove = [
+            tid for tid, t in self.tasks.items()
+            if t.status in (DownloadStatus.COMPLETED, DownloadStatus.FAILED)
+        ]
+        for tid in to_remove:
+            del self.tasks[tid]
+        self._save_history()
+        return len(to_remove)
 
     def get_task(self, task_id: str) -> Optional[DownloadTask]:
         """Get a task by ID."""
@@ -238,6 +328,9 @@ class DownloadManager:
 
         # Remove from active downloads
         self._active_downloads.pop(task_id, None)
+
+        # Persist to disk
+        self._save_history()
 
         return True
 
@@ -286,6 +379,25 @@ class DownloadManager:
 
         del self.tasks[task_id]
         return True
+
+    async def retry_task(self, task_id: str) -> Optional[DownloadTask]:
+        """Retry a failed download task by creating a new task with the same parameters."""
+        old = self.tasks.get(task_id)
+        if not old or old.status != DownloadStatus.FAILED:
+            return None
+
+        # Remove old task from history
+        del self.tasks[task_id]
+        self._save_history()
+
+        # Re-start with the same parameters
+        return await self.start_download(
+            product_id=old.product_id,
+            instrument=old.instrument,
+            lat=old.lat,
+            lon=old.lon,
+            file_types=getattr(old, '_file_types', None),
+        )
 
     async def start_download(
         self,
@@ -393,6 +505,13 @@ class DownloadManager:
 
                 # Update index.geojson
                 await self._update_index(task)
+
+                # Refresh in-memory cache so footprint API returns fresh data
+                try:
+                    from app import refresh_geojson_cache
+                    refresh_geojson_cache(str(task.instrument.value))
+                except Exception as e:
+                    print(f"[CACHE] Failed to refresh cache for {task.instrument}: {e}")
             elif core_failed:
                 task.status = DownloadStatus.FAILED
                 task.error = f"Failed to download core files: {', '.join(f.filename for f in core_failed)}"
@@ -406,8 +525,19 @@ class DownloadManager:
             task.error = str(e)
 
         finally:
+            # Clean up empty target directories from failed downloads
+            if task.status == DownloadStatus.FAILED:
+                try:
+                    target = Path(task.target_dir)
+                    if target.is_dir() and not any(target.iterdir()):
+                        target.rmdir()
+                except Exception:
+                    pass
+
             # Remove from active downloads
             self._active_downloads.pop(task.task_id, None)
+            # Persist history to disk
+            self._save_history()
 
     async def _download_crism_bundle(self, task: DownloadTask, session: aiohttp.ClientSession):
         """Download CRISM bundle files (skipping existing files)."""
@@ -828,7 +958,7 @@ class DownloadManager:
                     shutil.copy(src, dst)
 
     async def _download_sharad_highres_bundle(self, task: DownloadTask, session: aiohttp.ClientSession):
-        """Download SHARAD High-Res RDR bundle files (DAT + LBL)."""
+        """Download SHARAD High-Res RDR bundle files (DAT + LBL + cluttergram)."""
         bundle = await resolve_sharad_highres_bundle(task.base_key, session)
 
         files_to_download: List[ODEFile] = []
@@ -842,6 +972,12 @@ class DownloadManager:
             task.status = DownloadStatus.FAILED
             task.error = f"No files found for SHARAD High-Res product {task.base_key}"
             return
+
+        # Add cluttergram files if available
+        if bundle.clutter_img:
+            files_to_download.append(bundle.clutter_img)
+        if bundle.clutter_xml:
+            files_to_download.append(bundle.clutter_xml)
 
         # Create file progress entries
         for f in files_to_download:

@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [react()],
 
   build: {
+    // Disable modulepreload polyfill — stops preloading ALL vendor chunks (5.4MB)
+    // on every page. Vendors now load on-demand via dynamic imports.
+    modulePreload: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -32,7 +35,19 @@ export default defineConfig({
     },
     proxy: {
       // Proxy all API requests to backend
-      "/api": "http://localhost:8000",
+      "/api": {
+        target: "http://localhost:8000",
+        // Disable response buffering for SSE streams
+        configure: (proxy) => {
+          proxy.on("proxyRes", (proxyRes) => {
+            if (proxyRes.headers["content-type"]?.includes("text/event-stream")) {
+              // Flush immediately for SSE
+              proxyRes.headers["cache-control"] = "no-cache";
+              proxyRes.headers["x-accel-buffering"] = "no";
+            }
+          });
+        },
+      },
       "/hirise": "http://localhost:8000",
       "/crism": "http://localhost:8000",
       "/hirise_index.geojson": "http://localhost:8000",

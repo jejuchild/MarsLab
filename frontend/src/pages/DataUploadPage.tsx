@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
+import useIsMobile from "../hooks/useIsMobile";
 
 // =============================================================================
 // Types
@@ -655,6 +656,8 @@ function UploadFlow({
 // =============================================================================
 
 export default function DataUploadPage() {
+  const isMobile = useIsMobile();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [datasets, setDatasets] = useState<DatasetMetadata[]>([]);
   const [selectedDataset, setSelectedDataset] = useState<DatasetMetadata | null>(null);
   const [showUploadFlow, setShowUploadFlow] = useState(false);
@@ -706,43 +709,57 @@ export default function DataUploadPage() {
   return (
     <div className="h-screen bg-bg-dark text-white flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-border-dark px-6 py-2 shrink-0">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 text-white">
-            <span className="material-symbols-outlined text-primary text-2xl">rocket_launch</span>
-            <h2 className="text-white text-base font-bold">MarsLab</h2>
+      {isMobile ? (
+        <>
+          <header className="flex h-12 items-center justify-between border-b border-border-dark bg-bg-dark px-4 shrink-0">
+            <Link to="/" className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-xl">rocket_launch</span>
+              <h2 className="text-lg font-bold tracking-tight">MarsLab</h2>
+            </Link>
+            <button
+              onClick={() => setMobileMenuOpen(p => !p)}
+              className="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-white/10 text-slate-300"
+            >
+              <span className="material-symbols-outlined text-2xl">
+                {mobileMenuOpen ? "close" : "menu"}
+              </span>
+            </button>
+          </header>
+          {mobileMenuOpen && (
+            <div className="absolute top-12 left-0 right-0 z-50 border-b border-border-dark bg-bg-dark p-4 flex flex-col gap-2 shadow-xl">
+              <Link to="/" className="text-sm font-medium text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-white/5 transition-colors">Workbench</Link>
+              <Link to="/download" className="text-sm font-medium text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-white/5 transition-colors">Data Download</Link>
+              <Link to="/upload" className="text-sm font-medium text-fuchsia-400 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors">Data Upload</Link>
+              <Link to="/suggestions" onClick={() => setMobileMenuOpen(false)} className="text-sm font-medium text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2">
+                <span className="material-symbols-outlined text-sm">lightbulb</span>
+                Suggest Feature
+              </Link>
+            </div>
+          )}
+        </>
+      ) : (
+        <header className="flex items-center justify-between border-b border-border-dark px-6 py-2 shrink-0">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 text-white">
+              <span className="material-symbols-outlined text-primary text-2xl">rocket_launch</span>
+              <h2 className="text-white text-base font-bold">MarsLab</h2>
+            </div>
+            <div className="h-5 w-px bg-border-dark" />
+            <nav className="flex items-center gap-4">
+              <a href="/" className="text-slate-400 hover:text-white text-sm font-medium transition-colors">Workbench</a>
+              <a href="/download" className="text-slate-400 hover:text-white text-sm font-medium transition-colors">Data Download</a>
+              <a href="/upload" className="text-fuchsia-400 text-sm font-medium border-b-2 border-fuchsia-400 pb-0.5">Data Upload</a>
+            </nav>
           </div>
-          <div className="h-5 w-px bg-border-dark" />
-          <nav className="flex items-center gap-4">
-            <a
-              href="/"
-              className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
-            >
-              Workbench
-            </a>
-            <a
-              href="/download"
-              className="text-slate-400 hover:text-white text-sm font-medium transition-colors"
-            >
-              Data Download
-            </a>
-            <a
-              href="/upload"
-              className="text-fuchsia-400 text-sm font-medium border-b-2 border-fuchsia-400 pb-0.5"
-            >
-              Data Upload
-            </a>
-          </nav>
-        </div>
-        {/* Suggest Feature */}
-        <Link
-          to="/suggestions"
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-slate-400 hover:text-white border border-border-dark rounded-md hover:bg-white/5 transition-colors shrink-0"
-        >
-          <span className="material-symbols-outlined text-sm">lightbulb</span>
-          Suggest Feature
-        </Link>
-      </header>
+          <Link
+            to="/suggestions"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium text-slate-400 hover:text-white border border-border-dark rounded-md hover:bg-white/5 transition-colors shrink-0"
+          >
+            <span className="material-symbols-outlined text-sm">lightbulb</span>
+            Suggest Feature
+          </Link>
+        </header>
+      )}
 
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-auto max-w-[1600px] mx-auto w-full px-4 md:px-6 py-4 gap-4">
@@ -750,9 +767,9 @@ export default function DataUploadPage() {
         <GeoTIFFDisclaimer />
 
         {/* Dataset panels */}
-        <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
+        <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 overflow-auto md:overflow-hidden min-h-0">
           {/* Left panel - Dataset list */}
-          <aside className="w-1/3 flex flex-col bg-surface-dark rounded-xl border border-border-dark overflow-hidden">
+          <aside className="w-full md:w-1/3 flex flex-col bg-surface-dark rounded-xl border border-border-dark overflow-hidden max-h-[40vh] md:max-h-none shrink-0">
             <div className="p-4 border-b border-border-dark flex justify-between items-center">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
                 Uploaded Datasets ({datasets.length})

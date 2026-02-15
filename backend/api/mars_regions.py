@@ -1,101 +1,442 @@
 """
-Mars named regions lookup table.
+Mars named regions lookup table with bounding boxes.
 
-Provides coordinates for well-known Mars geographic features.
-Coordinates are center point (lat, lon) with approximate radius in degrees.
+Each region is defined by:
+- region_id: machine-readable identifier
+- display_name: human-readable name
+- lat_min, lat_max, lon_min, lon_max: bounding box (lon in -180/180)
+- description: scientific context
+- tags: categorization for filtering
+
+All coordinates use -180 to 180 longitude convention.
 """
 
-from typing import Optional, Dict, Tuple
-from dataclasses import dataclass
+from typing import Optional, Dict, List
+from dataclasses import dataclass, field
 import math
 
 
 @dataclass
 class MarsRegion:
-    """Mars geographic region."""
-    name: str
-    lat: float  # Center latitude
-    lon: float  # Center longitude (0-360 east)
-    radius_deg: float  # Approximate radius in degrees
+    """Mars geographic region defined by a bounding box."""
+    region_id: str
+    display_name: str
+    lat_min: float
+    lat_max: float
+    lon_min: float  # -180 to 180
+    lon_max: float  # -180 to 180
     description: str = ""
+    tags: List[str] = field(default_factory=list)
+
+    # Derived properties
+    @property
+    def name(self) -> str:
+        return self.display_name
+
+    @property
+    def center_lat(self) -> float:
+        return (self.lat_min + self.lat_max) / 2
+
+    @property
+    def center_lon(self) -> float:
+        if self.lon_min <= self.lon_max:
+            return (self.lon_min + self.lon_max) / 2
+        # Wraps around antimeridian: shift lon_max up by 360, average, then normalize
+        c = (self.lon_min + self.lon_max + 360) / 2
+        return c if c <= 180 else c - 360
+
+    @property
+    def lat(self) -> float:
+        """Legacy center latitude."""
+        return self.center_lat
+
+    @property
+    def lon(self) -> float:
+        """Legacy center longitude (0-360 for ODE)."""
+        lon = self.center_lon
+        if lon < 0:
+            lon += 360
+        return lon
+
+    @property
+    def radius_deg(self) -> float:
+        """Approximate radius in degrees (half the larger span)."""
+        lat_span = self.lat_max - self.lat_min
+        if self.lon_min <= self.lon_max:
+            lon_span = self.lon_max - self.lon_min
+        else:
+            lon_span = 360 + self.lon_max - self.lon_min
+        return max(lat_span, lon_span) / 2
+
+    def to_bbox_dict(self) -> Dict:
+        """Return as bbox dict for API responses."""
+        return {
+            "lat_min": self.lat_min,
+            "lat_max": self.lat_max,
+            "lon_min": self.lon_min,
+            "lon_max": self.lon_max,
+        }
+
+    def to_ode_bbox(self) -> Dict:
+        """Return bbox in ODE's 0-360 longitude convention."""
+        westernlon = self.lon_min
+        easternlon = self.lon_max
+        if westernlon < 0:
+            westernlon += 360
+        if easternlon < 0:
+            easternlon += 360
+        return {
+            "minlat": self.lat_min,
+            "maxlat": self.lat_max,
+            "westernlon": westernlon,
+            "easternlon": easternlon,
+        }
+
+    def contains_point(self, lat: float, lon: float) -> bool:
+        """Check if a point falls within this region's bbox."""
+        if lat < self.lat_min or lat > self.lat_max:
+            return False
+        # Handle longitude wrapping
+        if self.lon_min <= self.lon_max:
+            return self.lon_min <= lon <= self.lon_max
+        else:
+            # Wraps around antimeridian
+            return lon >= self.lon_min or lon <= self.lon_max
 
 
-# Major Mars regions and features
-# Coordinates use 0-360 east longitude system
-MARS_REGIONS: Dict[str, MarsRegion] = {
-    # Major Planitiae (Plains)
-    "arcadia planitia": MarsRegion("Arcadia Planitia", 47.0, 184.0, 15.0, "Northern lowland plain"),
-    "amazonis planitia": MarsRegion("Amazonis Planitia", 25.0, 196.0, 12.0, "Smooth lowland plain"),
-    "utopia planitia": MarsRegion("Utopia Planitia", 46.0, 110.0, 20.0, "Large impact basin, Zhurong landing site"),
-    "elysium planitia": MarsRegion("Elysium Planitia", 3.0, 154.0, 15.0, "InSight landing site"),
-    "isidis planitia": MarsRegion("Isidis Planitia", 13.0, 87.0, 10.0, "Impact basin"),
-    "hellas planitia": MarsRegion("Hellas Planitia", -42.0, 70.0, 12.0, "Deepest impact basin"),
-    "argyre planitia": MarsRegion("Argyre Planitia", -50.0, 316.0, 8.0, "Second largest impact basin"),
-    "chryse planitia": MarsRegion("Chryse Planitia", 22.0, 320.0, 10.0, "Viking 1 landing site"),
-    "acidalia planitia": MarsRegion("Acidalia Planitia", 47.0, 338.0, 15.0, "Northern lowland"),
+# =============================================================================
+# Region Lookup Table
+# =============================================================================
 
-    # Major Terrae (Highlands)
-    "terra sabaea": MarsRegion("Terra Sabaea", -5.0, 40.0, 15.0, "Southern highlands"),
-    "terra cimmeria": MarsRegion("Terra Cimmeria", -35.0, 145.0, 15.0, "Ancient highlands"),
-    "terra sirenum": MarsRegion("Terra Sirenum", -40.0, 210.0, 15.0, "Southern highlands"),
-    "noachis terra": MarsRegion("Noachis Terra", -45.0, 350.0, 15.0, "Ancient cratered terrain"),
-    "arabia terra": MarsRegion("Arabia Terra", 20.0, 5.0, 20.0, "Transitional terrain"),
-    "xanthe terra": MarsRegion("Xanthe Terra", 2.0, 310.0, 10.0, "Chaotic terrain region"),
+MARS_REGIONS: Dict[str, MarsRegion] = {}
 
-    # Major Volcanic Regions
-    "tharsis": MarsRegion("Tharsis", 0.0, 260.0, 20.0, "Volcanic plateau with major volcanoes"),
-    "olympus mons": MarsRegion("Olympus Mons", 18.65, 226.2, 3.0, "Largest volcano in solar system"),
-    "alba mons": MarsRegion("Alba Mons", 40.5, 250.5, 4.0, "Large low-relief volcano"),
-    "elysium mons": MarsRegion("Elysium Mons", 25.0, 147.0, 3.0, "Shield volcano"),
-    "ascraeus mons": MarsRegion("Ascraeus Mons", 11.9, 255.9, 2.0, "Tharsis Montes volcano"),
-    "pavonis mons": MarsRegion("Pavonis Mons", 1.0, 247.0, 2.0, "Tharsis Montes volcano"),
-    "arsia mons": MarsRegion("Arsia Mons", -8.4, 239.0, 2.5, "Tharsis Montes volcano"),
-    "syrtis major": MarsRegion("Syrtis Major", 8.0, 70.0, 8.0, "Low shield volcano, dark albedo feature"),
+def _r(region_id: str, name: str, lat_min: float, lat_max: float,
+       lon_min: float, lon_max: float, desc: str = "", tags: List[str] = None):
+    """Helper to register a region."""
+    region = MarsRegion(
+        region_id=region_id,
+        display_name=name,
+        lat_min=lat_min, lat_max=lat_max,
+        lon_min=lon_min, lon_max=lon_max,
+        description=desc,
+        tags=tags or [],
+    )
+    MARS_REGIONS[region_id] = region
 
-    # Major Canyons and Chasmata
-    "valles marineris": MarsRegion("Valles Marineris", -14.0, 294.0, 20.0, "Vast canyon system"),
-    "noctis labyrinthus": MarsRegion("Noctis Labyrinthus", -7.0, 262.0, 5.0, "Labyrinth of canyons"),
-    "ius chasma": MarsRegion("Ius Chasma", -7.0, 275.0, 4.0, "Part of Valles Marineris"),
-    "coprates chasma": MarsRegion("Coprates Chasma", -13.0, 295.0, 5.0, "Part of Valles Marineris"),
-    "hebes chasma": MarsRegion("Hebes Chasma", -1.0, 284.0, 2.0, "Enclosed canyon"),
-    "juventae chasma": MarsRegion("Juventae Chasma", -4.0, 298.0, 2.0, "Outflow channel source"),
+# ---- Major Planitiae (Plains) ----
+# All coordinates sourced from IAU/USGS Gazetteer of Planetary Nomenclature
+# (planetarynames.wr.usgs.gov), using refined control-network geometry.
+# Longitudes converted from 0-360 East to -180/180 convention.
 
-    # Polar Regions
-    "north pole": MarsRegion("North Polar Region", 85.0, 0.0, 10.0, "Northern polar ice cap"),
-    "south pole": MarsRegion("South Polar Region", -85.0, 0.0, 10.0, "Southern polar ice cap"),
-    "planum boreum": MarsRegion("Planum Boreum", 85.0, 180.0, 8.0, "North polar plateau"),
-    "planum australe": MarsRegion("Planum Australe", -85.0, 180.0, 8.0, "South polar plateau"),
-    "chasma boreale": MarsRegion("Chasma Boreale", 83.0, 315.0, 4.0, "North polar canyon"),
+_r("arcadia_planitia", "Arcadia Planitia",
+   33.87, 64.17, 165.86, -149.57,
+   "Northern lowland plain with subsurface ice deposits",
+   ["planitia", "lowland", "ice", "northern"])
 
-    # Landing Sites
-    "jezero crater": MarsRegion("Jezero Crater", 18.38, 77.58, 0.5, "Perseverance landing site, ancient delta"),
-    "gale crater": MarsRegion("Gale Crater", -5.4, 137.8, 1.5, "Curiosity landing site"),
-    "gusev crater": MarsRegion("Gusev Crater", -14.5, 175.4, 1.5, "Spirit landing site"),
-    "meridiani planum": MarsRegion("Meridiani Planum", -2.0, 354.0, 5.0, "Opportunity landing site"),
-    "viking 1": MarsRegion("Viking 1 Site", 22.3, 312.0, 1.0, "First successful Mars lander"),
-    "viking 2": MarsRegion("Viking 2 Site", 47.6, 134.0, 1.0, "Viking 2 landing site"),
+_r("amazonis_planitia", "Amazonis Planitia",
+   2.14, 49.75, -179.66, -140.58,
+   "Smooth lowland plain west of Tharsis",
+   ["planitia", "lowland", "volcanic"])
 
-    # Notable Craters
-    "schiaparelli crater": MarsRegion("Schiaparelli Crater", -3.0, 14.0, 2.5, "Large impact crater"),
-    "huygens crater": MarsRegion("Huygens Crater", -14.0, 55.0, 2.5, "Large impact crater"),
-    "holden crater": MarsRegion("Holden Crater", -26.0, 326.0, 1.5, "Alluvial fan crater"),
-    "eberswalde crater": MarsRegion("Eberswalde Crater", -24.0, 327.0, 0.5, "Ancient delta"),
-    "mawrth vallis": MarsRegion("Mawrth Vallis", 22.0, 343.0, 3.0, "Phyllosilicate-rich region"),
-    "nili fossae": MarsRegion("Nili Fossae", 21.0, 74.0, 4.0, "Graben system with diverse mineralogy"),
+_r("utopia_planitia", "Utopia Planitia",
+   12.92, 73.17, 71.86, 164.89,
+   "Large impact basin, Zhurong (Tianwen-1) landing site",
+   ["planitia", "impact_basin", "landing_site", "ice"])
 
-    # Outflow Channels
-    "kasei valles": MarsRegion("Kasei Valles", 25.0, 290.0, 8.0, "Largest outflow channel"),
-    "ares vallis": MarsRegion("Ares Vallis", 10.0, 335.0, 5.0, "Outflow channel, Pathfinder site"),
-    "tiu vallis": MarsRegion("Tiu Vallis", 15.0, 325.0, 4.0, "Outflow channel"),
-    "simud vallis": MarsRegion("Simud Vallis", 12.0, 322.0, 3.0, "Outflow channel"),
-    "maja vallis": MarsRegion("Maja Vallis", 15.0, 305.0, 3.0, "Outflow channel"),
-    "mangala vallis": MarsRegion("Mangala Vallis", -10.0, 210.0, 4.0, "Outflow channel"),
+_r("elysium_planitia", "Elysium Planitia",
+   -7.77, 11.40, 128.26, 179.11,
+   "InSight landing site, young volcanic terrain",
+   ["planitia", "volcanic", "landing_site"])
 
-    # Other Notable Features
-    "medusae fossae": MarsRegion("Medusae Fossae", 5.0, 195.0, 10.0, "Easily eroded deposit"),
-    "cerberus fossae": MarsRegion("Cerberus Fossae", 10.0, 166.0, 5.0, "Young volcanic fissures"),
-    "olympus mons aureole": MarsRegion("Olympus Aureole", 20.0, 215.0, 8.0, "Landslide deposits around Olympus"),
-}
+_r("isidis_planitia", "Isidis Planitia",
+   3.20, 22.59, 77.62, 98.91,
+   "Impact basin northeast of Syrtis Major",
+   ["planitia", "impact_basin"])
+
+_r("hellas_planitia", "Hellas Planitia",
+   -55.42, -27.86, 45.58, 96.12,
+   "Deepest and largest impact basin on Mars",
+   ["planitia", "impact_basin", "deep"])
+
+_r("argyre_planitia", "Argyre Planitia",
+   -57.29, -42.44, -53.88, -33.38,
+   "Second largest impact basin on Mars",
+   ["planitia", "impact_basin"])
+
+_r("chryse_planitia", "Chryse Planitia",
+   14.85, 39.61, -54.77, -26.07,
+   "Viking 1 landing site, terminus of outflow channels",
+   ["planitia", "landing_site", "outflow"])
+
+_r("acidalia_planitia", "Acidalia Planitia",
+   14.75, 68.68, -54.88, 16.18,
+   "Northern lowland, source region for recurring slope lineae",
+   ["planitia", "lowland", "northern"])
+
+# ---- Major Terrae (Highlands) ----
+_r("terra_sabaea", "Terra Sabaea",
+   -36.85, 42.16, 9.16, 82.00,
+   "Southern highlands with ancient terrain",
+   ["terra", "highlands", "ancient"])
+
+_r("terra_cimmeria", "Terra Cimmeria",
+   -73.54, 12.13, 98.79, 179.66,
+   "Ancient cratered highlands",
+   ["terra", "highlands", "ancient", "cratered"])
+
+_r("terra_sirenum", "Terra Sirenum",
+   -67.57, -11.40, -179.93, -110.32,
+   "Southern highlands with chloride salt deposits",
+   ["terra", "highlands", "minerals"])
+
+_r("noachis_terra", "Noachis Terra",
+   -83.60, -2.53, -59.96, 74.61,
+   "Ancient heavily cratered terrain",
+   ["terra", "highlands", "ancient", "cratered"])
+
+_r("arabia_terra", "Arabia Terra",
+   -18.07, 45.36, -29.69, 49.44,
+   "Transitional terrain with buried craters",
+   ["terra", "transitional"])
+
+_r("xanthe_terra", "Xanthe Terra",
+   -14.11, 17.27, -61.53, -35.06,
+   "Chaotic terrain region, outflow channel source",
+   ["terra", "chaotic", "outflow"])
+
+# ---- Major Volcanic Regions ----
+_r("tharsis", "Tharsis",
+   -15.0, 15.0, -115.0, -85.0,
+   "Volcanic plateau with the largest volcanoes in the solar system",
+   ["volcanic", "plateau", "tharsis"])
+
+_r("olympus_mons", "Olympus Mons",
+   13.48, 23.68, -139.24, -127.80,
+   "Largest volcano in the solar system, 21.9 km high",
+   ["volcanic", "shield_volcano", "tharsis"])
+
+_r("alba_mons", "Alba Mons",
+   36.53, 45.63, -116.29, -104.79,
+   "Large low-relief shield volcano",
+   ["volcanic", "shield_volcano"])
+
+_r("elysium_mons", "Elysium Mons",
+   21.78, 28.26, 143.59, 150.82,
+   "Shield volcano in Elysium region",
+   ["volcanic", "shield_volcano"])
+
+_r("ascraeus_mons", "Ascraeus Mons",
+   8.11, 15.92, -107.60, -101.00,
+   "Northernmost Tharsis Montes volcano",
+   ["volcanic", "shield_volcano", "tharsis"])
+
+_r("pavonis_mons", "Pavonis Mons",
+   -1.98, 4.15, -116.20, -109.90,
+   "Middle Tharsis Montes volcano on equator",
+   ["volcanic", "shield_volcano", "tharsis"])
+
+_r("arsia_mons", "Arsia Mons",
+   -11.57, -4.94, -123.80, -116.50,
+   "Southernmost Tharsis Montes volcano",
+   ["volcanic", "shield_volcano", "tharsis"])
+
+_r("syrtis_major", "Syrtis Major",
+   -0.99, 18.79, 59.00, 77.00,
+   "Low shield volcano, prominent dark albedo feature",
+   ["volcanic", "shield_volcano", "albedo"])
+
+# ---- Major Canyons and Chasmata ----
+_r("valles_marineris", "Valles Marineris",
+   -19.09, -2.96, -92.70, -28.90,
+   "Vast canyon system, 4000 km long and up to 7 km deep",
+   ["canyon", "chasma", "tectonic"])
+
+_r("noctis_labyrinthus", "Noctis Labyrinthus",
+   -12.26, -2.57, -111.70, -91.40,
+   "Labyrinth of intersecting canyons west of Valles Marineris",
+   ["canyon", "chasma", "labyrinth"])
+
+_r("ius_chasma", "Ius Chasma",
+   -9.97, -5.77, -91.50, -77.47,
+   "Western part of Valles Marineris",
+   ["canyon", "chasma", "valles_marineris"])
+
+_r("coprates_chasma", "Coprates Chasma",
+   -15.82, -10.38, -68.90, -52.70,
+   "Central Valles Marineris with layered deposits",
+   ["canyon", "chasma", "valles_marineris"])
+
+_r("hebes_chasma", "Hebes Chasma",
+   -2.17, 0.15, -78.61, -73.30,
+   "Enclosed canyon north of Valles Marineris",
+   ["canyon", "chasma", "enclosed"])
+
+_r("juventae_chasma", "Juventae Chasma",
+   -5.63, -0.59, -63.60, -60.10,
+   "Outflow channel source with sulfate deposits",
+   ["canyon", "chasma", "outflow", "minerals"])
+
+# ---- Polar Regions ----
+_r("north_pole", "North Polar Region",
+   78.0, 90.0, -180.0, 180.0,
+   "Northern polar ice cap (water ice + seasonal CO2)",
+   ["polar", "ice", "northern"])
+
+_r("south_pole", "South Polar Region",
+   -90.0, -78.0, -180.0, 180.0,
+   "Southern polar ice cap (CO2 ice + water ice)",
+   ["polar", "ice", "southern"])
+
+_r("planum_boreum", "Planum Boreum",
+   80.0, 90.0, -180.0, 180.0,
+   "North polar plateau with layered deposits",
+   ["polar", "ice", "layered_deposits", "northern"])
+
+_r("planum_australe", "Planum Australe",
+   -90.0, -80.0, -180.0, 180.0,
+   "South polar plateau with layered deposits",
+   ["polar", "ice", "layered_deposits", "southern"])
+
+_r("chasma_boreale", "Chasma Boreale",
+   79.30, 85.07, -59.38, -16.20,
+   "Major canyon cutting into north polar cap",
+   ["polar", "canyon", "ice"])
+
+# ---- Landing Sites ----
+_r("jezero_crater", "Jezero Crater",
+   18.01, 18.81, 77.27, 78.11,
+   "Perseverance landing site, ancient river delta",
+   ["crater", "landing_site", "delta", "astrobiology"])
+
+_r("gale_crater", "Gale Crater",
+   -6.62, -4.05, 136.40, 138.90,
+   "Curiosity landing site, Mount Sharp central peak",
+   ["crater", "landing_site", "layered_deposits"])
+
+_r("gusev_crater", "Gusev Crater",
+   -15.86, -13.20, 174.15, 176.91,
+   "Spirit landing site, ancient lakebed",
+   ["crater", "landing_site", "lakebed"])
+
+_r("meridiani_planum", "Meridiani Planum",
+   -4.00, 8.78, -10.90, 7.00,
+   "Opportunity landing site, hematite deposits",
+   ["planum", "landing_site", "minerals", "hematite"])
+
+_r("viking_1", "Viking 1 Site",
+   21.0, 24.0, -50.0, -46.0,
+   "First successful Mars lander site",
+   ["landing_site", "historic"])
+
+_r("viking_2", "Viking 2 Site",
+   46.0, 49.0, -134.0, -131.0,
+   "Viking 2 landing site in Utopia Planitia",
+   ["landing_site", "historic"])
+
+# ---- Notable Craters ----
+_r("schiaparelli_crater", "Schiaparelli Crater",
+   -5.93, 1.09, 12.90, 20.80,
+   "Large impact crater 461 km diameter",
+   ["crater", "large"])
+
+_r("huygens_crater", "Huygens Crater",
+   -17.80, -9.88, 51.40, 59.60,
+   "Large impact crater 467 km diameter",
+   ["crater", "large"])
+
+_r("holden_crater", "Holden Crater",
+   -27.33, -24.75, -35.45, -32.58,
+   "Crater with alluvial fans and layered sediments",
+   ["crater", "alluvial", "sedimentary"])
+
+_r("eberswalde_crater", "Eberswalde Crater",
+   -24.44, -23.52, -33.81, -32.79,
+   "Ancient inverted river delta",
+   ["crater", "delta", "fluvial"])
+
+_r("mawrth_vallis", "Mawrth Vallis",
+   18.69, 26.23, -19.80, -13.40,
+   "Phyllosilicate-rich outflow channel",
+   ["vallis", "minerals", "phyllosilicate", "fluvial"])
+
+_r("nili_fossae", "Nili Fossae",
+   17.01, 27.12, 72.10, 81.70,
+   "Graben system with olivine, carbonates, and diverse mineralogy",
+   ["fossae", "graben", "minerals", "olivine", "carbonate"])
+
+# ---- Outflow Channels ----
+_r("kasei_valles", "Kasei Valles",
+   16.71, 27.32, -74.40, -50.00,
+   "Largest outflow channel system on Mars",
+   ["vallis", "outflow", "fluvial"])
+
+_r("ares_vallis", "Ares Vallis",
+   0.33, 20.82, -36.00, -17.24,
+   "Outflow channel, Pathfinder landing site nearby",
+   ["vallis", "outflow", "fluvial", "landing_site"])
+
+_r("tiu_vallis", "Tiu Vallis",
+   2.77, 28.71, -36.70, -28.00,
+   "Outflow channel draining into Chryse Planitia",
+   ["vallis", "outflow", "fluvial"])
+
+_r("simud_vallis", "Simud Vallis",
+   10.97, 27.20, -43.42, -33.93,
+   "Outflow channel parallel to Tiu Vallis",
+   ["vallis", "outflow", "fluvial"])
+
+_r("maja_vallis", "Maja Vallis",
+   0.33, 20.54, -61.62, -49.74,
+   "Outflow channel from Juventae Chasma",
+   ["vallis", "outflow", "fluvial"])
+
+_r("mangala_vallis", "Mangala Vallis",
+   -18.20, -4.30, -151.85, -149.20,
+   "Long outflow channel system",
+   ["vallis", "outflow", "fluvial"])
+
+# ---- Other Notable Features ----
+_r("medusae_fossae", "Medusae Fossae",
+   -2.0, 12.0, -175.0, -155.0,
+   "Easily eroded volcanic ash or dust deposits",
+   ["fossae", "volcanic", "aeolian"])
+
+_r("cerberus_fossae", "Cerberus Fossae",
+   6.23, 16.16, 154.43, 174.72,
+   "Young volcanic fissures with recent lava flows",
+   ["fossae", "volcanic", "young"])
+
+_r("olympus_aureole", "Olympus Mons Aureole",
+   12.38, 34.48, -150.75, -130.83,
+   "Massive landslide deposits surrounding Olympus Mons",
+   ["volcanic", "landslide", "aureole"])
+
+
+# =============================================================================
+# Lookup Functions
+# =============================================================================
+
+# Build name-based index for fast lookup
+_NAME_INDEX: Dict[str, MarsRegion] = {}
+
+def _build_name_index():
+    """Build case-insensitive name lookup index."""
+    for region in MARS_REGIONS.values():
+        # Index by region_id
+        _NAME_INDEX[region.region_id.lower()] = region
+        # Index by display_name
+        _NAME_INDEX[region.display_name.lower()] = region
+        # Index by display_name without common suffixes for partial matching
+        name_lower = region.display_name.lower()
+        for suffix in [" planitia", " terra", " mons", " chasma", " vallis",
+                       " valles", " fossae", " planum", " crater", " site",
+                       " region", " labyrinthus", " aureole"]:
+            if name_lower.endswith(suffix):
+                base = name_lower[:-len(suffix)].strip()
+                if base and base not in _NAME_INDEX:
+                    _NAME_INDEX[base] = region
+
+_build_name_index()
 
 
 def find_region(query: str) -> Optional[MarsRegion]:
@@ -110,22 +451,24 @@ def find_region(query: str) -> Optional[MarsRegion]:
     """
     query_lower = query.lower().strip()
 
-    # Exact match first
-    if query_lower in MARS_REGIONS:
-        return MARS_REGIONS[query_lower]
+    # Exact match on region_id or display_name
+    if query_lower in _NAME_INDEX:
+        return _NAME_INDEX[query_lower]
 
-    # Partial match
-    for key, region in MARS_REGIONS.items():
+    # Try matching with underscores replaced by spaces
+    query_spaced = query_lower.replace("_", " ")
+    if query_spaced in _NAME_INDEX:
+        return _NAME_INDEX[query_spaced]
+
+    # Partial match: check if query is substring of any key
+    for key, region in _NAME_INDEX.items():
         if query_lower in key or key in query_lower:
-            return region
-        # Also check the region name
-        if query_lower in region.name.lower():
             return region
 
     return None
 
 
-def find_all_matching_regions(query: str) -> list[MarsRegion]:
+def find_all_matching_regions(query: str) -> List[MarsRegion]:
     """
     Find all Mars regions matching a query.
 
@@ -136,40 +479,62 @@ def find_all_matching_regions(query: str) -> list[MarsRegion]:
         List of matching MarsRegion objects
     """
     query_lower = query.lower().strip()
+    seen_ids = set()
     matches = []
 
-    for key, region in MARS_REGIONS.items():
-        if query_lower in key or query_lower in region.name.lower():
+    for region in MARS_REGIONS.values():
+        if region.region_id in seen_ids:
+            continue
+        name_lower = region.display_name.lower()
+        id_lower = region.region_id.lower()
+        if query_lower in name_lower or query_lower in id_lower:
             matches.append(region)
+            seen_ids.add(region.region_id)
 
     return matches
 
 
-def list_all_regions() -> list[MarsRegion]:
+def find_regions_by_tag(tag: str) -> List[MarsRegion]:
+    """Find all regions with a given tag."""
+    tag_lower = tag.lower()
+    return [r for r in MARS_REGIONS.values() if tag_lower in [t.lower() for t in r.tags]]
+
+
+def list_all_regions() -> List[MarsRegion]:
     """Return all known Mars regions."""
     return list(MARS_REGIONS.values())
 
 
-def find_nearest_region(lat: float, lon_360: float) -> Optional[MarsRegion]:
-    """
-    Find the nearest named region to a lat/lon point (0-360 east lon).
+def get_region_by_id(region_id: str) -> Optional[MarsRegion]:
+    """Get a region by its exact region_id."""
+    return MARS_REGIONS.get(region_id)
 
-    Scans all MARS_REGIONS, computes angular distance, returns the closest
-    region if the point falls within that region's radius_deg.
+
+def find_nearest_region(lat: float, lon_180: float) -> Optional[MarsRegion]:
     """
+    Find the nearest named region to a lat/lon point (-180/180 lon).
+
+    Checks if the point falls within any region's bounding box.
+    Falls back to closest region by center distance.
+    """
+    # First: check direct containment
+    for region in MARS_REGIONS.values():
+        if region.contains_point(lat, lon_180):
+            return region
+
+    # Fallback: closest center
     best: Optional[MarsRegion] = None
     best_dist = float("inf")
 
     for region in MARS_REGIONS.values():
-        dlat = lat - region.lat
-        # Handle longitude wrapping (both in 0-360)
-        dlon = lon_360 - region.lon
+        dlat = lat - region.center_lat
+        dlon = lon_180 - region.center_lon
         if dlon > 180:
             dlon -= 360
         elif dlon < -180:
             dlon += 360
         dist = math.sqrt(dlat * dlat + dlon * dlon)
-        if dist < region.radius_deg and dist < best_dist:
+        if dist < best_dist:
             best = region
             best_dist = dist
 

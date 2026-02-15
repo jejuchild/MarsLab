@@ -406,10 +406,13 @@ export default function MainPage() {
   const [regionVertices, setRegionVertices] = useState<{lat: number; lon: number}[]>([]);
 
   // Temporal Change Detection modal
-  const [showTemporalComparison, setShowTemporalComparison] = useState<{lat: number; lon: number} | null>(null);
+  const [showTemporalComparison, setShowTemporalComparison] = useState<{lat: number; lon: number; instrument?: string} | null>(null);
 
   // Keyboard shortcuts help modal
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+
+  // Right panel (inspector) collapsed state
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   // Onboarding tour (force re-trigger)
   const [showTourForced, setShowTourForced] = useState(false);
@@ -634,6 +637,18 @@ export default function MainPage() {
   const handleSharadHiresClick = useCallback((productId: string) => {
     setSharadHiresProductId(productId);
     setSelected(null); // Close regular Inspector
+  }, []);
+
+  // Fly to lat/lon coordinates (for search results not on map)
+  const [flyToCoords, setFlyToCoords] = useState<{ lat: number; lon: number } | null>(null);
+
+  const handleFlyToCoordsComplete = useCallback(() => {
+    setFlyToCoords(null);
+  }, []);
+
+  // Handle fly-to from LayerPanel (Fly To Location input)
+  const handleFlyToCoords = useCallback((lat: number, lon: number) => {
+    setFlyToCoords({ lat, lon });
   }, []);
 
   // Track whether the current fly-to was triggered by a deep-link
@@ -1268,17 +1283,7 @@ export default function MainPage() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [commandPalette.isOpen, showKeyboardHelp, sharadHiresProductId, selected, analysisMode, sharadPopup, handleSelectProduct, undo, redo]);
 
-  // Fly to lat/lon coordinates (for search results not on map)
-  const [flyToCoords, setFlyToCoords] = useState<{ lat: number; lon: number } | null>(null);
-
-  const handleFlyToCoordsComplete = useCallback(() => {
-    setFlyToCoords(null);
-  }, []);
-
-  // Handle fly-to from LayerPanel (Fly To Location input)
-  const handleFlyToCoords = useCallback((lat: number, lon: number) => {
-    setFlyToCoords({ lat, lon });
-  }, []);
+  // (flyToCoords state moved earlier — before URL state effects)
 
   // Handle view bound selected from map drag selection
   const handleViewBoundSelected = useCallback((bounds: BoundingBox) => {
@@ -1456,6 +1461,7 @@ export default function MainPage() {
       <Inspector
         selected={selected}
         onClose={() => setSelected(null)}
+        onCollapse={() => setRightPanelCollapsed(true)}
         activeOverlay={activeOverlays.get(selected.productId) || null}
         onSetOverlay={(type) => handleSetOverlay(selected.productId, type)}
         onSetOpacity={(opacity) => handleSetOpacity(selected.productId, opacity)}
@@ -1481,7 +1487,7 @@ export default function MainPage() {
         }}
         onDownloadProduct={handleDownloadProduct}
         onPinSpectrum={handlePinSpectrum}
-        onFindTemporalPairs={(lat, lon) => setShowTemporalComparison({ lat, lon })}
+        onFindTemporalPairs={(lat, lon, instrument) => setShowTemporalComparison({ lat, lon, instrument })}
       />
     ) : terrainPoint ? (
       <SlopeAnalysis
@@ -1565,7 +1571,43 @@ export default function MainPage() {
         />
       }
       leftPanel={isMobile ? null : layerPanelContent}
-      rightPanel={isMobile ? undefined : rightPanelContent}
+      rightPanel={isMobile ? undefined : (
+        rightPanelCollapsed ? (
+          /* Collapsed strip — thin vertical bar with expand button */
+          <div className="h-full w-8 bg-[#0a0f18] border-l border-border-dark flex flex-col items-center pt-2 gap-2">
+            <button
+              onClick={() => setRightPanelCollapsed(false)}
+              className="p-1 rounded hover:bg-[#232f48] text-[#6b7c9c] hover:text-white transition-colors"
+              title="Expand panel"
+            >
+              <span className="material-symbols-outlined text-base">chevron_left</span>
+            </button>
+            {/* Vertical label */}
+            <span className="text-[8px] text-[#6b7c9c] uppercase tracking-widest font-bold"
+              style={{ writingMode: "vertical-lr", textOrientation: "mixed" }}>
+              {selected ? "Inspector" : analysisMode ? "Analysis" : "Panel"}
+            </span>
+          </div>
+        ) : (
+          /* Expanded panel — wrap content with collapse button in header */
+          <div className="h-full flex flex-col relative">
+            {/* Collapse button — only for panels that don't have their own collapse
+                (Inspector and SharadHiresInspector handle it internally) */}
+            {!selected && !sharadHiresProductId && (
+              <button
+                onClick={() => setRightPanelCollapsed(true)}
+                className="absolute top-2 right-12 z-30 p-1 rounded hover:bg-[#232f48] text-[#6b7c9c] hover:text-white transition-colors"
+                title="Collapse panel"
+              >
+                <span className="material-symbols-outlined text-base">chevron_right</span>
+              </button>
+            )}
+            <div className="flex-1 overflow-hidden">
+              {rightPanelContent}
+            </div>
+          </div>
+        )
+      )}
       mobileNav={isMobile ? (
         <div className="flex items-center justify-around border-t border-border-dark bg-bg-dark px-2 py-1.5">
           <button
@@ -1772,6 +1814,7 @@ export default function MainPage() {
           <TemporalComparison
             lat={showTemporalComparison.lat}
             lon={showTemporalComparison.lon}
+            initialInstrument={showTemporalComparison.instrument}
             onClose={() => setShowTemporalComparison(null)}
           />
         </Suspense>

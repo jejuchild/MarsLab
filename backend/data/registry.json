@@ -57,6 +57,76 @@
         "label": [],
         "supplementary": []
       }
+    },
+    "sharad_highres": {
+      "id": "sharad_highres",
+      "name": "SHARAD_HIGHRES",
+      "display_name": "SHARAD High-Resolution RDR",
+      "geometry_type": "LineString",
+      "color": "#FFD700",
+      "data_directory": "sharad_highres_data",
+      "index_file": "index.geojson",
+      "product_id_pattern": "^R_[0-9]+",
+      "supports_spectrum": false,
+      "supports_rgb": false,
+      "file_types": {
+        "primary": [".dat"],
+        "label": [".lbl"],
+        "supplementary": []
+      }
+    },
+    "ctx": {
+      "id": "ctx",
+      "name": "CTX",
+      "display_name": "Context Camera (MRO)",
+      "geometry_type": "Polygon",
+      "color": "#FF69B4",
+      "data_directory": "ctx_data",
+      "index_file": "index.geojson",
+      "product_id_pattern": ".*CTX.*|^b[0-9]+_|^curiosity_ctx|^olympus_mons|^DEM_1m_|^InSight|^JEZ_ctx|^West_Candor",
+      "quickview_path": "ctx_quickview",
+      "supports_spectrum": false,
+      "supports_rgb": false,
+      "file_types": {
+        "primary": [],
+        "label": [],
+        "supplementary": []
+      }
+    },
+    "hirise_dtm": {
+      "id": "hirise_dtm",
+      "name": "HIRISE_DTM",
+      "display_name": "HiRISE Digital Terrain Model",
+      "geometry_type": "Polygon",
+      "color": "#8B4513",
+      "data_directory": "hirise_dtm_data",
+      "index_file": "index.geojson",
+      "product_id_pattern": "^DTE.*|^DTEEC.*",
+      "supports_spectrum": false,
+      "supports_rgb": false,
+      "file_types": {
+        "primary": [".IMG", ".tif"],
+        "label": [".lbl"],
+        "ortho": [".JP2"]
+      }
+    },
+    "crism_trr3": {
+      "id": "crism_trr3",
+      "name": "CRISM_TRR3",
+      "display_name": "CRISM Targeted Reduced Data Record v3",
+      "geometry_type": "Polygon",
+      "color": "#00CED1",
+      "data_directory": "mineral_cnn_data",
+      "index_file": "index.geojson",
+      "product_id_pattern": "^(frs|msv|hsv|frt|hrl|hrs|arl|atl)[0-9a-f]+_[0-9]+",
+      "quickview_path": "",
+      "supports_spectrum": true,
+      "supports_rgb": false,
+      "file_types": {
+        "primary": [".IMG"],
+        "label": [".LBL"],
+        "supplementary": []
+      }
     }
   }
 }

@@ -207,6 +207,66 @@ def _generate_figures(session: AgentSession) -> Dict[str, str]:
             except Exception as e:
                 logger.warning(f"Failed to generate slope figure: {e}")
 
+    # ── CNN Mineral Classification Map ──
+    cnn_result = session.all_results.get("mineral_cnn")
+    if cnn_result and cnn_result.success:
+        observations = cnn_result.data.get("observations", [])
+        if observations:
+            best_cnn_obs = observations[0].get("obs_id")
+            if best_cnn_obs:
+                try:
+                    from .mineral_cnn.constants import CLASS_NAME, RESULTS_DIR
+                    from .mineral_cnn.router import _MINERAL_COLORS
+                    result_dir = os.path.join(RESULTS_DIR, best_cnn_obs)
+                    mmap_path = os.path.join(result_dir, "mineral_map.npy")
+                    vmask_path = os.path.join(result_dir, "valid_mask.npy")
+
+                    if os.path.exists(mmap_path):
+                        mineral_map = np.load(mmap_path)
+                        valid_mask = (np.load(vmask_path)
+                                      if os.path.exists(vmask_path)
+                                      else mineral_map >= 0)
+
+                        rows, cols = mineral_map.shape
+                        rgba = np.zeros((rows, cols, 4), dtype=np.uint8)
+                        rgba[:, :, :3] = 240  # light bg for unclassified
+
+                        legend_items = []
+                        for mid, color in _MINERAL_COLORS.items():
+                            m = mineral_map == mid
+                            if m.any():
+                                rgba[m, 0] = color[0]
+                                rgba[m, 1] = color[1]
+                                rgba[m, 2] = color[2]
+                                rgba[m, 3] = 255
+                                legend_items.append((
+                                    int(m.sum()), mid,
+                                    CLASS_NAME.get(mid, f"Class {mid}"),
+                                    color,
+                                ))
+                        rgba[~valid_mask, 3] = 80
+                        legend_items.sort(key=lambda x: -x[0])
+
+                        fig, ax = plt.subplots(figsize=(8, 6))
+                        ax.imshow(rgba, aspect="auto")
+                        for i, (cnt, mid, name, color) in enumerate(legend_items[:6]):
+                            norm_color = (color[0] / 255, color[1] / 255, color[2] / 255)
+                            ax.plot([], [], "s", color=norm_color, markersize=8,
+                                    label=f"{name} ({cnt:,}px)")
+                        ax.legend(loc="upper right", fontsize=7)
+                        ax.set_title(f"CNN Mineral Classification — {best_cnn_obs}")
+                        ax.set_xlabel("Sample")
+                        ax.set_ylabel("Line")
+
+                        buf = io.BytesIO()
+                        fig.savefig(buf, format="png", dpi=100, bbox_inches="tight", facecolor="white")
+                        plt.close(fig)
+                        buf.seek(0)
+                        figures["cnn_mineral_map"] = base64.b64encode(buf.read()).decode()
+                        figures["cnn_mineral_map_obs_id"] = best_cnn_obs
+                except Exception as e:
+                    logger.warning(f"Failed to generate CNN mineral figure: {e}")
+
     return figures
 
 
@@ -267,6 +327,16 @@ def generate_evidence_figures(session: AgentSession) -> Dict:
                 power, n_traces = _get_power(pid)
                 surface = _pick_surface(pid, power)
 
+                # Downsample long tracks to keep figure manageable
+                MAX_DISPLAY_TRACES = 2000
+                ds = max(1, n_traces // MAX_DISPLAY_TRACES)
+                if ds > 1:
+                    n_trim = n_traces // ds * ds
+                    power = power[:n_trim].reshape(-1, ds, power.shape[1]).mean(axis=1)
+                    # Downsample surface by taking every ds-th sample
+                    surface = surface[:n_trim:ds]
+                    n_traces = power.shape[0]
+
                 fig, ax = plt.subplots(figsize=(14, 5))
                 fig.patch.set_facecolor("#0d1520")
                 ax.set_facecolor("#0d1520")
@@ -285,27 +355,43 @@ def generate_evidence_figures(session: AgentSession) -> Dict:
                 caption_parts = [f"Product: {pid}"]
 
                 if picks:
-                    # Plot subsurface reflector picks (yellow dots)
-                    tr_idxs = [pk["trace_idx"] for pk in picks]
-                    bin_idxs = [pk["bin_idx"] for pk in picks]
-                    ax.scatter(tr_idxs, bin_idxs, c="yellow", s=3, alpha=0.5,
-                               zorder=5, label="Subsurface reflector")
+                    # Remap pick trace indices to downsampled space and sort by trace
+                    sorted_picks = sorted(picks, key=lambda p: p["trace_idx"])
+                    tr_idxs = np.array([pk["trace_idx"] // ds for pk in sorted_picks])
+                    bin_idxs = np.array([pk["bin_idx"] for pk in sorted_picks])
+
+                    # Smooth with moving average for a clean continuous line
+                    if len(bin_idxs) > 5:
+                        kernel = max(3, len(bin_idxs) // 20)
+                        if kernel % 2 == 0:
+                            kernel += 1
+                        pad = kernel // 2
+                        padded = np.pad(bin_idxs.astype(np.float64), pad, mode="edge")
+                        smoothed = np.convolve(padded, np.ones(kernel) / kernel, mode="valid")
+                        bin_idxs_plot = smoothed
+                    else:
+                        bin_idxs_plot = bin_idxs.astype(np.float64)
+
+                    ax.plot(tr_idxs, bin_idxs_plot, color="yellow", linewidth=1.0,
+                            alpha=0.8, zorder=5, label="Subsurface reflector")
 
                     # Annotate strongest detection
                     strongest = max(picks, key=lambda p: p["snr"])
+                    s_tx = strongest["trace_idx"] // ds  # downsampled x
+                    s_by = strongest["bin_idx"]
                     ax.annotate(
                         f"Reflector\n{strongest['depth_m']:.0f} m depth\n"
                         f"SNR = {strongest['snr']:.1f}",
-                        xy=(strongest["trace_idx"], strongest["bin_idx"]),
-                        xytext=(strongest["trace_idx"] + n_traces * 0.08,
-                                max(strongest["bin_idx"] - 60, 10)),
+                        xy=(s_tx, s_by),
+                        xytext=(s_tx + n_traces * 0.08,
+                                max(s_by - 60, 10)),
                         fontsize=8, color="yellow", fontweight="bold",
                         arrowprops=dict(arrowstyle="->", color="yellow", lw=1.5),
                         bbox=dict(facecolor="black", alpha=0.8, edgecolor="yellow",
                                   lw=0.8, boxstyle="round,pad=0.3"),
                     )
                     caption_parts.append(
-                        f"{len(picks)} subsurface reflectors detected (SNR >= 2.5)"
+                        f"{len(picks)} subsurface reflectors detected (SNR >= 4.0)"
                     )
 
                     # Depth range info box
@@ -530,8 +616,11 @@ def generate_evidence_figures(session: AgentSession) -> Dict:
                             dtm_id, sub_lat, sub_lon,
                             radius_m=2000, grid_size=128,
                         )
-                        elev = np.array(patch.get("elevation") or patch.get("grid"))
-                        if elev is not None and elev.size > 0:
+                        elev_flat = patch.get("elevations")
+                        p_rows = patch.get("rows", 128)
+                        p_cols = patch.get("cols", 128)
+                        if elev_flat and len(elev_flat) > 0:
+                            elev = np.array(elev_flat).reshape(p_rows, p_cols)
                             fig, ax = plt.subplots(figsize=(7, 6))
                             fig.patch.set_facecolor("#0d1520")
                             ax.set_facecolor("#0d1520")
@@ -730,6 +819,8 @@ def _build_report_markdown(session: AgentSession) -> str:
         n_analyzed = sub.get("analyzed_count", 0)
         n_detect = sub.get("subsurface_detections", 0)
         depth = sub.get("depth_summary", {})
+        eps_source = synthesis.get("epsilon_r_source", depth.get("epsilon_r_source", "assumed") if depth else "no_data")
+        is_fallback = synthesis.get("is_fallback", eps_source == "assumed")
 
         lines.append("| Parameter | Value |")
         lines.append("|-----------|-------|")
@@ -739,7 +830,14 @@ def _build_report_markdown(session: AgentSession) -> str:
         if depth:
             lines.append(f"| Estimated Depth Range | {depth.get('min_depth_m', 'N/A')} – {depth.get('max_depth_m', 'N/A')} m |")
             lines.append(f"| Median Depth | {depth.get('median_depth_m', 'N/A')} m |")
-            lines.append(f"| Dielectric Constant (εr) | {depth.get('epsilon_r_assumed', 3.15)} (water-ice) |")
+            if is_fallback:
+                lines.append(f"| Dielectric Constant (εr) | {depth.get('epsilon_r_assumed', 3.15)} (**ASSUMED** — water-ice) |")
+            else:
+                # Physics-based εr available
+                diel_a = synthesis.get("dielectric_analysis", {})
+                eps_val = diel_a.get("median_epsilon_r", depth.get("epsilon_r_assumed", 3.15))
+                method_label = eps_source.replace("_", " ").title()
+                lines.append(f"| Dielectric Constant (εr) | **{eps_val}** (measured — {method_label}) |")
         lines.append("")
 
         if n_detect > 0 and depth:
@@ -767,18 +865,37 @@ def _build_report_markdown(session: AgentSession) -> str:
                     "This depth is **too deep for practical ice extraction** "
                     "and reduces the site's utility for ISRU."
                 )
-            lines.append(
-                f"SHARAD analysis detected **{n_detect} subsurface reflector(s)**, "
-                f"providing direct evidence of a dielectric interface. "
-                f"Assuming εr = {depth.get('epsilon_r_assumed', 3.15)} (water-ice), "
-                f"the ice-table depth is estimated at "
-                f"**{depth['min_depth_m']}–{depth['max_depth_m']} m** "
-                f"(median {depth['median_depth_m']} m). {depth_qual}"
-            )
+
+            if is_fallback:
+                # Prominent fallback warning
+                physics_attempted = synthesis.get("physics_inversion_attempted", False)
+                if physics_attempted:
+                    fallback_reason = "Physics-based inversion was attempted but failed (insufficient DTM-SHARAD intersections or no terraced craters detected)."
+                else:
+                    fallback_reason = "Physics-based inversion was not possible due to lack of co-located HiRISE DTM data."
+
+                lines.append(
+                    f"**FALLBACK ESTIMATE:** SHARAD detected **{n_detect} subsurface reflector(s)**. "
+                    f"Depth is estimated at **{depth['min_depth_m']}–{depth['max_depth_m']} m** "
+                    f"(median {depth['median_depth_m']} m) using **assumed** εr = {depth.get('epsilon_r_assumed', 3.15)} (water-ice). "
+                    f"This depth is **not independently measured** — it assumes the subsurface "
+                    f"material is water ice. {fallback_reason}"
+                )
+                lines.append("")
+                lines.append(f"> {depth_qual}")
+            else:
+                lines.append(
+                    f"SHARAD analysis detected **{n_detect} subsurface reflector(s)**, "
+                    f"providing direct evidence of a dielectric interface. "
+                    f"Using εr estimated via morphological + radar inversion, "
+                    f"the interface depth is "
+                    f"**{depth['min_depth_m']}–{depth['max_depth_m']} m** "
+                    f"(median {depth['median_depth_m']} m). {depth_qual}"
+                )
         elif n_analyzed > 0:
             lines.append(
                 f"{n_analyzed} SHARAD radargrams were analyzed but no subsurface "
-                f"reflectors exceeded the detection threshold (SNR ≥ 2.5). "
+                f"reflectors exceeded the detection threshold (SNR >= 4.0). "
                 f"This does not rule out ice — deposits may be below SHARAD "
                 f"vertical resolution (~15 m) or masked by surface clutter."
             )
@@ -796,8 +913,171 @@ def _build_report_markdown(session: AgentSession) -> str:
                 f"Figure 1: SHARAD Radargram ({figures.get('sharad_radargram_pid', 'N/A')})",
                 "Red line marks the auto-picked surface return. Cyan dashed lines delimit "
                 "the subsurface search zone (20–200 range bins below surface). "
-                "Any subsurface reflector within this zone is evaluated for SNR ≥ 2.5.",
+                "Any subsurface reflector within this zone is evaluated for SNR >= 4.0.",
             ))
+
+    # ── 2b. Dielectric Constant Estimation (εr) — MANDATORY SECTION ──
+    diel = synthesis.get("dielectric_analysis", {})
+    terrace_diel = synthesis.get("terrace_dielectric", {})
+    physics_inv = synthesis.get("sharad_physics_inversion", {})
+    method_hierarchy = synthesis.get("dielectric_method_hierarchy", [])
+    has_dielectric = (
+        diel.get("estimates_count", 0) > 0
+        or terrace_diel.get("estimates_count", 0) > 0
+        or physics_inv.get("inversions_completed", 0) > 0
+    )
+
+    lines.append("## 2b. Dielectric Constant Estimation (εr)")
+    lines.append("")
+    lines.append(
+        "Dielectric constant (εr) constrains subsurface composition. "
+        "Pure water ice: εr ~ 3.1, dry regolith: εr ~ 4-6, basalt: εr ~ 7-9. "
+        "εr MUST be estimated via morphological + radar inversion when data permits."
+    )
+    lines.append("")
+
+    if has_dielectric:
+        lines.append("| Method | εr | Interpretation |")
+        lines.append("|--------|-----|----------------|")
+
+        if terrace_diel.get("estimates_count", 0) > 0:
+            med_eps_raw = terrace_diel.get("median_epsilon_r")
+            med_eps = f"{med_eps_raw:.2f}" if isinstance(med_eps_raw, (int, float)) else "N/A"
+            interp = terrace_diel.get("interpretation", "")
+            lines.append(
+                f"| Terraced Crater Method | **{med_eps}** "
+                f"({terrace_diel.get('estimates_count', 0)} estimates) | {interp} |"
+            )
+
+        if physics_inv.get("inversions_completed", 0) > 0:
+            best_eps_raw = physics_inv.get("best_epsilon_r")
+            best_eps = f"{best_eps_raw:.2f}" if isinstance(best_eps_raw, (int, float)) else "N/A"
+            ci = physics_inv.get("best_epsilon_r_ci")
+            ci_str = ""
+            if ci:
+                try:
+                    ci_str = f" ({float(ci[0]):.2f}-{float(ci[1]):.2f})"
+                except (TypeError, ValueError, IndexError):
+                    pass
+            conf = physics_inv.get("reflector_confidence", 0)
+            lines.append(
+                f"| Physics-Based Inversion | **{best_eps}{ci_str}** "
+                f"(confidence: {conf:.0%}) | DTM-constrained, no εr assumption |"
+            )
+
+        if diel.get("estimates_count", 0) > 0 and diel.get("method") not in ("terraced_crater", "physics_inversion"):
+            med_eps = diel.get("median_epsilon_r", "N/A")
+            interp = diel.get("interpretation", "")
+            lines.append(f"| Standard Dielectric | {med_eps} | {interp} |")
+
+        lines.append("")
+
+        # εr consistency comparison (when multiple methods available)
+        eps_values_for_comparison = []
+        if terrace_diel.get("estimates_count", 0) > 0 and terrace_diel.get("median_epsilon_r") is not None:
+            eps_values_for_comparison.append(("Terraced Crater", float(terrace_diel["median_epsilon_r"])))
+        if physics_inv.get("inversions_completed", 0) > 0 and physics_inv.get("best_epsilon_r") is not None:
+            eps_values_for_comparison.append(("Physics Inversion", float(physics_inv["best_epsilon_r"])))
+
+        if len(eps_values_for_comparison) >= 2:
+            lines.append("### εr Consistency Comparison")
+            lines.append("")
+            eps_vals = [v for _, v in eps_values_for_comparison]
+            delta = abs(eps_vals[0] - eps_vals[1])
+            if delta < 0.5:
+                consistency_label = "**CONSISTENT** — methods agree within 0.5"
+            elif delta < 1.5:
+                consistency_label = "**MARGINAL** — methods diverge by {:.2f}".format(delta)
+            else:
+                consistency_label = "**INCONSISTENT** — methods diverge by {:.2f}".format(delta)
+            for name, val in eps_values_for_comparison:
+                lines.append(f"- {name}: εr = {val:.2f}")
+            lines.append(f"- Agreement: {consistency_label}")
+            lines.append("")
+
+        # Ice probability assessment based on εr
+        any_eps = (
+            physics_inv.get("best_epsilon_r")
+            or terrace_diel.get("median_epsilon_r")
+            or diel.get("median_epsilon_r")
+        )
+        if any_eps is not None:
+            try:
+                eps_val = float(any_eps)
+                lines.append("### Ice Probability Assessment")
+                lines.append("")
+                if eps_val < 2.5:
+                    lines.append(f"εr = {eps_val:.2f}: Below pure-ice range. Suggests very porous material or dry regolith. **Ice unlikely at this dielectric.**")
+                elif eps_val <= 3.5:
+                    lines.append(f"εr = {eps_val:.2f}: Within water-ice range (2.5-3.5). **Ice presence is probable** (εr < 4 threshold met).")
+                elif eps_val <= 5.0:
+                    lines.append(f"εr = {eps_val:.2f}: Above pure-ice but below basalt. Suggests ice-cemented regolith or ice-rock mixture. **Possible ice content.**")
+                else:
+                    lines.append(f"εr = {eps_val:.2f}: Above ice range. Indicates rocky/basaltic subsurface. **Ice unlikely at this dielectric.**")
+                lines.append("")
+            except (TypeError, ValueError):
+                pass
+
+        # Terrace details if available
+        estimates = terrace_diel.get("estimates", [])
+        if estimates:
+            lines.append("### Terrace Crater Details")
+            lines.append("")
+            lines.append("| Crater | Depth (m) | εr | Quality |")
+            lines.append("|--------|-----------|-----|---------|")
+            for est in estimates[:5]:
+                cid = est.get("crater_id", "?")
+                edepth = est.get("depth_true_m", "?")
+                eps = est.get("epsilon_r", "?")
+                qual = est.get("quality", "?")
+                lines.append(f"| {cid} | {edepth} | {eps} | {qual} |")
+            lines.append("")
+
+        # Physics inversion methodology
+        methodology = physics_inv.get("methodology", "")
+        if methodology:
+            lines.append(f"*Methodology:* {methodology}")
+            lines.append("")
+
+        # Cross-instrument note
+        mineral_sigs = synthesis.get("mineral_signatures", {})
+        has_ice_sigs = mineral_sigs.get("high_ice_count", 0) > 0
+        if any_eps and has_ice_sigs:
+            try:
+                eps_val = float(any_eps)
+                if 2.0 <= eps_val <= 4.0:
+                    lines.append(
+                        f"**Cross-instrument agreement:** εr = {eps_val:.2f} falls in the "
+                        f"water-ice range (2.5-3.5), consistent with CRISM ice spectral "
+                        f"detections. This strengthens the ice-presence hypothesis."
+                    )
+                    lines.append("")
+            except (TypeError, ValueError):
+                pass
+    else:
+        # No dielectric inversion data at all — explain why
+        lines.append("**No dielectric inversion was performed.**")
+        lines.append("")
+        failure_reasons = []
+        for entry in method_hierarchy:
+            if entry.get("status") == "attempted_failed":
+                failure_reasons.append(f"- {entry['method'].replace('_', ' ').title()}: {entry.get('reason', 'unknown')}")
+        if failure_reasons:
+            lines.append("Attempted methods and failure reasons:")
+            lines.extend(failure_reasons)
+        else:
+            lines.append(
+                "Dielectric inversion requires both SHARAD subsurface reflectors and "
+                "co-located HiRISE DTM data with terraced crater morphology. "
+                "Neither condition was met for this region."
+            )
+        lines.append("")
+        lines.append(
+            "All depth estimates in this report use **assumed εr = 3.15** (water-ice). "
+            "This is a non-physical fallback and should not be cited as evidence of ice. "
+            "A fallback penalty has been applied to the subsurface confidence score."
+        )
+        lines.append("")
 
     # ── 3. Surface / Near-Surface Composition (CRISM) ──
     mineral = synthesis.get("mineral_signatures", {})
@@ -865,6 +1145,71 @@ def _build_report_markdown(session: AgentSession) -> str:
                 "Per-pixel ice probability score (0–1) from CRISM MTRDR browse product. "
                 "Warmer colors indicate higher ice spectral response. "
                 "Pixels above 0.3 are counted as significant ice detections.",
+            ))
+
+    # ── 3b. CNN Mineral Classification (CRISM TRR3) ──
+    cnn = synthesis.get("cnn_mineral_classification", {})
+    if cnn and cnn.get("observations_classified", 0) > 0:
+        lines.append("## 3b. CNN Mineral Classification (CRISM TRR3)")
+        lines.append("")
+        lines.append(
+            "Deep learning mineral classification using a 1D CNN-Attention model "
+            "on CRISM TRR3 hyperspectral cubes (438 bands). Confidence threshold: 95% softmax."
+        )
+        lines.append("")
+
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| Observations Classified | {cnn.get('observations_classified', 0)} |")
+
+        top_minerals = cnn.get("top_minerals", [])
+        if top_minerals:
+            top_names = ", ".join(m.get("name", "?") for m in top_minerals[:5])
+            lines.append(f"| Top Minerals | {top_names} |")
+
+        ice_detected = cnn.get("ice_detected", False)
+        lines.append(f"| H₂O Ice Detected | **{'Yes' if ice_detected else 'No'}** |")
+        if ice_detected:
+            ice_types = cnn.get("ice_types", [])
+            if ice_types:
+                lines.append(f"| Ice Types | {', '.join(ice_types)} |")
+            lines.append(f"| H₂O Total Pixels | {cnn.get('h2o_total_pixels', 0):,} |")
+            lines.append(f"| H₂O-Rich Observations (≥1%) | {cnn.get('h2o_rich_observations', 0)} |")
+
+        co2 = cnn.get("co2_total_pixels", 0)
+        if co2 > 0:
+            lines.append(f"| CO₂ Frost Pixels | {co2:,} |")
+        lines.append("")
+
+        # H2O hotspot
+        hotspot = cnn.get("h2o_hotspot")
+        if hotspot and hotspot.get("center_lat") is not None:
+            lines.append(
+                f"**H₂O Hotspot:** ({hotspot['center_lat']:.4f}, "
+                f"{hotspot['center_lon']:.4f}) — "
+                f"max {hotspot.get('max_h2o_percent', 0):.1f}% H₂O ice pixels."
+            )
+            lines.append("")
+
+        # Top minerals table
+        if top_minerals and len(top_minerals) > 1:
+            lines.append("### Mineral Abundance (by pixel count)")
+            lines.append("")
+            lines.append("| Mineral | Pixels |")
+            lines.append("|---------|--------|")
+            for m in top_minerals[:8]:
+                lines.append(f"| {m.get('name', '?')} | {m.get('total_pixels', 0):,} |")
+            lines.append("")
+
+        # CNN mineral map figure
+        if "cnn_mineral_map" in figures:
+            fig_num = 3  # after SHARAD (1), CRISM ice (2)
+            lines.extend(_fig_markdown(
+                figures["cnn_mineral_map"],
+                f"Figure {fig_num}: CNN Mineral Map ({figures.get('cnn_mineral_map_obs_id', 'N/A')})",
+                "Per-pixel mineral classification via 1D CNN-Attention (95% confidence threshold). "
+                "Each color represents a different mineral class. "
+                "Unclassified pixels (below threshold) shown in light gray.",
             ))
 
     # ── 4. Cross-Instrument Consistency Analysis ──
@@ -979,6 +1324,54 @@ def _build_report_markdown(session: AgentSession) -> str:
             lines.append(explanation)
             lines.append("")
 
+    # ── 7b. Physics Assessment Summary (MANDATORY) ──
+    lines.append("## 7b. Physics Assessment Summary")
+    lines.append("")
+
+    method_hierarchy_report = synthesis.get("dielectric_method_hierarchy", [])
+    is_fallback_report = synthesis.get("is_fallback", True)
+    eps_source_report = synthesis.get("epsilon_r_source", "assumed")
+
+    if method_hierarchy_report:
+        lines.append("### εr Estimation Methods Attempted")
+        lines.append("")
+        lines.append("| Method | Status | εr | Notes |")
+        lines.append("|--------|--------|-----|-------|")
+        for entry in method_hierarchy_report:
+            method_name = entry["method"].replace("_", " ").title()
+            status = entry["status"].replace("_", " ").title()
+            eps_val = entry.get("epsilon_r")
+            eps_str = f"{eps_val:.2f}" if isinstance(eps_val, (int, float)) else "-"
+            reason = entry.get("reason", "")
+            lines.append(f"| {method_name} | {status} | {eps_str} | {reason} |")
+        lines.append("")
+    else:
+        lines.append("No dielectric estimation methods were attempted.")
+        lines.append("")
+
+    if is_fallback_report:
+        lines.append(
+            "**Depth estimation mode: FALLBACK (assumed εr = 3.15).** "
+            "All depth values in this report are computed from an assumed dielectric "
+            "constant and should NOT be treated as independent physical evidence of ice. "
+            "A -0.05 scoring penalty has been applied to the subsurface confidence score."
+        )
+    else:
+        lines.append(
+            f"**Depth estimation mode: PHYSICS-BASED (εr via {eps_source_report.replace('_', ' ')}).** "
+            "Dielectric constant was independently measured, not assumed. "
+            "Depth estimates are grounded in physical measurement."
+        )
+    lines.append("")
+
+    # Physics failure penalties
+    scoring_model = synthesis.get("scoring_model", {})
+    sub_breakdown = scoring_model.get("sub_scores", {}).get("subsurface_potential", {})
+    fallback_pen = sub_breakdown.get("fallback_penalty", 0)
+    if fallback_pen != 0:
+        lines.append(f"**Physics failure penalty applied:** {fallback_pen:+.2f} to subsurface score.")
+        lines.append("")
+
     # ── 8. Landing Site Decision ──
     rec_data = synthesis.get("recommended_site", {})
     primary = rec_data.get("primary_site") or rec_data.get("best_site") if rec_data else None
@@ -1088,7 +1481,36 @@ def _build_report_markdown(session: AgentSession) -> str:
     lines.append(f"| SHARAD Total Tracks | {sub_tracks} |")
     crism_n = synthesis.get("mineral_signatures", {}).get("crism_count", 0)
     lines.append(f"| CRISM Products | {crism_n} |")
+    eps_source_label = synthesis.get("epsilon_r_source", "assumed").replace("_", " ").title()
+    lines.append(f"| εr Estimation Method | {eps_source_label} |")
+    lines.append(f"| Depth Mode | {'Physics-Based' if not synthesis.get('is_fallback', True) else 'FALLBACK (assumed εr)'} |")
     lines.append("")
+
+    # Critical flags for physics inversion gaps
+    critical_flags_list = []
+    has_sharad_hr = any(
+        step.instrument == "SHARAD_HIGHRES" and step.result and step.result.success
+        for step in session.steps
+    )
+    physics_inv_done = synthesis.get("sharad_physics_inversion", {}).get("inversions_completed", 0) > 0
+    terrace_done = synthesis.get("terrace_dielectric", {}).get("estimates_count", 0) > 0
+
+    if has_sharad_hr and not physics_inv_done and not terrace_done:
+        # Check if it was at least attempted
+        attempted = synthesis.get("physics_inversion_attempted", False)
+        if not attempted:
+            critical_flags_list.append(
+                "Physics-based dielectric inversion was NOT attempted despite "
+                "SHARAD_HIGHRES data being available. All subsurface depth estimates "
+                "rely on assumed εr = 3.15."
+            )
+
+    if critical_flags_list:
+        lines.append("### Critical Flags")
+        lines.append("")
+        for flag in critical_flags_list:
+            lines.append(f"- **WARNING:** {flag}")
+        lines.append("")
 
     # ── Appendix B: Execution Log ──
     lines.append("## Appendix B: Execution Log")
@@ -1221,6 +1643,23 @@ async def agent_session(session_id: str):
     # Fix stale sessions: non-terminal but task is gone (server restarted)
     if not session.is_terminal and (session._task is None or session._task.done()):
         data["status"] = "done" if session.synthesis else "error"
+    # Regenerate figures for sessions that have all_results but missing base64
+    effective_status = data.get("status", session.status)
+    figs = data.get("figures")
+    has_base64 = figs and isinstance(figs, list) and figs and "base64" in figs[0]
+    if effective_status == "done" and not has_base64 and session.all_results:
+        try:
+            figures_data = generate_evidence_figures(session)
+            if figures_data.get("figures"):
+                data["figures"] = figures_data["figures"]
+                session.figures = figures_data["figures"]
+        except Exception:
+            pass
+    # Include physics pipeline warnings if present in synthesis
+    synth = data.get("synthesis") or {}
+    pw = synth.get("physics_pipeline_warnings")
+    if pw:
+        data["physics_pipeline_warnings"] = pw
     return data
 
 

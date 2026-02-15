@@ -87,7 +87,8 @@ function CRISMQuickviewImage({ productId, instrument }: { productId: string; ins
     }
 
     if (instrument === "CRISM_TRR3") {
-      setImgSrc(`/api/mineral-cnn/quickview/${productId}`);
+      const obsId = productId.replace(/_\d{2}$/, "");
+      setImgSrc(`/api/mineral-cnn/quickview/${obsId}`);
       return;
     }
 
@@ -169,10 +170,12 @@ export default function Inspector({
   onDownloadProduct,
   onPinSpectrum,
   onFindTemporalPairs,
+  onCollapse,
   isMobile = false,
 }: {
   selected: InspectorContext | null;
   onClose: () => void;
+  onCollapse?: () => void;
   activeOverlay: ProductOverlay | null;
   onSetOverlay: (type: OverlayType | null) => void;
   onSetOpacity?: (opacity: number) => void;
@@ -190,7 +193,7 @@ export default function Inspector({
   onRemoveRecent?: (productId: string) => void;
   onDownloadProduct?: (productId: string, instrument: string) => void;
   onPinSpectrum?: (spectrum: { productId: string; lat: number; lon: number; wavelengths: number[]; reflectance: (number | null)[] }) => void;
-  onFindTemporalPairs?: (lat: number, lon: number) => void;
+  onFindTemporalPairs?: (lat: number, lon: number, instrument: string) => void;
   isMobile?: boolean;
 }) {
   const hasNote = useMemo(
@@ -404,7 +407,7 @@ export default function Inspector({
 
   // Available overlay types for this instrument
   const availableOverlays: OverlayType[] = isTRR3
-    ? ["quickview", "highres", "mineral_cnn"]
+    ? ["quickview", "mineral_cnn"]
     : isCRISM
       ? ["quickview", "highres", "browse_HYD", "browse_ICE", "browse_IC2", "score_ice", "score_hyd"]
       : ["quickview", "highres"];
@@ -474,12 +477,23 @@ export default function Inspector({
           </button>
         )}
 
-        <button
-          onClick={onClose}
-          className="flex items-center justify-center px-3 text-slate-500 hover:text-red-400 transition-colors"
-        >
-          <span className="material-symbols-outlined text-lg">close</span>
-        </button>
+        <div className="flex items-center shrink-0">
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              className="flex items-center justify-center px-1.5 text-slate-500 hover:text-white transition-colors"
+              title="Collapse panel"
+            >
+              <span className="material-symbols-outlined text-base">chevron_right</span>
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center px-3 text-slate-500 hover:text-red-400 transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
       </div>
 
       {/* Recent Products Chip Bar */}
@@ -744,7 +758,7 @@ export default function Inspector({
         {/* Find Temporal Pairs */}
         {selected && selected.instrument !== "CUSTOM" && onFindTemporalPairs && (
           <button
-            onClick={() => onFindTemporalPairs(selected.lat, selected.lon)}
+            onClick={() => onFindTemporalPairs(selected.lat, selected.lon, selected.instrument)}
             className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30 transition-all active:scale-[0.98]"
           >
             <span className="material-symbols-outlined text-sm">compare</span>
@@ -1491,7 +1505,7 @@ function MetadataTab({ selected }: { selected: InspectorContext }) {
 
       {/* TRR3 Mineral Classification */}
       {selected.instrument === "CRISM_TRR3" && (
-        <TRR3MineralSection obsId={selected.productId} />
+        <TRR3MineralSection obsId={selected.productId.replace(/_\d{2}$/, "")} />
       )}
     </div>
   );

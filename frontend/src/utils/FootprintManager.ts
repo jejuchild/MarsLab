@@ -12,7 +12,7 @@ import * as Cesium from "cesium";
 import { getInstrumentCesiumColor, type InstrumentId } from "../config/instrumentRegistry";
 import { normalizeLonForMap } from "./coordinates";
 
-export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX";
+export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
 
 export interface LoadResult {
   instrument: InstrumentType;
@@ -57,6 +57,10 @@ export class FootprintManager {
   private abortControllers: Map<InstrumentType, AbortController> = new Map();
   private requestIds: Map<InstrumentType, number> = new Map(); // Track request IDs for idempotency
   private nextRequestId = 0;
+  // In-flight promise deduplication: if loadFootprints is called while a previous load is pending, return the same promise
+  private inFlightLoads: Map<InstrumentType, Promise<LoadResult | null>> = new Map();
+  // Store the bbox that was used when loading each instrument's footprints
+  private loadedBboxes: Map<InstrumentType, [number, number, number, number]> = new Map();
 
   private onLoadStart?: (instrument: InstrumentType) => void;
   private onLoadEnd?: (instrument: InstrumentType, result: LoadResult) => void;
@@ -75,11 +79,15 @@ export class FootprintManager {
     this.entityIds.set("SHARAD", new Set());
     this.entityIds.set("SHARAD_HIGHRES", new Set());
     this.entityIds.set("CTX", new Set());
+    this.entityIds.set("HIRISE_DTM", new Set());
+    this.entityIds.set("CRISM_TRR3", new Set());
     this.features.set("CRISM", []);
     this.features.set("HIRISE", []);
     this.features.set("SHARAD", []);
     this.features.set("SHARAD_HIGHRES", []);
     this.features.set("CTX", []);
+    this.features.set("HIRISE_DTM", []);
+    this.features.set("CRISM_TRR3", []);
   }
 
   /**
@@ -110,7 +118,6 @@ export class FootprintManager {
 
       // Sanity check - if spans are too large, fallback to corner picking
       if (lonSpan < 350 && latSpan < 170) {
-        console.log(`[FootprintManager] computeViewRectangle: [${west.toFixed(1)}, ${south.toFixed(1)}, ${east.toFixed(1)}, ${north.toFixed(1)}] (lonSpan=${lonSpan.toFixed(0)}°, crossesAM=${crossesAntimeridian})`);
         return [west, south, east, north];
       }
     }
@@ -153,7 +160,6 @@ export class FootprintManager {
 
     if (lons.length < 4) {
       // Not enough points picked - probably viewing full globe or off-planet
-      console.log("[FootprintManager] Not enough points picked, returning full globe");
       return [-180, -90, 180, 90];
     }
 
@@ -178,7 +184,6 @@ export class FootprintManager {
       if (positiveLons.length > 0 && negativeLons.length > 0) {
         west = Math.min(...positiveLons);
         east = Math.max(...negativeLons);
-        console.log(`[FootprintManager] Antimeridian crossing detected: west=${west.toFixed(1)}, east=${east.toFixed(1)}`);
       } else {
         // Fallback if something went wrong
         west = Math.min(...lons);
@@ -197,22 +202,37 @@ export class FootprintManager {
       east = 180;
     }
 
-    console.log(`[FootprintManager] Corner picking: [${west.toFixed(1)}, ${south.toFixed(1)}, ${east.toFixed(1)}, ${north.toFixed(1)}]`);
     return [west, south, east, north];
   }
 
   /**
    * Load footprints for current viewport - EXPLICIT CALL ONLY
-   * Each call clears previous footprints and loads fresh data
+   * Each call clears previous footprints and loads fresh data.
+   * Concurrent calls for the same instrument are deduplicated (returns same promise).
    */
   async loadFootprints(instrument: InstrumentType): Promise<LoadResult | null> {
+    // Deduplicate: if a load is already in-flight for this instrument, return it
+    const existing = this.inFlightLoads.get(instrument);
+    if (existing) {
+      return existing;
+    }
+
+    const promise = this._doLoadFootprints(instrument);
+    this.inFlightLoads.set(instrument, promise);
+    try {
+      return await promise;
+    } finally {
+      this.inFlightLoads.delete(instrument);
+    }
+  }
+
+  private async _doLoadFootprints(instrument: InstrumentType): Promise<LoadResult | null> {
     const bbox = this.getViewportBbox();
     if (!bbox) {
       console.warn("[FootprintManager] Cannot compute viewport");
       return null;
     }
 
-    console.log(`[FootprintManager] Loading ${instrument} for bbox: [${bbox.map(v => v.toFixed(1)).join(", ")}]`);
 
     // Generate unique request ID
     const requestId = ++this.nextRequestId;
@@ -238,18 +258,16 @@ export class FootprintManager {
 
       // Check if this request is still the current one (idempotency check)
       if (this.requestIds.get(instrument) !== requestId) {
-        console.log(`[FootprintManager] Request ${requestId} superseded, discarding results`);
         return null;
       }
 
-      console.log(`[FootprintManager] ${instrument}: received ${data.features.length} features`);
 
-      // Store and render footprints
+      // Store loaded bbox and render footprints
+      this.loadedBboxes.set(instrument, bbox);
       this.features.set(instrument, data.features);
       this.renderFeatures(instrument, data.features);
 
       const entityCount = this.entityIds.get(instrument)?.size ?? 0;
-      console.log(`[FootprintManager] ${instrument}: created ${entityCount} entities`);
 
       const result: LoadResult = {
         instrument,
@@ -263,7 +281,6 @@ export class FootprintManager {
 
     } catch (err: any) {
       if (err.name === "AbortError") {
-        console.log(`[FootprintManager] Request ${requestId} aborted`);
         return null;
       }
       console.error(`[FootprintManager] Error loading ${instrument}:`, err);
@@ -283,7 +300,6 @@ export class FootprintManager {
   clearFootprints(instrument: InstrumentType): void {
     const ids = this.entityIds.get(instrument);
     if (ids && ids.size > 0) {
-      console.log(`[FootprintManager] Clearing ${ids.size} entities for ${instrument}`);
       this.viewer.entities.suspendEvents();
       for (const id of ids) {
         const entity = this.viewer.entities.getById(id);
@@ -301,6 +317,21 @@ export class FootprintManager {
    */
   getFeatures(instrument: InstrumentType): FootprintFeature[] {
     return this.features.get(instrument) ?? [];
+  }
+
+  /**
+   * Get the bbox that was used when loading an instrument's footprints.
+   * Returns [west, south, east, north] or null if not loaded.
+   */
+  getLoadedBbox(instrument: InstrumentType): [number, number, number, number] | null {
+    return this.loadedBboxes.get(instrument) ?? null;
+  }
+
+  /**
+   * Get all loaded bboxes (for rendering on map).
+   */
+  getAllLoadedBboxes(): Map<InstrumentType, [number, number, number, number]> {
+    return this.loadedBboxes;
   }
 
   /**
@@ -345,12 +376,12 @@ export class FootprintManager {
         const centerLon = (west + east) / 2;
         const centerLat = (south + north) / 2;
 
-        // Add rectangle
+        // Add rectangle with light fill (visible but subtle)
         this.viewer.entities.add({
           id: entityId,
           rectangle: {
             coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
-            material: color.withAlpha(0),
+            material: color.withAlpha(0.10),
             outline: true,
             outlineColor: color,
             outlineWidth: 1,
@@ -360,10 +391,11 @@ export class FootprintManager {
         });
         ids.add(entityId);
 
-        // Add label
+        // Add label (hidden by default, shown on hover)
         const labelId = `${instrument}_LBL_${productId}`;
         this.viewer.entities.add({
           id: labelId,
+          show: false,
           position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 0, this.ellipsoid),
           label: {
             text: productId,
@@ -411,6 +443,7 @@ export class FootprintManager {
         const labelId = `${instrument}_LBL_${productId}`;
         this.viewer.entities.add({
           id: labelId,
+          show: false,
           position: midPos,
           label: {
             text: productId,
@@ -450,10 +483,11 @@ export class FootprintManager {
         });
         ids.add(entityId);
 
-        // Add label
+        // Add label (hidden by default, shown on hover)
         const labelId = `${instrument}_LBL_${productId}`;
         this.viewer.entities.add({
           id: labelId,
+          show: false,
           position: Cesium.Cartesian3.fromDegrees(nlon, lat, 0, this.ellipsoid),
           label: {
             text: productId,
@@ -482,12 +516,20 @@ export class FootprintManager {
    */
   setVisible(instrument: InstrumentType, visible: boolean): void {
     const ids = this.entityIds.get(instrument);
-    if (!ids) return;
+    if (!ids || ids.size === 0) return;
 
+    this.viewer.entities.suspendEvents();
     for (const id of ids) {
       const entity = this.viewer.entities.getById(id);
-      if (entity) entity.show = visible;
+      if (!entity) continue;
+      // Labels stay hidden (hover-only) — only toggle footprint entities
+      if (id.includes('_LBL_')) {
+        entity.show = false;
+      } else {
+        entity.show = visible;
+      }
     }
+    this.viewer.entities.resumeEvents();
     this.viewer.scene.requestRender();
   }
 
@@ -518,6 +560,8 @@ export class FootprintManager {
     this.clearFootprints("SHARAD");
     this.clearFootprints("SHARAD_HIGHRES");
     this.clearFootprints("CTX");
+    this.clearFootprints("HIRISE_DTM");
+    this.clearFootprints("CRISM_TRR3");
   }
 }
 

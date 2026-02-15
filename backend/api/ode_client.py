@@ -15,12 +15,15 @@ This module handles:
 import re
 import asyncio
 import hashlib
+import logging
 import aiohttp
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
 from enum import Enum
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from cachetools import TTLCache
+
+logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -38,7 +41,51 @@ _ode_cache: TTLCache = TTLCache(maxsize=256, ttl=300)
 def _cache_key(*args) -> str:
     """Create a stable cache key from query parameters."""
     raw = "|".join(str(a) for a in args)
-    return hashlib.md5(raw.encode()).hexdigest()
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+# =============================================================================
+# HTTP Retry with Exponential Backoff
+# =============================================================================
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE = 1.0  # seconds
+
+
+async def _fetch_with_retry(
+    session: aiohttp.ClientSession,
+    url: str,
+    timeout: float = 30,
+    retries: int = MAX_RETRIES,
+) -> Optional[aiohttp.ClientResponse]:
+    """Fetch a URL with exponential backoff retry on transient failures."""
+    for attempt in range(retries):
+        try:
+            resp = await session.get(url, timeout=aiohttp.ClientTimeout(total=timeout))
+            if resp.status == 200:
+                return resp
+            if resp.status == 429:
+                retry_after = float(resp.headers.get("Retry-After", RETRY_BACKOFF_BASE * (2 ** attempt)))
+                logger.warning(f"ODE rate-limited (429), retrying after {retry_after:.1f}s")
+                await resp.release()
+                await asyncio.sleep(retry_after)
+                continue
+            if resp.status >= 500:
+                logger.warning(f"ODE server error ({resp.status}), attempt {attempt + 1}/{retries}")
+                await resp.release()
+                await asyncio.sleep(RETRY_BACKOFF_BASE * (2 ** attempt))
+                continue
+            # 4xx (not 429) — don't retry
+            logger.warning(f"ODE returned {resp.status} for {url[:120]}")
+            return resp
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            if attempt < retries - 1:
+                wait = RETRY_BACKOFF_BASE * (2 ** attempt)
+                logger.warning(f"ODE request failed ({e}), retrying in {wait:.1f}s (attempt {attempt + 1}/{retries})")
+                await asyncio.sleep(wait)
+            else:
+                logger.error(f"ODE request failed after {retries} attempts: {e}")
+                return None
+    return None
 
 
 ODE_PRODUCTFILES_BASE = "https://ode.rsl.wustl.edu/mars/productfiles.aspx"
@@ -166,32 +213,19 @@ def parse_crism_base_key(product_id: str) -> str:
     return product_id.lower()
 
 
-# Allowed CRISM observation types for science analysis.
-# Excludes mapping/survey modes (MSP, MSV, MSW) and calibration (ATO, ATU, EPF)
-# which have lower spectral resolution and are not useful for mineral identification.
-CRISM_TARGETED_PREFIXES = ("frt", "hrl", "hrs", "frs")
+# Allowed CRISM observation types.
+# Only FRT (Full Resolution Targeted) — the highest spectral/spatial resolution mode
+# best suited for mineral identification and CNN classification.
+CRISM_TARGETED_PREFIXES = ("frt",)
 
 
 def is_crism_targeted(product_id: str) -> bool:
-    """Check if a CRISM product is a targeted observation (FRT/HRL/HRS/FRS).
-
-    Excludes multi-spectral mapping (MSP/MSV/MSW) and calibration types.
-    """
+    """Check if a CRISM product is a Full Resolution Targeted (FRT) observation."""
     return product_id.lower().startswith(CRISM_TARGETED_PREFIXES)
 
 
 def is_crism_product_id(product_id: str) -> bool:
-    """
-    Check if a string looks like a CRISM product ID.
-
-    CRISM IDs typically start with:
-    - frt (Full Resolution Targeted)
-    - hrl (Half Resolution Long)
-    - hrs (Half Resolution Short)
-    - frs (Full Resolution Short)
-
-    Note: Mapping types (MSP/MSV/MSW) and calibration (ATO/ATU/EPF) excluded.
-    """
+    """Check if a string looks like a CRISM FRT product ID."""
     return product_id.lower().startswith(CRISM_TARGETED_PREFIXES)
 
 
@@ -311,7 +345,7 @@ async def search_ode_products(
             )
             products.extend(inst_products)
 
-        # Filter CRISM: targeted observations (FRT/HRL/HRS/FRS) + I/F data only
+        # Filter CRISM: FRT (Full Resolution Targeted) + I/F data only
         if not instrument or instrument == Instrument.CRISM:
             products = [
                 p for p in products
@@ -405,12 +439,13 @@ async def _search_ode_by_instrument(
                 f"limit={max_results}"
             )
             try:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        products.extend(_parse_ode_rest_response(data, instrument))
+                resp = await _fetch_with_retry(session, url, timeout=30)
+                if resp and resp.status == 200:
+                    data = await resp.json()
+                    products.extend(_parse_ode_rest_response(data, instrument))
+                    await resp.release()
             except Exception as e:
-                print(f"ODE REST search error for {instrument}/{pt}: {e}")
+                logger.error(f"ODE REST search error for {instrument}/{pt}: {e}")
 
             # Stop if we have enough results
             if len(products) >= max_results:
@@ -429,14 +464,15 @@ async def _search_ode_by_instrument(
             f"limit={max_results * 3}"  # Request more to account for filtering
         )
         try:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    all_products = _parse_ode_rest_response(data, instrument)
-                    # Filter to RED products only
-                    products = [p for p in all_products if "_RED" in p.product_id.upper()]
+            resp = await _fetch_with_retry(session, url, timeout=30)
+            if resp and resp.status == 200:
+                data = await resp.json()
+                all_products = _parse_ode_rest_response(data, instrument)
+                # Filter to RED products only
+                products = [p for p in all_products if "_RED" in p.product_id.upper()]
+                await resp.release()
         except Exception as e:
-            print(f"ODE REST search error for {instrument}: {e}")
+            logger.error(f"ODE REST search error for {instrument}: {e}")
 
     return products[:max_results]
 
@@ -526,7 +562,7 @@ def _parse_ode_rest_response(data: Dict[str, Any], instrument: Instrument) -> Li
             ))
 
     except Exception as e:
-        print(f"Error parsing ODE response: {e}")
+        logger.error(f"Error parsing ODE response: {e}")
 
     return products
 
@@ -595,13 +631,14 @@ async def search_ode_spatial(
                     )
 
                     try:
-                        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                            if resp.status == 200:
-                                data = await resp.json()
-                                inst_products = _parse_ode_rest_response(data, inst)
-                                products.extend(inst_products)
+                        resp = await _fetch_with_retry(session, url, timeout=60)
+                        if resp and resp.status == 200:
+                            data = await resp.json()
+                            inst_products = _parse_ode_rest_response(data, inst)
+                            products.extend(inst_products)
+                            await resp.release()
                     except Exception as e:
-                        print(f"ODE spatial search error for {inst}/{pt}: {e}")
+                        logger.error(f"ODE spatial search error for {inst}/{pt}: {e}")
 
                     if len(products) >= max_results:
                         break
@@ -624,18 +661,18 @@ async def search_ode_spatial(
                 )
 
                 try:
-                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            inst_products = _parse_ode_rest_response(data, inst)
-                            # Filter to RED products only
-                            inst_products = [p for p in inst_products if "_RED" in p.product_id.upper()]
-                            products.extend(inst_products)
+                    resp = await _fetch_with_retry(session, url, timeout=60)
+                    if resp and resp.status == 200:
+                        data = await resp.json()
+                        inst_products = _parse_ode_rest_response(data, inst)
+                        # Filter to RED products only
+                        inst_products = [p for p in inst_products if "_RED" in p.product_id.upper()]
+                        products.extend(inst_products)
+                        await resp.release()
                 except Exception as e:
-                    print(f"ODE spatial search error for {inst}: {e}")
+                    logger.error(f"ODE spatial search error for {inst}: {e}")
 
-        # Filter CRISM: targeted observations (FRT/HRL/HRS/FRS) + I/F data only
-        # Excludes mapping/survey types (MSP, MSV, MSW) which have low spectral resolution
+        # Filter CRISM: FRT (Full Resolution Targeted) + I/F data only
         products = [
             p for p in products
             if p.instrument != Instrument.CRISM
@@ -707,15 +744,16 @@ async def discover_product_files(
     try:
         url = f"{ODE_PRODUCTFILES_BASE}?productid={product_id}"
 
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-            if resp.status != 200:
-                return []
+        resp = await _fetch_with_retry(session, url, timeout=30)
+        if not resp or resp.status != 200:
+            return []
 
-            xml_text = await resp.text()
-            return _parse_productfiles_xml(xml_text)
+        xml_text = await resp.text()
+        await resp.release()
+        return _parse_productfiles_xml(xml_text)
 
     except Exception as e:
-        print(f"ODE PRODUCTFILES error: {e}")
+        logger.error(f"ODE PRODUCTFILES error: {e}")
         return []
     finally:
         if close_session:
@@ -750,12 +788,12 @@ def _parse_productfiles_xml(xml_text: str) -> List[ODEFile]:
                 ))
 
     except ET.ParseError as e:
-        print(f"XML parse error: {e}")
+        logger.error(f"XML parse error: {e}")
 
     return files
 
 
-def _get_elem_text(parent: ET.Element, tag: str, default: str = "") -> str:
+def _get_elem_text(parent, tag: str, default: str = "") -> str:
     """Safely get text from an XML element."""
     elem = parent.find(tag)
     return elem.text if elem is not None and elem.text else default
@@ -783,16 +821,17 @@ async def _get_product_metadata(
     )
 
     try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-            if resp.status != 200:
-                return None
-            data = await resp.json()
-            products = data.get("ODEResults", {}).get("Products", {}).get("Product")
-            if isinstance(products, list):
-                return products[0] if products else None
-            return products
+        resp = await _fetch_with_retry(session, url, timeout=30)
+        if not resp or resp.status != 200:
+            return None
+        data = await resp.json()
+        await resp.release()
+        products = data.get("ODEResults", {}).get("Products", {}).get("Product")
+        if isinstance(products, list):
+            return products[0] if products else None
+        return products
     except Exception as e:
-        print(f"Error getting product metadata: {e}")
+        logger.error(f"Error getting product metadata: {e}")
         return None
 
 
@@ -921,7 +960,7 @@ async def resolve_crism_bundle(
                 ))
 
     except Exception as e:
-        print(f"Error resolving CRISM bundle: {e}")
+        logger.error(f"Error resolving CRISM bundle: {e}")
     finally:
         if close_session:
             await session.close()
@@ -983,7 +1022,7 @@ async def resolve_hirise_bundle(
                 bundle.lbl_file = f
 
     except Exception as e:
-        print(f"Error resolving HiRISE bundle: {e}")
+        logger.error(f"Error resolving HiRISE bundle: {e}")
     finally:
         if close_session:
             await session.close()
@@ -1131,32 +1170,31 @@ async def get_sharad_highres_footprint(
             f"limit=1"
         )
 
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                products = data.get("ODEResults", {}).get("Products", {}).get("Product", [])
-                if isinstance(products, dict):
-                    products = [products]
+        resp = await _fetch_with_retry(session, url, timeout=30)
+        if resp and resp.status == 200:
+            data = await resp.json()
+            await resp.release()
+            products = data.get("ODEResults", {}).get("Products", {}).get("Product", [])
+            if isinstance(products, dict):
+                products = [products]
 
-                if products:
-                    p = products[0]
-                    # Try Footprint_C0_geometry first (WKT LINESTRING)
-                    footprint_wkt = p.get("Footprint_C0_geometry", "")
-                    if footprint_wkt and "LINESTRING" in footprint_wkt.upper():
-                        coordinates = _parse_wkt_linestring(footprint_wkt)
+            if products:
+                p = products[0]
+                footprint_wkt = p.get("Footprint_C0_geometry", "")
+                if footprint_wkt and "LINESTRING" in footprint_wkt.upper():
+                    coordinates = _parse_wkt_linestring(footprint_wkt)
 
-                    # Fallback to start/stop coordinates if WKT parsing fails
-                    if not coordinates:
-                        start_lat = _safe_float(p.get("Start_latitude"))
-                        start_lon = _safe_float(p.get("Start_longitude"))
-                        stop_lat = _safe_float(p.get("Stop_latitude"))
-                        stop_lon = _safe_float(p.get("Stop_longitude"))
+                if not coordinates:
+                    start_lat = _safe_float(p.get("Start_latitude"))
+                    start_lon = _safe_float(p.get("Start_longitude"))
+                    stop_lat = _safe_float(p.get("Stop_latitude"))
+                    stop_lon = _safe_float(p.get("Stop_longitude"))
 
-                        if all(v is not None for v in [start_lat, start_lon, stop_lat, stop_lon]):
-                            coordinates = [[start_lon, start_lat], [stop_lon, stop_lat]]
+                    if all(v is not None for v in [start_lat, start_lon, stop_lat, stop_lon]):
+                        coordinates = [[start_lon, start_lat], [stop_lon, stop_lat]]
 
     except Exception as e:
-        print(f"Error fetching SHARAD High-Res footprint: {e}")
+        logger.error(f"Error fetching SHARAD High-Res footprint: {e}")
     finally:
         if close_session:
             await session.close()
@@ -1218,13 +1256,14 @@ async def search_sharad_spatial(
             f"limit={max_results}"
         )
 
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                products = _parse_ode_rest_response(data, Instrument.SHARAD)
+        resp = await _fetch_with_retry(session, url, timeout=60)
+        if resp and resp.status == 200:
+            data = await resp.json()
+            products = _parse_ode_rest_response(data, Instrument.SHARAD)
+            await resp.release()
 
     except Exception as e:
-        print(f"SHARAD spatial search error: {e}")
+        logger.error(f"SHARAD spatial search error: {e}")
     finally:
         if close_session:
             await session.close()
@@ -1276,13 +1315,14 @@ async def search_sharad_highres_spatial(
             f"limit={max_results}"
         )
 
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                products = _parse_ode_rest_response(data, Instrument.SHARAD_HIGHRES)
+        resp = await _fetch_with_retry(session, url, timeout=60)
+        if resp and resp.status == 200:
+            data = await resp.json()
+            products = _parse_ode_rest_response(data, Instrument.SHARAD_HIGHRES)
+            await resp.release()
 
     except Exception as e:
-        print(f"SHARAD High-Res spatial search error: {e}")
+        logger.error(f"SHARAD High-Res spatial search error: {e}")
     finally:
         if close_session:
             await session.close()
@@ -1328,13 +1368,14 @@ async def search_sharad_products(
             f"limit={max_results}"
         )
 
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                products = _parse_ode_rest_response(data, Instrument.SHARAD)
+        resp = await _fetch_with_retry(session, url, timeout=30)
+        if resp and resp.status == 200:
+            data = await resp.json()
+            products = _parse_ode_rest_response(data, Instrument.SHARAD)
+            await resp.release()
 
     except Exception as e:
-        print(f"SHARAD search error: {e}")
+        logger.error(f"SHARAD search error: {e}")
     finally:
         if close_session:
             await session.close()
@@ -1380,13 +1421,14 @@ async def search_sharad_highres_products(
             f"limit={max_results}"
         )
 
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                products = _parse_ode_rest_response(data, Instrument.SHARAD_HIGHRES)
+        resp = await _fetch_with_retry(session, url, timeout=30)
+        if resp and resp.status == 200:
+            data = await resp.json()
+            products = _parse_ode_rest_response(data, Instrument.SHARAD_HIGHRES)
+            await resp.release()
 
     except Exception as e:
-        print(f"SHARAD High-Res search error: {e}")
+        logger.error(f"SHARAD High-Res search error: {e}")
     finally:
         if close_session:
             await session.close()
@@ -1506,7 +1548,7 @@ async def resolve_sharad_bundle(
                     )
 
     except Exception as e:
-        print(f"Error resolving SHARAD bundle: {e}")
+        logger.error(f"Error resolving SHARAD bundle: {e}")
     finally:
         if close_session:
             await session.close()
@@ -1563,33 +1605,32 @@ async def resolve_sharad_highres_bundle(
             f"limit=1"
         )
 
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                products = data.get("ODEResults", {}).get("Products", {}).get("Product", [])
-                if isinstance(products, dict):
-                    products = [products]
+        resp = await _fetch_with_retry(session, url, timeout=30)
+        if resp and resp.status == 200:
+            data = await resp.json()
+            await resp.release()
+            products = data.get("ODEResults", {}).get("Products", {}).get("Product", [])
+            if isinstance(products, dict):
+                products = [products]
 
-                if products:
-                    p = products[0]
-                    label_url = p.get("LabelURL", "")
+            if products:
+                p = products[0]
+                label_url = p.get("LabelURL", "")
 
-                    if label_url:
-                        # Construct file URLs from LabelURL
-                        # LabelURL: .../r_0401101_001_ss19_700_a.lbl
-                        base_url = label_url.rsplit("/", 1)[0]
-                        pid_lower = product_id.lower()
+                if label_url:
+                    base_url = label_url.rsplit("/", 1)[0]
+                    pid_lower = product_id.lower()
 
-                        bundle.lbl_file = ODEFile(
-                            filename=f"{pid_lower}.lbl",
-                            url=label_url,
-                            file_type="Label"
-                        )
-                        bundle.dat_file = ODEFile(
-                            filename=f"{pid_lower}.dat",
-                            url=f"{base_url}/{pid_lower}.dat",
-                            file_type="Product"
-                        )
+                    bundle.lbl_file = ODEFile(
+                        filename=f"{pid_lower}.lbl",
+                        url=label_url,
+                        file_type="Label"
+                    )
+                    bundle.dat_file = ODEFile(
+                        filename=f"{pid_lower}.dat",
+                        url=f"{base_url}/{pid_lower}.dat",
+                        file_type="Product"
+                    )
 
         # Also resolve cluttergram (surface clutter simulation)
         obs_id = parts[1] if len(parts) >= 2 else ""
@@ -1601,39 +1642,40 @@ async def resolve_sharad_highres_bundle(
                 f"productid=s_{sim_id}_sim*&output=json&results=pfm&limit=5"
             )
             try:
-                async with session.get(sim_url, timeout=aiohttp.ClientTimeout(total=30)) as sim_resp:
-                    if sim_resp.status == 200:
-                        sim_data = await sim_resp.json()
-                        sim_products_container = sim_data.get("ODEResults", {}).get("Products", {})
-                        if isinstance(sim_products_container, dict):
-                            sim_products = sim_products_container.get("Product", [])
-                            if isinstance(sim_products, dict):
-                                sim_products = [sim_products]
-                            if sim_products:
-                                sim_files = sim_products[0].get("Product_files", {}).get("Product_file", [])
-                                if isinstance(sim_files, dict):
-                                    sim_files = [sim_files]
-                                for sf in sim_files:
-                                    fname = sf.get("FileName", "").upper()
-                                    surl = sf.get("URL", "")
-                                    if fname.endswith("_SIM.IMG"):
-                                        bundle.clutter_img = ODEFile(
-                                            filename=fname.lower(),
-                                            url=surl,
-                                            file_type="Product",
-                                            size_bytes=int(sf.get("KBytes", 0)) * 1024,
-                                        )
-                                    elif fname.endswith("_SIM.XML"):
-                                        bundle.clutter_xml = ODEFile(
-                                            filename=fname.lower(),
-                                            url=surl,
-                                            file_type="Label",
-                                        )
+                sim_resp = await _fetch_with_retry(session, sim_url, timeout=30)
+                if sim_resp and sim_resp.status == 200:
+                    sim_data = await sim_resp.json()
+                    await sim_resp.release()
+                    sim_products_container = sim_data.get("ODEResults", {}).get("Products", {})
+                    if isinstance(sim_products_container, dict):
+                        sim_products = sim_products_container.get("Product", [])
+                        if isinstance(sim_products, dict):
+                            sim_products = [sim_products]
+                        if sim_products:
+                            sim_files = sim_products[0].get("Product_files", {}).get("Product_file", [])
+                            if isinstance(sim_files, dict):
+                                sim_files = [sim_files]
+                            for sf in sim_files:
+                                fname = sf.get("FileName", "").upper()
+                                surl = sf.get("URL", "")
+                                if fname.endswith("_SIM.IMG"):
+                                    bundle.clutter_img = ODEFile(
+                                        filename=fname.lower(),
+                                        url=surl,
+                                        file_type="Product",
+                                        size_bytes=int(sf.get("KBytes", 0)) * 1024,
+                                    )
+                                elif fname.endswith("_SIM.XML"):
+                                    bundle.clutter_xml = ODEFile(
+                                        filename=fname.lower(),
+                                        url=surl,
+                                        file_type="Label",
+                                    )
             except Exception as e2:
-                print(f"Warning: Could not resolve cluttergram: {e2}")
+                logger.warning(f"Could not resolve cluttergram: {e2}")
 
     except Exception as e:
-        print(f"Error resolving SHARAD High-Res bundle: {e}")
+        logger.error(f"Error resolving SHARAD High-Res bundle: {e}")
     finally:
         if close_session:
             await session.close()

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useReducer } from "react";
 
 /* =========================================================
  * Types
@@ -16,6 +16,14 @@ type StepData = {
 type AgentEvent = {
   event: string;
   data: Record<string, unknown>;
+};
+
+type EvidenceFigure = {
+  id: string;
+  title: string;
+  caption: string;
+  instrument: string;
+  base64: string;
 };
 
 type SessionState = "idle" | "connecting" | "planning" | "executing" | "synthesizing" | "done" | "error";
@@ -89,6 +97,208 @@ function formatTime(seconds: number): string {
 }
 
 /* =========================================================
+ * Session State Reducer
+ * Consolidates all agent-execution state into one atomic dispatch.
+ * =======================================================*/
+type SessionData = {
+  sessionState: SessionState;
+  sessionId: string | null;
+  steps: StepData[];
+  narrative: string;
+  synthesis: Record<string, unknown> | null;
+  figures: EvidenceFigure[];
+  planInfo: { region: string; instruments: string[]; planned_by: string } | null;
+  error: string | null;
+  reasoningText: string;
+  reasoningPhase: string | null;
+  reasoningCollapsed: boolean;
+  downloadProgress: { completed: number; failed: number; skipped: number; total: number } | null;
+  totalSteps: number;
+  completedSteps: number;
+  chatLog: ChatEntry[];
+  agentMode: "react" | "rules" | null;
+  iterationCount: number;
+  activeAction: { tool: string; params: Record<string, unknown> } | null;
+};
+
+const INITIAL_SESSION: SessionData = {
+  sessionState: "idle",
+  sessionId: null,
+  steps: [],
+  narrative: "",
+  synthesis: null,
+  figures: [],
+  planInfo: null,
+  error: null,
+  reasoningText: "",
+  reasoningPhase: null,
+  reasoningCollapsed: false,
+  downloadProgress: null,
+  totalSteps: 0,
+  completedSteps: 0,
+  chatLog: [],
+  agentMode: null,
+  iterationCount: 0,
+  activeAction: null,
+};
+
+type SessionAction =
+  | { type: "RESET" }
+  | { type: "SET_CONNECTING" }
+  | { type: "TOGGLE_REASONING_COLLAPSED" }
+  | { type: "EVENT"; event: AgentEvent; narrativePhase: boolean };
+
+function sessionReducer(state: SessionData, action: SessionAction): SessionData {
+  switch (action.type) {
+    case "RESET":
+      return { ...INITIAL_SESSION };
+    case "SET_CONNECTING":
+      return { ...INITIAL_SESSION, sessionState: "connecting" };
+    case "TOGGLE_REASONING_COLLAPSED":
+      return { ...state, reasoningCollapsed: !state.reasoningCollapsed };
+    case "EVENT":
+      return applyEvent(state, action.event, action.narrativePhase);
+    default:
+      return state;
+  }
+}
+
+function applyEvent(s: SessionData, event: AgentEvent, narrativePhase: boolean): SessionData {
+  switch (event.event) {
+    case "session_start":
+      return {
+        ...s,
+        sessionId: (event.data.session_id as string) || null,
+        agentMode: event.data.mode === "react" ? "react" : s.agentMode,
+        sessionState: event.data.mode === "react" ? "executing" : s.sessionState,
+      };
+    case "reasoning_start":
+      return { ...s, reasoningPhase: event.data.phase as string, reasoningText: "", reasoningCollapsed: false };
+    case "reasoning_chunk":
+      return { ...s, reasoningText: s.reasoningText + (event.data.text as string) };
+    case "reasoning_end":
+      return { ...s, reasoningPhase: null, reasoningCollapsed: true };
+    case "plan": {
+      const newSteps = (event.data.steps as StepData[]) || [];
+      return {
+        ...s,
+        planInfo: {
+          region: (event.data.region as string) || "Unknown",
+          instruments: (event.data.instruments as string[]) || [],
+          planned_by: (event.data.planned_by as string) || "rules",
+        },
+        steps: newSteps,
+        totalSteps: newSteps.length,
+        sessionState: "executing",
+      };
+    }
+    case "step_start": {
+      const stepId = (event.data as StepData).id;
+      return {
+        ...s,
+        steps: s.steps.map(st => st.id === stepId ? { ...st, status: "running" as const } : st),
+        downloadProgress: (event.data as StepData).type === "download" ? null : s.downloadProgress,
+      };
+    }
+    case "download_progress":
+      return { ...s, downloadProgress: event.data as SessionData["downloadProgress"] };
+    case "step_complete":
+    case "step_failed": {
+      const updated = event.data as StepData;
+      return {
+        ...s,
+        steps: s.steps.map(st => st.id === updated.id ? updated : st),
+        completedSteps: s.completedSteps + 1,
+        downloadProgress: updated.type === "download" ? null : s.downloadProgress,
+      };
+    }
+    case "narrative":
+      return { ...s, narrative: (event.data.narrative as string) || "", sessionState: "synthesizing" };
+    case "figures":
+      return { ...s, figures: (event.data.figures as EvidenceFigure[]) || [] };
+    case "done":
+      return { ...s, synthesis: (event.data.synthesis as Record<string, unknown>) || null, sessionState: "done" };
+    case "error":
+      return { ...s, error: (event.data.error as string) || "Unknown error", sessionState: "error" };
+    // ReAct events
+    case "thought_start": {
+      const iter = event.data.iteration as number;
+      if (event.data.phase === "narrative") {
+        return { ...s, reasoningPhase: "narrative", reasoningText: "", reasoningCollapsed: false };
+      }
+      return {
+        ...s, iterationCount: iter,
+        chatLog: [...s.chatLog, { type: "thought" as const, text: "", iteration: iter, streaming: true }],
+      };
+    }
+    case "thought_chunk": {
+      if (narrativePhase) {
+        return { ...s, reasoningText: s.reasoningText + (event.data.text as string) };
+      }
+      const log = [...s.chatLog];
+      const last = log[log.length - 1];
+      if (last?.type === "thought") {
+        log[log.length - 1] = { ...last, text: last.text + (event.data.text as string) };
+      }
+      return { ...s, chatLog: log };
+    }
+    case "thought_end": {
+      if (event.data.phase === "narrative") {
+        return { ...s, reasoningPhase: null, reasoningCollapsed: true };
+      }
+      const log2 = [...s.chatLog];
+      const last2 = log2[log2.length - 1];
+      if (last2?.type === "thought") {
+        log2[log2.length - 1] = { ...last2, streaming: false };
+      }
+      return { ...s, chatLog: log2 };
+    }
+    case "action_start": {
+      const tool = event.data.tool as string;
+      const params = (event.data.params as Record<string, unknown>) || {};
+      return {
+        ...s,
+        chatLog: [...s.chatLog, { type: "action" as const, tool, params, iteration: event.data.iteration as number }],
+        activeAction: { tool, params },
+        downloadProgress: tool === "download_products" ? null : s.downloadProgress,
+      };
+    }
+    case "action_complete": {
+      const acTool = event.data.tool as string;
+      return {
+        ...s,
+        chatLog: [...s.chatLog, {
+          type: "observation" as const,
+          tool: acTool,
+          text: event.data.observation as string,
+          success: event.data.success as boolean,
+          iteration: event.data.iteration as number,
+        }],
+        activeAction: null,
+        completedSteps: s.completedSteps + 1,
+        downloadProgress: acTool === "download_products" ? null : s.downloadProgress,
+      };
+    }
+    case "action": {
+      if ((event.data.tool as string) === "finish") {
+        const fp = (event.data.params as Record<string, unknown>) || {};
+        return {
+          ...s,
+          chatLog: [...s.chatLog, {
+            type: "finish" as const,
+            summary: (fp.summary as string) || "",
+            recommendation: (fp.recommendation as string) || "",
+          }],
+        };
+      }
+      return s;
+    }
+    default:
+      return s;
+  }
+}
+
+/* =========================================================
  * Component
  * =======================================================*/
 export default function AgenticPanel({
@@ -96,14 +306,11 @@ export default function AgenticPanel({
 }: {
   onClose: () => void;
 }) {
+  // Reducer holds all session-execution state
+  const [session, dispatch] = useReducer(sessionReducer, INITIAL_SESSION);
+
+  // UI-only state (not part of agent execution)
   const [objective, setObjective] = useState("");
-  const [sessionState, setSessionState] = useState<SessionState>("idle");
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [steps, setSteps] = useState<StepData[]>([]);
-  const [narrative, setNarrative] = useState("");
-  const [synthesis, setSynthesis] = useState<Record<string, unknown> | null>(null);
-  const [planInfo, setPlanInfo] = useState<{ region: string; instruments: string[]; planned_by: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [autoDownload, setAutoDownload] = useState(true);
   const [ollamaStatus, setOllamaStatus] = useState<boolean | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -133,13 +340,7 @@ export default function AgenticPanel({
     document.addEventListener("mouseup", onUp);
   }, [panelWidth]);
 
-  // Reasoning state
-  const [reasoningText, setReasoningText] = useState("");
-  const [reasoningPhase, setReasoningPhase] = useState<string | null>(null);
-  const [reasoningCollapsed, setReasoningCollapsed] = useState(false);
-
-  // Download progress state
-  const [downloadProgress, setDownloadProgress] = useState<{ completed: number; failed: number; skipped: number; total: number } | null>(null);
+  // Download start time ref (not state — only used for rate calculations)
   const downloadStartRef = useRef<number | null>(null);
 
   // History panel state
@@ -147,17 +348,11 @@ export default function AgenticPanel({
   const [pastSessions, setPastSessions] = useState<SessionSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Time tracking state
+  // Time tracking
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [totalSteps, setTotalSteps] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState(0);
 
-  // ReAct mode state
-  const [chatLog, setChatLog] = useState<ChatEntry[]>([]);
-  const [agentMode, setAgentMode] = useState<"react" | "rules" | null>(null);
-  const [iterationCount, setIterationCount] = useState(0);
-  const [activeAction, setActiveAction] = useState<{ tool: string; params: Record<string, unknown> } | null>(null);
+  // Narrative phase ref (not state — used in processEvent synchronously)
   const narrativePhaseRef = useRef(false);
 
   // Check Ollama status on mount
@@ -173,196 +368,52 @@ export default function AgenticPanel({
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [steps, narrative, reasoningText, chatLog]);
+  }, [session.steps, session.narrative, session.reasoningText, session.chatLog]);
 
   // Auto-scroll reasoning panel
   useEffect(() => {
-    if (reasoningRef.current && reasoningPhase) {
+    if (reasoningRef.current && session.reasoningPhase) {
       reasoningRef.current.scrollTop = reasoningRef.current.scrollHeight;
     }
-  }, [reasoningText, reasoningPhase]);
+  }, [session.reasoningText, session.reasoningPhase]);
 
   // Elapsed time ticker
   useEffect(() => {
     if (!startTime) return;
-    const isActive = sessionState !== "idle" && sessionState !== "done" && sessionState !== "error";
+    const ss = session.sessionState;
+    const isActive = ss !== "idle" && ss !== "done" && ss !== "error";
     if (!isActive) return;
 
     const interval = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [startTime, sessionState]);
+  }, [startTime, session.sessionState]);
 
   // ── Shared SSE event processor ──────────────────────────
   const processEvent = useCallback((event: AgentEvent) => {
-    switch (event.event) {
-      case "session_start":
-        setSessionId((event.data.session_id as string) || null);
-        if (event.data.mode === "react") {
-          setAgentMode("react");
-          setSessionState("executing");
-        }
-        break;
-      case "reasoning_start":
-        setReasoningPhase(event.data.phase as string);
-        setReasoningText("");
-        setReasoningCollapsed(false);
-        break;
-      case "reasoning_chunk":
-        setReasoningText((prev) => prev + (event.data.text as string));
-        break;
-      case "reasoning_end":
-        setReasoningPhase(null);
-        setReasoningCollapsed(true);
-        break;
-      case "plan":
-        setPlanInfo({
-          region: (event.data.region as string) || "Unknown",
-          instruments: (event.data.instruments as string[]) || [],
-          planned_by: (event.data.planned_by as string) || "rules",
-        });
-        setSteps((event.data.steps as StepData[]) || []);
-        setTotalSteps(((event.data.steps as StepData[]) || []).length);
-        setSessionState("executing");
-        break;
-      case "step_start":
-        setSteps((prev) =>
-          prev.map((s) =>
-            s.id === (event.data as StepData).id ? { ...s, status: "running" } : s
-          )
-        );
-        if ((event.data as StepData).type === "download") {
-          setDownloadProgress(null);
-          downloadStartRef.current = Date.now();
-        }
-        break;
-      case "download_progress":
-        setDownloadProgress(event.data as { completed: number; failed: number; skipped: number; total: number });
-        break;
-      case "step_complete":
-      case "step_failed": {
-        const updated = event.data as StepData;
-        setSteps((prev) =>
-          prev.map((s) => (s.id === updated.id ? updated : s))
-        );
-        setCompletedSteps((prev) => prev + 1);
-        if (updated.type === "download") {
-          setDownloadProgress(null);
-          downloadStartRef.current = null;
-        }
-        break;
-      }
-      case "narrative":
-        setNarrative((event.data.narrative as string) || "");
-        setSessionState("synthesizing");
-        break;
-      case "done":
-        setSynthesis((event.data.synthesis as Record<string, unknown>) || null);
-        setSessionState("done");
-        break;
-      case "error":
-        setError((event.data.error as string) || "Unknown error");
-        setSessionState("error");
-        break;
-
-      // ── ReAct events ──
-      case "thought_start": {
-        const iter = event.data.iteration as number;
-        if (event.data.phase === "narrative") {
-          narrativePhaseRef.current = true;
-          setReasoningPhase("narrative");
-          setReasoningText("");
-          setReasoningCollapsed(false);
-        } else {
-          narrativePhaseRef.current = false;
-          setIterationCount(iter);
-          setChatLog(prev => [...prev, {
-            type: "thought" as const,
-            text: "",
-            iteration: iter,
-            streaming: true,
-          }]);
-        }
-        break;
-      }
-      case "thought_chunk":
-        if (narrativePhaseRef.current) {
-          setReasoningText(prev => prev + (event.data.text as string));
-        } else {
-          setChatLog(prev => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.type === "thought") {
-              updated[updated.length - 1] = {
-                ...last,
-                text: last.text + (event.data.text as string),
-              };
-            }
-            return updated;
-          });
-        }
-        break;
-      case "thought_end":
-        if (event.data.phase === "narrative") {
-          narrativePhaseRef.current = false;
-          setReasoningPhase(null);
-          setReasoningCollapsed(true);
-        } else {
-          setChatLog(prev => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last?.type === "thought") {
-              updated[updated.length - 1] = { ...last, streaming: false };
-            }
-            return updated;
-          });
-        }
-        break;
-      case "action_start": {
-        const startTool = event.data.tool as string;
-        const startParams = (event.data.params as Record<string, unknown>) || {};
-        setChatLog(prev => [...prev, {
-          type: "action" as const,
-          tool: startTool,
-          params: startParams,
-          iteration: event.data.iteration as number,
-        }]);
-        setActiveAction({ tool: startTool, params: startParams });
-        if (startTool === "download_products") {
-          setDownloadProgress(null);
-          downloadStartRef.current = Date.now();
-        }
-        break;
-      }
-      case "action_complete":
-        setChatLog(prev => [...prev, {
-          type: "observation" as const,
-          tool: event.data.tool as string,
-          text: event.data.observation as string,
-          success: event.data.success as boolean,
-          iteration: event.data.iteration as number,
-        }]);
-        setActiveAction(null);
-        setCompletedSteps(prev => prev + 1);
-        if ((event.data.tool as string) === "download_products") {
-          setDownloadProgress(null);
-          downloadStartRef.current = null;
-        }
-        break;
-      case "action": {
-        const actionTool = event.data.tool as string;
-        if (actionTool === "finish") {
-          const finishParams = (event.data.params as Record<string, unknown>) || {};
-          setChatLog(prev => [...prev, {
-            type: "finish" as const,
-            summary: (finishParams.summary as string) || "",
-            recommendation: (finishParams.recommendation as string) || "",
-          }]);
-        }
-        break;
-      }
+    // Update narrative phase ref for synchronous access in reducer
+    if (event.event === "thought_start" && event.data.phase === "narrative") {
+      narrativePhaseRef.current = true;
+    } else if (event.event === "thought_start") {
+      narrativePhaseRef.current = false;
+    } else if (event.event === "thought_end" && event.data.phase === "narrative") {
+      narrativePhaseRef.current = false;
     }
+    // Track download start time via ref (not in reducer)
+    if (event.event === "step_start" && (event.data as StepData).type === "download") {
+      downloadStartRef.current = Date.now();
+    }
+    if (event.event === "action_start" && event.data.tool === "download_products") {
+      downloadStartRef.current = Date.now();
+    }
+    if ((event.event === "step_complete" || event.event === "step_failed") && (event.data as StepData).type === "download") {
+      downloadStartRef.current = null;
+    }
+    if (event.event === "action_complete" && event.data.tool === "download_products") {
+      downloadStartRef.current = null;
+    }
+    dispatch({ type: "EVENT", event, narrativePhase: narrativePhaseRef.current });
   }, []);
 
   // ── Shared SSE stream consumer ─────────────────────────
@@ -372,9 +423,14 @@ export default function AgenticPanel({
 
     const decoder = new TextDecoder();
     let buffer = "";
+    const SSE_TIMEOUT_MS = 120_000; // 2 minutes with no data = stale
 
     while (true) {
-      const { done, value } = await reader.read();
+      // Race between reader and timeout
+      const timeoutPromise = new Promise<{ done: true; value: undefined }>(
+        (_, reject) => setTimeout(() => reject(new Error("SSE stream timeout: no data received for 2 minutes")), SSE_TIMEOUT_MS)
+      );
+      const { done, value } = await Promise.race([reader.read(), timeoutPromise]);
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -408,24 +464,10 @@ export default function AgenticPanel({
   const handleRun = useCallback(async () => {
     if (!objective.trim()) return;
 
-    setSessionState("connecting");
-    setSteps([]);
-    setNarrative("");
-    setSynthesis(null);
-    setPlanInfo(null);
-    setError(null);
-    setReasoningText("");
-    setReasoningPhase(null);
-    setReasoningCollapsed(false);
-    setChatLog([]);
-    setAgentMode(null);
-    setIterationCount(0);
-    setActiveAction(null);
+    dispatch({ type: "SET_CONNECTING" });
     narrativePhaseRef.current = false;
     setStartTime(Date.now());
     setElapsed(0);
-    setTotalSteps(0);
-    setCompletedSteps(0);
 
     try {
       // Start the agent via POST — runs in background on server
@@ -440,11 +482,10 @@ export default function AgenticPanel({
         throw new Error(err.detail || "Failed to start agent");
       }
 
-      setSessionState("planning");
+      dispatch({ type: "EVENT", event: { event: "reasoning_start", data: { phase: "planning" } }, narrativePhase: false });
       await consumeSSEStream(res);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
-      setSessionState("error");
+      dispatch({ type: "EVENT", event: { event: "error", data: { error: e instanceof Error ? e.message : "Unknown error" } }, narrativePhase: false });
     }
   }, [objective, autoDownload, consumeSSEStream]);
 
@@ -469,99 +510,96 @@ export default function AgenticPanel({
       type: s.type as string,
       description: s.description as string,
       instrument: (s.instrument as string) || null,
-      status: (s.status as string) || "completed",
+      status: (s.status as StepData["status"]) || "completed",
       result_summary: (s.result_summary as string) || null,
       error: (s.error as string) || null,
     }));
 
-    setSteps(loadedSteps);
-    setTotalSteps(loadedSteps.length);
-    setCompletedSteps(loadedSteps.filter(s => s.status === "completed" || s.status === "failed").length);
     setObjective((data.objective as string) || "");
-    setNarrative((data.narrative as string) || "");
-    setSynthesis((data.synthesis as Record<string, unknown>) || null);
-    setPlanInfo({
+
+    // Build the full session state in one dispatch via "done" or "error" event
+    const isError = data.status === "error" || !!data.error;
+    const planInfo = {
       region: (data.region_name as string) || "Unknown",
       instruments: ((data.synthesis as Record<string, unknown>)?.instruments_searched as string[]) || [],
       planned_by: "restored",
-    });
-
-    if (data.status === "error" || data.error) {
-      setError((data.error as string) || "Session ended with error");
-      setSessionState("error");
+    };
+    // We dispatch a synthetic "done" event, then patch remaining fields
+    dispatch({ type: "RESET" });
+    // Hydrate all fields at once by dispatching plan + done/error
+    dispatch({ type: "EVENT", event: { event: "plan", data: { steps: loadedSteps, ...planInfo } }, narrativePhase: false });
+    dispatch({ type: "EVENT", event: { event: "narrative", data: { narrative: (data.narrative as string) || "" } }, narrativePhase: false });
+    if (data.figures) {
+      dispatch({ type: "EVENT", event: { event: "figures", data: { figures: data.figures } }, narrativePhase: false });
+    }
+    if (isError) {
+      dispatch({ type: "EVENT", event: { event: "error", data: { error: (data.error as string) || "Session ended with error" } }, narrativePhase: false });
     } else {
-      setSessionState("done");
+      dispatch({ type: "EVENT", event: { event: "done", data: { synthesis: data.synthesis || null } }, narrativePhase: false });
     }
   }, []);
 
-  const handleLoadSession = useCallback(async (sid: string, status?: string, sessionObjective?: string) => {
+  const handleLoadSession = useCallback(async (sid: string, _status?: string, sessionObjective?: string) => {
     setShowHistory(false);
-    setSessionState("connecting");
-    setSteps([]);
-    setNarrative("");
-    setSynthesis(null);
-    setPlanInfo(null);
-    setError(null);
-    setReasoningText("");
-    setReasoningPhase(null);
-    setChatLog([]);
-    setAgentMode(null);
-    setIterationCount(0);
-    setActiveAction(null);
+    dispatch({ type: "SET_CONNECTING" });
     narrativePhaseRef.current = false;
     setStartTime(null);
     setElapsed(0);
-    setTotalSteps(0);
-    setCompletedSteps(0);
-    setSessionId(sid);
-    // Set objective immediately from session list data
     if (sessionObjective) setObjective(sessionObjective);
 
     try {
-      // Always try JSON endpoint first — works for completed + stale sessions
       const jsonRes = await fetch(`/api/agent/session/${sid}`);
       if (!jsonRes.ok) throw new Error("Failed to load session");
       const data = await jsonRes.json();
 
       const effectiveStatus = data.status as string;
       if (effectiveStatus === "done" || effectiveStatus === "error") {
-        // Session is finished — populate from JSON snapshot
         loadSessionFromJson(data);
+        // Dispatch session_start AFTER loadSessionFromJson (which calls RESET and wipes sessionId)
+        dispatch({ type: "EVENT", event: { event: "session_start", data: { session_id: sid } }, narrativePhase: false });
       } else {
-        // Truly in-progress — use SSE resume to stream live events
         setObjective((data.objective as string) || sessionObjective || "");
+        // Set sessionId before resuming SSE stream
+        dispatch({ type: "EVENT", event: { event: "session_start", data: { session_id: sid } }, narrativePhase: false });
         const res = await fetch(`/api/agent/resume/${sid}`);
         if (!res.ok) throw new Error("Failed to resume session");
 
-        setSessionState("planning");
+        dispatch({ type: "EVENT", event: { event: "reasoning_start", data: { phase: "planning" } }, narrativePhase: false });
         setStartTime(Date.now());
         await consumeSSEStream(res);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load session");
-      setSessionState("error");
+      dispatch({ type: "EVENT", event: { event: "error", data: { error: e instanceof Error ? e.message : "Failed to load session" } }, narrativePhase: false });
     }
   }, [consumeSSEStream, loadSessionFromJson]);
 
   const handleStop = useCallback(async () => {
-    if (!sessionId) return;
+    if (!session.sessionId) return;
     try {
-      await fetch(`/api/agent/stop/${sessionId}`, { method: "POST" });
+      await fetch(`/api/agent/stop/${session.sessionId}`, { method: "POST" });
     } catch { /* SSE stream will deliver the error event */ }
-  }, [sessionId]);
+  }, [session.sessionId]);
 
-  const isRunning = sessionState !== "idle" && sessionState !== "done" && sessionState !== "error";
+  const isRunning = session.sessionState !== "idle" && session.sessionState !== "done" && session.sessionState !== "error";
+
+  // Destructure session for convenient JSX access
+  const {
+    sessionState, sessionId, steps, narrative, synthesis, figures,
+    planInfo, error, reasoningText, reasoningPhase, reasoningCollapsed,
+    downloadProgress, totalSteps, completedSteps, chatLog, agentMode,
+    iterationCount, activeAction,
+  } = session;
 
   // Estimated time remaining
   const estRemaining = agentMode === "react"
     ? (iterationCount > 2 && elapsed > 0
-      ? Math.round((elapsed / iterationCount) * (15 - iterationCount))
+      ? Math.round((elapsed / iterationCount) * (30 - iterationCount))
       : null)
     : (completedSteps > 0 && totalSteps > 0
       ? Math.round((elapsed / completedSteps) * (totalSteps - completedSteps))
       : null);
   const progressPct = agentMode === "react"
-    ? Math.round((iterationCount / 15) * 100)
+    ? Math.round((iterationCount / 30) * 100)
     : (totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0);
 
   return (
@@ -729,7 +767,7 @@ export default function AgenticPanel({
                 : sessionState === "synthesizing"
                 ? "Synthesizing..."
                 : agentMode === "react"
-                ? `Iteration ${iterationCount}/15`
+                ? `Iteration ${iterationCount}/30`
                 : estRemaining !== null
                 ? `~${formatTime(estRemaining)} remaining`
                 : "Estimating..."}
@@ -752,7 +790,7 @@ export default function AgenticPanel({
         {reasoningText && sessionState !== "synthesizing" && sessionState !== "done" && !narrative && (
           <div className="bg-[#1a2333] border border-violet-500/20 rounded-lg overflow-hidden">
             <button
-              onClick={() => setReasoningCollapsed((p) => !p)}
+              onClick={() => dispatch({ type: "TOGGLE_REASONING_COLLAPSED" })}
               className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#232f48]/50 transition-colors"
             >
               <span className={`material-symbols-outlined text-sm text-violet-400 ${reasoningPhase ? "animate-pulse" : ""}`}>
@@ -1029,7 +1067,7 @@ export default function AgenticPanel({
         {reasoningText && (sessionState === "synthesizing" || (narrative && reasoningPhase === null)) && (
           <div className="bg-[#1a2333] border border-violet-500/20 rounded-lg overflow-hidden">
             <button
-              onClick={() => setReasoningCollapsed((p) => !p)}
+              onClick={() => dispatch({ type: "TOGGLE_REASONING_COLLAPSED" })}
               className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#232f48]/50 transition-colors"
             >
               <span className={`material-symbols-outlined text-sm text-violet-400 ${reasoningPhase ? "animate-pulse" : ""}`}>
@@ -1114,7 +1152,7 @@ export default function AgenticPanel({
             {/* Sub-scores */}
             <div className="mt-3 grid grid-cols-2 xl:grid-cols-4 gap-2">
               {/* Engineering */}
-              {synthesis.engineering_feasibility && (
+              {!!synthesis.engineering_feasibility && (
                 <div className="bg-[#0d1520] rounded p-2">
                   <div className="text-[8px] uppercase text-[#6b7c9c] mb-1">Engineering</div>
                   <div className={`text-xs font-bold ${
@@ -1133,7 +1171,7 @@ export default function AgenticPanel({
               )}
 
               {/* Subsurface */}
-              {synthesis.subsurface_coverage && (
+              {!!synthesis.subsurface_coverage && (
                 <div className="bg-[#0d1520] rounded p-2">
                   <div className="text-[8px] uppercase text-[#6b7c9c] mb-1">Subsurface</div>
                   <div className={`text-xs font-bold ${
@@ -1152,7 +1190,7 @@ export default function AgenticPanel({
               )}
 
               {/* CRISM Ice */}
-              {synthesis.mineral_signatures && (
+              {!!synthesis.mineral_signatures && (
                 <div className="bg-[#0d1520] rounded p-2">
                   <div className="text-[8px] uppercase text-[#6b7c9c] mb-1">Ice Signatures</div>
                   <div className="text-xs font-bold text-cyan-400">
@@ -1176,6 +1214,11 @@ export default function AgenticPanel({
               </div>
             </div>
           </div>
+        )}
+
+        {/* Evidence Figures Gallery */}
+        {figures.length > 0 && (
+          <EvidenceGallery figures={figures} />
         )}
 
         {/* Narrative Report */}
@@ -1241,6 +1284,92 @@ export default function AgenticPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+
+/* =========================================================
+ * Evidence Figures Gallery
+ * =======================================================*/
+function EvidenceGallery({ figures }: { figures: EvidenceFigure[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="bg-[#1a2333] border border-[#232f48] rounded-lg overflow-hidden">
+      {/* Header */}
+      <button
+        onClick={() => setCollapsed((p) => !p)}
+        className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-[#232f48]/50 transition-colors"
+      >
+        <span className="material-symbols-outlined text-sm text-cyan-400">image</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+          Evidence Figures
+        </span>
+        <span className="text-[8px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono">
+          {figures.length}
+        </span>
+        <span className="material-symbols-outlined text-sm text-[#6b7c9c] ml-auto">
+          {collapsed ? "expand_more" : "expand_less"}
+        </span>
+      </button>
+
+      {!collapsed && (
+        <div className="px-3 pb-3 space-y-2">
+          {/* Figure grid */}
+          <div className="grid grid-cols-2 gap-2">
+            {figures.map((fig) => (
+              <button
+                key={fig.id}
+                onClick={() => setExpanded(expanded === fig.id ? null : fig.id)}
+                className={`relative rounded-lg overflow-hidden border transition-all text-left ${
+                  expanded === fig.id
+                    ? "col-span-2 border-cyan-500/50"
+                    : "border-[#232f48] hover:border-cyan-500/30"
+                }`}
+              >
+                {fig.base64 ? (
+                  <img
+                    src={`data:image/png;base64,${fig.base64}`}
+                    alt={fig.title}
+                    className="w-full"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="h-24 flex items-center justify-center bg-[#0d1520] text-[9px] text-[#6b7c9c]">
+                    Figure not available in restored session
+                  </div>
+                )}
+                {/* Title overlay */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[7px] px-1 py-0.5 bg-[#232f48] rounded font-mono text-sky-400 shrink-0">
+                      {fig.instrument}
+                    </span>
+                    <span className="text-[8px] text-white font-medium truncate">
+                      {fig.title}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Expanded caption */}
+          {expanded &&
+            (() => {
+              const fig = figures.find((f) => f.id === expanded);
+              return fig ? (
+                <div className="bg-[#0d1520] rounded-lg p-2">
+                  <p className="text-[9px] text-[#92a4c9] leading-relaxed italic">
+                    {fig.caption}
+                  </p>
+                </div>
+              ) : null;
+            })()}
+        </div>
+      )}
     </div>
   );
 }

@@ -52,7 +52,20 @@ MAX_LIMIT = 5000
 
 @lru_cache(maxsize=8)
 def load_geojson_index(instrument: str) -> dict:
-    """Load and cache GeoJSON index for an instrument using the registry."""
+    """Load and cache GeoJSON index for an instrument using the registry.
+
+    Tries the app-level preloaded cache first for instant access,
+    falls back to disk read if not preloaded.
+    """
+    # Try app-level preloaded cache first (loaded at startup)
+    try:
+        from app import _geojson_cache
+        cache_key = instrument.lower()
+        if cache_key in _geojson_cache:
+            return _geojson_cache[cache_key]
+    except ImportError:
+        pass
+
     registry = get_registry()
     config = registry.get(instrument)
 
@@ -80,7 +93,12 @@ def normalize_lon(lon: float) -> float:
 def feature_intersects_bbox(feature: dict, min_lon: float, min_lat: float,
                             max_lon: float, max_lat: float,
                             crosses_antimeridian: bool) -> bool:
-    """Check if a feature intersects the bounding box."""
+    """
+    Check if a feature intersects the bounding box.
+
+    All longitudes are in -180 to 180 range.
+    If crosses_antimeridian is True, the bbox wraps: [min_lon, 180] U [-180, max_lon]
+    """
     geom = feature.get("geometry")
     if not geom:
         return False
@@ -91,7 +109,7 @@ def feature_intersects_bbox(feature: dict, min_lon: float, min_lat: float,
     if not coords:
         return False
 
-    # Extract bounds from geometry
+    # Extract all coordinate points from geometry
     if geom_type == "Polygon":
         ring = coords[0] if coords else []
         lons = [normalize_lon(c[0]) for c in ring]
@@ -113,27 +131,43 @@ def feature_intersects_bbox(feature: dict, min_lon: float, min_lat: float,
     feat_min_lat = min(lats)
     feat_max_lat = max(lats)
 
-    # Latitude check (simple)
+    # Latitude check (simple rectangle overlap)
     if feat_max_lat < min_lat or feat_min_lat > max_lat:
         return False
 
+    # Check if feature itself crosses antimeridian (large longitude span)
+    feat_crosses_antimeridian = (feat_max_lon - feat_min_lon) > 180
+
     # Longitude check
     if crosses_antimeridian:
-        # Query bbox crosses antimeridian: min_lon > max_lon
-        # Feature intersects if it's in [min_lon, 180] OR [-180, max_lon]
-        in_western_part = feat_max_lon >= min_lon  # Feature reaches into western part
-        in_eastern_part = feat_min_lon <= max_lon  # Feature reaches into eastern part
+        # Query bbox crosses antimeridian: covers [min_lon, 180] U [-180, max_lon]
+        # A feature intersects if ANY of its points are in either segment
 
-        # Feature itself might cross antimeridian
-        feat_crosses = feat_max_lon - feat_min_lon > 180
-        if feat_crosses:
-            return True  # Feature crosses antimeridian, likely intersects
+        if feat_crosses_antimeridian:
+            # Both cross antimeridian - almost certainly intersect
+            return True
 
-        return in_western_part or in_eastern_part
+        # Check if feature is in the positive segment [min_lon, 180]
+        in_positive_segment = feat_max_lon >= min_lon and feat_min_lon <= 180
+
+        # Check if feature is in the negative segment [-180, max_lon]
+        in_negative_segment = feat_min_lon <= max_lon and feat_max_lon >= -180
+
+        return in_positive_segment or in_negative_segment
     else:
-        # Normal case: simple overlap check
-        if feat_max_lon < min_lon or feat_min_lon > max_lon:
-            return False
+        # Normal case: standard rectangle overlap
+        if feat_crosses_antimeridian:
+            # Feature crosses antimeridian but query doesn't
+            # Feature covers [feat_min_lon, 180] U [-180, feat_max_lon]
+            # Check if query bbox overlaps either segment
+            overlaps_positive = min_lon <= 180 and max_lon >= feat_min_lon
+            overlaps_negative = min_lon <= feat_max_lon and max_lon >= -180
+            # Actually for normal query, just check if any overlap
+            return not (max_lon < feat_min_lon and min_lon > feat_max_lon)
+        else:
+            # Simple overlap check
+            if feat_max_lon < min_lon or feat_min_lon > max_lon:
+                return False
 
     return True
 
@@ -299,9 +333,15 @@ async def get_footprints(
     all_features = geojson.get("features", [])
 
     # Filter features by bbox
+    is_crism = instrument.upper() in ("CRISM", "CRISM_TRR3")
     matching_features = []
     for feature in all_features:
         if feature_intersects_bbox(feature, min_lon, min_lat, max_lon, max_lat, crosses_antimeridian):
+            # For CRISM layers, only show FRT (Full Resolution Targeted) products
+            if is_crism:
+                pid = feature.get("properties", {}).get("product_id", "")
+                if pid and not pid.lower().startswith("frt"):
+                    continue
             matching_features.append(feature)
 
     total_matching = len(matching_features)
@@ -340,21 +380,24 @@ async def get_footprints(
                     "geometry": geom,
                 })
 
-    return JSONResponse(content={
-        "type": "FeatureCollection",
-        "features": result_features,
-        "metadata": {
-            "truncated": truncated,
-            "returned": len(result_features),
-            "total_estimate": total_matching,
-            "lod": lod,
-            "original_lod": original_lod,
-            "lod_enforced": lod_enforced,
-            "simplify": simplify,
-            "bbox": [min_lon, min_lat, max_lon, max_lat],
-            "instrument": instrument.upper(),
-        }
-    })
+    return JSONResponse(
+        content={
+            "type": "FeatureCollection",
+            "features": result_features,
+            "metadata": {
+                "truncated": truncated,
+                "returned": len(result_features),
+                "total_estimate": total_matching,
+                "lod": lod,
+                "original_lod": original_lod,
+                "lod_enforced": lod_enforced,
+                "simplify": simplify,
+                "bbox": [min_lon, min_lat, max_lon, max_lat],
+                "instrument": instrument.upper(),
+            }
+        },
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 @router.get("/api/footprints/stats")

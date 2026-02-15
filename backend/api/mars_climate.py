@@ -265,28 +265,57 @@ class ClimateResult:
     dust: dict
     wind: dict
     frost: dict
-    climate_score: int          # 0-10 for agent scoring
+    climate_score: int          # 0-10 for agent scoring (backward compat)
     climate_summary: str
-    annual_stats: dict          # Aggregated over 4 seasons
+    annual_stats: dict          # Aggregated over 12 Ls bins
+    seasonal_profile: list      # Per-Ls-bin climate data (12 entries)
+    climate_subscore: float     # 0-1 formula-based score
+    climate_score_formula: str  # Human-readable formula explanation
+
+
+_LS_BINS = list(range(0, 360, 30))  # 12 bins: 0, 30, 60, ..., 330
+
+_LS_LABELS = [
+    "Ls 0-30 (N Early Spring)",
+    "Ls 30-60 (N Mid Spring)",
+    "Ls 60-90 (N Late Spring)",
+    "Ls 90-120 (N Early Summer)",
+    "Ls 120-150 (N Mid Summer)",
+    "Ls 150-180 (N Late Summer)",
+    "Ls 180-210 (N Early Autumn)",
+    "Ls 210-240 (N Mid Autumn)",
+    "Ls 240-270 (N Late Autumn)",
+    "Ls 270-300 (N Early Winter)",
+    "Ls 300-330 (N Mid Winter)",
+    "Ls 330-360 (N Late Winter)",
+]
+
+_CLIMATE_SCORE_FORMULA = (
+    "climate_subscore = 0.30 * t_score + 0.25 * d_score + 0.20 * w_score + 0.25 * f_score "
+    "where t_score = clamp(1 - |annual_t_mean - 215| / 70, 0, 1) if outside 180-250K else 1.0; "
+    "d_score = clamp(1 - annual_tau_mean / 1.0, 0, 1); "
+    "w_score = clamp(1 - (annual_wind_mean - 3.0) / 12.0, 0, 1); "
+    "f_score = 1 - max_frost_prob"
+)
 
 
 def analyze_climate(lat: float, lon: float) -> ClimateResult:
     """
     Full climate analysis for a single point.
-    Computes stats across 4 seasons (Ls = 0, 90, 180, 270).
+    Computes stats across 12 Ls bins (every 30 deg) and produces a
+    formula-based 0-1 climate_subscore plus backward-compatible 0-10 score.
     """
     elevation = get_elevation_m(lat, lon)
+    n_bins = len(_LS_BINS)
 
-    # Sample 4 seasons
-    seasons = [0, 90, 180, 270]
-    season_names = ["N Spring", "N Summer", "N Autumn", "N Winter"]
+    # Sample 12 Ls bins
     all_temps = []
     all_dust = []
     all_wind = []
     all_frost = []
-    seasonal_data = []
+    seasonal_profile = []
 
-    for ls in seasons:
+    for i, ls in enumerate(_LS_BINS):
         t = surface_temperature_k(lat, ls, elevation)
         d = dust_opacity(lat, ls)
         w = wind_speed(lat, ls)
@@ -295,67 +324,91 @@ def analyze_climate(lat: float, lon: float) -> ClimateResult:
         all_dust.append(d)
         all_wind.append(w)
         all_frost.append(f)
-        seasonal_data.append({"ls": ls, "temp": t, "dust": d, "wind": w, "frost": f})
+        seasonal_profile.append({
+            "ls": ls,
+            "ls_label": _LS_LABELS[i],
+            "temperature": {"mean_k": t["mean_k"], "max_k": t["max_k"], "min_k": t["min_k"]},
+            "pressure_pa": round(surface_pressure_pa(elevation), 1),
+            "dust_tau": d["tau_mean"],
+            "wind_mean_ms": w["mean_ms"],
+            "frost_probability": f["frost_probability"],
+        })
 
     # Annual aggregates
     annual_t_min = min(t["min_k"] for t in all_temps)
     annual_t_max = max(t["max_k"] for t in all_temps)
-    annual_t_mean = sum(t["mean_k"] for t in all_temps) / 4
-    annual_tau_mean = sum(d["tau_mean"] for d in all_dust) / 4
+    annual_t_mean = sum(t["mean_k"] for t in all_temps) / n_bins
+    annual_tau_mean = sum(d["tau_mean"] for d in all_dust) / n_bins
     annual_tau_peak = max(d["tau_peak"] for d in all_dust)
-    annual_wind_mean = sum(w["mean_ms"] for w in all_wind) / 4
+    annual_wind_mean = sum(w["mean_ms"] for w in all_wind) / n_bins
     annual_wind_gust = max(w["gust_ms"] for w in all_wind)
     max_frost_prob = max(f["frost_probability"] for f in all_frost)
     any_seasonal_frost = any(f["seasonal_frost"] for f in all_frost)
+
+    # Derived physical quantities
+    seasonal_means = [t["mean_k"] for t in all_temps]
+    temperature_amplitude_k = max(seasonal_means) - min(seasonal_means)
+
+    all_tau_means = [d["tau_mean"] for d in all_dust]
+    dust_variability = max(all_tau_means) - min(all_tau_means)
+
+    # Pressure is elevation-dependent (constant across Ls in this model),
+    # but include for completeness — bins share the same pressure here.
+    bin_pressure = surface_pressure_pa(elevation)
+    pressure_range_pa = 0.0  # Same elevation → same pressure per bin
+
+    frost_duration_ls = sum(
+        1 for f in all_frost if f["frost_probability"] > 0.3
+    )
 
     annual_stats = {
         "temp_min_k": round(annual_t_min, 1),
         "temp_max_k": round(annual_t_max, 1),
         "temp_mean_k": round(annual_t_mean, 1),
         "temp_range_k": round(annual_t_max - annual_t_min, 1),
+        "temperature_amplitude_k": round(temperature_amplitude_k, 1),
         "dust_tau_mean": round(annual_tau_mean, 2),
         "dust_tau_peak": round(annual_tau_peak, 2),
+        "dust_variability": round(dust_variability, 3),
         "wind_mean_ms": round(annual_wind_mean, 1),
         "wind_gust_max_ms": round(annual_wind_gust, 1),
         "frost_max_probability": round(max_frost_prob, 2),
+        "frost_duration_ls": frost_duration_ls,
         "seasonal_frost": any_seasonal_frost,
-        "pressure_pa": round(surface_pressure_pa(elevation), 1),
+        "pressure_pa": round(bin_pressure, 1),
+        "pressure_range_pa": round(pressure_range_pa, 1),
         "elevation_m": round(elevation, 0),
-        "seasonal_breakdown": seasonal_data,
+        "seasonal_breakdown": seasonal_profile,
     }
 
-    # ── Climate score (0-10) ──
-    score = 0
-
-    # Temperature livability (0-3): favorable if mean 180-250K
+    # ── Formula-based climate subscore (0-1) ──
+    # Temperature suitability (0-1): best if mean 180-250K
     if 180 <= annual_t_mean <= 250:
-        score += 3
-    elif 160 <= annual_t_mean < 180 or 250 < annual_t_mean <= 270:
-        score += 1
+        t_score = 1.0
+    else:
+        t_score = max(0.0, 1.0 - abs(annual_t_mean - 215) / 70.0)
 
-    # Dust (0-2): low annual dust is better
-    if annual_tau_mean < 0.4:
-        score += 2
-    elif annual_tau_mean < 0.7:
-        score += 1
+    # Dust suitability (0-1): lower dust = better
+    d_score = max(0.0, 1.0 - annual_tau_mean / 1.0)
 
-    # Wind (0-2): low wind is better for operations
-    if annual_wind_mean < 7:
-        score += 2
-    elif annual_wind_mean < 10:
-        score += 1
+    # Wind suitability (0-1): lower wind = better
+    w_score = max(0.0, 1.0 - (annual_wind_mean - 3.0) / 12.0)
 
-    # CO2 frost (0-3): no persistent frost is better
-    if max_frost_prob < 0.05:
-        score += 3
-    elif max_frost_prob < 0.3:
-        score += 2
-    elif not any_seasonal_frost:
-        score += 1
+    # Frost penalty (0-1): no frost = 1.0
+    f_score = 1.0 - max_frost_prob
+
+    # Composite with explicit weights
+    climate_subscore = (
+        0.30 * t_score + 0.25 * d_score + 0.20 * w_score + 0.25 * f_score
+    )
+    climate_subscore = round(max(0.0, min(1.0, climate_subscore)), 4)
+
+    # Backward-compatible integer score (0-10)
+    climate_score = round(climate_subscore * 10)
 
     # Build summary
     parts = []
-    parts.append(f"Annual mean temperature {annual_t_mean:.0f} K ({annual_t_min:.0f}–{annual_t_max:.0f} K range)")
+    parts.append(f"Annual mean temperature {annual_t_mean:.0f} K ({annual_t_min:.0f}\u2013{annual_t_max:.0f} K range)")
     parts.append(f"Surface pressure {annual_stats['pressure_pa']:.0f} Pa at {elevation:.0f} m elevation")
 
     if annual_tau_peak > 2.0:
@@ -366,14 +419,14 @@ def analyze_climate(lat: float, lon: float) -> ClimateResult:
         parts.append(f"Low dust environment (peak tau {annual_tau_peak:.1f})")
 
     if any_seasonal_frost:
-        parts.append("Seasonal CO2 frost present — limits winter operations")
+        parts.append(f"Seasonal CO2 frost present ({frost_duration_ls}/12 Ls bins) \u2014 limits winter operations")
     elif max_frost_prob > 0:
         parts.append(f"Minor frost risk ({max_frost_prob:.0%} probability)")
 
     summary = ". ".join(parts) + "."
 
     # Use best-season temp for the primary display
-    best_season_idx = max(range(4), key=lambda i: all_temps[i]["mean_k"])
+    best_season_idx = max(range(n_bins), key=lambda i: all_temps[i]["mean_k"])
 
     return ClimateResult(
         lat=lat,
@@ -384,9 +437,12 @@ def analyze_climate(lat: float, lon: float) -> ClimateResult:
         dust=all_dust[best_season_idx],
         wind=all_wind[best_season_idx],
         frost=all_frost[best_season_idx],
-        climate_score=score,
+        climate_score=climate_score,
         climate_summary=summary,
         annual_stats=annual_stats,
+        seasonal_profile=seasonal_profile,
+        climate_subscore=climate_subscore,
+        climate_score_formula=_CLIMATE_SCORE_FORMULA,
     )
 
 
@@ -424,11 +480,14 @@ def climate_analysis_for_region(
             "success": False,
             "error": "Climate analysis failed for all sample points",
             "climate_score": 0,
+            "climate_subscore": 0.0,
         }
 
     # Aggregate
     scores = [r.climate_score for r in results]
+    subscores = [r.climate_subscore for r in results]
     avg_score = round(sum(scores) / len(scores))
+    avg_subscore = round(sum(subscores) / len(subscores), 4)
 
     # Use center point as primary
     center = results[0]
@@ -439,8 +498,15 @@ def climate_analysis_for_region(
         "center_lon": center_lon,
         "elevation_m": center.elevation_m,
         "climate_score": avg_score,
+        "climate_subscore": avg_subscore,
+        "climate_score_formula": center.climate_score_formula,
         "climate_summary": center.climate_summary,
         "annual_stats": center.annual_stats,
+        "seasonal_profile": center.seasonal_profile,
         "sample_points": len(results),
         "score_range": {"min": min(scores), "max": max(scores)},
+        "subscore_range": {
+            "min": round(min(subscores), 4),
+            "max": round(max(subscores), 4),
+        },
     }

@@ -1,0 +1,833 @@
+{
+  "meta": {
+    "version": "1.0",
+    "description": "Curated Mars science context for agentic AI system. Used to enrich Llama's prompts with domain-specific knowledge.",
+    "last_updated": "2025-02-10",
+    "populated_by": "Claude (claude-opus-4-6)"
+  },
+
+  "regions": {
+    "arcadia_planitia": {
+      "display_name": "Arcadia Planitia",
+      "science_context": "Northern lowland plain between 38-60°N with extensive evidence for near-surface ice deposits. The region shows polygonal terrain and periglacial landforms indicative of ground ice. SHARAD radar has detected widespread subsurface reflectors consistent with an ice table at shallow depths.",
+      "key_findings": [
+        "SHARAD detected subsurface ice deposits extending to depths of 20-40m (Bramson et al. 2015)",
+        "Fresh impact craters expose clean water ice at depths of 1-10m (Dundas et al. 2014)",
+        "Polygonal terrain widespread, suggesting thermal contraction of ice-rich regolith (Levy et al. 2009)",
+        "Hydrogen abundance from neutron spectroscopy indicates >40% ice by volume in upper meter (Feldman et al. 2004)"
+      ],
+      "relevant_minerals": ["water ice", "dust mantle", "basaltic regolith"],
+      "ice_confidence": "high",
+      "landing_site_suitability": "Strong candidate for ISRU missions due to accessible shallow ice, flat terrain, and low elevation, though latitude (~47°N) limits solar power availability.",
+      "references": ["Bramson+2015", "Dundas+2014", "Dundas+2018", "Levy+2009", "Feldman+2004"]
+    },
+    "amazonis_planitia": {
+      "display_name": "Amazonis Planitia",
+      "science_context": "Extremely smooth lowland plain west of the Tharsis rise, one of the flattest regions on Mars. Covered by young Amazonian-age lava flows from Tharsis volcanism. Some areas show evidence of recent volcanic resurfacing within the last 100 Ma.",
+      "key_findings": [
+        "Some of the youngest lava flows on Mars, dated to ~100-200 Ma (Hartmann & Berman 2000)",
+        "Extremely low surface roughness makes it suitable for landing (Kreslavsky & Head 2000)",
+        "Limited evidence for subsurface ice at equatorial latitudes (Boynton et al. 2002)"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "olivine"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Very flat terrain ideal for landing, but low latitude and volcanic substrate provide limited ice resources for ISRU.",
+      "references": ["Hartmann+2000", "Kreslavsky+2000", "Boynton+2002"]
+    },
+    "utopia_planitia": {
+      "display_name": "Utopia Planitia",
+      "science_context": "The largest recognized impact basin on Mars (~3300 km diameter), filled with sedimentary and volcanic deposits. Landing site of Viking 2 and Zhurong (Tianwen-1). Extensive evidence for subsurface ice from SHARAD, neutron spectroscopy, and geomorphology including scalloped depressions.",
+      "key_findings": [
+        "SHARAD detected a massive subsurface ice deposit with volume equivalent to Lake Superior (Stuurman et al. 2016)",
+        "Scalloped depressions indicate sublimation of ground ice (Morgenstern et al. 2007)",
+        "Zhurong rover found hydrated minerals in soil, suggesting past water interaction (Liu et al. 2022)",
+        "Viking 2 measured thin frost deposits at the surface (Jones et al. 1979)"
+      ],
+      "relevant_minerals": ["water ice", "hydrated silicates", "basalt", "dust"],
+      "ice_confidence": "high",
+      "landing_site_suitability": "Prime candidate for ice-mining missions. Confirmed massive subsurface ice deposits, relatively flat terrain, though high latitude (~45°N) impacts solar power.",
+      "references": ["Stuurman+2016", "Morgenstern+2007", "Liu+2022", "Dundas+2018"]
+    },
+    "elysium_planitia": {
+      "display_name": "Elysium Planitia",
+      "science_context": "Volcanic plain near the equator hosting the InSight lander. Contains some of the youngest volcanic features on Mars including Cerberus Fossae lava flows (<10 Ma). The region transitions from young volcanic terrain to older cratered surfaces.",
+      "key_findings": [
+        "InSight detected marsquakes originating from Cerberus Fossae (Banerdt et al. 2020)",
+        "Young lava flows dated to 2-10 Ma suggest recent volcanic activity (Vaucher et al. 2009)",
+        "Possible remnant pack ice or frozen sea under dust cover near Cerberus (Murray et al. 2005)"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "olivine", "dust"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Low elevation and equatorial location favor EDL and solar power. Limited confirmed ice resources, but flat terrain is landing-friendly.",
+      "references": ["Banerdt+2020", "Vaucher+2009", "Murray+2005"]
+    },
+    "isidis_planitia": {
+      "display_name": "Isidis Planitia",
+      "science_context": "Large impact basin (~1500 km diameter) northeast of Syrtis Major. The western rim hosts Jezero Crater (Perseverance landing site). Basin floor contains olivine-rich and carbonate-bearing units transported from Syrtis Major and Nili Fossae regions.",
+      "key_findings": [
+        "Olivine-carbonate units on basin floor indicate aqueous alteration (Ehlmann et al. 2008)",
+        "Western margin has diverse mineralogy including phyllosilicates (Mustard et al. 2009)",
+        "Basin acts as a sediment sink for material from surrounding highlands"
+      ],
+      "relevant_minerals": ["olivine", "carbonates", "phyllosilicates", "pyroxene"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Low elevation favors EDL. Mineralogically diverse region of high scientific interest, but equatorial latitude and no confirmed ice limit ISRU potential.",
+      "references": ["Ehlmann+2008", "Mustard+2009", "Hamilton+2003"]
+    },
+    "hellas_planitia": {
+      "display_name": "Hellas Planitia",
+      "science_context": "The deepest and largest well-preserved impact basin on Mars (diameter ~2300 km, depth ~7 km below datum). Atmospheric pressure at the floor is the highest on Mars (~12 mbar). Contains diverse deposits including glacial, fluvial, volcanic, and aeolian materials.",
+      "key_findings": [
+        "Deepest point on Mars (-8.2 km MOLA datum) provides highest surface atmospheric pressure (Smith et al. 1999)",
+        "Glacial features on eastern rim suggest past ice sheet activity (Crown et al. 2005)",
+        "Honeycomb terrain on basin floor may be related to volcanic or ice-related processes (Bernhardt et al. 2016)",
+        "Seasonal CO2 frost and dust storm activity common"
+      ],
+      "relevant_minerals": ["phyllosilicates", "sulfates", "dust", "CO2 ice"],
+      "ice_confidence": "medium",
+      "landing_site_suitability": "Highest atmospheric pressure on Mars aids EDL, but deep basin creates communication challenges and frequent dust storms reduce solar power reliability.",
+      "references": ["Smith+1999", "Crown+2005", "Bernhardt+2016"]
+    },
+    "argyre_planitia": {
+      "display_name": "Argyre Planitia",
+      "science_context": "Second largest impact basin on Mars (~1800 km diameter). Located in the southern highlands with evidence of past glacial activity, fluvial channels, and possible paleolake. The basin may have been connected to a larger hydrological system draining toward the northern lowlands.",
+      "key_findings": [
+        "Evidence for past glacial activity on basin margins (Banks et al. 2009)",
+        "Eskers and glacial landforms suggest wet-based glaciation (Hiesinger & Head 2002)",
+        "Possible paleolake in basin floor with shoreline features (Parker et al. 2000)"
+      ],
+      "relevant_minerals": ["phyllosilicates", "chlorides", "basalt"],
+      "ice_confidence": "medium",
+      "landing_site_suitability": "High southern latitude limits solar power. Scientific interest for paleoclimate studies but challenging for surface operations.",
+      "references": ["Banks+2009", "Hiesinger+2002", "Parker+2000"]
+    },
+    "chryse_planitia": {
+      "display_name": "Chryse Planitia",
+      "science_context": "Northern lowland plain that served as the terminus for several massive outflow channels (Kasei, Ares, Tiu, Simud Valles). Viking 1 landing site. The region preserves evidence of catastrophic flooding events that carved channels up to 100 km wide.",
+      "key_findings": [
+        "Viking 1 landed here in 1976, providing first surface images of Mars (Mutch et al. 1976)",
+        "Multiple outflow channels converge here, indicating massive flooding events (Baker 1982)",
+        "Streamlined islands and flood-carved terrain visible from orbit (Carr 1996)"
+      ],
+      "relevant_minerals": ["basalt", "dust", "iron oxides"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Proven landing site (Viking 1). Low elevation aids EDL, but moderate latitude and no confirmed ice deposits.",
+      "references": ["Mutch+1976", "Baker+1982", "Carr+1996"]
+    },
+    "acidalia_planitia": {
+      "display_name": "Acidalia Planitia",
+      "science_context": "Large northern lowland plain featuring mud volcano-like mounds and possible evidence for subsurface fluid mobilization. Contains giant polygons (1-10 km scale) that may indicate deep-seated desiccation or tectonic processes.",
+      "key_findings": [
+        "Giant polygons may indicate deep ground ice or desiccation (McGill & Hills 1992)",
+        "Mound features interpreted as possible mud volcanoes (Oehler & Allen 2010)",
+        "Featured as fictional landing site in 'The Martian' (Mars exploration community interest)"
+      ],
+      "relevant_minerals": ["basalt", "dust", "possible hydrated minerals"],
+      "ice_confidence": "medium",
+      "landing_site_suitability": "Flat terrain and low elevation favor landing. Mid-northern latitude may have seasonal ice. Subsurface fluid features are scientifically interesting.",
+      "references": ["McGill+1992", "Oehler+2010"]
+    },
+    "terra_sabaea": {
+      "display_name": "Terra Sabaea",
+      "science_context": "Ancient southern highlands terrain with heavily cratered surfaces dating to the Noachian period (~4 Ga). Contains some of the oldest exposed crust on Mars with phyllosilicate-bearing outcrops indicating past aqueous alteration.",
+      "key_findings": [
+        "Noachian-age terrain with extensive clay mineral detections by CRISM (Bibring et al. 2006)",
+        "Ancient valley networks suggest past fluvial activity (Hynek et al. 2010)",
+        "Diverse phyllosilicate mineralogy including Fe/Mg smectites"
+      ],
+      "relevant_minerals": ["phyllosilicates", "Fe/Mg smectites", "basalt", "pyroxene"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "High elevation and rough terrain limit landing options. Scientifically valuable for understanding early Mars habitability.",
+      "references": ["Bibring+2006", "Hynek+2010"]
+    },
+    "terra_cimmeria": {
+      "display_name": "Terra Cimmeria",
+      "science_context": "Ancient heavily cratered highlands in the southern hemisphere with Noachian-age terrain. Features numerous valley networks and degraded crater forms indicative of past surface water flow. Magnetic anomalies in this region are among the strongest on Mars.",
+      "key_findings": [
+        "Strong crustal magnetic anomalies suggest ancient dynamo activity (Connerney et al. 1999)",
+        "Extensive valley network systems indicate Noachian-era precipitation or groundwater sapping (Irwin et al. 2005)",
+        "Some mid-latitude ice-related features at higher latitudes within the region"
+      ],
+      "relevant_minerals": ["phyllosilicates", "pyroxene", "basalt"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Rough, heavily cratered terrain limits safe landing zones. High elevation increases EDL challenges.",
+      "references": ["Connerney+1999", "Irwin+2005"]
+    },
+    "terra_sirenum": {
+      "display_name": "Terra Sirenum",
+      "science_context": "Southern highlands region notable for widespread chloride salt deposits detected by THEMIS and CRISM, suggesting evaporation of brines or shallow lakes. Also hosts some of the clearest examples of recurring slope lineae (RSL).",
+      "key_findings": [
+        "Widespread chloride salt deposits indicate past evaporative environments (Osterloo et al. 2008)",
+        "Recurring slope lineae observed on crater walls, possibly related to briny water (McEwen et al. 2011)",
+        "Strong crustal magnetic anomalies in parts of the region (Lillis et al. 2008)"
+      ],
+      "relevant_minerals": ["chloride salts", "phyllosilicates", "sulfates", "basalt"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "High elevation and southern latitude limit accessibility. Chloride deposits and RSL are high-priority science targets.",
+      "references": ["Osterloo+2008", "McEwen+2011", "Lillis+2008"]
+    },
+    "noachis_terra": {
+      "display_name": "Noachis Terra",
+      "science_context": "One of the oldest and most heavily cratered terrains on Mars, giving its name to the Noachian geological period (~4.1-3.7 Ga). Contains abundant evidence for past water activity including valley networks, phyllosilicate deposits, and degraded craters with sedimentary infill.",
+      "key_findings": [
+        "Type locality for the Noachian period, representing Mars' oldest terrain (Scott & Tanaka 1986)",
+        "Widespread phyllosilicate detections by OMEGA and CRISM (Poulet et al. 2005)",
+        "Degraded craters suggest extensive surface modification by water and wind"
+      ],
+      "relevant_minerals": ["phyllosilicates", "Fe/Mg smectites", "basalt", "iron oxides"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "High scientific value for studying early Mars. Rough terrain and high elevation limit landing options.",
+      "references": ["Scott+1986", "Poulet+2005"]
+    },
+    "arabia_terra": {
+      "display_name": "Arabia Terra",
+      "science_context": "Transitional terrain between the southern highlands and northern lowlands, with a gradual elevation change. Contains numerous buried 'ghost' craters and evidence for past explosive volcanism (pyroclastic deposits). Some areas show finely layered sedimentary deposits.",
+      "key_findings": [
+        "Ghost craters buried under sedimentary deposits suggest extensive resurfacing (Frey et al. 2002)",
+        "Evidence for ancient explosive volcanism and pyroclastic deposits (Michalski & Bleacher 2013)",
+        "Finely layered deposits in some craters may be lacustrine or aeolian (Lewis et al. 2008)"
+      ],
+      "relevant_minerals": ["phyllosilicates", "sulfates", "hematite", "dust"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Moderate elevation transition zone. Layered deposits are scientifically interesting but terrain variability complicates landing site selection.",
+      "references": ["Frey+2002", "Michalski+2013", "Lewis+2008"]
+    },
+    "xanthe_terra": {
+      "display_name": "Xanthe Terra",
+      "science_context": "Highlands region featuring chaotic terrain and the source regions of major outflow channels (Simud, Tiu, and Shalbatana Valles). Chaotic terrain formed by catastrophic release of subsurface water or collapse of ice-rich ground.",
+      "key_findings": [
+        "Chaotic terrain interpreted as source of catastrophic flood events (Carr 1979)",
+        "Collapsed ground suggests former subsurface ice or aquifer reservoirs (Rodriguez et al. 2005)",
+        "Outflow channels originating here carved massive flood paths toward Chryse Planitia"
+      ],
+      "relevant_minerals": ["basalt", "sulfates", "iron oxides"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Chaotic terrain is hazardous for landing. Scientifically interesting for studying past hydrological processes.",
+      "references": ["Carr+1979", "Rodriguez+2005"]
+    },
+    "tharsis": {
+      "display_name": "Tharsis",
+      "science_context": "Massive volcanic plateau ~5000 km across and ~10 km high, hosting the three Tharsis Montes shield volcanoes and Olympus Mons. Formed by a long-lived mantle plume, representing the largest volcanic construct in the solar system. Its mass has influenced Mars' rotational axis.",
+      "key_findings": [
+        "The Tharsis bulge shifted Mars' spin axis by ~20° (Bouley et al. 2016)",
+        "Volcanic activity spanned most of Mars history, from Noachian to recent Amazonian (Werner 2009)",
+        "Extensive tectonic fracturing (graben) radial to the Tharsis center",
+        "High elevation (~10 km) means extremely thin atmosphere"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "olivine", "volcanic glass"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Extremely high elevation makes EDL very challenging due to thin atmosphere. Poor landing site despite volcanic science interest.",
+      "references": ["Bouley+2016", "Werner+2009", "Phillips+2001"]
+    },
+    "olympus_mons": {
+      "display_name": "Olympus Mons",
+      "science_context": "Largest volcano in the solar system — a shield volcano 21.9 km high and 600 km in diameter. Surrounded by a 6-8 km high escarpment and an aureole of landslide deposits. Caldera complex at summit contains multiple nested collapse craters.",
+      "key_findings": [
+        "Youngest lava flows on flanks dated to ~2 Ma, indicating geologically recent volcanism (Neukum et al. 2004)",
+        "Six nested calderas in summit caldera complex (Mouginis-Mark & Robinson 1992)",
+        "Aureole deposits extend >1000 km from the base, representing massive gravitational spreading"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "olivine", "volcanic glass"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Extreme elevation (21.9 km) makes landing impossible with current EDL technology. Atmosphere too thin for parachute deployment.",
+      "references": ["Neukum+2004", "Mouginis-Mark+1992"]
+    },
+    "alba_mons": {
+      "display_name": "Alba Mons",
+      "science_context": "Unique low-relief shield volcano with the largest areal footprint of any Martian volcano (~2000 km across) but only ~6.8 km high. Surrounded by extensive graben and sheet lava flows. Unusually low slopes suggest very fluid lava eruptions.",
+      "key_findings": [
+        "Largest volcanic footprint on Mars despite modest height (McGovern et al. 2004)",
+        "Extensive lava tube and channel systems visible on flanks (Carr et al. 1977)",
+        "Some flank regions show mid-latitude ice-related features (periglacial terrain)"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "dust"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "High elevation limits EDL. Gentle slopes are mechanically favorable but thin atmosphere is the primary constraint.",
+      "references": ["McGovern+2004", "Carr+1977"]
+    },
+    "elysium_mons": {
+      "display_name": "Elysium Mons",
+      "science_context": "Shield volcano in the Elysium volcanic province, standing ~14.1 km above the surrounding plains. Smaller than the Tharsis volcanoes but still significant. Associated with the young Cerberus Fossae volcanic system to the south.",
+      "key_findings": [
+        "Evidence for both effusive and pyroclastic volcanic activity (Wilson & Head 1994)",
+        "Associated Cerberus Fossae region has some of the youngest volcanism on Mars",
+        "Glacial features on northwestern flank suggest past ice accumulation (Parsons & Head 2005)"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "volcanic glass"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "High elevation limits EDL capability. Volcanic science interest but not practical for landing.",
+      "references": ["Wilson+1994", "Parsons+2005"]
+    },
+    "ascraeus_mons": {
+      "display_name": "Ascraeus Mons",
+      "science_context": "Northernmost and tallest of the three Tharsis Montes shield volcanoes at 18.2 km elevation. Features a caldera complex at the summit and long lava flow fields extending down its flanks. Fan-shaped deposits on western flank interpreted as glacial in origin.",
+      "key_findings": [
+        "Fan-shaped deposits interpreted as remnants of tropical glaciers (Head & Marchant 2003)",
+        "Complex caldera with multiple collapse events recorded in nested craters",
+        "Flank lava flows show varying ages, indicating episodic volcanism"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "olivine"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Extreme elevation prohibits landing with current technology.",
+      "references": ["Head+2003", "Neukum+2004"]
+    },
+    "pavonis_mons": {
+      "display_name": "Pavonis Mons",
+      "science_context": "Middle of the three Tharsis Montes, sitting almost exactly on the equator at ~14 km elevation. Features a deep caldera and cave skylights on its flanks that may provide radiation-shielded habitats. Fan-shaped glacial deposits on western flank.",
+      "key_findings": [
+        "Lava tube skylights/cave entrances identified on flanks (Cushing et al. 2007)",
+        "Caves could provide radiation shielding for future human habitation",
+        "Fan-shaped deposits similar to Arsia and Ascraeus suggest past glaciation (Shean et al. 2005)"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "olivine"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "High elevation limits EDL. Cave skylights are of interest for future habitat concepts but current technology cannot access them.",
+      "references": ["Cushing+2007", "Shean+2005"]
+    },
+    "arsia_mons": {
+      "display_name": "Arsia Mons",
+      "science_context": "Southernmost of the Tharsis Montes at ~17.8 km elevation. Hosts the largest known caldera on Mars (110 km diameter). Fan-shaped deposits on western flank are the best-preserved evidence for past tropical mountain glaciers on Mars.",
+      "key_findings": [
+        "Best-preserved tropical glacier deposits on Mars (Head & Marchant 2003)",
+        "Largest caldera of any Tharsis volcano (110 km across, 4.5 km deep)",
+        "Cloud formations over caldera observed seasonally, possibly orographic"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "olivine"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Extreme elevation prohibits landing with current technology.",
+      "references": ["Head+2003", "Forget+2006"]
+    },
+    "syrtis_major": {
+      "display_name": "Syrtis Major",
+      "science_context": "Low-relief shield volcano and one of the most prominent dark albedo features visible from Earth. Located between Isidis Basin and the southern highlands. The dark surface is due to exposed basaltic rock with minimal dust cover. Adjacent to the mineralogically diverse Nili Fossae region.",
+      "key_findings": [
+        "Low-relief volcanic construct with basaltic lava flows (Hiesinger & Head 2004)",
+        "Minimal dust cover exposes underlying basaltic mineralogy (Bandfield 2002)",
+        "Adjacent Nili Fossae has the highest concentration of olivine/carbonate detections on Mars"
+      ],
+      "relevant_minerals": ["basalt", "pyroxene", "olivine", "high-calcium pyroxene"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Moderate elevation. Near Jezero Crater landing site. Good solar power due to low dust coverage but equatorial location provides no ice resources.",
+      "references": ["Hiesinger+2004", "Bandfield+2002"]
+    },
+    "valles_marineris": {
+      "display_name": "Valles Marineris",
+      "science_context": "The largest canyon system in the solar system — over 4000 km long, up to 200 km wide, and 7 km deep. Formed primarily by tectonic rifting associated with Tharsis uplift, with subsequent modification by landslides, water, and wind. Interior layered deposits (ILDs) may be lacustrine, volcanic, or aeolian.",
+      "key_findings": [
+        "Sulfate-rich interior layered deposits suggest past standing water or groundwater upwelling (Gendrin et al. 2005)",
+        "CRISM detected diverse hydrated minerals including monohydrated and polyhydrated sulfates (Murchie et al. 2009)",
+        "Massive landslide deposits on canyon floors, some >100 km runout (Lucchitta 1979)",
+        "Possible evidence for past lakes in enclosed chasmata (Warner et al. 2013)"
+      ],
+      "relevant_minerals": ["sulfates", "monohydrated sulfate", "polyhydrated sulfate", "phyllosilicates", "iron oxides", "pyroxene"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Canyon floor elevation is low (aiding EDL), but steep walls, landslide hazards, and limited communication windows make landing extremely risky.",
+      "references": ["Gendrin+2005", "Murchie+2009", "Lucchitta+1979", "Warner+2013"]
+    },
+    "noctis_labyrinthus": {
+      "display_name": "Noctis Labyrinthus",
+      "science_context": "Complex labyrinth of intersecting troughs and pit chains at the western end of Valles Marineris, formed by tectonic extension and collapse related to Tharsis uplift. The intersecting graben create a maze-like pattern unique on Mars.",
+      "key_findings": [
+        "Formed by crustal extension associated with Tharsis loading (Tanaka & Davis 1988)",
+        "Some troughs may have hosted transient lakes (Weitz et al. 2011)",
+        "Light-toned layered deposits within troughs suggest past aqueous activity"
+      ],
+      "relevant_minerals": ["sulfates", "phyllosilicates", "iron oxides"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Extremely rugged terrain with deep troughs and collapse features. Not suitable for landing.",
+      "references": ["Tanaka+1988", "Weitz+2011"]
+    },
+    "ius_chasma": {
+      "display_name": "Ius Chasma",
+      "science_context": "Western portion of the main Valles Marineris trough system, featuring linear graben morphology with layered wall rock exposures. Contains interior layered deposits and evidence for past groundwater seepage along canyon walls.",
+      "key_findings": [
+        "Layered sulfate and phyllosilicate deposits detected by CRISM (Roach et al. 2010)",
+        "Spur-and-gully morphology on walls suggests past groundwater seepage",
+        "Interior layered deposits interpreted as lacustrine or spring-fed chemical precipitates"
+      ],
+      "relevant_minerals": ["sulfates", "phyllosilicates", "kieserite", "gypsum"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Canyon floor provides low elevation for EDL but steep walls and narrow morphology limit safe landing zones.",
+      "references": ["Roach+2010", "Murchie+2009"]
+    },
+    "coprates_chasma": {
+      "display_name": "Coprates Chasma",
+      "science_context": "Central deepest section of Valles Marineris with well-exposed layered wall rock and interior deposits. Features one of the best-preserved records of Martian crustal stratigraphy and contains extensive sulfate-bearing layered deposits.",
+      "key_findings": [
+        "Wall rock exposes ~5 km of crustal stratigraphy (Flahaut et al. 2012)",
+        "Monohydrated (kieserite) and polyhydrated sulfate deposits in central mounds (Gendrin et al. 2005)",
+        "Possible evidence for a past lake based on shoreline-like features"
+      ],
+      "relevant_minerals": ["kieserite", "polyhydrated sulfates", "phyllosilicates", "pyroxene"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Deep canyon floor aids EDL, but terrain hazards from landslides and steep walls make landing risky.",
+      "references": ["Flahaut+2012", "Gendrin+2005"]
+    },
+    "hebes_chasma": {
+      "display_name": "Hebes Chasma",
+      "science_context": "Enclosed depression north of the main Valles Marineris troughs with no outlet. Contains a massive interior mound (Hebes Mensa) of layered deposits nearly reaching rim height. The enclosed nature suggests past lake formation.",
+      "key_findings": [
+        "Interior layered deposit (Hebes Mensa) contains sulfates and phyllosilicates (Hauber et al. 2008)",
+        "Enclosed basin with no outlet — possible closed-basin lake (Adams et al. 2009)",
+        "Monohydrated and polyhydrated sulfates detected by CRISM"
+      ],
+      "relevant_minerals": ["sulfates", "kieserite", "polyhydrated sulfates", "phyllosilicates"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Enclosed basin floor is relatively flat but surrounded by steep walls. Limited escape routes for rovers.",
+      "references": ["Hauber+2008", "Adams+2009"]
+    },
+    "juventae_chasma": {
+      "display_name": "Juventae Chasma",
+      "science_context": "Outflow channel source chasma with massive sulfate-bearing mounds on its floor. One of the best examples of sulfate deposition on Mars. The chasma is the source of Maja Vallis, indicating catastrophic water release.",
+      "key_findings": [
+        "Multiple large sulfate-bearing mounds (light-toned deposits) on chasma floor (Bishop et al. 2009)",
+        "Source of Maja Vallis outflow channel — catastrophic flood events (Catling & Moore 2003)",
+        "Monohydrated sulfate (kieserite) is dominant mineral in interior deposits"
+      ],
+      "relevant_minerals": ["kieserite", "sulfates", "polyhydrated sulfates", "phyllosilicates"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Sulfate mounds are high-priority science targets but chasma walls and rough floor terrain limit landing safety.",
+      "references": ["Bishop+2009", "Catling+2003"]
+    },
+    "north_pole": {
+      "display_name": "North Polar Region",
+      "science_context": "The northern polar ice cap consists of a permanent water ice cap overlain by seasonal CO2 frost. The permanent cap (Planum Boreum) is ~1000 km across and up to 3 km thick, containing layered deposits that record Mars' climate history over millions of years.",
+      "key_findings": [
+        "Permanent cap is >95% water ice with thin CO2 frost veneer seasonally (Byrne 2009)",
+        "Polar layered deposits record orbital/climate cycles over ~4 Myr (Laskar et al. 2002)",
+        "SHARAD detected internal layering throughout the cap (Phillips et al. 2008)",
+        "Phoenix lander confirmed water ice at ~5 cm depth at 68°N (Smith et al. 2009)"
+      ],
+      "relevant_minerals": ["water ice", "CO2 ice", "dust", "gypsum"],
+      "ice_confidence": "high",
+      "landing_site_suitability": "Abundant ice for ISRU but extreme latitude means no solar power for ~6 months per year. Seasonal CO2 deposition/sublimation cycles create additional hazards.",
+      "references": ["Byrne+2009", "Phillips+2008", "Smith+2009", "Laskar+2002"]
+    },
+    "south_pole": {
+      "display_name": "South Polar Region",
+      "science_context": "The south polar cap has a permanent CO2 ice cap overlying a larger water ice cap. The residual CO2 cap creates the 'Swiss cheese' terrain morphology. Controversial radar signals from MARSIS were initially interpreted as subsurface liquid water but remain debated.",
+      "key_findings": [
+        "Residual CO2 ice cap with distinctive 'Swiss cheese' erosion pits (Thomas et al. 2000)",
+        "MARSIS bright radar reflections initially interpreted as subsurface liquid water (Orosei et al. 2018), later debated",
+        "Water ice cap beneath CO2 is estimated at ~1.6 million km³ (Plaut et al. 2007)",
+        "South polar layered deposits similar to north but less well-exposed"
+      ],
+      "relevant_minerals": ["CO2 ice", "water ice", "dust"],
+      "ice_confidence": "high",
+      "landing_site_suitability": "Extreme latitude, permanent CO2 ice cap, and rough terrain make this unsuitable for landing missions.",
+      "references": ["Orosei+2018", "Thomas+2000", "Plaut+2007"]
+    },
+    "planum_boreum": {
+      "display_name": "Planum Boreum",
+      "science_context": "The north polar plateau, composed of stacked water ice and dust layers (polar layered deposits or PLD) up to 3 km thick. These layers record climate variations driven by orbital parameters (obliquity, eccentricity) and provide the best Martian paleoclimate archive.",
+      "key_findings": [
+        "SHARAD revealed internal layering correlating with ~120 kyr orbital cycles (Phillips et al. 2008)",
+        "Total ice volume estimated at ~1.14 million km³ (Zuber et al. 1998)",
+        "Basal unit beneath PLD contains sand-rich material, possibly ancient erg deposit (Byrne & Murray 2002)",
+        "Layer exposure in troughs like Chasma Boreale allows optical study of climate record"
+      ],
+      "relevant_minerals": ["water ice", "dust", "gypsum (dune fields)", "sand"],
+      "ice_confidence": "high",
+      "landing_site_suitability": "Massive ice resource but extreme latitude and seasonal darkness make year-round operations impossible with solar power.",
+      "references": ["Phillips+2008", "Zuber+1998", "Byrne+2002"]
+    },
+    "planum_australe": {
+      "display_name": "Planum Australe",
+      "science_context": "The south polar plateau, composed of layered water ice and dust deposits covered by a thin residual CO2 ice cap. Less well-studied than Planum Boreum but contains a significant water ice reservoir. MARSIS radar studies suggested possible subsurface anomalies.",
+      "key_findings": [
+        "Estimated to contain ~1.6 million km³ of water ice (Plaut et al. 2007)",
+        "Residual CO2 cap with Swiss cheese terrain actively retreating (Malin et al. 2001)",
+        "MARSIS bright basal reflections remain controversial — ice, clay, or brine? (Orosei et al. 2018, Smith et al. 2021)"
+      ],
+      "relevant_minerals": ["water ice", "CO2 ice", "dust"],
+      "ice_confidence": "high",
+      "landing_site_suitability": "Extreme southern latitude, CO2 ice hazards, and rough terrain make this impractical for landing.",
+      "references": ["Plaut+2007", "Malin+2001", "Orosei+2018"]
+    },
+    "chasma_boreale": {
+      "display_name": "Chasma Boreale",
+      "science_context": "Major canyon cutting into the north polar cap, ~560 km long and up to 2 km deep. Exposes cross-sections of polar layered deposits, providing a window into Mars' climate history. The canyon may have formed by a combination of katabatic wind erosion and basal melting.",
+      "key_findings": [
+        "Wall exposures reveal hundreds of individual ice-dust layers (Fishbaugh & Head 2005)",
+        "Basal unit exposed at canyon floor, possibly Hesperian-age sand deposit (Tanaka et al. 2008)",
+        "Formation debated: katabatic winds vs. volcanic basal melting vs. outflow events"
+      ],
+      "relevant_minerals": ["water ice", "dust layers", "sand (basal unit)"],
+      "ice_confidence": "high",
+      "landing_site_suitability": "Canyon within polar cap — extreme environment, not suitable for landing but scientifically invaluable for paleoclimate studies.",
+      "references": ["Fishbaugh+2005", "Tanaka+2008"]
+    },
+    "jezero_crater": {
+      "display_name": "Jezero Crater",
+      "science_context": "Ancient impact crater (~49 km diameter) that hosted a paleolake fed by river channels, with a well-preserved delta on its western margin. Selected as the Perseverance rover landing site for its high astrobiology potential. The delta contains some of the best-preserved lacustrine sediments on Mars.",
+      "key_findings": [
+        "Perseverance rover landed Feb 2021, collecting samples for Mars Sample Return (Farley et al. 2022)",
+        "Delta deposits contain carbonate and phyllosilicate minerals (Horgan et al. 2020)",
+        "Igneous floor rocks (olivine-bearing) may represent original crater floor or later volcanic fill (Liu et al. 2022)",
+        "Organic molecules detected in delta sediments by SHERLOC instrument (Scheller et al. 2022)"
+      ],
+      "relevant_minerals": ["carbonates", "phyllosilicates", "olivine", "pyroxene", "Fe/Mg smectites"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Proven landing site (Perseverance). Moderate elevation, equatorial latitude provides year-round solar power. Highest astrobiology priority on Mars.",
+      "references": ["Farley+2022", "Horgan+2020", "Scheller+2022"]
+    },
+    "gale_crater": {
+      "display_name": "Gale Crater",
+      "science_context": "154 km diameter crater with a 5.5 km tall central mound (Mount Sharp / Aeolis Mons) composed of layered sedimentary deposits. Curiosity rover has been exploring since 2012, finding evidence for a habitable ancient lake environment with diverse mineralogy recording changing environmental conditions.",
+      "key_findings": [
+        "Curiosity found evidence for ancient habitable lake environment (Grotzinger et al. 2014)",
+        "Stratigraphic column in Mt. Sharp records transition from clay-bearing to sulfate-bearing deposits (Milliken et al. 2010)",
+        "Organic molecules and seasonal methane variations detected (Eigenbrode et al. 2018)",
+        "Transition from phyllosilicates to sulfates up-section records drying climate (Bristow et al. 2018)"
+      ],
+      "relevant_minerals": ["phyllosilicates", "sulfates", "hematite", "iron oxides", "borates", "clay minerals"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Proven landing site (Curiosity). Low elevation crater floor aids EDL. Near-equatorial location provides reliable solar power.",
+      "references": ["Grotzinger+2014", "Milliken+2010", "Eigenbrode+2018", "Bristow+2018"]
+    },
+    "gusev_crater": {
+      "display_name": "Gusev Crater",
+      "science_context": "166 km diameter crater interpreted as an ancient lakebed fed by Ma'adim Vallis. Spirit rover landed in 2004 and explored until 2010. Initially found basaltic plains, then discovered sulfate-rich soils and silica deposits in the Columbia Hills indicating past hydrothermal activity.",
+      "key_findings": [
+        "Spirit rover found olivine-rich basaltic plains on crater floor (Squyres et al. 2004)",
+        "Columbia Hills: silica-rich deposits indicating past hot springs / fumarolic activity (Squyres et al. 2008)",
+        "Sulfate-cemented soils record past acid-sulfate alteration (Ming et al. 2006)",
+        "Home Plate structure interpreted as volcanic explosion crater or hydrovolcanic feature"
+      ],
+      "relevant_minerals": ["basalt", "olivine", "opaline silica", "sulfates", "goethite"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Proven landing site (Spirit). Near-equatorial location but somewhat elevated crater floor.",
+      "references": ["Squyres+2004", "Squyres+2008", "Ming+2006"]
+    },
+    "meridiani_planum": {
+      "display_name": "Meridiani Planum",
+      "science_context": "Flat plain near the equator notable for extensive hematite deposits detected from orbit. Opportunity rover explored from 2004 to 2018, finding evidence for past acidic water environments including sulfate evaporites and hematite concretions ('blueberries').",
+      "key_findings": [
+        "Opportunity found hematite concretions ('blueberries') indicating past water (Squyres et al. 2004)",
+        "Cross-bedded sulfate sandstones record fluctuating shallow water and wind (Grotzinger et al. 2005)",
+        "Burns Formation records acid-sulfate evaporitic environment (McLennan et al. 2005)",
+        "Opportunity drove 45 km over 14 years, the longest Mars surface traverse"
+      ],
+      "relevant_minerals": ["hematite", "sulfates", "jarosite", "goethite", "basalt"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Proven landing site (Opportunity). Extremely flat terrain, equatorial location, and low elevation make it ideal for landing.",
+      "references": ["Squyres+2004", "Grotzinger+2005", "McLennan+2005"]
+    },
+    "viking_1": {
+      "display_name": "Viking 1 Site",
+      "science_context": "First successful Mars landing site (July 20, 1976) in western Chryse Planitia. The lander operated until 1982, providing the first surface images, weather data, and the controversial biology experiments. Rocky terrain with a thin regolith cover.",
+      "key_findings": [
+        "First surface images and weather measurements from Mars surface (Mutch et al. 1976)",
+        "Biology experiments showed unexpected chemical reactivity in soil (Klein 1978)",
+        "Diurnal temperature range and wind patterns measured for first time on Mars"
+      ],
+      "relevant_minerals": ["basalt", "iron oxides", "dust", "palagonite-like material"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Proven landing site. Historic significance but limited scientific novelty for future missions.",
+      "references": ["Mutch+1976", "Klein+1978"]
+    },
+    "viking_2": {
+      "display_name": "Viking 2 Site",
+      "science_context": "Second Viking landing site in Utopia Planitia at 47.6°N. Higher latitude than Viking 1, the site showed thin frost deposits seasonally. Rocky terrain similar to Viking 1 but with evidence for past periglacial modification of the landscape.",
+      "key_findings": [
+        "Seasonal water frost observed on surface in winter (Jones et al. 1979)",
+        "Polygonal ground patterns visible from orbit suggest ground ice (Seibert & Kargel 2001)",
+        "Soil chemistry similar to Viking 1 site — globally mixed dust component"
+      ],
+      "relevant_minerals": ["basalt", "iron oxides", "water frost", "dust"],
+      "ice_confidence": "medium",
+      "landing_site_suitability": "Proven landing site. Higher latitude provides access to seasonal frost/ice but limits solar power in winter.",
+      "references": ["Jones+1979", "Seibert+2001"]
+    },
+    "schiaparelli_crater": {
+      "display_name": "Schiaparelli Crater",
+      "science_context": "Large impact crater (461 km diameter) in the Arabia Terra-Meridiani region. Contains layered sedimentary deposits and dark sand dunes on its floor. The crater preserves evidence of past aeolian and possible lacustrine depositional environments.",
+      "key_findings": [
+        "Layered deposits within crater suggest past water or wind-deposited sediments",
+        "Active dark dune fields on crater floor (Fenton et al. 2005)",
+        "Named after Giovanni Schiaparelli who mapped Mars 'canali' in 1877"
+      ],
+      "relevant_minerals": ["basalt", "iron oxides", "dust", "sand"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Large flat floor area could accommodate landing but limited scientific uniqueness compared to other equatorial sites.",
+      "references": ["Fenton+2005"]
+    },
+    "huygens_crater": {
+      "display_name": "Huygens Crater",
+      "science_context": "Large ancient impact crater (467 km diameter) in the southern highlands. One of the oldest and largest preserved craters on Mars. Contains degraded interior features suggesting significant post-impact modification by water, wind, and subsequent impacts.",
+      "key_findings": [
+        "One of the largest preserved impact craters on Mars",
+        "Heavily degraded rim suggests Noachian-age formation with long modification history",
+        "Interior deposits include possible lacustrine sediments"
+      ],
+      "relevant_minerals": ["basalt", "phyllosilicates", "dust"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Southern highlands location with high elevation limits EDL. Scientific interest for early Mars geology.",
+      "references": ["Schultz+1988"]
+    },
+    "holden_crater": {
+      "display_name": "Holden Crater",
+      "science_context": "140 km crater that was a finalist landing site for MSL (Curiosity). Contains well-preserved alluvial fan deposits from Uzboi Vallis breach, megabreccia from the impact, and layered lacustrine sediments. One of the best examples of water-deposited sediments on Mars.",
+      "key_findings": [
+        "Alluvial fans from Uzboi Vallis breach contain some of the best fluvial sediments on Mars (Grant et al. 2008)",
+        "Megabreccia blocks exposed in crater floor record the impact event (Grant et al. 2008)",
+        "Phyllosilicate-bearing lacustrine deposits suggest sustained standing water (Milliken & Bish 2010)"
+      ],
+      "relevant_minerals": ["phyllosilicates", "smectites", "alluvial sediments"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Was a strong MSL candidate. Excellent science but moderate elevation and southern latitude create EDL and solar constraints.",
+      "references": ["Grant+2008", "Milliken+2010"]
+    },
+    "eberswalde_crater": {
+      "display_name": "Eberswalde Crater",
+      "science_context": "65 km crater containing one of the most compelling inverted river delta deposits on Mars. The delta provided early definitive evidence that persistent surface water flow existed on ancient Mars. Was a finalist landing site for MSL.",
+      "key_findings": [
+        "Inverted delta with preserved meander patterns — definitive evidence of sustained fluvial activity (Malin & Edgett 2003)",
+        "Phyllosilicate minerals detected in delta deposits by CRISM (Milliken & Bish 2010)",
+        "Delta morphology indicates long-lived river system, not catastrophic flooding"
+      ],
+      "relevant_minerals": ["phyllosilicates", "smectites", "fluvial sediments"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "High science value (delta deposits) but small crater size and proximity to Holden Crater rim create landing hazards.",
+      "references": ["Malin+2003", "Milliken+2010"]
+    },
+    "mawrth_vallis": {
+      "display_name": "Mawrth Vallis",
+      "science_context": "Outflow channel region containing the largest and most diverse phyllosilicate deposits on Mars. The clay-bearing stratigraphy shows a characteristic Al-phyllosilicate over Fe/Mg-phyllosilicate sequence that may record a global environmental transition from neutral-alkaline to acidic conditions.",
+      "key_findings": [
+        "Largest phyllosilicate exposure on Mars detected by OMEGA and CRISM (Poulet et al. 2005)",
+        "Al-clay over Fe/Mg-clay stratigraphy widespread — possible global weathering signal (Bishop et al. 2008)",
+        "High astrobiology potential — clay minerals can preserve biosignatures (Michalski et al. 2010)",
+        "Was a finalist landing site for ExoMars and MSL"
+      ],
+      "relevant_minerals": ["nontronite", "montmorillonite", "kaolinite", "Al-phyllosilicates", "Fe/Mg-phyllosilicates"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Among the most mineralogically diverse sites on Mars. Moderate elevation and latitude are acceptable for landing.",
+      "references": ["Poulet+2005", "Bishop+2008", "Michalski+2010"]
+    },
+    "nili_fossae": {
+      "display_name": "Nili Fossae",
+      "science_context": "Graben system northeast of Syrtis Major with the highest concentration of diverse minerals detected from orbit on Mars. Contains olivine, carbonates, phyllosilicates, and other minerals in distinct stratigraphic units. The carbonates are among the best-preserved on Mars and indicate past neutral-alkaline water chemistry.",
+      "key_findings": [
+        "Largest carbonate deposit on Mars detected by CRISM (Ehlmann et al. 2008)",
+        "Olivine-rich unit is one of the largest olivine exposures in the solar system (Hamilton & Christensen 2005)",
+        "Diverse phyllosilicate assemblages including smectites, chlorite, prehnite (Ehlmann et al. 2009)",
+        "Methane plume reported over Nili Fossae (Mumma et al. 2009), though later contested"
+      ],
+      "relevant_minerals": ["magnesite", "siderite", "olivine", "phyllosilicates", "prehnite", "serpentine", "kaolinite"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Extremely high mineralogical diversity makes this a prime science target. Terrain is moderately rough. Adjacent to Jezero Crater.",
+      "references": ["Ehlmann+2008", "Ehlmann+2009", "Hamilton+2005", "Mumma+2009"]
+    },
+    "kasei_valles": {
+      "display_name": "Kasei Valles",
+      "science_context": "The largest outflow channel system on Mars, stretching ~3000 km from Echus Chasma to Chryse Planitia. Multiple flood episodes carved channels up to 200 km wide. The enormous discharge rates required imply catastrophic release of large subsurface water reservoirs.",
+      "key_findings": [
+        "Discharge rates estimated at 10⁹-10¹⁰ m³/s, orders of magnitude beyond any terrestrial flood (Robinson & Tanaka 1990)",
+        "Multiple flood episodes spanning Hesperian to Amazonian periods (Chapman et al. 2010)",
+        "Streamlined islands and cataracts preserve evidence of extreme flow conditions"
+      ],
+      "relevant_minerals": ["basalt", "iron oxides", "dust"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Rough terrain from flood carving limits safe landing zones. Channel floor areas may be accessible in places.",
+      "references": ["Robinson+1990", "Chapman+2010"]
+    },
+    "ares_vallis": {
+      "display_name": "Ares Vallis",
+      "science_context": "Major outflow channel draining from chaotic terrain to Chryse Planitia. Mars Pathfinder (1997) landed near the channel mouth, finding a diverse collection of flood-transported rocks. The channel records catastrophic flooding from groundwater release.",
+      "key_findings": [
+        "Pathfinder/Sojourner landed near mouth in 1997, found diverse rock types transported by floods (Golombek et al. 1997)",
+        "Flood-deposited boulders include andesitic and basaltic compositions (McSween et al. 1999)",
+        "Channel morphology indicates multiple flood events over time"
+      ],
+      "relevant_minerals": ["basalt", "andesite", "iron oxides"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Proven landing site (Pathfinder). Low elevation and diverse rock types from flood deposits provide good science access.",
+      "references": ["Golombek+1997", "McSween+1999"]
+    },
+    "tiu_vallis": {
+      "display_name": "Tiu Vallis",
+      "science_context": "Outflow channel system draining northward into Chryse Planitia, parallel to Ares Vallis. Originates from chaotic terrain in the highlands. Contains streamlined islands and flood-carved terraces recording catastrophic water release.",
+      "key_findings": [
+        "Sourced from collapse of chaotic terrain, indicating subsurface water release (Carr 1996)",
+        "Streamlined islands indicate high-velocity flood flow",
+        "Multiple flood episodes carved nested channel terraces"
+      ],
+      "relevant_minerals": ["basalt", "dust", "iron oxides"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Channel floor areas may be accessible but flood-carved terrain creates hazards. Lower scientific priority than other sites.",
+      "references": ["Carr+1996"]
+    },
+    "simud_vallis": {
+      "display_name": "Simud Vallis",
+      "science_context": "Outflow channel parallel to Tiu Vallis, also draining into Chryse Planitia from chaotic terrain sources. Part of the circum-Chryse outflow channel system that collectively represents the largest flood events known in the solar system.",
+      "key_findings": [
+        "Part of the circum-Chryse outflow system — collectively the largest flood channels on Mars",
+        "Chaotic terrain source regions suggest catastrophic aquifer drainage",
+        "Channel morphology similar to Tiu and Ares Valles"
+      ],
+      "relevant_minerals": ["basalt", "dust", "iron oxides"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Similar constraints to other outflow channels — rough terrain but low elevation aids EDL.",
+      "references": ["Carr+1996", "Baker+1982"]
+    },
+    "maja_vallis": {
+      "display_name": "Maja Vallis",
+      "science_context": "Outflow channel originating from Juventae Chasma and flowing north toward Chryse Planitia. The channel records catastrophic flooding from the collapse and drainage of the Juventae Chasma depression.",
+      "key_findings": [
+        "Sourced from Juventae Chasma, linking canyon formation to outflow events (Catling & Moore 2003)",
+        "Channel narrows and deepens downstream, indicating focused flow",
+        "Terminal deposits spread across western Chryse Planitia"
+      ],
+      "relevant_minerals": ["basalt", "sulfates (at source)", "dust"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Flood-carved terrain with variable roughness. Source region (Juventae) has higher scientific interest than the channel itself.",
+      "references": ["Catling+2003"]
+    },
+    "mangala_vallis": {
+      "display_name": "Mangala Vallis",
+      "science_context": "Long outflow channel system (~900 km) originating from a graben in southern Tharsis and flowing southwest. One of the younger outflow channels on Mars, with flood events dating to the Amazonian period. Demonstrates that catastrophic flooding occurred relatively recently in Mars history.",
+      "key_findings": [
+        "Young Amazonian-age flooding events, among the most recent outflows on Mars (Tanaka 1986)",
+        "Sourced from graben, suggesting tectonic triggering of subsurface water release",
+        "Flow features include streamlined islands and scour marks"
+      ],
+      "relevant_minerals": ["basalt", "dust"],
+      "ice_confidence": "none",
+      "landing_site_suitability": "Southern location and rough flood terrain limit appeal. Scientific interest for understanding recent water activity on Mars.",
+      "references": ["Tanaka+1986"]
+    },
+    "medusae_fossae": {
+      "display_name": "Medusae Fossae",
+      "science_context": "Enigmatic deposit of easily eroded material extending >5000 km along the Mars equator. The formation is hundreds of meters thick and extremely radar-transparent. Its origin remains debated — leading hypotheses include volcanic ignimbrite (pyroclastic flow deposits) or ice-dust mixtures.",
+      "key_findings": [
+        "MARSIS and SHARAD show extremely low radar reflectivity, consistent with low-density material (Watters et al. 2007)",
+        "Formation volume comparable to the polar layered deposits (Bradley et al. 2002)",
+        "Leading origin hypotheses: ignimbrite from Tharsis/Elysium volcanism or aeolian loess deposit (Mandt et al. 2008)",
+        "Yardang-rich terrain indicates intense aeolian erosion"
+      ],
+      "relevant_minerals": ["volcanic ash/pumice", "dust", "possible ice"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Very soft, easily eroded surface may not support lander/rover weight. Not recommended for landing despite low elevation.",
+      "references": ["Watters+2007", "Bradley+2002", "Mandt+2008"]
+    },
+    "cerberus_fossae": {
+      "display_name": "Cerberus Fossae",
+      "science_context": "System of young volcanic fissures southeast of Elysium Mons, source of some of the youngest lava flows on Mars (<10 Ma, possibly <2 Ma). Also the source of many marsquakes detected by InSight. Represents the most recently active volcanic region on Mars.",
+      "key_findings": [
+        "Youngest confirmed volcanic surfaces on Mars, possibly <2 Ma (Vaucher et al. 2009)",
+        "Source of marsquakes detected by InSight seismometer (Banerdt et al. 2020)",
+        "Fissure-fed flood lavas covering >100,000 km² (Plescia 2003)",
+        "Possible recent aqueous flooding from subsurface aquifer breach (Burr et al. 2002)"
+      ],
+      "relevant_minerals": ["basalt", "olivine", "pyroxene"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Flat young lava plains are landable but fissures create local hazards. High scientific interest for understanding Mars' volcanic and seismic activity.",
+      "references": ["Vaucher+2009", "Banerdt+2020", "Plescia+2003", "Burr+2002"]
+    },
+    "olympus_aureole": {
+      "display_name": "Olympus Mons Aureole",
+      "science_context": "Massive lobes of chaotic, blocky terrain extending up to 1000 km from the base of Olympus Mons. Interpreted as enormous landslide deposits from the gravitational collapse of the volcano's flanks. Represents some of the largest mass movements in the solar system.",
+      "key_findings": [
+        "Landslide deposits extend >750 km from Olympus Mons base (Francis & Wadge 1983)",
+        "Volume of individual lobes exceeds any terrestrial landslide by orders of magnitude",
+        "May have been facilitated by weak basal clay layers or ground ice (McGovern et al. 2004)"
+      ],
+      "relevant_minerals": ["basalt", "volcanic debris", "dust"],
+      "ice_confidence": "low",
+      "landing_site_suitability": "Extremely rough, blocky terrain from landslide deposits. Not suitable for landing.",
+      "references": ["Francis+1983", "McGovern+2004"]
+    }
+  },
+
+  "instruments": {
+    "CRISM": {
+      "full_name": "Compact Reconnaissance Imaging Spectrometer for Mars",
+      "spacecraft": "MRO",
+      "key_bands": {
+        "1.0um": "Ferrous iron (Fe²⁺) in olivine/pyroxene crystal field absorption",
+        "1.5um": "Water ice absorption — broad feature diagnostic of H₂O ice",
+        "1.9um": "Bound water / hydrated minerals — strong absorption from H-O-H bending + stretching",
+        "2.1um": "Al-OH stretch in Al-phyllosilicates (montmorillonite, kaolinite)",
+        "2.2um": "Al-OH in kaolinite, Al-smectites — key indicator for Al-phyllosilicates",
+        "2.3um": "Fe/Mg-OH in Fe/Mg-phyllosilicates (nontronite, saponite, chlorite)",
+        "2.4um": "Combination band for Mg-OH in serpentine, chlorite",
+        "2.5um": "Carbonate overtone — CO₃ in magnesite, siderite, calcite",
+        "3.0um": "Fundamental O-H stretch — adsorbed and structural water",
+        "3.4um": "CO₂ ice absorption — diagnostic of carbon dioxide frost"
+      },
+      "interpretation_notes": "CRISM acquires hyperspectral data from 0.36-3.92 um in 544 channels. Band depth ratios (e.g., BD1900, BD2300) are used to map mineral abundance. Summary parameters (OLINDEX, LCPINDEX, D2300, etc.) provide quick mineral screening. MTRDR (Map-projected Targeted Reduced Data Record) is the standard analysis product.",
+      "ice_relevant_signatures": "Water ice shows broad absorptions at 1.5 um and 2.0 um. Band depth at 1.5 um (BD1500) > 0.02 is significant. CO₂ ice has a distinctive 3.4 um absorption. Hydrated sulfates (BD1900 > 0.03) may indicate past water-ice interaction.",
+      "common_minerals": ["pyroxene (HCP/LCP)", "olivine", "plagioclase", "phyllosilicates (Fe/Mg smectites)", "Al-phyllosilicates", "sulfates (kieserite, gypsum)", "carbonates", "hematite", "opaline silica", "serpentine", "chlorite", "prehnite"],
+      "limitations": "Atmospheric CO₂ bands contaminate 2.0 um region. Dust cover attenuates spectral features. CRISM has been in reduced operations mode since 2017 with only one functional cryocooler."
+    },
+    "HIRISE": {
+      "full_name": "High Resolution Imaging Science Experiment",
+      "spacecraft": "MRO",
+      "resolution": "25-50 cm/pixel (highest resolution orbital camera at Mars), swath width ~6 km, 3 color bands (RED, BG, NIR)",
+      "interpretation_notes": "HiRISE provides the most detailed orbital views of the Mars surface, resolving individual boulders and dune ripples. Stereo pairs enable Digital Terrain Model (DTM) generation at 1-2 m/post. Color information from BG-RED-NIR helps distinguish rock types and surface coatings.",
+      "ice_relevant_features": "Fresh impact craters exposing subsurface ice (bright material that fades over weeks-months). Recurring slope lineae (RSL) — seasonal dark streaks on warm slopes. Polygonal terrain (thermal contraction cracks in ice-rich ground). Scalloped depressions (sublimation of ground ice). Expanded craters with terraced interiors (ice-cemented regolith).",
+      "limitations": "Limited spatial coverage (~3% of Mars imaged at full resolution). Each image covers only ~6x12 km. Requires specific targeting — not a global survey instrument."
+    },
+    "SHARAD": {
+      "full_name": "SHAllow RADar sounder",
+      "spacecraft": "MRO",
+      "frequency": "15-25 MHz (center frequency 20 MHz), bandwidth 10 MHz",
+      "penetration_depth": "Up to ~1 km in ice, ~100-300m in dry regolith. Depth resolution ~15m in free space (~10m in ice).",
+      "interpretation_notes": "SHARAD transmits radar pulses and records reflections from subsurface dielectric boundaries. Strong reflectors indicate transitions between materials with different dielectric constants (e.g., regolith to ice, ice to rock). Time delay between surface and subsurface returns indicates depth. Signal attenuation with depth provides information about material properties.",
+      "ice_detection_method": "Subsurface ice produces a strong radar reflector at the ice-regolith or ice-bedrock boundary due to the large dielectric contrast (ice ε~3.1 vs. rock ε~6-9). Clean ice is nearly radar-transparent, so thick ice deposits show delayed subsurface reflectors with minimal signal loss. The real part of the dielectric constant inferred from time delays can confirm ice composition.",
+      "clutter_notes": "Surface clutter from off-nadir topographic features (hills, crater rims) can mimic subsurface returns. Clutter simulations using MOLA topography are essential for distinguishing real subsurface reflections from surface artifacts. Nadir-side-lobe reflections from rough surfaces also create false subsurface signals.",
+      "limitations": "Cannot detect thin ice layers (<15m). Surface clutter is a major challenge in rough terrain. Cannot penetrate electrically conductive materials (wet clay, briny ground). MARSIS (Mars Express) operates at lower frequency (1.3-5.5 MHz) and penetrates deeper but with coarser resolution."
+    },
+    "CTX": {
+      "full_name": "Context Camera",
+      "spacecraft": "MRO",
+      "resolution": "~6 m/pixel, swath width ~30 km, grayscale (single broadband visible channel ~500-800 nm)",
+      "interpretation_notes": "CTX provides the primary context imaging for HiRISE and CRISM targets. It has imaged >99% of Mars at ~6 m/pixel, making it the most complete high-resolution global dataset. CTX images are the standard base map for geological mapping and landing site characterization. Stereo CTX pairs can generate DTMs at ~20 m/post.",
+      "limitations": "Grayscale only — no color or spectral information. Resolution sufficient for landform mapping but cannot resolve small features visible in HiRISE. Some coverage gaps remain near the poles."
+    },
+    "HIRISE_DTM": {
+      "full_name": "HiRISE Digital Terrain Model",
+      "spacecraft": "MRO",
+      "resolution": "1-2 m horizontal posting (grid spacing), vertical precision ~0.25-1 m depending on stereo geometry and terrain",
+      "interpretation_notes": "DTMs are generated from HiRISE stereo image pairs using photogrammetric processing (ISIS + Socet Set / Ames Stereo Pipeline). They provide the highest-resolution topographic data available for Mars, enabling slope analysis, volume calculations, and 3D visualization. Each DTM covers the overlapping area of two HiRISE images (~5x10 km typical).",
+      "slope_analysis_notes": "DTM-derived slopes at 1-2 m baseline are critical for landing site safety assessment. NASA typically requires <15° slopes for safe landing. Rock abundance can be estimated from slope statistics at HiRISE scale. Slopes are also used to model solar illumination and thermal environments for surface operations planning.",
+      "limitations": "Limited spatial coverage — only available where stereo HiRISE pairs have been acquired and processed (~5000 DTMs as of 2024). Processing is computationally expensive. Artifacts can occur in areas of poor texture or steep shadows."
+    }
+  },
+
+  "general_knowledge": {
+    "shallow_ice": {
+      "description": "Mars has extensive deposits of near-surface water ice in the mid-to-high latitudes of both hemispheres. This ice exists as pore-filling ice in regolith, massive ice lenses, and buried glacial deposits. It is thermodynamically stable under current conditions poleward of ~40-50° latitude but is also found at lower latitudes as metastable relict deposits protected by lag covers.",
+      "latitude_dependence": "Ice stability increases with latitude. Poleward of ~60°, ice is stable within centimeters of the surface. Between 40-60°, ice is stable at depths of 0.1-1m. At 30-40°, relict ice may persist at >1m depth under protective lag deposits. Equatorward of 30°, surface/near-surface ice is generally unstable under current orbital conditions.",
+      "depth_range": "Ranges from <5 cm at high latitudes (>65°) to several meters at mid-latitudes (~40-50°). Massive ice deposits detected by SHARAD can extend to 100+ meters depth. Fresh impact craters have exposed clean ice at depths of 0.1-1m at latitudes as low as ~39°N.",
+      "detection_methods": ["SHARAD/MARSIS radar sounding (detects ice-regolith boundaries at depth)", "Neutron spectroscopy (GRS/MONS — measures hydrogen abundance in upper ~1m)", "Fresh impact crater exposure (HiRISE observes bright ice excavated by new impacts)", "Geomorphology (polygonal terrain, scalloped depressions, lobate debris aprons)", "Thermal inertia measurements (ice-cemented ground has higher thermal inertia)"],
+      "key_references": ["Dundas+2018", "Bramson+2015", "Feldman+2004", "Byrne+2009", "Stuurman+2016", "Mellon+2009"]
+    },
+    "landing_constraints": {
+      "latitude": "Human missions prefer latitudes between 0-30°N for year-round solar power and moderate thermal environment. Robotic missions can operate at higher latitudes (Phoenix landed at 68°N). Southern hemisphere generally harder due to higher elevations and shorter favorable weather windows.",
+      "elevation": "Landing sites must be below ~+2 km MOLA datum (ideally below 0 km) to provide sufficient atmospheric density for EDL (entry, descent, landing). Lower elevation means thicker atmosphere for parachute deceleration. Hellas Basin floor (-8 km) has the highest surface atmospheric pressure.",
+      "slope": "Surface slopes must be <15° at the landing footprint scale for safe touchdown. Regional slopes <5° preferred. HiRISE DTM-derived slope maps at 1-2 m baseline are the standard for slope safety assessment.",
+      "rock_abundance": "Rock abundance should be <15-20% at sizes >0.3m for safe landing. Rock abundance can be estimated from thermal inertia data (TES/THEMIS) and HiRISE imaging. Higher rock abundance risks damaging landing gear or tipping the lander.",
+      "dust_coverage": "Moderate dust coverage is acceptable but thick dust deposits (>1m) are hazardous due to uncertain bearing strength. Dust devil activity can clean solar panels (positive) but also reduce visibility. Regions with high albedo generally have more dust coverage."
+    },
+    "mineral_signatures": {
+      "phyllosilicates": "Clay minerals (smectites, chlorite, kaolinite, serpentine) formed by water-rock interaction, primarily during the Noachian period. Their presence indicates sustained liquid water at neutral-to-alkaline pH. They are the most widespread evidence for past habitable conditions on Mars and can preserve organic molecules.",
+      "sulfates": "Sulfate minerals (gypsum, kieserite, jarosite, polyhydrated sulfates) indicate evaporitic environments with acid-sulfate water chemistry. Found extensively in Valles Marineris and Meridiani Planum. The phyllosilicate-to-sulfate transition in the stratigraphic record may reflect a global climate shift from wetter/neutral to drier/acidic conditions.",
+      "carbonates": "Relatively rare on Mars despite abundant atmospheric CO₂. Best exposures at Nili Fossae (magnesite, siderite). Their scarcity may indicate that Mars' surface water was generally too acidic for carbonate precipitation, or that carbonates formed but were subsequently dissolved. Small amounts found by rovers in dust and soil.",
+      "olivine": "Common primary igneous mineral in Martian basalts. Easily weathers in the presence of water, so its preservation indicates limited aqueous alteration. Large olivine exposures (e.g., Nili Fossae, Gusev Crater) suggest surfaces that have been relatively dry since emplacement.",
+      "hematite": "Crystalline hematite (gray hematite) detected at Meridiani Planum and other sites. Can form through aqueous alteration of iron-bearing minerals. At Meridiani, hematite occurs as concretions ('blueberries') precipitated from groundwater flowing through sulfate sandstones.",
+      "perchlorate": "Discovered by Phoenix lander (0.4-0.6 wt%) and confirmed by Curiosity. Perchlorates are strong oxidizers that lower the freezing point of water significantly (to ~-70°C for Mg-perchlorate brines). Relevant for ISRU as a potential oxidizer, but also a health hazard for human missions requiring soil remediation."
+    },
+    "water_history": {
+      "noachian": "Noachian period (~4.1-3.7 Ga) was the wettest era on Mars with extensive valley network formation, lake formation, and widespread phyllosilicate mineral production. Climate may have been warm enough for episodic rainfall or supported by impact-generated transient warming. The most habitable period in Mars' history.",
+      "hesperian": "Hesperian period (~3.7-3.0 Ga) marked the transition from wet to dry conditions. Catastrophic outflow channels formed from groundwater release, sulfate deposits replaced phyllosilicates as the dominant alteration product, and volcanic activity (Tharsis) released significant volatiles. Water activity became increasingly episodic and localized.",
+      "amazonian": "Amazonian period (~3.0 Ga to present) is characterized by cold, dry conditions similar to today. Water activity limited to transient brines, seasonal frost cycles, and slow ice sublimation/deposition. Glacial activity at mid-latitudes during high-obliquity periods deposited ice now preserved as lobate debris aprons and buried glaciers."
+    },
+    "isru_relevance": {
+      "water_ice": "Subsurface water ice is the primary ISRU target for future human Mars missions. Water can be extracted by heating regolith or mining ice deposits, then used for drinking water, crop irrigation, and split into H₂ (fuel) and O₂ (propellant/breathing) via electrolysis. Accessible ice at <1-2m depth in mid-latitudes (35-55°N) is the sweet spot balancing ice accessibility with solar power availability.",
+      "co2": "The 95% CO₂ atmosphere can be collected and processed via the Sabatier reaction (CO₂ + 4H₂ → CH₄ + 2H₂O) to produce methane fuel and water, or via solid oxide electrolysis (MOXIE demonstrated this on Perseverance) to produce O₂. CO₂ is the most readily available resource on Mars.",
+      "regolith": "Martian regolith can potentially be used for construction (sintered bricks, 3D-printed structures), radiation shielding (piled over habitats), and agriculture (with soil amendment to remove perchlorates and add nutrients). Iron-rich regolith could be processed for metal extraction. Basaltic regolith composition is relatively uniform globally."
+    }
+  }
+}

@@ -1,0 +1,136 @@
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr05xxx/rdr0577801/r_0577801_001_ss19_700_a.dat
+  out=r_0577801_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr05xxx/rdr0577801/r_0577801_001_ss19_700_a.lbl
+  out=r_0577801_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr66xxx/rdr6646203/r_6646203_001_ss4_700_a.lbl
+  out=r_6646203_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr67xxx/rdr6711902/r_6711902_001_ss4_700_a.lbl
+  out=r_6711902_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr40xxx/rdr4018103/r_4018103_001_ss19_700_a.dat
+  out=r_4018103_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr40xxx/rdr4018103/r_4018103_001_ss19_700_a.lbl
+  out=r_4018103_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr66xxx/rdr6654102/r_6654102_001_ss4_700_a.lbl
+  out=r_6654102_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr57xxx/rdr5712501/r_5712501_001_ss19_700_a.dat
+  out=r_5712501_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr57xxx/rdr5712501/r_5712501_001_ss19_700_a.lbl
+  out=r_5712501_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr65xxx/rdr6524202/r_6524202_001_ss4_700_a.dat
+  out=r_6524202_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr65xxx/rdr6524202/r_6524202_001_ss4_700_a.lbl
+  out=r_6524202_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1002/data/rdr22xxx/rdr2252401/r_2252401_001_ss04_700_a.dat
+  out=r_2252401_001_ss04_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1002/data/rdr22xxx/rdr2252401/r_2252401_001_ss04_700_a.lbl
+  out=r_2252401_001_ss04_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr07xxx/rdr0709601/r_0709601_001_ss19_700_a.dat
+  out=r_0709601_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr07xxx/rdr0709601/r_0709601_001_ss19_700_a.lbl
+  out=r_0709601_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr39xxx/rdr3908602/r_3908602_001_ss19_700_a.lbl
+  out=r_3908602_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr78xxx/rdr7860201/r_7860201_001_ss4_700_a.dat
+  out=r_7860201_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr78xxx/rdr7860201/r_7860201_001_ss4_700_a.lbl
+  out=r_7860201_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr84xxx/rdr8496501/r_8496501_001_ss4_700_a.dat
+  out=r_8496501_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr84xxx/rdr8496501/r_8496501_001_ss4_700_a.lbl
+  out=r_8496501_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr06xxx/rdr0684602/r_0684602_001_ss19_700_a.dat
+  out=r_0684602_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr06xxx/rdr0684602/r_0684602_001_ss19_700_a.lbl
+  out=r_0684602_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr66xxx/rdr6629003/r_6629003_001_ss4_700_a.dat
+  out=r_6629003_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr66xxx/rdr6629003/r_6629003_001_ss4_700_a.lbl
+  out=r_6629003_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr61xxx/rdr6170101/r_6170101_001_ss4_700_a.dat
+  out=r_6170101_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr61xxx/rdr6170101/r_6170101_001_ss4_700_a.lbl
+  out=r_6170101_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr48xxx/rdr4893602/r_4893602_001_ss19_700_a.lbl
+  out=r_4893602_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr74xxx/rdr7490301/r_7490301_001_ss4_700_a.dat
+  out=r_7490301_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr74xxx/rdr7490301/r_7490301_001_ss4_700_a.lbl
+  out=r_7490301_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr12xxx/rdr1297701/r_1297701_001_ss19_700_a.lbl
+  out=r_1297701_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr67xxx/rdr6777202/r_6777202_001_ss4_700_a.lbl
+  out=r_6777202_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr65xxx/rdr6553202/r_6553202_001_ss4_700_a.lbl
+  out=r_6553202_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr56xxx/rdr5677601/r_5677601_001_ss19_700_a.dat
+  out=r_5677601_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr56xxx/rdr5677601/r_5677601_001_ss19_700_a.lbl
+  out=r_5677601_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr58xxx/rdr5867501/r_5867501_001_ss19_700_a.lbl
+  out=r_5867501_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr39xxx/rdr3913901/r_3913901_001_ss19_700_a.dat
+  out=r_3913901_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr39xxx/rdr3913901/r_3913901_001_ss19_700_a.lbl
+  out=r_3913901_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1002/data/rdr23xxx/rdr2336801/r_2336801_001_ss04_700_a.dat
+  out=r_2336801_001_ss04_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1002/data/rdr23xxx/rdr2336801/r_2336801_001_ss04_700_a.lbl
+  out=r_2336801_001_ss04_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr67xxx/rdr6744603/r_6744603_001_ss4_700_a.dat
+  out=r_6744603_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr67xxx/rdr6744603/r_6744603_001_ss4_700_a.lbl
+  out=r_6744603_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr86xxx/rdr8675101/r_8675101_001_ss4_700_a.lbl
+  out=r_8675101_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1002/data/rdr24xxx/rdr2466401/r_2466401_001_ss04_700_a.lbl
+  out=r_2466401_001_ss04_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr39xxx/rdr3985901/r_3985901_001_ss19_700_a.lbl
+  out=r_3985901_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr83xxx/rdr8343501/r_8343501_001_ss4_700_a.dat
+  out=r_8343501_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr83xxx/rdr8343501/r_8343501_001_ss4_700_a.lbl
+  out=r_8343501_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr71xxx/rdr7151501/r_7151501_001_ss4_700_a.dat
+  out=r_7151501_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr71xxx/rdr7151501/r_7151501_001_ss4_700_a.lbl
+  out=r_7151501_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr06xxx/rdr0614702/r_0614702_001_ss19_700_a.dat
+  out=r_0614702_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr06xxx/rdr0614702/r_0614702_001_ss19_700_a.lbl
+  out=r_0614702_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr66xxx/rdr6657401/r_6657401_001_ss4_700_a.dat
+  out=r_6657401_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr66xxx/rdr6657401/r_6657401_001_ss4_700_a.lbl
+  out=r_6657401_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr65xxx/rdr6523601/r_6523601_001_ss4_700_a.lbl
+  out=r_6523601_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr06xxx/rdr0650301/r_0650301_001_ss19_700_a.lbl
+  out=r_0650301_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr40xxx/rdr4043102/r_4043102_001_ss19_700_a.dat
+  out=r_4043102_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr40xxx/rdr4043102/r_4043102_001_ss19_700_a.lbl
+  out=r_4043102_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr39xxx/rdr3940302/r_3940302_001_ss19_700_a.dat
+  out=r_3940302_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr39xxx/rdr3940302/r_3940302_001_ss19_700_a.lbl
+  out=r_3940302_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr75xxx/rdr7590502/r_7590502_001_ss4_700_a.dat
+  out=r_7590502_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr75xxx/rdr7590502/r_7590502_001_ss4_700_a.lbl
+  out=r_7590502_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr69xxx/rdr6995301/r_6995301_001_ss4_700_a.dat
+  out=r_6995301_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr69xxx/rdr6995301/r_6995301_001_ss4_700_a.lbl
+  out=r_6995301_001_ss4_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr07xxx/rdr0780801/r_0780801_001_ss19_700_a.dat
+  out=r_0780801_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr07xxx/rdr0780801/r_0780801_001_ss19_700_a.lbl
+  out=r_0780801_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr39xxx/rdr3933702/r_3933702_001_ss19_700_a.dat
+  out=r_3933702_001_ss19_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr39xxx/rdr3933702/r_3933702_001_ss19_700_a.lbl
+  out=r_3933702_001_ss19_700_a.lbl
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr66xxx/rdr6647503/r_6647503_001_ss4_700_a.dat
+  out=r_6647503_001_ss4_700_a.dat
+https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1004/data/rdr66xxx/rdr6647503/r_6647503_001_ss4_700_a.lbl
+  out=r_6647503_001_ss4_700_a.lbl

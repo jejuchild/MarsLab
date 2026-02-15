@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 
 /* =========================================================
@@ -24,10 +24,19 @@ export interface SearchableItem {
   title?: string;
 }
 
+type SearchMode = "product" | "coordinates" | "region" | "text";
+
 interface TopBarProps {
   onSearch?: (query: string) => void;
   onSelectResult?: (productId: string, instrument?: string, lat?: number | null, lon?: number | null) => void;
   searchableItems?: SearchableItem[];
+  isMobile?: boolean;
+  onEasterEgg?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  lastActionDescription?: string;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 /* =========================================================
@@ -43,11 +52,79 @@ const INSTRUMENT_COLORS: Record<string, string> = {
 };
 
 /* =========================================================
+ * Search mode detection
+ * =======================================================*/
+function detectSearchMode(query: string): SearchMode {
+  const trimmed = query.trim();
+
+  // Coordinates: "lat, lon" pattern (e.g., "-18.4, 77.5" or "18.4 77.5")
+  if (/^-?\d+\.?\d*\s*[,\s]\s*-?\d+\.?\d*$/.test(trimmed)) {
+    return "coordinates";
+  }
+
+  // Product ID patterns
+  const productPatterns = [
+    /^(frt|hrl|hrs|frs|att|atr)/i,           // CRISM
+    /^(esp|psp|tra)_\d/i,                       // HiRISE
+    /^(dteec|dteed)/i,                          // HiRISE DTM
+    /^s_\d/i,                                    // SHARAD
+    /^(b|p|d|g|j|k|n|t)\d{4}_\d/i,             // CTX
+  ];
+  if (productPatterns.some(p => p.test(trimmed))) {
+    return "product";
+  }
+
+  // Known region names (simple check for common Mars locations)
+  const regions = [
+    "jezero", "gale", "olympus", "valles", "hellas", "argyre", "syrtis",
+    "utopia", "isidis", "arcadia", "amazonis", "elysium", "tharsis",
+    "chryse", "acidalia", "arabia", "terra", "planitia", "mons"
+  ];
+  if (regions.some(r => trimmed.toLowerCase().includes(r))) {
+    return "region";
+  }
+
+  return "text";
+}
+
+/* =========================================================
+ * Coordinate parsing
+ * =======================================================*/
+function parseCoordinates(query: string): { lat: number; lon: number } | null {
+  const match = query.trim().match(/^(-?\d+\.?\d*)\s*[,\s]\s*(-?\d+\.?\d*)$/);
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lon = parseFloat(match[2]);
+    if (lat >= -90 && lat <= 90 && lon >= -360 && lon <= 360) {
+      return { lat, lon };
+    }
+  }
+  return null;
+}
+
+/* =========================================================
+ * Search mode badge config
+ * =======================================================*/
+const MODE_BADGE: Record<SearchMode, { label: string; color: string }> = {
+  product:     { label: "ID",     color: "text-cyan-400 bg-cyan-500/20 border-cyan-500/30" },
+  coordinates: { label: "XY",     color: "text-emerald-400 bg-emerald-500/20 border-emerald-500/30" },
+  region:      { label: "Region", color: "text-amber-400 bg-amber-500/20 border-amber-500/30" },
+  text:        { label: "Search", color: "text-slate-400 bg-slate-500/20 border-slate-500/30" },
+};
+
+/* =========================================================
  * TopBar Component
  * =======================================================*/
 export default function TopBar({
   onSearch,
   onSelectResult,
+  isMobile = false,
+  onEasterEgg,
+  canUndo = false,
+  canRedo = false,
+  lastActionDescription,
+  onUndo,
+  onRedo,
 }: TopBarProps) {
   const [query, setQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -55,11 +132,18 @@ export default function TopBar({
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [totalProducts, setTotalProducts] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Detect search mode from query
+  const searchMode = useMemo<SearchMode>(() => {
+    if (!query.trim()) return "text";
+    return detectSearchMode(query);
+  }, [query]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -115,12 +199,29 @@ export default function TopBar({
   }, []);
 
   const handleInputChange = (value: string) => {
+    // Easter egg: typing "game" triggers the space shooter
+    if (value.trim().toLowerCase() === "game" && onEasterEgg) {
+      setQuery("");
+      setResults([]);
+      setShowDropdown(false);
+      onEasterEgg();
+      return;
+    }
+
     setQuery(value);
     setShowDropdown(value.trim().length > 0);
 
-    // Debounce the search
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => doSearch(value), 200);
+    // Only do backend search for non-coordinate modes
+    const mode = detectSearchMode(value);
+    if (mode !== "coordinates") {
+      // Debounce the search
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => doSearch(value), 200);
+    } else {
+      // Clear results for coordinate mode
+      setResults([]);
+      setSearching(false);
+    }
   };
 
   const handleSelect = (item: SearchResultItem) => {
@@ -130,6 +231,22 @@ export default function TopBar({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle coordinates mode: Enter flies to coordinates
+    if (searchMode === "coordinates" && e.key === "Enter") {
+      e.preventDefault();
+      const coords = parseCoordinates(query);
+      if (coords) {
+        setShowDropdown(false);
+        onSelectResult?.(
+          `${coords.lat.toFixed(4)}, ${coords.lon.toFixed(4)}`,
+          "REGION",
+          coords.lat,
+          coords.lon,
+        );
+      }
+      return;
+    }
+
     if (!showDropdown || results.length === 0) {
       if (e.key === "Enter" && onSearch) {
         onSearch(query);
@@ -174,6 +291,237 @@ export default function TopBar({
     );
   };
 
+  // Mode badge component
+  const badge = query.trim() ? MODE_BADGE[searchMode] : null;
+
+  /* -- Search bar (shared between desktop and mobile menu) -- */
+  const searchBar = (
+    <div className={`relative ${isMobile ? "w-full" : "w-full max-w-xl"}`}>
+      <div className="flex h-9 w-full items-stretch rounded-lg bg-surface-dark">
+        <div className="flex items-center justify-center pl-3 text-slate-400">
+          {searching ? (
+            <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+          ) : (
+            <span className="material-symbols-outlined text-[20px]">search</span>
+          )}
+        </div>
+        {/* Mode badge */}
+        {badge && (
+          <div className="flex items-center pl-2">
+            <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${badge.color}`}>
+              {badge.label}
+            </span>
+          </div>
+        )}
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => handleInputChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => query.trim() && setShowDropdown(true)}
+          className="w-full border-none bg-transparent px-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-0"
+          placeholder="Search product IDs, coordinates, regions..."
+        />
+        {query && (
+          <button
+            onClick={() => {
+              setQuery("");
+              setResults([]);
+              setShowDropdown(false);
+              inputRef.current?.focus();
+            }}
+            className="flex items-center justify-center pr-3 text-slate-400 hover:text-white"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        )}
+      </div>
+
+      {/* Coordinates hint */}
+      {showDropdown && searchMode === "coordinates" && (
+        <div
+          ref={dropdownRef}
+          className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border border-border-dark bg-surface-dark p-3 shadow-xl"
+        >
+          <div className="flex items-center gap-2 text-emerald-400">
+            <span className="material-symbols-outlined text-base">my_location</span>
+            <span className="text-sm">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-bold">Enter</kbd> to fly to these coordinates
+            </span>
+          </div>
+          {(() => {
+            const coords = parseCoordinates(query);
+            if (coords) {
+              return (
+                <p className="mt-1.5 text-[11px] text-slate-400 font-mono pl-6">
+                  {coords.lat.toFixed(4)}° lat, {coords.lon.toFixed(4)}° lon
+                </p>
+              );
+            }
+            return null;
+          })()}
+        </div>
+      )}
+
+      {/* Search Results Dropdown */}
+      {showDropdown && searchMode !== "coordinates" && results.length > 0 && (
+        <div
+          ref={dropdownRef}
+          className="absolute top-full left-0 right-0 z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-border-dark bg-surface-dark shadow-xl"
+        >
+          <div className="px-3 py-1.5 border-b border-border-dark/50 flex justify-between">
+            <span className="text-[10px] text-slate-500">
+              {results.length} result{results.length !== 1 ? "s" : ""}
+            </span>
+            {totalProducts && (
+              <span className="text-[10px] text-slate-600">
+                {totalProducts.toLocaleString()} products in database
+              </span>
+            )}
+          </div>
+
+          <div className="p-1">
+            {results.map((item, index) => {
+              const colorClass = INSTRUMENT_COLORS[item.instrument] || "text-slate-400 bg-slate-500/20 border-slate-500/30";
+              return (
+                <button
+                  key={`${item.instrument}-${item.product_id}`}
+                  onClick={() => { handleSelect(item); setMobileMenuOpen(false); }}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors ${
+                    index === selectedIndex
+                      ? "bg-primary/20 text-white"
+                      : "text-slate-300 hover:bg-white/5"
+                  }`}
+                >
+                  <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${colorClass}`}>
+                    {item.instrument}
+                  </span>
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="font-mono text-sm truncate">
+                      {highlightMatch(item.product_id, query)}
+                    </span>
+                    {item.title && (
+                      <span className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {item.title}
+                      </span>
+                    )}
+                  </div>
+                  {item.lat != null && item.lon != null && (
+                    <span className="text-[9px] text-slate-600 font-mono shrink-0">
+                      {item.lat.toFixed(1)}°, {item.lon.toFixed(1)}°
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {showDropdown && searchMode !== "coordinates" && query.trim().length >= 2 && !searching && results.length === 0 && (
+        <div
+          ref={dropdownRef}
+          className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border border-border-dark bg-surface-dark p-4 text-center shadow-xl"
+        >
+          <span className="text-sm text-slate-400">No products found for &ldquo;{query}&rdquo;</span>
+        </div>
+      )}
+    </div>
+  );
+
+  /* -- Undo/Redo buttons -- */
+  const undoRedoButtons = (
+    <div className="flex items-center gap-0.5 ml-2">
+      <button
+        onClick={onUndo}
+        disabled={!canUndo}
+        className={`p-1.5 rounded transition-colors ${canUndo ? 'text-[#92a4c9] hover:text-white hover:bg-[#232f48]' : 'text-[#3a4a68] cursor-not-allowed'}`}
+        title={lastActionDescription ? `Undo: ${lastActionDescription}` : 'Nothing to undo'}
+      >
+        <span className="material-symbols-outlined text-lg">undo</span>
+      </button>
+      <button
+        onClick={onRedo}
+        disabled={!canRedo}
+        className={`p-1.5 rounded transition-colors ${canRedo ? 'text-[#92a4c9] hover:text-white hover:bg-[#232f48]' : 'text-[#3a4a68] cursor-not-allowed'}`}
+        title="Redo"
+      >
+        <span className="material-symbols-outlined text-lg">redo</span>
+      </button>
+    </div>
+  );
+
+  /* -- Mobile header -- */
+  if (isMobile) {
+    return (
+      <>
+        <header className="flex h-12 items-center justify-between border-b border-border-dark bg-bg-dark px-4">
+          {/* Brand */}
+          <Link to="/" className="flex items-center gap-2">
+            <div className="flex size-5 items-center justify-center text-primary">
+              <span className="material-symbols-outlined text-xl">rocket_launch</span>
+            </div>
+            <h1 className="text-lg font-bold tracking-tight">MarsLab</h1>
+          </Link>
+
+          {/* Hamburger */}
+          <button
+            onClick={() => setMobileMenuOpen((p) => !p)}
+            className="flex items-center justify-center w-9 h-9 rounded-lg hover:bg-white/10 text-slate-300"
+          >
+            <span className="material-symbols-outlined text-2xl">
+              {mobileMenuOpen ? "close" : "menu"}
+            </span>
+          </button>
+        </header>
+
+        {/* Mobile slide-down menu */}
+        {mobileMenuOpen && (
+          <div className="absolute top-12 left-0 right-0 z-50 border-b border-border-dark bg-bg-dark p-4 flex flex-col gap-4 shadow-xl">
+            {/* Search */}
+            {searchBar}
+
+            {/* Nav links */}
+            <nav className="flex flex-col gap-2">
+              <Link
+                to="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-white hover:text-primary px-2 py-2 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                Workbench
+              </Link>
+              <Link
+                to="/download"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                Data Download
+              </Link>
+              <Link
+                to="/upload"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                Data Upload
+              </Link>
+              <Link
+                to="/suggestions"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">lightbulb</span>
+                Suggest Feature
+              </Link>
+            </nav>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  /* -- Desktop header -- */
   return (
     <header className="flex h-14 items-center justify-between border-b border-border-dark bg-bg-dark px-6">
       {/* Brand + Navigation */}
@@ -209,113 +557,10 @@ export default function TopBar({
         </nav>
       </div>
 
-      {/* Search */}
+      {/* Search + Undo/Redo */}
       <div className="flex flex-1 items-center justify-center px-10">
-        <div className="relative w-full max-w-xl">
-          <div className="flex h-9 w-full items-stretch rounded-lg bg-surface-dark">
-            <div className="flex items-center justify-center pl-3 text-slate-400">
-              {searching ? (
-                <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
-              ) : (
-                <span className="material-symbols-outlined text-[20px]">search</span>
-              )}
-            </div>
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => query.trim() && setShowDropdown(true)}
-              className="w-full border-none bg-transparent px-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-0"
-              placeholder="Search product IDs across all instruments..."
-            />
-            {query && (
-              <button
-                onClick={() => {
-                  setQuery("");
-                  setResults([]);
-                  setShowDropdown(false);
-                  inputRef.current?.focus();
-                }}
-                className="flex items-center justify-center pr-3 text-slate-400 hover:text-white"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
-          </div>
-
-          {/* Search Results Dropdown */}
-          {showDropdown && results.length > 0 && (
-            <div
-              ref={dropdownRef}
-              className="absolute top-full left-0 right-0 z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-border-dark bg-surface-dark shadow-xl"
-            >
-              {/* Result count header */}
-              <div className="px-3 py-1.5 border-b border-border-dark/50 flex justify-between">
-                <span className="text-[10px] text-slate-500">
-                  {results.length} result{results.length !== 1 ? "s" : ""}
-                </span>
-                {totalProducts && (
-                  <span className="text-[10px] text-slate-600">
-                    {totalProducts.toLocaleString()} products in database
-                  </span>
-                )}
-              </div>
-
-              <div className="p-1">
-                {results.map((item, index) => {
-                  const colorClass = INSTRUMENT_COLORS[item.instrument] || "text-slate-400 bg-slate-500/20 border-slate-500/30";
-                  return (
-                    <button
-                      key={`${item.instrument}-${item.product_id}`}
-                      onClick={() => handleSelect(item)}
-                      onMouseEnter={() => setSelectedIndex(index)}
-                      className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors ${
-                        index === selectedIndex
-                          ? "bg-primary/20 text-white"
-                          : "text-slate-300 hover:bg-white/5"
-                      }`}
-                    >
-                      {/* Instrument badge */}
-                      <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border shrink-0 ${colorClass}`}>
-                        {item.instrument}
-                      </span>
-
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <span className="font-mono text-sm truncate">
-                          {highlightMatch(item.product_id, query)}
-                        </span>
-                        {item.title && (
-                          <span className="text-[11px] text-slate-400 truncate mt-0.5">
-                            {item.title}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Coordinates */}
-                      {item.lat != null && item.lon != null && (
-                        <span className="text-[9px] text-slate-600 font-mono shrink-0">
-                          {item.lat.toFixed(1)}°, {item.lon.toFixed(1)}°
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* No results message */}
-          {showDropdown && query.trim().length >= 2 && !searching && results.length === 0 && (
-            <div
-              ref={dropdownRef}
-              className="absolute top-full left-0 right-0 z-50 mt-1 rounded-lg border border-border-dark bg-surface-dark p-4 text-center shadow-xl"
-            >
-              <span className="text-sm text-slate-400">No products found for "{query}"</span>
-            </div>
-          )}
-        </div>
+        {searchBar}
+        {undoRedoButtons}
       </div>
 
       {/* Suggest Feature */}

@@ -20,6 +20,8 @@ from .ode_client import (
     search_sharad_highres_spatial,
 )
 from .download_manager import check_local_existence_detailed
+import json
+from pathlib import Path
 
 router = APIRouter(prefix="/api/search", tags=["Point Search"])
 
@@ -242,6 +244,7 @@ async def search_by_point(
             "HIRISE": [],
             "SHARAD": [],
             "SHARAD_HIGHRES": [],
+            "HIRISE_DTM": [],
         }
 
         # Helper to calculate distance and add to result
@@ -332,12 +335,57 @@ async def search_by_point(
             except Exception as e:
                 print(f"SHARAD High-Res search error: {e}")
 
+        async def search_hirise_dtm():
+            try:
+                index_path = Path(__file__).parent.parent / "hirise_dtm_data" / "index.geojson"
+                if not index_path.exists():
+                    return
+                with open(index_path) as f:
+                    data = json.load(f)
+                for feature in data.get("features", []):
+                    props = feature.get("properties", {})
+                    pid = props.get("product_id", "")
+                    if not pid:
+                        continue
+                    geom = feature.get("geometry", {})
+                    coords = geom.get("coordinates", [])
+                    if geom.get("type") != "Polygon" or not coords:
+                        continue
+                    ring = coords[0]
+                    clat = sum(c[1] for c in ring) / len(ring)
+                    clon = sum(c[0] for c in ring) / len(ring)
+                    if clat < minlat or clat > maxlat:
+                        continue
+                    if westernlon <= easternlon:
+                        if clon < westernlon or clon > easternlon:
+                            continue
+                    else:
+                        if clon < westernlon and clon > easternlon:
+                            continue
+                    distance_km = round(haversine_distance_km(lat, lon_normalized, clat, clon), 2)
+                    results["HIRISE_DTM"].append({
+                        "product_id": pid,
+                        "instrument": "hirise_dtm",
+                        "lat": clat,
+                        "lon": clon,
+                        "distance_km": distance_km,
+                        "exists": True,
+                        "has_core": True,
+                        "has_browse": True,
+                        "missing_files": [],
+                    })
+                results["HIRISE_DTM"].sort(key=lambda x: x.get("distance_km") or float('inf'))
+                results["HIRISE_DTM"] = results["HIRISE_DTM"][:limit]
+            except Exception as e:
+                print(f"HiRISE DTM search error: {e}")
+
         # Run all searches concurrently
         await asyncio.gather(
             search_crism(),
             search_hirise(),
             search_sharad(),
             search_sharad_highres(),
+            search_hirise_dtm(),
         )
 
         # Count total results

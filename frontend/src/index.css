@@ -62,3 +62,52 @@
     border-radius: 10px;
   }
 }
+
+/* Bottom sheet animations */
+.bottom-sheet-enter {
+  animation: slideUp 0.3s ease-out;
+}
+
+.bottom-sheet-backdrop {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Mobile bottom nav */
+.mobile-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Command Palette animations */
+.animate-slideDown {
+  animation: cmdSlideDown 0.15s ease-out;
+}
+
+.animate-fadeIn {
+  animation: cmdFadeIn 0.15s ease-out;
+}
+
+@keyframes cmdSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes cmdFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

@@ -2,6 +2,8 @@ import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import MainPage from "./pages/MainPage";
+import useServiceWorker from "./hooks/useServiceWorker";
+import OfflineIndicator from "./components/OfflineIndicator";
 
 // Lazy-load secondary pages (not needed on initial load)
 const DataDownloadPage = lazy(() => import("./pages/DataDownloadPage"));
@@ -9,8 +11,16 @@ const DataUploadPage = lazy(() => import("./pages/DataUploadPage"));
 const FeatureSuggestionsPage = lazy(() => import("./pages/FeatureSuggestionsPage"));
 
 export default function App() {
+  const { isOnline, isUpdateAvailable, cacheStats, updateApp } = useServiceWorker();
+
   return (
     <>
+      <OfflineIndicator
+        isOnline={isOnline}
+        isUpdateAvailable={isUpdateAvailable}
+        cacheStats={cacheStats}
+        onUpdate={updateApp}
+      />
       <Toaster
         position="bottom-right"
         toastOptions={{

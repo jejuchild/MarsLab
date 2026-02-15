@@ -8,7 +8,7 @@
  * - Elevation-based coloring
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -312,6 +312,30 @@ export default function Slope3DViewer({ point, onClose }: Slope3DViewerProps) {
   const [showBoundingBox, setShowBoundingBox] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
 
+  // Panel width (resizable)
+  const [panelWidth, setPanelWidth] = useState(384);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      const delta = startX - ev.clientX;
+      const maxW = Math.floor(window.innerWidth * 0.6);
+      setPanelWidth(Math.max(280, Math.min(maxW, startW + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [panelWidth]);
+
   // Fetch DEM data when point or patch size changes
   useEffect(() => {
     let cancelled = false;
@@ -371,7 +395,12 @@ export default function Slope3DViewer({ point, onClose }: Slope3DViewerProps) {
   }, [point.lat, point.lon, patchSizeKm]);
 
   return (
-    <div className="flex flex-col h-full bg-[#0a0f18]">
+    <div className="relative flex flex-col h-full bg-[#0a0f18]" style={{ width: panelWidth }}>
+      {/* Resize handle (left edge) */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-primary/30 active:bg-primary/50 transition-colors"
+        onMouseDown={handleResizeStart}
+      />
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#232f48]">
         <div className="flex items-center gap-2">
