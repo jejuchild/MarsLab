@@ -20,6 +20,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter, grey_closing, label
 
 from .common import (
+    SharedDEMContext,
     compute_slope_map,
     disk_footprint,
     extract_dem_window,
@@ -98,17 +99,13 @@ def _uid() -> str:
 
 
 def _smooth_1d(arr: np.ndarray, window: int = 5) -> np.ndarray:
-    """Moving-average smooth of a 1-D array, ignoring NaNs."""
-    out = np.copy(arr)
-    half = window // 2
-    n = len(arr)
-    for i in range(n):
-        lo = max(0, i - half)
-        hi = min(n, i + half + 1)
-        seg = arr[lo:hi]
-        valid = seg[~np.isnan(seg)]
-        if len(valid) > 0:
-            out[i] = np.mean(valid)
+    """Moving-average smooth of a 1-D array, NaN-aware, vectorized."""
+    valid = np.where(np.isnan(arr), 0.0, arr)
+    counts = np.where(np.isnan(arr), 0.0, 1.0)
+    kernel = np.ones(window)
+    sum_vals = np.convolve(valid, kernel, mode="same")
+    sum_counts = np.convolve(counts, kernel, mode="same")
+    out = np.where(sum_counts > 0, sum_vals / sum_counts, arr)
     return out
 
 
@@ -200,6 +197,9 @@ def _component_properties(
     }
 
 
+_DOWNSAMPLE_THRESHOLD = 40  # Kernels larger than this use 2x downsampled DEM
+
+
 def _depression_depth_map(
     elev_smooth: np.ndarray,
     closing_radii: tuple[int, ...] = _CLOSING_RADII_PX,
@@ -208,12 +208,35 @@ def _depression_depth_map(
 
     For each scale the morphological closing fills depressions up to the
     disk size; the residual (closed - input) gives depression depth.
+
+    For large kernels (radius > 40 px), uses 2x downsampled DEM to reduce
+    computational cost by ~4x, then upsamples the result back.
     """
+    from scipy.ndimage import zoom
+
     depth_max = np.zeros_like(elev_smooth)
     for r_px in closing_radii:
-        footprint = disk_footprint(r_px)
-        closed = grey_closing(elev_smooth, footprint=footprint)
-        residual = closed - elev_smooth
+        if r_px > _DOWNSAMPLE_THRESHOLD:
+            # 2x downsample: halve kernel and array, ~4x fewer operations
+            ds_factor = 2
+            small = zoom(elev_smooth, 1.0 / ds_factor, order=1)
+            small_r = max(1, r_px // ds_factor)
+            footprint = disk_footprint(small_r)
+            closed_small = grey_closing(small, footprint=footprint)
+            residual_small = closed_small - small
+            residual = zoom(residual_small, ds_factor, order=1)
+            # Trim/pad to match original shape
+            residual = residual[:elev_smooth.shape[0], :elev_smooth.shape[1]]
+            if residual.shape != elev_smooth.shape:
+                padded = np.zeros_like(elev_smooth)
+                h = min(residual.shape[0], elev_smooth.shape[0])
+                w = min(residual.shape[1], elev_smooth.shape[1])
+                padded[:h, :w] = residual[:h, :w]
+                residual = padded
+        else:
+            footprint = disk_footprint(r_px)
+            closed = grey_closing(elev_smooth, footprint=footprint)
+            residual = closed - elev_smooth
         depth_max = np.maximum(depth_max, residual)
     return depth_max
 
@@ -350,6 +373,7 @@ def detect_craters_and_volcanics(
     min_diameter_km: float = 5.0,
     min_depth_m: float = 100.0,
     on_progress: ProgressCallback = None,
+    ctx: SharedDEMContext | None = None,
 ) -> list[DetectedFeature]:
     """Detect craters, terraced craters, volcanic constructs, and graben.
 
@@ -365,6 +389,9 @@ def detect_craters_and_volcanics(
         Minimum depression depth (metres) to seed candidate labelling.
     on_progress : callable, optional
         ``on_progress(phase: str, data: dict)`` called at key stages.
+    ctx : SharedDEMContext, optional
+        Pre-computed DEM data. If provided, skips DEM extraction and
+        derivative computation. Dramatically faster for multi-detector scans.
 
     Returns
     -------
@@ -374,26 +401,25 @@ def detect_craters_and_volcanics(
     features: list[DetectedFeature] = []
 
     # ------------------------------------------------------------------
-    # 1. Extract DEM window
+    # 1. Use shared context or extract DEM
     # ------------------------------------------------------------------
-    _emit(on_progress, "extracting_dem", {"radius_km": radius_km})
-    elev, meta = extract_dem_window(lat0, lon0, radius_km)
-
-    px_m_ns: float = meta["px_m_ns"]
-    px_m_ew: float = meta["px_m_ew"]
-    px_m: float = (px_m_ns + px_m_ew) / 2.0  # mean pixel size
-
-    # ------------------------------------------------------------------
-    # 2. Fill NaN for morphological ops
-    # ------------------------------------------------------------------
-    nan_mask = np.isnan(elev)
-    fill_val = float(np.nanmean(elev)) if not np.all(nan_mask) else 0.0
-    elev_filled = np.where(nan_mask, fill_val, elev)
-
-    # ------------------------------------------------------------------
-    # 3. Gaussian smooth sigma=1.5 px
-    # ------------------------------------------------------------------
-    elev_smooth = gaussian_filter(elev_filled, sigma=1.5)
+    if ctx is not None:
+        meta = ctx.meta
+        px_m_ns = ctx.px_m_ns
+        px_m_ew = ctx.px_m_ew
+        px_m = ctx.px_m
+        elev_filled = ctx.elev_filled
+        elev_smooth = ctx.elev_smooth
+    else:
+        _emit(on_progress, "extracting_dem", {"radius_km": radius_km})
+        elev, meta = extract_dem_window(lat0, lon0, radius_km)
+        px_m_ns = meta["px_m_ns"]
+        px_m_ew = meta["px_m_ew"]
+        px_m = (px_m_ns + px_m_ew) / 2.0
+        nan_mask = np.isnan(elev)
+        fill_val = float(np.nanmean(elev)) if not np.all(nan_mask) else 0.0
+        elev_filled = np.where(nan_mask, fill_val, elev)
+        elev_smooth = gaussian_filter(elev_filled, sigma=2.0)
 
     # ------------------------------------------------------------------
     # 4-5. Multi-scale morphological closing -> depression depth
@@ -583,8 +609,8 @@ def detect_craters_and_volcanics(
     inv_binary = inv_depth_map > min_depth_m
     inv_labels, inv_n = label(inv_binary)
 
-    # Slope map for flank angle filtering
-    slope_map = compute_slope_map(elev_smooth, px_m_ns, px_m_ew)
+    # Slope map for flank angle filtering (reuse shared if available)
+    slope_map = ctx.slope_deg if ctx is not None else compute_slope_map(elev_smooth, px_m_ns, px_m_ew)
 
     # Collect centres of already-detected craters so we can avoid
     # double-counting calderas as volcanic constructs.

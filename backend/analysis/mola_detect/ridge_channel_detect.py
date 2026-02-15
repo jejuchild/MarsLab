@@ -18,6 +18,7 @@ from typing import Callable, Optional
 import numpy as np
 from scipy import ndimage
 from .common import (
+    SharedDEMContext,
     extract_dem_window,
     compute_slope_map,
     pixel_to_latlon,
@@ -32,38 +33,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
-
-def _fill_nan_with_mean(elev: np.ndarray) -> np.ndarray:
-    """Replace NaN pixels with the array mean for gradient computation."""
-    arr = elev.copy()
-    mask = np.isnan(arr)
-    if mask.any():
-        arr[mask] = np.nanmean(arr)
-    return arr
-
-
-def _compute_laplacian(
-    elev_smooth: np.ndarray,
-    px_m_ew: float,
-    px_m_ns: float,
-) -> np.ndarray:
-    """
-    Compute the negative Laplacian of the elevation surface.
-
-    Returns ``-(d2z/dx2 + d2z/dy2)``.
-    Positive values indicate concave-up terrain (valleys);
-    negative values indicate convex-up terrain (ridges).
-    """
-    # First derivatives (row = NS, col = EW)
-    dz_dy = np.gradient(elev_smooth, px_m_ns, axis=0)
-    dz_dx = np.gradient(elev_smooth, px_m_ew, axis=1)
-
-    # Second derivatives
-    d2z_dy2 = np.gradient(dz_dy, px_m_ns, axis=0)
-    d2z_dx2 = np.gradient(dz_dx, px_m_ew, axis=1)
-
-    laplacian = d2z_dx2 + d2z_dy2  # positive = convex, negative = concave
-    return -laplacian  # flip sign: positive = valley, negative = ridge
 
 
 def _inertia_axes(rows: np.ndarray, cols: np.ndarray):
@@ -200,6 +169,7 @@ def detect_channels(
     radius_km: float,
     min_length_km: float = 5.0,
     on_progress: Optional[Callable] = None,
+    ctx: SharedDEMContext | None = None,
 ) -> list[DetectedFeature]:
     """
     Detect channel / valley features in a MOLA DEM window.
@@ -214,6 +184,8 @@ def detect_channels(
         Minimum major-axis length to keep a candidate.
     on_progress : callable, optional
         ``(stage_name, info_dict)`` callback for UI progress reporting.
+    ctx : SharedDEMContext, optional
+        Pre-computed DEM data to avoid redundant I/O.
 
     Returns
     -------
@@ -222,24 +194,25 @@ def detect_channels(
     """
     _progress = on_progress or (lambda *a: None)
 
-    # 1. Extract DEM
-    _progress("extracting_dem", {})
-    elev, meta = extract_dem_window(lat0, lon0, radius_km)
-    px_m_ew = meta["px_m_ew"]
-    px_m_ns = meta["px_m_ns"]
-
-    if elev.size == 0:
-        return []
-
-    # 2. Fill NaN
-    elev_filled = _fill_nan_with_mean(elev)
-
-    # 3. Gaussian smooth (sigma = 2 px)
-    elev_smooth = ndimage.gaussian_filter(elev_filled, sigma=2.0)
-
-    # 4. Compute curvature (negative Laplacian)
-    _progress("computing_curvature", {})
-    neg_laplacian = _compute_laplacian(elev_smooth, px_m_ew, px_m_ns)
+    if ctx is not None:
+        meta = ctx.meta
+        px_m_ew = ctx.px_m_ew
+        px_m_ns = ctx.px_m_ns
+        elev_filled = ctx.elev_filled
+        neg_laplacian = ctx.neg_laplacian
+    else:
+        _progress("extracting_dem", {})
+        elev, meta = extract_dem_window(lat0, lon0, radius_km)
+        px_m_ew = meta["px_m_ew"]
+        px_m_ns = meta["px_m_ns"]
+        if elev.size == 0:
+            return []
+        nan_mask = np.isnan(elev)
+        fill_val = float(np.nanmean(elev)) if not np.all(nan_mask) else 0.0
+        elev_filled = np.where(nan_mask, fill_val, elev)
+        elev_smooth = ndimage.gaussian_filter(elev_filled, sigma=2.0)
+        from .common import _compute_laplacian
+        neg_laplacian = _compute_laplacian(elev_smooth, px_m_ew, px_m_ns)
 
     # 5. Threshold for valleys (neg_laplacian > 0 = valley)
     valley_values = neg_laplacian[neg_laplacian > 0]
@@ -388,6 +361,7 @@ def detect_ridges(
     radius_km: float,
     min_length_km: float = 5.0,
     on_progress: Optional[Callable] = None,
+    ctx: SharedDEMContext | None = None,
 ) -> list[DetectedFeature]:
     """
     Detect wrinkle-ridge features in a MOLA DEM window.
@@ -406,6 +380,8 @@ def detect_ridges(
         Minimum major-axis length to keep a candidate.
     on_progress : callable, optional
         ``(stage_name, info_dict)`` callback for UI progress reporting.
+    ctx : SharedDEMContext, optional
+        Pre-computed DEM data to avoid redundant I/O.
 
     Returns
     -------
@@ -414,24 +390,27 @@ def detect_ridges(
     """
     _progress = on_progress or (lambda *a: None)
 
-    # 1. Extract DEM + slope
-    _progress("extracting_dem", {})
-    elev, meta = extract_dem_window(lat0, lon0, radius_km)
-    px_m_ew = meta["px_m_ew"]
-    px_m_ns = meta["px_m_ns"]
-
-    if elev.size == 0:
-        return []
-
-    elev_filled = _fill_nan_with_mean(elev)
-    slope_deg = compute_slope_map(elev_filled, px_m_ns, px_m_ew)
-
-    # 2. Gaussian smooth (sigma = 2 px)
-    elev_smooth = ndimage.gaussian_filter(elev_filled, sigma=2.0)
-
-    # 3. Compute curvature
-    _progress("computing_curvature", {})
-    neg_laplacian = _compute_laplacian(elev_smooth, px_m_ew, px_m_ns)
+    if ctx is not None:
+        meta = ctx.meta
+        px_m_ew = ctx.px_m_ew
+        px_m_ns = ctx.px_m_ns
+        elev_filled = ctx.elev_filled
+        slope_deg = ctx.slope_deg
+        neg_laplacian = ctx.neg_laplacian
+    else:
+        _progress("extracting_dem", {})
+        elev, meta = extract_dem_window(lat0, lon0, radius_km)
+        px_m_ew = meta["px_m_ew"]
+        px_m_ns = meta["px_m_ns"]
+        if elev.size == 0:
+            return []
+        nan_mask = np.isnan(elev)
+        fill_val = float(np.nanmean(elev)) if not np.all(nan_mask) else 0.0
+        elev_filled = np.where(nan_mask, fill_val, elev)
+        slope_deg = compute_slope_map(elev_filled, px_m_ns, px_m_ew)
+        elev_smooth = ndimage.gaussian_filter(elev_filled, sigma=2.0)
+        from .common import _compute_laplacian
+        neg_laplacian = _compute_laplacian(elev_smooth, px_m_ew, px_m_ns)
 
     # Ridges: neg_laplacian < 0 (convex up)
     ridge_values = -neg_laplacian  # positive = convex

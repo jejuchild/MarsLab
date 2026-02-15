@@ -3,6 +3,9 @@ MOLA Landform Detection Router — SSE streaming endpoint.
 
 POST /api/mola-detect/scan    — Run detection pipeline, stream SSE events
 GET  /api/mola-detect/status  — Check if DEM is available
+
+Performance: DEM extracted once, derivatives pre-computed, detectors run in
+parallel via asyncio.gather + to_thread.
 """
 
 import json
@@ -71,7 +74,6 @@ def _feature_to_dict(f) -> dict:
     if f.sinuosity > 0:
         d["sinuosity"] = round(f.sinuosity, 2)
     if f.path:
-        # Simplify path for JSON (limit vertices)
         path = f.path
         if len(path) > 80:
             step = max(1, len(path) // 80)
@@ -91,8 +93,9 @@ async def run_scan(req: ScanRequest):
     """
     Run MOLA landform detection pipeline with SSE progress streaming.
 
-    Detects craters, terraced craters, volcanic constructs, graben,
-    channels/valleys, wrinkle ridges, and LDAs in a circular region.
+    DEM is extracted once, derivatives pre-computed, then detectors
+    (channels+ridges, LDAs) run in parallel while craters run first
+    (heaviest, needs morphological closing).
     """
     async def event_stream():
         t0 = time.time()
@@ -102,16 +105,29 @@ async def run_scan(req: ScanRequest):
         try:
             yield _sse("status", {
                 "phase": "starting",
-                "message": f"Scanning {req.radius_km}km radius around ({req.lat:.2f}, {req.lon:.2f})",
+                "message": f"Extracting DEM ({req.radius_km}km radius)...",
                 "progress": 0,
             })
 
-            # Phase 1: Craters, volcanics, graben
+            # ── Extract DEM once, pre-compute all shared derivatives ──
+            from analysis.mola_detect.common import build_shared_context
+            ctx = await asyncio.to_thread(
+                build_shared_context, req.lat, req.lon, req.radius_km,
+            )
+
+            yield _sse("status", {
+                "phase": "dem_ready",
+                "message": f"DEM ready ({ctx.elev.shape[1]}x{ctx.elev.shape[0]} px), running detectors...",
+                "progress": 0.10,
+            })
+
+            # ── Phase 1: Craters (heaviest — morphological closing) ──
+            # Run first so results stream early while lighter detectors follow.
             if req.detect_craters:
                 yield _sse("status", {
                     "phase": "detecting_craters",
                     "message": "Detecting craters, volcanic constructs, and graben...",
-                    "progress": 0.05,
+                    "progress": 0.12,
                 })
 
                 from analysis.mola_detect.crater_detect import detect_craters_and_volcanics
@@ -121,6 +137,7 @@ async def run_scan(req: ScanRequest):
                     req.lat, req.lon, req.radius_km,
                     min_diameter_km=req.min_diameter_km,
                     min_depth_m=req.min_depth_m,
+                    ctx=ctx,
                 )
 
                 for f in features:
@@ -131,84 +148,55 @@ async def run_scan(req: ScanRequest):
                 yield _sse("status", {
                     "phase": "craters_done",
                     "message": f"Found {len(features)} crater-type features",
-                    "progress": 0.35,
+                    "progress": 0.55,
                 })
 
-            # Phase 2: Channels and ridges
-            if req.detect_channels or req.detect_ridges:
-                from analysis.mola_detect.ridge_channel_detect import detect_channels, detect_ridges
+            # ── Phase 2: Channels, ridges, LDAs — run in parallel ──
+            parallel_tasks = []
+            task_labels = []
 
-                if req.detect_channels:
-                    yield _sse("status", {
-                        "phase": "detecting_channels",
-                        "message": "Detecting channels and valleys...",
-                        "progress": 0.40,
-                    })
+            if req.detect_channels:
+                from analysis.mola_detect.ridge_channel_detect import detect_channels
+                parallel_tasks.append(asyncio.to_thread(
+                    detect_channels, req.lat, req.lon, req.radius_km, ctx=ctx,
+                ))
+                task_labels.append("channels")
 
-                    channels = await asyncio.to_thread(
-                        detect_channels,
-                        req.lat, req.lon, req.radius_km,
-                    )
+            if req.detect_ridges:
+                from analysis.mola_detect.ridge_channel_detect import detect_ridges
+                parallel_tasks.append(asyncio.to_thread(
+                    detect_ridges, req.lat, req.lon, req.radius_km, ctx=ctx,
+                ))
+                task_labels.append("ridges")
 
-                    for f in channels:
-                        all_features.append(f)
-                        yield _sse("feature", _feature_to_dict(f))
-                        counts[f.feature_type] = counts.get(f.feature_type, 0) + 1
-
-                    yield _sse("status", {
-                        "phase": "channels_done",
-                        "message": f"Found {len(channels)} channels/valleys",
-                        "progress": 0.55,
-                    })
-
-                if req.detect_ridges:
-                    yield _sse("status", {
-                        "phase": "detecting_ridges",
-                        "message": "Detecting wrinkle ridges...",
-                        "progress": 0.60,
-                    })
-
-                    ridges = await asyncio.to_thread(
-                        detect_ridges,
-                        req.lat, req.lon, req.radius_km,
-                    )
-
-                    for f in ridges:
-                        all_features.append(f)
-                        yield _sse("feature", _feature_to_dict(f))
-                        counts[f.feature_type] = counts.get(f.feature_type, 0) + 1
-
-                    yield _sse("status", {
-                        "phase": "ridges_done",
-                        "message": f"Found {len(ridges)} wrinkle ridges",
-                        "progress": 0.75,
-                    })
-
-            # Phase 3: LDAs
             if req.detect_ldas:
-                yield _sse("status", {
-                    "phase": "detecting_ldas",
-                    "message": "Detecting lobate debris aprons...",
-                    "progress": 0.80,
-                })
-
                 from analysis.mola_detect.lda_detect import detect_ldas
+                parallel_tasks.append(asyncio.to_thread(
+                    detect_ldas, req.lat, req.lon, req.radius_km, ctx=ctx,
+                ))
+                task_labels.append("ldas")
 
-                ldas = await asyncio.to_thread(
-                    detect_ldas,
-                    req.lat, req.lon, req.radius_km,
-                )
-
-                for f in ldas:
-                    all_features.append(f)
-                    yield _sse("feature", _feature_to_dict(f))
-                    counts[f.feature_type] = counts.get(f.feature_type, 0) + 1
-
+            if parallel_tasks:
+                active_names = ", ".join(task_labels)
                 yield _sse("status", {
-                    "phase": "ldas_done",
-                    "message": f"Found {len(ldas)} LDAs",
-                    "progress": 0.95,
+                    "phase": "detecting_parallel",
+                    "message": f"Detecting {active_names} (parallel)...",
+                    "progress": 0.60,
                 })
+
+                results = await asyncio.gather(*parallel_tasks)
+
+                for label, result_features in zip(task_labels, results):
+                    for f in result_features:
+                        all_features.append(f)
+                        yield _sse("feature", _feature_to_dict(f))
+                        counts[f.feature_type] = counts.get(f.feature_type, 0) + 1
+
+                    yield _sse("status", {
+                        "phase": f"{label}_done",
+                        "message": f"Found {len(result_features)} {label}",
+                        "progress": 0.90,
+                    })
 
             # Done
             elapsed = round(time.time() - t0, 1)

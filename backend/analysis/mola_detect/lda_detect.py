@@ -27,6 +27,7 @@ from scipy import ndimage
 from scipy.spatial import ConvexHull
 
 from .common import (
+    SharedDEMContext,
     extract_dem_window,
     compute_slope_map,
     pixel_to_latlon,
@@ -202,6 +203,7 @@ def detect_ldas(
     min_area_km2: float = 10.0,
     latitude_filter: bool = True,
     on_progress: Optional[Callable] = None,
+    ctx: SharedDEMContext | None = None,
 ) -> list[DetectedFeature]:
     """
     Detect Lobate Debris Apron features in a MOLA DEM window.
@@ -219,6 +221,8 @@ def detect_ldas(
         30-60 deg N or S latitude band (typical for LDAs).
     on_progress : callable, optional
         ``(stage_name, info_dict)`` callback for UI progress reporting.
+    ctx : SharedDEMContext, optional
+        Pre-computed DEM data to avoid redundant I/O.
 
     Returns
     -------
@@ -227,22 +231,24 @@ def detect_ldas(
     """
     _progress = on_progress or (lambda *a: None)
 
-    # 1. Extract DEM + slope
-    _progress("extracting_dem", {})
-    elev, meta = extract_dem_window(lat0, lon0, radius_km)
-    px_m_ew = meta["px_m_ew"]
-    px_m_ns = meta["px_m_ns"]
-
-    if elev.size == 0:
-        return []
-
-    # Fill NaN for gradient computation
-    elev_filled = elev.copy()
-    nan_mask = np.isnan(elev_filled)
-    if nan_mask.any():
-        elev_filled[nan_mask] = np.nanmean(elev_filled)
-
-    slope_deg = compute_slope_map(elev_filled, px_m_ns, px_m_ew)
+    if ctx is not None:
+        meta = ctx.meta
+        px_m_ew = ctx.px_m_ew
+        px_m_ns = ctx.px_m_ns
+        elev_filled = ctx.elev_filled
+        slope_deg = ctx.slope_deg
+    else:
+        _progress("extracting_dem", {})
+        elev, meta = extract_dem_window(lat0, lon0, radius_km)
+        px_m_ew = meta["px_m_ew"]
+        px_m_ns = meta["px_m_ns"]
+        if elev.size == 0:
+            return []
+        elev_filled = elev.copy()
+        nan_mask = np.isnan(elev_filled)
+        if nan_mask.any():
+            elev_filled[nan_mask] = np.nanmean(elev_filled)
+        slope_deg = compute_slope_map(elev_filled, px_m_ns, px_m_ew)
 
     # 2. Slope masks
     _progress("computing_curvature", {})

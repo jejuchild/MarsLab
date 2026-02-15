@@ -2,19 +2,103 @@
 Shared DEM extraction utilities for MOLA landform detection.
 
 Reuses the global MOLA DEM infrastructure from terrain_router.
+Provides a SharedDEMContext to avoid redundant I/O and computation.
 """
 
+import logging
 import math
+from dataclasses import dataclass, field
+
 import numpy as np
 import rasterio
 from rasterio.windows import Window
+from scipy.ndimage import gaussian_filter
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from api.terrain_router import _get_dem, MARS_EQUATORIAL_RADIUS, MARS_POLAR_RADIUS, MARS_MEAN_RADIUS
 
+logger = logging.getLogger(__name__)
 
 MAX_SCAN_RADIUS_KM = 500  # Cap to prevent OOM
+
+
+# ---------------------------------------------------------------------------
+# Shared DEM context — extract once, reuse everywhere
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SharedDEMContext:
+    """Pre-computed DEM data shared across all detectors in a single scan."""
+    elev: np.ndarray              # raw elevation (NaN for nodata)
+    elev_filled: np.ndarray       # NaN-filled elevation
+    elev_smooth: np.ndarray       # Gaussian-smoothed (sigma=2)
+    slope_deg: np.ndarray         # slope map in degrees
+    neg_laplacian: np.ndarray     # -(d2z/dx2 + d2z/dy2); >0 = valley, <0 = ridge
+    meta: dict = field(default_factory=dict)
+    px_m_ew: float = 0.0
+    px_m_ns: float = 0.0
+    px_m: float = 0.0             # mean pixel size
+
+
+def build_shared_context(lat0: float, lon0: float, radius_km: float) -> SharedDEMContext:
+    """
+    Extract DEM once and pre-compute all shared derivatives.
+
+    This eliminates 4x redundant DEM reads and duplicate slope/Laplacian
+    computations across detectors.
+    """
+    elev, meta = extract_dem_window(lat0, lon0, radius_km)
+    px_m_ew = meta["px_m_ew"]
+    px_m_ns = meta["px_m_ns"]
+    px_m = (px_m_ew + px_m_ns) / 2.0
+
+    # Fill NaN
+    nan_mask = np.isnan(elev)
+    fill_val = float(np.nanmean(elev)) if not np.all(nan_mask) else 0.0
+    elev_filled = np.where(nan_mask, fill_val, elev)
+
+    # Gaussian smooth (sigma=2, shared across all detectors)
+    elev_smooth = gaussian_filter(elev_filled, sigma=2.0)
+
+    # Slope map (shared: used by craters, ridges, LDAs)
+    slope_deg = compute_slope_map(elev_smooth, px_m_ns, px_m_ew)
+
+    # Laplacian curvature (shared: used by channels + ridges)
+    neg_laplacian = _compute_laplacian(elev_smooth, px_m_ew, px_m_ns)
+
+    logger.info(
+        "SharedDEMContext: %dx%d window (%.0f km radius) at (%.3f, %.3f)",
+        elev.shape[1], elev.shape[0], radius_km, lat0, lon0,
+    )
+
+    return SharedDEMContext(
+        elev=elev,
+        elev_filled=elev_filled,
+        elev_smooth=elev_smooth,
+        slope_deg=slope_deg,
+        neg_laplacian=neg_laplacian,
+        meta=meta,
+        px_m_ew=px_m_ew,
+        px_m_ns=px_m_ns,
+        px_m=px_m,
+    )
+
+
+def _compute_laplacian(
+    elev_smooth: np.ndarray, px_m_ew: float, px_m_ns: float,
+) -> np.ndarray:
+    """
+    Negative Laplacian of the elevation surface.
+
+    Returns -(d2z/dx2 + d2z/dy2).
+    Positive = concave-up (valleys); negative = convex-up (ridges).
+    """
+    dz_dy = np.gradient(elev_smooth, px_m_ns, axis=0)
+    dz_dx = np.gradient(elev_smooth, px_m_ew, axis=1)
+    d2z_dy2 = np.gradient(dz_dy, px_m_ns, axis=0)
+    d2z_dx2 = np.gradient(dz_dx, px_m_ew, axis=1)
+    return -(d2z_dx2 + d2z_dy2)
 
 
 def extract_dem_window(
