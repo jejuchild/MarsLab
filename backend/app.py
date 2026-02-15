@@ -481,6 +481,9 @@ app.include_router(temporal_router)  # /api/temporal/* — Temporal Change Detec
 from analysis.ice_evidence.router import router as ice_evidence_router
 app.include_router(ice_evidence_router)  # /api/ice/* — Ice Evidence Synthesizer
 
+from api.mola_detect_router import router as mola_detect_router
+app.include_router(mola_detect_router)  # /api/mola-detect/* — MOLA Landform Detection
+
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
     """

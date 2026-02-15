@@ -322,8 +322,8 @@ interface LayerPanelProps {
   onCustomDatasetToggle?: (id: string, visible: boolean) => void;
 
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | null;
-  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | null) => void;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null) => void;
 
   // Fly-To navigation
   onFlyToCoords?: (lat: number, lon: number) => void;
@@ -338,6 +338,10 @@ interface LayerPanelProps {
   // Coordinate grid
   showGrid?: boolean;
   onToggleGrid?: (v: boolean) => void;
+
+  // Region layer
+  showRegionLayer?: boolean;
+  onToggleRegionLayer?: (v: boolean) => void;
 
   // Field Notes
   fieldNotes?: FieldNote[];
@@ -629,6 +633,9 @@ export default function LayerPanel({
   // Coordinate grid
   showGrid = false,
   onToggleGrid,
+  // Region layer
+  showRegionLayer = false,
+  onToggleRegionLayer,
   // Field Notes
   fieldNotes = [],
   showFieldNotesOnMap = true,
@@ -882,6 +889,26 @@ export default function LayerPanel({
             <span className="material-symbols-outlined text-xs text-slate-400">grid_on</span>
             <span className={`text-[11px] font-medium ${showGrid ? "text-slate-300" : "text-[#92a4c9]"}`}>
               Coordinate Grid
+            </span>
+          </label>
+
+          {/* Region Layer */}
+          <label
+            className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+              showRegionLayer
+                ? "bg-amber-500/20 border border-amber-400/50"
+                : "bg-[#1a2333] border border-[#232f48] hover:border-amber-400/30"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={showRegionLayer}
+              onChange={(e) => onToggleRegionLayer?.(e.target.checked)}
+              className="rounded bg-[#0a0f18] border-[#232f48] text-amber-400 focus:ring-0 focus:ring-offset-0"
+            />
+            <span className="material-symbols-outlined text-xs text-amber-400">map</span>
+            <span className={`text-[11px] font-medium ${showRegionLayer ? "text-amber-300" : "text-[#92a4c9]"}`}>
+              Named Regions
             </span>
           </label>
         </div>
@@ -1198,6 +1225,29 @@ export default function LayerPanel({
               </div>
               {analysisMode === "region_stats" && (
                 <span className="text-[8px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-bold uppercase">
+                  ON
+                </span>
+              )}
+            </button>
+
+            {/* Crater/LDA Detection */}
+            <button
+              onClick={() => onAnalysisModeChange?.(analysisMode === "crater_detect" ? null : "crater_detect")}
+              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
+                analysisMode === "crater_detect"
+                  ? "bg-rose-500/20 border border-rose-500/50 text-rose-400"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-rose-500/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">target</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">Landform Detect
+                  <span className="text-[8px] px-1 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold ml-1">NEW</span>
+                </span>
+                <p className="text-[9px] text-[#6b7c9c]">Find craters, channels, LDAs from MOLA DEM</p>
+              </div>
+              {analysisMode === "crater_detect" && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold uppercase">
                   ON
                 </span>
               )}

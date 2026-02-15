@@ -37,6 +37,8 @@ import { getInstrumentIds, type InstrumentId, isInstrumentId } from "../config/i
 import type { OverlapStats } from "../utils/overlapFilter";
 import SpectralComparison from "../components/SpectralComparison";
 import type { PinnedSpectrum } from "../components/SpectralComparison";
+import { CuriositySelfieModal, OlympusMonsPanel, OlympusMonsClimber, TerraformOverlay } from "../components/EasterEggs";
+import type { DetectedFeature } from "../components/CraterDetectPanel";
 
 // Memoize heavy child components to prevent unnecessary re-renders
 const MapView = memo(MapViewRaw);
@@ -54,6 +56,7 @@ const ReportPanel = lazy(() => import("../components/ReportPanel"));
 const RegionDashboard = lazy(() => import("../components/RegionDashboard"));
 const SpaceGame = lazy(() => import("../components/SpaceGame"));
 const RegionStatsPanel = lazy(() => import("../components/RegionStatsPanel"));
+const CraterDetectPanel = lazy(() => import("../components/CraterDetectPanel"));
 const TemporalComparison = lazy(() => import("../components/TemporalComparison"));
 
 // Default CRISM wavelengths (in micrometers)
@@ -218,7 +221,7 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | null;
+  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Guided Workflow: user-selected location
@@ -395,15 +398,24 @@ export default function MainPage() {
 
   // Coordinate grid
   const [showGrid, setShowGrid] = useState(false);
+  const [showRegionLayer, setShowRegionLayer] = useState(false);
 
   // Region Dashboard overlay
   const [showRegionDashboard, setShowRegionDashboard] = useState(false);
 
   // Easter egg game
   const [showGame, setShowGame] = useState(false);
+  const [showTerraform, setShowTerraform] = useState(false);
+  const [showCuriosity, setShowCuriosity] = useState(false);
+  const [showOlympusMons, setShowOlympusMons] = useState(false);
+  const [showOlympusMonsClimber, setShowOlympusMonsClimber] = useState(false);
 
   // Region Stats polygon vertices
   const [regionVertices, setRegionVertices] = useState<{lat: number; lon: number}[]>([]);
+
+  // Crater/Landform Detection
+  const [craterDetectCenter, setCraterDetectCenter] = useState<{lat: number; lon: number} | null>(null);
+  const [craterDetectFeatures, setCraterDetectFeatures] = useState<DetectedFeature[]>([]);
 
   // Temporal Change Detection modal
   const [showTemporalComparison, setShowTemporalComparison] = useState<{lat: number; lon: number; instrument?: string} | null>(null);
@@ -438,6 +450,42 @@ export default function MainPage() {
     });
     setShowSpectralComparison(true);
     toast.success("Spectrum pinned for comparison");
+  }, []);
+
+  // Terraform mode: auto-dismiss after 10 seconds
+  useEffect(() => {
+    if (!showTerraform) return;
+    const timer = setTimeout(() => setShowTerraform(false), 10000);
+    return () => clearTimeout(timer);
+  }, [showTerraform]);
+
+  // Mark Watney: fly to Acidalia Planitia + toast
+  const handleMarkWatney = useCallback(() => {
+    setFlyToCoords({ lat: 41.715, lon: -19.35 });
+    toast(
+      "\"I'm going to have to science the s**t out of this.\" -- Mark Watney, Sol 6",
+      {
+        icon: "\u{1F954}",
+        duration: 6000,
+        style: {
+          background: "#101622",
+          color: "#92a4c9",
+          border: "1px solid #232f48",
+          maxWidth: "420px",
+        },
+      },
+    );
+  }, []);
+
+  // Olympus Mons triple-click callback
+  const handleOlympusMonsClick = useCallback(() => {
+    setShowOlympusMons(true);
+  }, []);
+
+  // Olympus Mons 7-click: climber animation
+  const handleOlympusMonsClimber = useCallback(() => {
+    setShowOlympusMons(false); // close comparison if open
+    setShowOlympusMonsClimber(true);
   }, []);
 
   // Memoized inspected product ID for MapView (avoids re-render on unrelated state changes)
@@ -1034,6 +1082,10 @@ export default function MainPage() {
       // Region Stats mode: add vertex to polygon
       setRegionVertices((prev) => [...prev, { lat, lon }]);
     }
+    if (analysisMode === "crater_detect") {
+      // Crater detection: set scan center point
+      setCraterDetectCenter({ lat, lon });
+    }
   }, [analysisMode]);
 
   // When a product is selected, clear terrain point
@@ -1068,6 +1120,10 @@ export default function MainPage() {
     }
     if (mode !== "region_stats") {
       setRegionVertices([]);
+    }
+    if (mode !== "crater_detect") {
+      setCraterDetectCenter(null);
+      setCraterDetectFeatures([]);
     }
   }, []);
 
@@ -1207,6 +1263,11 @@ export default function MainPage() {
 
       // Escape — close current panel/modal
       if (e.key === "Escape") {
+        // Easter eggs first (highest z-index)
+        if (showOlympusMonsClimber) { setShowOlympusMonsClimber(false); return; }
+        if (showCuriosity) { setShowCuriosity(false); return; }
+        if (showOlympusMons) { setShowOlympusMons(false); return; }
+        if (showTerraform) { setShowTerraform(false); return; }
         if (showKeyboardHelp) {
           setShowKeyboardHelp(false);
           return;
@@ -1281,7 +1342,7 @@ export default function MainPage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [commandPalette.isOpen, showKeyboardHelp, sharadHiresProductId, selected, analysisMode, sharadPopup, handleSelectProduct, undo, redo]);
+  }, [commandPalette.isOpen, showKeyboardHelp, sharadHiresProductId, selected, analysisMode, sharadPopup, handleSelectProduct, undo, redo, showCuriosity, showOlympusMons, showOlympusMonsClimber, showTerraform]);
 
   // (flyToCoords state moved earlier — before URL state effects)
 
@@ -1432,6 +1493,8 @@ export default function MainPage() {
       // Coordinate grid
       showGrid={showGrid}
       onToggleGrid={setShowGrid}
+      showRegionLayer={showRegionLayer}
+      onToggleRegionLayer={setShowRegionLayer}
       // Field Notes
       fieldNotes={fieldNotes}
       showFieldNotesOnMap={showFieldNotesOnMap}
@@ -1543,6 +1606,21 @@ export default function MainPage() {
           onClearPolygon={() => setRegionVertices([])}
         />
       </Suspense>
+    ) : analysisMode === "crater_detect" ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading landform detector...</div>}>
+        <CraterDetectPanel
+          scanCenter={craterDetectCenter}
+          onClose={() => { setAnalysisMode(null); setCraterDetectCenter(null); setCraterDetectFeatures([]); }}
+          onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
+          onSearchHiRISE={(lat, lon) => {
+            navigate(`/download?lat=${lat}&lon=${lon}&instrument=HIRISE`);
+          }}
+          onSearchSHARAD={(lat, lon) => {
+            navigate(`/download?lat=${lat}&lon=${lon}&instrument=SHARAD`);
+          }}
+          onFeaturesChanged={setCraterDetectFeatures}
+        />
+      </Suspense>
     ) : (
       <div className="h-full flex items-center justify-center bg-[#101622]">
         <EmptyState
@@ -1563,6 +1641,9 @@ export default function MainPage() {
           isMobile={isMobile}
           onSelectResult={handleSearchSelect}
           onEasterEgg={() => setShowGame(true)}
+          onTerraform={() => setShowTerraform(true)}
+          onCuriositySelfie={() => setShowCuriosity(true)}
+          onMarkWatney={handleMarkWatney}
           canUndo={canUndo}
           canRedo={canRedo}
           lastActionDescription={lastAction?.description}
@@ -1677,6 +1758,7 @@ export default function MainPage() {
         onFieldNoteClick={handleFieldNoteClick}
         activeDTMProductId={activeDTMProduct}
         showGrid={showGrid}
+        showRegionLayer={showRegionLayer}
         aiAnalysisPin={aiAnalysisPin}
         overlapFilter={overlapFilter}
         onOverlapStatsChange={handleOverlapStatsChange}
@@ -1686,6 +1768,10 @@ export default function MainPage() {
         sharadTracePin={sharadTracePin}
         showMeasurementTools={showMeasurementTools}
         onMeasurementPinNote={handleMeasurementPinNote}
+        terraformMode={showTerraform}
+        onOlympusMonsTripleClick={handleOlympusMonsClick}
+        onOlympusMonsClimber={handleOlympusMonsClimber}
+        craterDetectFeatures={craterDetectFeatures}
       />
 
       {/* Smart Context Copilot */}
@@ -1863,6 +1949,24 @@ export default function MainPage() {
           <SpaceGame onClose={() => setShowGame(false)} />
         </Suspense>
       )}
+
+      {/* Easter egg: Curiosity Selfie */}
+      {showCuriosity && (
+        <CuriositySelfieModal onClose={() => setShowCuriosity(false)} />
+      )}
+
+      {/* Easter egg: Olympus Mons Height Comparison */}
+      {showOlympusMons && (
+        <OlympusMonsPanel onClose={() => setShowOlympusMons(false)} />
+      )}
+
+      {/* Easter egg: Olympus Mons Climber */}
+      {showOlympusMonsClimber && (
+        <OlympusMonsClimber onClose={() => setShowOlympusMonsClimber(false)} />
+      )}
+
+      {/* Easter egg: Terraform Mode overlay */}
+      <TerraformOverlay active={showTerraform} />
 
       {/* Keyboard Shortcuts Help Modal */}
       <KeyboardShortcuts

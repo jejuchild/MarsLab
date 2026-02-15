@@ -151,6 +151,7 @@ type MapViewProps = {
   onFieldNoteClick?: (note: FieldNote) => void;
   // Coordinate grid overlay
   showGrid?: boolean;
+  showRegionLayer?: boolean;
   // AI Analysis pin location
   aiAnalysisPin?: { lat: number; lon: number } | null;
   // Multi-Instrument Overlap Filter
@@ -166,6 +167,26 @@ type MapViewProps = {
   // Measurement & annotation tools
   showMeasurementTools?: boolean;
   onMeasurementPinNote?: (lat: number, lon: number, text: string) => void;
+  // Crater/Landform Detection
+  craterDetectFeatures?: Array<{
+    id: string;
+    type: string;
+    lat: number;
+    lon: number;
+    diameter_km?: number;
+    area_km2?: number;
+    length_km?: number;
+    morphology?: string;
+    confidence: number;
+    description: string;
+    path?: [number, number][];
+    boundary?: [number, number][];
+  }>;
+
+  // Easter eggs
+  terraformMode?: boolean;
+  onOlympusMonsTripleClick?: () => void;
+  onOlympusMonsClimber?: () => void;
 };
 
 /* ==================================================
@@ -613,6 +634,7 @@ export default function MapView({
   fieldNotes = [],
   onFieldNoteClick,
   showGrid = false,
+  showRegionLayer = false,
   aiAnalysisPin = null,
   overlapFilter,
   onOverlapStatsChange,
@@ -622,6 +644,10 @@ export default function MapView({
   sharadTracePin = null,
   showMeasurementTools = false,
   onMeasurementPinNote,
+  craterDetectFeatures,
+  terraformMode = false,
+  onOlympusMonsTripleClick,
+  onOlympusMonsClimber,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -680,6 +706,12 @@ export default function MapView({
   const onFootprintsLoadingRef = useRef(onFootprintsLoading);
   const onFieldNoteClickRef = useRef(onFieldNoteClick);
   const fieldNotesRef = useRef(fieldNotes);
+  const onOlympusMonsTripleClickRef = useRef(onOlympusMonsTripleClick);
+  const onOlympusMonsClimberRef = useRef(onOlympusMonsClimber);
+
+  // Easter egg: Olympus Mons triple-click tracking
+  const olympusMonsClickCountRef = useRef(0);
+  const olympusMonsClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // DTM Hover System - refs for performance (no re-renders on hover)
   const dtmHoverReadoutRef = useRef<DTMHoverReadoutHandle>(null);
@@ -741,6 +773,14 @@ export default function MapView({
   useEffect(() => {
     fieldNotesRef.current = fieldNotes;
   }, [fieldNotes]);
+
+  useEffect(() => {
+    onOlympusMonsTripleClickRef.current = onOlympusMonsTripleClick;
+  }, [onOlympusMonsTripleClick]);
+
+  useEffect(() => {
+    onOlympusMonsClimberRef.current = onOlympusMonsClimber;
+  }, [onOlympusMonsClimber]);
 
   useEffect(() => {
     onTerrainClickRef.current = onTerrainClick;
@@ -1033,6 +1073,25 @@ export default function MapView({
         const clickLon = Cesium.Math.toDegrees(clickCarto.longitude);
         const clickLat = Cesium.Math.toDegrees(clickCarto.latitude);
 
+        // Easter egg: Olympus Mons summit clicks (~18.65°N, -133.5°E)
+        // 3 clicks → height comparison, 7 clicks → climber animation
+        if (Math.abs(clickLat - 18.65) < 1.5 && Math.abs(clickLon - (-133.5)) < 1.5) {
+          olympusMonsClickCountRef.current += 1;
+          if (olympusMonsClickTimerRef.current) clearTimeout(olympusMonsClickTimerRef.current);
+          olympusMonsClickTimerRef.current = setTimeout(() => {
+            olympusMonsClickCountRef.current = 0;
+          }, 5000);
+          if (olympusMonsClickCountRef.current >= 7) {
+            olympusMonsClickCountRef.current = 0;
+            if (olympusMonsClickTimerRef.current) clearTimeout(olympusMonsClickTimerRef.current);
+            onOlympusMonsClimberRef.current?.();
+            return;
+          }
+          if (olympusMonsClickCountRef.current === 3) {
+            onOlympusMonsTripleClickRef.current?.();
+            return;
+          }
+        }
 
         // PRIORITY 1: Check if click is within any active overlay bounds
         // This is more reliable than Cesium picking for image overlays
@@ -3159,6 +3218,176 @@ export default function MapView({
     viewer.scene.requestRender();
   }, [scoreOverlays, overlayOpacities]);
 
+  // Landform detection entities
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    // Remove old detection entities
+    const toRemove = viewer.entities.values.filter(
+      (e: Cesium.Entity) => e.id?.startsWith("DETECT_")
+    );
+    for (const e of toRemove) viewer.entities.remove(e);
+
+    if (!craterDetectFeatures || craterDetectFeatures.length === 0) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    const COLORS: Record<string, string> = {
+      crater: "#fb923c",
+      terraced_crater: "#f43f5e",
+      volcanic: "#ef4444",
+      graben: "#a855f7",
+      channel: "#3b82f6",
+      wrinkle_ridge: "#eab308",
+      lda: "#22d3ee",
+    };
+
+    viewer.entities.suspendEvents();
+
+    for (const f of craterDetectFeatures) {
+      const color = COLORS[f.type] || "#6b7c9c";
+      const cesiumColor = Cesium.Color.fromCssColorString(color);
+
+      if (f.type === "lda" && f.boundary && f.boundary.length > 2) {
+        // LDA: polygon
+        const positions = f.boundary.flatMap(([lat, lon]: [number, number]) => [lon, lat]);
+        viewer.entities.add({
+          id: `DETECT_${f.id}`,
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray(positions),
+            material: cesiumColor.withAlpha(0.15),
+            outline: true,
+            outlineColor: cesiumColor.withAlpha(0.7),
+          },
+        });
+        // Label at center
+        viewer.entities.add({
+          id: `DETECT_L_${f.id}`,
+          position: Cesium.Cartesian3.fromDegrees(f.lon, f.lat, 0, MARS_ELLIPSOID),
+          label: {
+            text: `LDA ${f.area_km2?.toFixed(0) || ""} km\u00b2`,
+            font: "bold 11px sans-serif",
+            fillColor: cesiumColor,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            scaleByDistance: new Cesium.NearFarScalar(5e4, 1.0, 2e6, 0.3),
+          },
+        });
+      } else if ((f.type === "channel" || f.type === "wrinkle_ridge" || f.type === "graben") && f.path && f.path.length > 1) {
+        // Polyline features
+        const positions = f.path.flatMap(([lat, lon]: [number, number]) => [lon, lat]);
+        viewer.entities.add({
+          id: `DETECT_${f.id}`,
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArray(positions),
+            width: f.type === "graben" ? 3 : 2,
+            material: cesiumColor.withAlpha(0.8),
+            clampToGround: true,
+          },
+        });
+        // Label at midpoint
+        const midIdx = Math.floor(f.path.length / 2);
+        const midPt = f.path[midIdx];
+        const sizeLabel = f.length_km ? `${f.length_km.toFixed(0)} km` : "";
+        viewer.entities.add({
+          id: `DETECT_L_${f.id}`,
+          position: Cesium.Cartesian3.fromDegrees(midPt[1], midPt[0], 0, MARS_ELLIPSOID),
+          label: {
+            text: `${f.type === "channel" ? "Ch" : f.type === "graben" ? "Gr" : "WR"} ${sizeLabel}`,
+            font: "10px sans-serif",
+            fillColor: cesiumColor,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            scaleByDistance: new Cesium.NearFarScalar(5e4, 1.0, 2e6, 0.3),
+          },
+        });
+      } else {
+        // Craters, volcanics — ellipse
+        const radiusM = (f.diameter_km || 5) * 500;
+        viewer.entities.add({
+          id: `DETECT_${f.id}`,
+          position: Cesium.Cartesian3.fromDegrees(f.lon, f.lat, 0, MARS_ELLIPSOID),
+          ellipse: {
+            semiMajorAxis: radiusM,
+            semiMinorAxis: radiusM,
+            material: cesiumColor.withAlpha(0.12),
+            outline: true,
+            outlineColor: cesiumColor.withAlpha(0.7),
+          },
+          point: {
+            pixelSize: 5,
+            color: cesiumColor,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 1,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          },
+          label: {
+            text: `${f.morphology || f.type}\n${f.diameter_km?.toFixed(1) || ""} km`,
+            font: "10px sans-serif",
+            fillColor: cesiumColor,
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -10),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            scaleByDistance: new Cesium.NearFarScalar(5e4, 1.0, 2e6, 0.3),
+          },
+        });
+      }
+    }
+
+    viewer.entities.resumeEvents();
+    viewer.scene.requestRender();
+
+    return () => {
+      if (!viewer || viewer.isDestroyed()) return;
+      const ents = viewer.entities.values.filter(
+        (e: Cesium.Entity) => e.id?.startsWith("DETECT_")
+      );
+      for (const e of ents) viewer.entities.remove(e);
+    };
+  }, [craterDetectFeatures]);
+
+  // Easter egg: Terraform mode — tint globe blue/green
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const TERRAFORM_ID = "__TERRAFORM_TINT__";
+
+    if (terraformMode) {
+      viewer.entities.add({
+        id: TERRAFORM_ID,
+        rectangle: {
+          coordinates: Cesium.Rectangle.fromDegrees(-180, -90, 180, 90),
+          material: new Cesium.ColorMaterialProperty(
+            new Cesium.Color(0.1, 0.5, 0.8, 0.3)
+          ),
+          height: 0,
+        },
+      });
+      viewer.scene.requestRender();
+    } else {
+      const ent = viewer.entities.getById(TERRAFORM_ID);
+      if (ent) {
+        viewer.entities.remove(ent);
+        viewer.scene.requestRender();
+      }
+    }
+
+    return () => {
+      const ent = viewer.entities.getById(TERRAFORM_ID);
+      if (ent) viewer.entities.remove(ent);
+    };
+  }, [terraformMode]);
+
   // Mineral classification overlays effect (CNN mineral map on TRR3)
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -4194,6 +4423,111 @@ export default function MapView({
       viewer.scene.requestRender();
     };
   }, [showGrid]);
+
+  // Named region layer overlay
+  const regionCacheRef = useRef<Array<{
+    region_id: string; display_name: string;
+    lat_min: number; lat_max: number; lon_min: number; lon_max: number;
+    tags: string[];
+  }> | null>(null);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const REGION_PREFIX = "REGION_";
+
+    if (!showRegionLayer) {
+      // Remove all region entities
+      const toRemove = viewer.entities.values.filter((e) =>
+        typeof e.id === "string" && e.id.startsWith(REGION_PREFIX)
+      );
+      for (const ent of toRemove) viewer.entities.remove(ent);
+      if (toRemove.length > 0) viewer.scene.requestRender();
+      return;
+    }
+
+    // Tag → color mapping
+    const TAG_COLORS: Record<string, [number, number, number]> = {
+      volcanic:      [0.93, 0.35, 0.05],  // orange
+      shield_volcano:[0.93, 0.35, 0.05],
+      ice:           [0.00, 0.80, 0.85],  // cyan
+      polar:         [0.00, 0.80, 0.85],
+      landing_site:  [0.96, 0.75, 0.14],  // gold
+      canyon:        [0.87, 0.25, 0.25],  // red
+      planitia:      [0.30, 0.50, 0.90],  // blue
+      lowland:       [0.30, 0.50, 0.90],
+      terra:         [0.85, 0.65, 0.30],  // amber
+      highland:      [0.85, 0.65, 0.30],
+      crater:        [0.20, 0.80, 0.50],  // emerald
+      impact:        [0.20, 0.80, 0.50],
+    };
+
+    const getRegionColor = (tags: string[]): Cesium.Color => {
+      for (const tag of tags) {
+        const c = TAG_COLORS[tag];
+        if (c) return new Cesium.Color(c[0], c[1], c[2], 1.0);
+      }
+      return new Cesium.Color(0.55, 0.65, 0.80, 1.0); // slate default
+    };
+
+    const renderRegions = (regions: typeof regionCacheRef.current) => {
+      if (!regions || !viewerRef.current) return;
+      const v = viewerRef.current;
+
+      v.entities.suspendEvents();
+      for (const r of regions) {
+        if (v.entities.getById(`${REGION_PREFIX}${r.region_id}`)) continue;
+
+        const color = getRegionColor(r.tags);
+        const centerLat = (r.lat_min + r.lat_max) / 2;
+        const centerLon = (r.lon_min + r.lon_max) / 2;
+
+        v.entities.add({
+          id: `${REGION_PREFIX}${r.region_id}`,
+          rectangle: {
+            coordinates: Cesium.Rectangle.fromDegrees(r.lon_min, r.lat_min, r.lon_max, r.lat_max),
+            material: new Cesium.ColorMaterialProperty(color.withAlpha(0.12)),
+            outline: true,
+            outlineColor: new Cesium.ConstantProperty(color.withAlpha(0.40)),
+            outlineWidth: new Cesium.ConstantProperty(1),
+            height: 0,
+          },
+          position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat),
+          label: {
+            text: r.display_name,
+            font: "11px monospace",
+            fillColor: color.withAlpha(0.85),
+            outlineColor: Cesium.Color.BLACK,
+            outlineWidth: 2,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            scaleByDistance: new Cesium.NearFarScalar(500000, 1.0, 5000000, 0.4),
+            translucencyByDistance: new Cesium.NearFarScalar(1000000, 1.0, 8000000, 0.3),
+          },
+        });
+      }
+      v.entities.resumeEvents();
+      v.scene.requestRender();
+    };
+
+    // Use cached data if available
+    if (regionCacheRef.current) {
+      renderRegions(regionCacheRef.current);
+      return;
+    }
+
+    // Fetch regions from API
+    fetch("/api/proximity/regions")
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => {
+        regionCacheRef.current = data;
+        renderRegions(data);
+      })
+      .catch(() => {});
+  }, [showRegionLayer]);
 
   return (
     <>
