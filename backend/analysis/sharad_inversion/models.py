@@ -65,6 +65,17 @@ class DielectricInversion(BaseModel):
     interpretation: str
     source: str = "DTM_terrace_inversion"
     derivation: List[DerivationStep] = Field(default_factory=list)
+    # Gaussian error propagation
+    epsilon_r_sigma: Optional[float] = None
+    epsilon_r_1sigma_lo: Optional[float] = None
+    epsilon_r_1sigma_hi: Optional[float] = None
+    epsilon_r_2sigma_lo: Optional[float] = None
+    epsilon_r_2sigma_hi: Optional[float] = None
+    # Sensitivity analysis
+    sensitivity_depth_plus10: Optional[float] = None
+    sensitivity_depth_minus10: Optional[float] = None
+    sensitivity_twt_plus1bin: Optional[float] = None
+    sensitivity_twt_minus1bin: Optional[float] = None
 
 class HyperbolaValidation(BaseModel):
     """Cross-validation via hyperbola curvature fitting."""
@@ -99,6 +110,11 @@ class InversionPipelineResult(BaseModel):
     best_epsilon_r_ci: Optional[List[float]] = None
     best_interpretation: Optional[str] = None
     reflector_confidence: float = 0.0  # 0-1 overall
+    # Gaussian error propagation (aggregated from best inversion)
+    best_epsilon_r_sigma: Optional[float] = None
+    best_epsilon_r_1sigma: Optional[List[float]] = None  # [lo, hi]
+    # Sensitivity analysis (from best inversion)
+    sensitivity: Optional[Dict[str, float]] = None  # depth_plus10, depth_minus10, twt_plus1bin, twt_minus1bin
     assumptions: List[PhysicalAssumption] = Field(default_factory=list)
     derivation_log: List[DerivationStep] = Field(default_factory=list)
     error: Optional[str] = None

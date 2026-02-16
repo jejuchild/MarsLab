@@ -111,3 +111,38 @@
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+
+/* ── Panel Intelligence animations ─────────────────────────── */
+
+/* Attention pulse: subtle inset teal glow on panel auto-open */
+@keyframes panelAttentionPulse {
+  0%   { box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0); }
+  30%  { box-shadow: inset 0 0 8px 1px rgba(20, 184, 166, 0.35); }
+  100% { box-shadow: inset 0 0 0 1px rgba(20, 184, 166, 0); }
+}
+
+.panel-attention-pulse {
+  animation: panelAttentionPulse 1.2s ease-out;
+}
+
+/* Section highlight for new Copilot/Agent content blocks */
+@keyframes sectionHighlightFade {
+  0%   { background-color: rgba(20, 184, 166, 0.12); }
+  100% { background-color: transparent; }
+}
+
+.section-highlight-new {
+  animation: sectionHighlightFade 2s ease-out forwards;
+  border-radius: 6px;
+}
+
+/* Collapsed strip pulse — draws eye to the collapsed sidebar */
+@keyframes stripPulse {
+  0%   { border-left-color: #232f48; }
+  30%  { border-left-color: rgba(20, 184, 166, 0.6); }
+  100% { border-left-color: #232f48; }
+}
+
+.strip-attention-pulse {
+  animation: stripPulse 1.5s ease-out;
+}

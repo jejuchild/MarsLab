@@ -15,10 +15,10 @@ import SharadHiresInspector from "../components/SharadHiresInspector";
 import FieldNoteModal from "../components/FieldNoteModal";
 import AiAnalysisPanelRaw from "../components/AiAnalysisPanel";
 import AgenticPanelRaw from "../components/AgenticPanel";
+import AssistantPanelRaw from "../components/AssistantPanel";
 import GuidedWorkflowsRaw from "../components/GuidedWorkflows";
 import type { WorkflowAction } from "../components/GuidedWorkflows";
-import ContextCopilot from "../components/ContextCopilot";
-import type { CopilotDispatch } from "../components/ContextCopilot";
+import CopilotFab from "../components/CopilotFab";
 import type { FieldNote } from "../api/fieldnotes";
 import useFieldNotes from "../hooks/useFieldNotes";
 import AppShell from "../components/layout/AppShell";
@@ -26,6 +26,8 @@ import BottomSheet from "../components/BottomSheet";
 import useIsMobile from "../hooks/useIsMobile";
 import useUrlState from "../hooks/useUrlState";
 import useCommandPalette from "../hooks/useCommandPalette";
+import usePanelManager from "../hooks/usePanelManager";
+import PanelAttentionWrapper from "../components/PanelAttentionWrapper";
 import { useUndoRedo } from "../hooks/useUndoRedo";
 import CommandPalette from "../components/CommandPalette";
 import type { CommandAction } from "../components/CommandPalette";
@@ -46,6 +48,7 @@ const Inspector = memo(InspectorRaw);
 const LayerPanel = memo(LayerPanelRaw);
 const AiAnalysisPanel = memo(AiAnalysisPanelRaw);
 const AgenticPanel = memo(AgenticPanelRaw);
+const AssistantPanel = memo(AssistantPanelRaw);
 const GuidedWorkflows = memo(GuidedWorkflowsRaw);
 
 // Lazy-loaded heavy components (Three.js / Recharts)
@@ -221,8 +224,9 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "assistant" | "report" | "guided" | "region_stats" | "crater_detect" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
+  const [copilotGoal, setCopilotGoal] = useState<string | null>(null);
 
   // Guided Workflow: user-selected location
   const [guidedLocation, setGuidedLocation] = useState<{ lat: number; lon: number } | null>(null);
@@ -427,6 +431,22 @@ export default function MainPage() {
   // Right panel (inspector) collapsed state
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
+  // Panel intelligence: auto-open, attention pulse, autonomy toggle
+  const panelManager = usePanelManager({
+    rightPanelCollapsed,
+    setRightPanelCollapsed,
+    isMobile,
+    setMobilePanel,
+  });
+  // Stable callbacks for memoized children (avoids breaking memo())
+  const handleAgenticPanelAttention = useCallback(() => panelManager.ensurePanelVisible("analysis_complete"), [panelManager.ensurePanelVisible]);
+  const handleAssistantPanelAttention = useCallback(() => panelManager.ensurePanelVisible("copilot_write"), [panelManager.ensurePanelVisible]);
+  const handleCopilotClose = useCallback(() => { setAnalysisMode(null); setCopilotGoal(null); }, []);
+  const handleCopilotFlyTo = useCallback((lat: number, lon: number) => setFlyToCoords({ lat, lon }), []);
+  const handleCopilotHighlight = useCallback((productIds: string[]) => {
+    if (productIds.length > 0) setFlyToProductId(productIds[0]);
+  }, []);
+
   // Onboarding tour (force re-trigger)
   const [showTourForced, setShowTourForced] = useState(false);
 
@@ -504,14 +524,14 @@ export default function MainPage() {
   }, []);
 
   // Explicit footprint loading handlers
-  const handleLoadFootprints = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM") => {
+  const handleLoadFootprints = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3") => {
     // Auto-enable visibility when loading
     const id = instrument.toLowerCase() as InstrumentId;
     setInstrumentVisibility(prev => ({ ...prev, [id]: true }));
     setLoadFootprintsTrigger({ instrument, timestamp: Date.now() });
   }, []);
 
-  const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM", loading: boolean) => {
+  const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3", loading: boolean) => {
     setFootprintsLoading((prev) => ({
       ...prev,
       [instrument.toLowerCase()]: loading,
@@ -519,7 +539,7 @@ export default function MainPage() {
   }, []);
 
   const handleFootprintsLoaded = useCallback((result: {
-    instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM";
+    instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
     count: number;
     truncated: boolean;
     total: number;
@@ -616,6 +636,7 @@ export default function MainPage() {
       lon: product.lon ?? 0,
       title: product.title,
     });
+    panelManager.ensurePanelVisible("feature_select");
 
     // Fly to the product
     setFlyToProductId(product.productId);
@@ -624,7 +645,7 @@ export default function MainPage() {
     if (activeOverlaysRef.current.has(product.productId)) {
       setBringToFrontId(product.productId);
     }
-  }, []);
+  }, [panelManager.ensurePanelVisible]);
 
   // Handle fly-to from Active Products section
   const handleFlyToProduct = useCallback((productId: string) => {
@@ -739,9 +760,24 @@ export default function MainPage() {
       setFlyToProductId(urlState.product);
     }
 
-    // Restore analysis mode
+    // Restore analysis mode — with crash-loop protection.
+    // If we're reloading into ?mode=assistant within 3 seconds of the
+    // last page load, skip restoring it (likely an infinite-reload crash).
     if (urlState.mode) {
-      setAnalysisMode(urlState.mode as AnalysisMode);
+      const now = Date.now();
+      const lastLoad = Number(sessionStorage.getItem("_marslab_last_load") || "0");
+      sessionStorage.setItem("_marslab_last_load", String(now));
+      const isCrashLoop =
+        (urlState.mode === "assistant" || urlState.mode === "agentic") &&
+        lastLoad > 0 &&
+        now - lastLoad < 3000;
+      if (!isCrashLoop) {
+        setAnalysisMode(urlState.mode as AnalysisMode);
+      } else {
+        // Break the loop: clear mode from URL
+        console.warn("[MarsLab] Crash-loop detected — skipping assistant mode restore");
+        updateUrl({ mode: undefined });
+      }
     }
 
     // Restore base layer
@@ -827,6 +863,7 @@ export default function MainPage() {
         lat,
         lon,
       });
+      panelManager.ensurePanelVisible("feature_select");
 
       // Enable quickview overlay (same as handleHiRiseDTMClick)
       setActiveOverlays((prev) => {
@@ -901,7 +938,8 @@ export default function MainPage() {
       lat,
       lon,
     });
-  }, []);
+    panelManager.ensurePanelVisible("feature_select");
+  }, [panelManager.ensurePanelVisible]);
 
   // Handle HiRISE DTM footprint click - One-click inspection flow
   // Automatically: 1) Open inspector, 2) Enable quickview, 3) Activate DTM 3D mode
@@ -997,12 +1035,7 @@ export default function MainPage() {
     fetchFilteredIds();
   }, [iceScoreFilter.enabled, iceScoreFilter.minScore, iceScoreFilter.minPercent]);
 
-  // Auto-open inspector bottom sheet on mobile when a product is selected
-  useEffect(() => {
-    if (isMobile && (selected || sharadHiresProductId)) {
-      setMobilePanel('inspector');
-    }
-  }, [isMobile, selected, sharadHiresProductId]);
+  // Mobile auto-open is handled by panelManager.ensurePanelVisible() at each trigger point
 
   // Load custom datasets from server (triggered by Load button)
   const handleLoadCustomData = useCallback(async () => {
@@ -1092,13 +1125,22 @@ export default function MainPage() {
   // When a product is selected, clear terrain point
   const handleSelect = useCallback((ctx: InspectorContext | null) => {
     setSelected(ctx);
-    if (ctx) setTerrainPoint(null);
-  }, []);
+    if (ctx) {
+      setTerrainPoint(null);
+      panelManager.ensurePanelVisible("feature_select");
+    }
+  }, [panelManager.ensurePanelVisible]);
 
   // Analysis mode toggle handler
   const handleAnalysisModeChange = useCallback((mode: AnalysisMode) => {
     setAnalysisMode(mode);
-    // Clear state for all modes
+    // Clear state for all modes — ensures the selected mode's panel actually renders
+    // (rightPanelContent priority chain: selected > terrainPoint > ... > analysisMode)
+    if (mode === "assistant" || mode === "agentic") {
+      // These modes MUST clear higher-priority panel states to render
+      setSelected(null);
+      setSharadHiresProductId(null);
+    }
     if (mode !== "slope") {
       setTerrainPoint(null);
     }
@@ -1201,38 +1243,6 @@ export default function MainPage() {
         break;
     }
   }, [handleAnalysisModeChange, navigate]);
-
-  // Copilot dispatch handler — translates copilot actions into app state changes
-  const handleCopilotAction = useCallback((action: CopilotDispatch) => {
-    switch (action.type) {
-      case "load_instrument": {
-        const id = action.instrument.toLowerCase();
-        if (isInstrumentId(id)) {
-          setInstrumentVisibility((prev) => ({ ...prev, [id]: true }));
-          setLoadFootprintsTrigger({
-            instrument: action.instrument.toUpperCase() as any,
-            timestamp: Date.now(),
-          });
-        }
-        break;
-      }
-      case "run_analysis":
-        handleAnalysisModeChange(action.mode as AnalysisMode);
-        break;
-      case "fly_to":
-        setFlyToCoords({ lat: action.lat, lon: action.lon });
-        break;
-      case "show_product": {
-        const product = visibleProductsRef.current.find(
-          (p: VisibleProduct) => p.productId === action.productId,
-        );
-        if (product) {
-          handleSelectProduct(product);
-        }
-        break;
-      }
-    }
-  }, [handleAnalysisModeChange, handleSelectProduct]);
 
   // Keyboard shortcut handler
   useEffect(() => {
@@ -1391,6 +1401,7 @@ export default function MainPage() {
     // Open appropriate panel based on instrument
     if (instrument === "SHARAD_HIGHRES") {
       setSharadHiresProductId(productId);
+      panelManager.ensurePanelVisible("search_result");
     } else if (instrument && instrument !== "CTX") {
       setSelected({
         instrument: instrument as any,
@@ -1398,18 +1409,9 @@ export default function MainPage() {
         lat: lat ?? 0,
         lon: lon ?? 0,
       });
+      panelManager.ensurePanelVisible("search_result");
     }
-  }, [handleSelectProduct]);
-
-  // Memoized props for ContextCopilot to avoid unnecessary re-renders
-  const copilotSelectedProduct = useMemo(
-    () => selected ? { productId: selected.productId, instrument: selected.instrument } : null,
-    [selected?.productId, selected?.instrument],
-  );
-  const copilotVisibleInstruments = useMemo(
-    () => Object.entries(instrumentVisibility).filter(([, v]) => v).map(([k]) => k),
-    [instrumentVisibility],
-  );
+  }, [handleSelectProduct, panelManager.ensurePanelVisible]);
 
   // Derive legacy overlay formats for MapView compatibility
   // These will be replaced when MapView is updated to use unified format
@@ -1518,11 +1520,29 @@ export default function MainPage() {
       // Measurement Tools
       showMeasurementTools={showMeasurementTools}
       onToggleMeasurementTools={setShowMeasurementTools}
+      // Panel Intelligence
+      autoOpenEnabled={panelManager.autoOpenEnabled}
+      onAutoOpenChange={panelManager.setAutoOpenEnabled}
     />
   );
 
   const rightPanelContent =
-    sharadHiresProductId ? (
+    // Explicit analysis modes take priority (user deliberately opened these)
+    analysisMode === "assistant" ? (
+      <AssistantPanel
+        onClose={handleCopilotClose}
+        onFlyTo={handleCopilotFlyTo}
+        onHighlight={handleCopilotHighlight}
+        initialGoal={copilotGoal}
+        onPanelAttention={handleAssistantPanelAttention}
+      />
+    ) : analysisMode === "agentic" ? (
+      <AgenticPanel
+        onClose={() => { setAnalysisMode(null); setEpsilonTarget(null); }}
+        initialObjective={epsilonTarget ? `Run terrain εr inversion for terraced crater at (${epsilonTarget.lat.toFixed(3)}, ${epsilonTarget.lon.toFixed(3)}), diameter ${epsilonTarget.diameter_km?.toFixed(1) ?? "?"} km, terrace depth ${epsilonTarget.terrace_depth_m?.toFixed(0) ?? "?"} m. Search for SHARAD and HiRISE DTM data, then compute dielectric constant.` : undefined}
+        onPanelAttention={handleAgenticPanelAttention}
+      />
+    ) : sharadHiresProductId ? (
       <SharadHiresInspector
         productId={sharadHiresProductId}
         onClose={() => { setSharadHiresProductId(null); setSharadTracePin(null); }}
@@ -1534,7 +1554,7 @@ export default function MainPage() {
       <Inspector
         selected={selected}
         onClose={() => setSelected(null)}
-        onCollapse={() => setRightPanelCollapsed(true)}
+        onCollapse={() => { setRightPanelCollapsed(true); panelManager.recordManualCollapse(); }}
         activeOverlay={activeOverlays.get(selected.productId) || null}
         onSetOverlay={(type) => handleSetOverlay(selected.productId, type)}
         onSetOpacity={(opacity) => handleSetOpacity(selected.productId, opacity)}
@@ -1592,11 +1612,6 @@ export default function MainPage() {
           setAiAnalysisPin(null);
           setAnalysisMode(null);
         }}
-      />
-    ) : analysisMode === "agentic" ? (
-      <AgenticPanel
-        onClose={() => { setAnalysisMode(null); setEpsilonTarget(null); }}
-        initialObjective={epsilonTarget ? `Run terrain εr inversion for terraced crater at (${epsilonTarget.lat.toFixed(3)}, ${epsilonTarget.lon.toFixed(3)}), diameter ${epsilonTarget.diameter_km?.toFixed(1) ?? "?"} km, terrace depth ${epsilonTarget.terrace_depth_m?.toFixed(0) ?? "?"} m. Search for SHARAD and HiRISE DTM data, then compute dielectric constant.` : undefined}
       />
     ) : analysisMode === "report" ? (
       <Suspense fallback={<div className="flex items-center justify-center h-full text-[#6b7c9c] text-xs">Loading...</div>}>
@@ -1667,7 +1682,11 @@ export default function MainPage() {
       rightPanel={isMobile ? undefined : (
         rightPanelCollapsed ? (
           /* Collapsed strip — thin vertical bar with expand button */
-          <div className="h-full w-8 bg-[#0a0f18] border-l border-border-dark flex flex-col items-center pt-2 gap-2">
+          <div
+            key={panelManager.stripPulseKey}
+            className={`h-full w-8 bg-[#0a0f18] border-l border-border-dark flex flex-col items-center pt-2 gap-2${panelManager.stripPulse ? " strip-attention-pulse" : ""}`}
+            onAnimationEnd={panelManager.clearStripPulse}
+          >
             <button
               onClick={() => setRightPanelCollapsed(false)}
               className="p-1 rounded hover:bg-[#232f48] text-[#6b7c9c] hover:text-white transition-colors"
@@ -1688,7 +1707,7 @@ export default function MainPage() {
                 (Inspector and SharadHiresInspector handle it internally) */}
             {!selected && !sharadHiresProductId && (
               <button
-                onClick={() => setRightPanelCollapsed(true)}
+                onClick={() => { setRightPanelCollapsed(true); panelManager.recordManualCollapse(); }}
                 className="absolute top-2 right-12 z-30 p-1 rounded hover:bg-[#232f48] text-[#6b7c9c] hover:text-white transition-colors"
                 title="Collapse panel"
               >
@@ -1696,7 +1715,13 @@ export default function MainPage() {
               </button>
             )}
             <div className="flex-1 overflow-hidden">
-              {rightPanelContent}
+              <PanelAttentionWrapper
+                isActive={panelManager.attentionPulse}
+                pulseKey={panelManager.attentionPulseKey}
+                onPulseEnd={panelManager.clearAttentionPulse}
+              >
+                {rightPanelContent}
+              </PanelAttentionWrapper>
             </div>
           </div>
         )
@@ -1786,16 +1811,15 @@ export default function MainPage() {
         craterDetectFeatures={craterDetectFeatures}
       />
 
-      {/* Smart Context Copilot */}
+      {/* Copilot FAB — floating agent input */}
       {!isMobile && (
-        <ContextCopilot
-          selectedProduct={copilotSelectedProduct}
-          visibleInstruments={copilotVisibleInstruments}
-          currentLocation={null}
-          analysisMode={analysisMode}
-          overlayCount={activeOverlays.size}
-          overlapFilterEnabled={overlapFilter.enabled}
-          onAction={handleCopilotAction}
+        <CopilotFab
+          hidden={analysisMode === "assistant"}
+          onSubmit={(goal) => {
+            setCopilotGoal(goal);
+            handleAnalysisModeChange("assistant");
+            panelManager.ensurePanelVisible("user_click");
+          }}
         />
       )}
 

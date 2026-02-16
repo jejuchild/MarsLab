@@ -487,8 +487,11 @@ app.include_router(mola_detect_router)  # /api/mola-detect/* — MOLA Landform D
 from api.terrain_features import router as terrain_features_router
 app.include_router(terrain_features_router)  # /api/terrain/features_in_view
 
-from backend.agent.workflow_router import router as workflow_router
+from agent.workflow_router import router as workflow_router
 app.include_router(workflow_router)  # /api/workflow/* — Workflow Research Assistant
+
+from copilot.router import router as copilot_router
+app.include_router(copilot_router)  # /api/copilot/* — Adaptive Research Copilot
 
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):

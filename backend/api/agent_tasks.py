@@ -2513,6 +2513,10 @@ def synthesize_results(
             "assumptions": inv.get("assumptions", []),
             "derivation_log": inv.get("derivation_log", []),
             "methodology": inv.get("methodology", ""),
+            # Gaussian error propagation (B-level)
+            "best_epsilon_r_sigma": inv.get("best_epsilon_r_sigma"),
+            "best_epsilon_r_1sigma": inv.get("best_epsilon_r_1sigma"),
+            "sensitivity": inv.get("sensitivity"),
         }
         # Override dielectric_analysis if physics inversion succeeded
         if inv.get("inversions_completed", 0) > 0:

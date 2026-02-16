@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 
 /* =========================================================
  * Types
@@ -32,6 +33,9 @@ interface TopBarProps {
   searchableItems?: SearchableItem[];
   isMobile?: boolean;
   onEasterEgg?: () => void;
+  onTerraform?: () => void;
+  onCuriositySelfie?: () => void;
+  onMarkWatney?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
   lastActionDescription?: string;
@@ -120,6 +124,9 @@ export default function TopBar({
   onSelectResult,
   isMobile = false,
   onEasterEgg,
+  onTerraform,
+  onCuriositySelfie,
+  onMarkWatney,
   canUndo = false,
   canRedo = false,
   lastActionDescription,
@@ -138,6 +145,25 @@ export default function TopBar({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Easter egg #3: Curiosity selfie — click logo 7 times rapidly
+  const logoClickCountRef = useRef(0);
+  const logoClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLogoClick = useCallback((e: React.MouseEvent) => {
+    logoClickCountRef.current += 1;
+    if (logoClickTimerRef.current) clearTimeout(logoClickTimerRef.current);
+    logoClickTimerRef.current = setTimeout(() => {
+      logoClickCountRef.current = 0;
+    }, 2000);
+
+    if (logoClickCountRef.current >= 7) {
+      e.preventDefault();
+      logoClickCountRef.current = 0;
+      if (logoClickTimerRef.current) clearTimeout(logoClickTimerRef.current);
+      onCuriositySelfie?.();
+    }
+  }, [onCuriositySelfie]);
 
   // Detect search mode from query
   const searchMode = useMemo<SearchMode>(() => {
@@ -206,6 +232,38 @@ export default function TopBar({
       setShowDropdown(false);
       onEasterEgg();
       return;
+    }
+
+    // Easter egg #2: terraform mode
+    if (value.trim().toLowerCase() === "terraform" && onTerraform) {
+      setQuery("");
+      setResults([]);
+      setShowDropdown(false);
+      onTerraform();
+      return;
+    }
+
+    // Easter egg #5: Mark Watney / The Martian
+    if (value.trim().toLowerCase() === "markwatney" && onMarkWatney) {
+      setQuery("");
+      setResults([]);
+      setShowDropdown(false);
+      onMarkWatney();
+      return;
+    }
+
+    // Easter egg #6: metric enforcement
+    const lower = value.trim().toLowerCase();
+    if (lower === "feet" || lower === "miles" || lower === "inches" || lower === "yards") {
+      toast("This is a science tool. We use metric here.", {
+        icon: "\u{1F4CF}",
+        duration: 3000,
+        style: {
+          background: "#101622",
+          color: "#92a4c9",
+          border: "1px solid #232f48",
+        },
+      });
     }
 
     setQuery(value);
@@ -459,7 +517,7 @@ export default function TopBar({
       <>
         <header className="flex h-12 items-center justify-between border-b border-border-dark bg-bg-dark px-4">
           {/* Brand */}
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2" onClick={handleLogoClick}>
             <div className="flex size-5 items-center justify-center text-primary">
               <span className="material-symbols-outlined text-xl">rocket_launch</span>
             </div>
@@ -526,7 +584,7 @@ export default function TopBar({
     <header className="flex h-14 items-center justify-between border-b border-border-dark bg-bg-dark px-6">
       {/* Brand + Navigation */}
       <div className="flex items-center gap-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 cursor-pointer" onClick={handleLogoClick}>
           <div className="flex size-6 items-center justify-center text-primary">
             <span className="material-symbols-outlined text-2xl">rocket_launch</span>
           </div>

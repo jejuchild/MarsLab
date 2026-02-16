@@ -138,7 +138,7 @@ type MapViewProps = {
     opacity: number;
   }>;
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | null;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "assistant" | "report" | "guided" | "region_stats" | "crater_detect" | null;
   // Active HiRISE DTM product for hover elevation probing
   activeDTMProductId?: string | null;
   linePoints?: Array<{ lat: number; lon: number }>;
@@ -847,6 +847,12 @@ export default function MapView({
     );
 
     viewerRef.current = viewer;
+
+    // Suppress Cesium tile-load errors (network failures) so they don't
+    // bubble up as unhandled rejections and crash the page.
+    viewer.scene.renderError.addEventListener((_scene: any, error: any) => {
+      console.warn("[Cesium] render error (suppressed):", error);
+    });
 
     viewer.scene.globe = new Cesium.Globe(MARS_ELLIPSOID);
     viewer.scene.globe.depthTestAgainstTerrain = false;
@@ -1754,11 +1760,15 @@ export default function MapView({
     // the visibility effect doesn't re-run (show state unchanged)
     (async () => {
       try {
+        console.log(`[MapView] Loading ${instrument} footprints...`);
         const result = await fm.loadFootprints(instrument);
         if (cancelled) return;
+        console.log(`[MapView] ${instrument} load result:`, result);
         if (result && result.count > 0) {
           fm.setVisible(instrument, true);
           setFootprintVersion(v => v + 1);
+        } else {
+          console.warn(`[MapView] ${instrument}: no footprints found in viewport`);
         }
       } catch (e) {
         if (!cancelled) toast.error(`Failed to load ${instrument} footprints`);
@@ -1931,6 +1941,7 @@ export default function MapView({
       if (showSharadHighres) fm.setVisible("SHARAD_HIGHRES", true);
       if (showCTX) fm.setVisible("CTX", true);
       if (showHiRISEDTM) fm.setVisible("HIRISE_DTM", true);
+      if (showCRISM_TRR3) fm.setVisible("CRISM_TRR3", true);
       // Re-apply CRISM ice score filter if active
       if (crismFilteredIds !== null && showCRISM) {
         const crismFeatures = fm.getFeatures("CRISM");
@@ -1987,6 +1998,7 @@ export default function MapView({
         SHARAD_HIGHRES: showSharadHighres,
         CTX: showCTX,
         HIRISE_DTM: showHiRISEDTM,
+        CRISM_TRR3: showCRISM_TRR3,
       }[inst] ?? false;
 
       if (!instrumentOn) continue;
@@ -2010,7 +2022,7 @@ export default function MapView({
     viewer.scene.requestRender();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overlapEnabled, footprintVersion, crismFilteredIds,
-      showCRISM, showHiRISE, showSHARAD, showSharadHighres, showCTX, showHiRISEDTM]);
+      showCRISM, showHiRISE, showSHARAD, showSharadHighres, showCTX, showHiRISEDTM, showCRISM_TRR3]);
 
   // Line Profile markers and polyline
   useEffect(() => {
@@ -2228,35 +2240,39 @@ export default function MapView({
         }
       }
 
-      // If found entity with position (point/polyline), fly to its position
+      // If found entity with position (point), fly above it
       if (foundEntity?.position) {
         const pos = foundEntity.position.getValue(Cesium.JulianDate.now());
         if (pos) {
+          const carto = Cesium.Cartographic.fromCartesian(pos, MARS_ELLIPSOID);
           v.camera.flyTo({
-            destination: pos,
+            destination: Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, 50000, MARS_ELLIPSOID),
             orientation: {
               heading: 0,
               pitch: Cesium.Math.toRadians(-90),
               roll: 0,
             },
+            duration: 0.8,
             complete: () => onFlyToComplete?.(),
           });
           return;
         }
       }
 
-      // If found entity with polyline, fly to its center
+      // If found entity with polyline, fly above its center
       if (foundEntity?.polyline?.positions) {
         const positions = foundEntity.polyline.positions.getValue(Cesium.JulianDate.now());
         if (positions && positions.length > 0) {
           const midIdx = Math.floor(positions.length / 2);
+          const carto = Cesium.Cartographic.fromCartesian(positions[midIdx], MARS_ELLIPSOID);
           v.camera.flyTo({
-            destination: positions[midIdx],
+            destination: Cesium.Cartesian3.fromRadians(carto.longitude, carto.latitude, 80000, MARS_ELLIPSOID),
             orientation: {
               heading: 0,
               pitch: Cesium.Math.toRadians(-90),
               roll: 0,
             },
+            duration: 0.8,
             complete: () => onFlyToComplete?.(),
           });
           return;
@@ -2369,8 +2385,8 @@ export default function MapView({
 
     const { lat, lon } = flyToCoords;
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(lon, lat, 500000),
-      duration: 1.5,
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, 50000),
+      duration: 1.0,
     });
 
     onFlyToCoordsComplete?.();
@@ -2716,8 +2732,7 @@ export default function MapView({
             imageUrl = `/hirise/quickview/${productId}.png`;
             instrument = "HIRISE";
           } else if (isTRR3) {
-            const obsId = productId.replace(/_\d{2}$/, "");
-            imageUrl = `/api/mineral-cnn/quickview/${obsId}`;
+            imageUrl = `/api/mineral-cnn/quickview/${productId}`;
             instrument = "CRISM_TRR3";
           } else {
             // Smart backend endpoint handles all naming patterns
@@ -3425,9 +3440,7 @@ export default function MapView({
           const bounds = await getProductBounds(productId);
           if (!bounds || !viewerRef.current) return null;
 
-          // obs_id: strip _NN suffix (e.g. frt0000c702_07 → frt0000c702)
-          const obsId = productId.replace(/_\d{2}$/, "");
-          const mapUrl = `/api/mineral-cnn/result/${obsId}/mineral-map.png`;
+          const mapUrl = `/api/mineral-cnn/result/${productId}/mineral-map.png`;
 
           const res = await fetch(mapUrl);
           if (!res.ok) return null;

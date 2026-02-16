@@ -218,6 +218,16 @@ function applyEvent(s: SessionData, event: AgentEvent, narrativePhase: boolean):
       return { ...s, figures: (event.data.figures as EvidenceFigure[]) || [] };
     case "done":
       return { ...s, synthesis: (event.data.synthesis as Record<string, unknown>) || null, sessionState: "done" };
+    case "evidence_pack_assembled":
+    case "report_generated":
+    case "artifacts_saved":
+      return s; // informational — no state change needed
+    case "critique_start":
+      return { ...s, sessionState: "synthesizing" };
+    case "critique_end":
+      return s; // critique complete — done event follows
+    case "budget_exceeded":
+      return s; // informational — pipeline continues to synthesis
     case "error":
       return { ...s, error: (event.data.error as string) || "Unknown error", sessionState: "error" };
     // ReAct events
@@ -304,9 +314,11 @@ function applyEvent(s: SessionData, event: AgentEvent, narrativePhase: boolean):
 export default function AgenticPanel({
   onClose,
   initialObjective,
+  onPanelAttention,
 }: {
   onClose: () => void;
   initialObjective?: string;
+  onPanelAttention?: () => void;
 }) {
   // Reducer holds all session-execution state
   const [session, dispatch] = useReducer(sessionReducer, INITIAL_SESSION);
@@ -416,7 +428,11 @@ export default function AgenticPanel({
       downloadStartRef.current = null;
     }
     dispatch({ type: "EVENT", event, narrativePhase: narrativePhaseRef.current });
-  }, []);
+    // Notify parent for panel attention on meaningful completions
+    if (event.event === "step_complete" || event.event === "done" || event.event === "narrative") {
+      onPanelAttention?.();
+    }
+  }, [onPanelAttention]);
 
   // ── Shared SSE stream consumer ─────────────────────────
   const consumeSSEStream = useCallback(async (res: Response) => {
@@ -1255,14 +1271,14 @@ export default function AgenticPanel({
           </div>
         )}
 
-        {/* Download Report */}
+        {/* Download Report + Evidence Pack */}
         {sessionState === "done" && sessionId && (
           <div className="bg-[#1a2333] border border-[#232f48] rounded-lg p-3">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-sm text-sky-400">download</span>
               <span className="text-[10px] font-bold uppercase tracking-widest text-sky-400">Download Report</span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button
                 onClick={() => window.open(`/api/agent/report/${sessionId}?format=md`, "_blank")}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
@@ -1276,6 +1292,13 @@ export default function AgenticPanel({
               >
                 <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
                 PDF
+              </button>
+              <button
+                onClick={() => window.open(`/api/agent/evidence/${sessionId}`, "_blank")}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[10px] font-bold uppercase tracking-wider transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm">data_object</span>
+                Evidence JSON
               </button>
             </div>
           </div>

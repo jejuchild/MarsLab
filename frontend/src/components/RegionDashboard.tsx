@@ -369,28 +369,33 @@ export default function RegionDashboard({
   useEffect(() => {
     if (!isOpen) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8_000);
     setLoading(true);
     setError(null);
 
-    fetch("/api/proximity/regions")
+    fetch("/api/proximity/regions", { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<RegionRaw[]>;
       })
       .then((data) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setRegionData(data);
         setLoading(false);
       })
       .catch((err) => {
-        if (cancelled) return;
-        setError(err.message);
+        if (controller.signal.aborted) {
+          setError("Backend not reachable — start the server with: uvicorn backend.app:app");
+        } else {
+          setError(err.message);
+        }
         setLoading(false);
       });
 
     return () => {
-      cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, [isOpen]);
 
@@ -398,26 +403,27 @@ export default function RegionDashboard({
   useEffect(() => {
     if (!isOpen) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     setScoresLoading(true);
 
-    fetch("/api/regions/scores")
+    fetch("/api/regions/scores", { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json() as Promise<RegionScoresResponse>;
       })
       .then((data) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setScoresMap(data.scores);
         setScoresLoading(false);
       })
       .catch(() => {
-        if (cancelled) return;
         setScoresLoading(false);
       });
 
     return () => {
-      cancelled = true;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, [isOpen]);
 
@@ -595,7 +601,7 @@ export default function RegionDashboard({
           {scoresLoading && (
             <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-sky-500/10 border border-sky-500/20">
               <span className="material-symbols-outlined text-sm text-sky-400 animate-spin">progress_activity</span>
-              <span className="text-xs text-sky-300">Computing real scores from DEM + instrument data... (first time only)</span>
+              <span className="text-xs text-sky-300">Loading region scores...</span>
             </div>
           )}
 

@@ -106,6 +106,12 @@ class AgentSession:
     figures: Optional[List[Dict[str, Any]]] = None
     error: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    # B-level report fields
+    evidence_pack: Optional[Dict[str, Any]] = None
+    report_draft: Optional[str] = None
+    report_critique: Optional[Dict[str, Any]] = None
+    artifacts_dir: Optional[str] = None
+    wall_clock_start: Optional[float] = None
 
     # Event buffer for replay/resume — stores every SSE event emitted
     events: List[Dict[str, Any]] = field(default_factory=list)
@@ -128,7 +134,7 @@ class AgentSession:
         return self.status in ("done", "error")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "session_id": self.session_id,
             "objective": self.objective,
             "status": self.status,
@@ -145,6 +151,13 @@ class AgentSession:
             "error": self.error,
             "created_at": self.created_at,
         }
+        if self.evidence_pack:
+            d["evidence_pack"] = self.evidence_pack
+        if self.report_critique:
+            d["report_critique"] = self.report_critique
+        if self.artifacts_dir:
+            d["artifacts_dir"] = self.artifacts_dir
+        return d
 
 
 # Active sessions store
@@ -217,6 +230,10 @@ def _load_sessions():
                 figures=rec.get("figures"),
                 error=rec.get("error"),
                 created_at=rec.get("created_at", ""),
+                evidence_pack=rec.get("evidence_pack"),
+                report_draft=rec.get("report_draft"),
+                report_critique=rec.get("report_critique"),
+                artifacts_dir=rec.get("artifacts_dir"),
             )
             _sessions[sid] = session
         logger.info(f"Loaded {len(records)} agent sessions from disk")
@@ -248,6 +265,15 @@ def _save_session(session: AgentSession):
     record = session.to_dict()
     record["steps"] = step_records
     # Keep figures with base64 data — they're small evidence PNGs (~10-50KB each)
+    # Persist B-level report data
+    if session.evidence_pack:
+        record["evidence_pack"] = session.evidence_pack
+    if session.report_draft:
+        record["report_draft"] = session.report_draft
+    if session.report_critique:
+        record["report_critique"] = session.report_critique
+    if session.artifacts_dir:
+        record["artifacts_dir"] = session.artifacts_dir
     if session.bbox:
         record["bbox"] = {
             "min_lat": session.bbox.min_lat,
@@ -2593,6 +2619,40 @@ async def run_agent(
         yield {"event": "thought_end", "data": {"phase": "narrative"}}
         yield {"event": "narrative", "data": {"narrative": session.narrative}}
 
+        # ── B-level: EvidencePack + Report + Critique + Artifacts ──
+        try:
+            from .evidence_pack import assemble_evidence_pack, save_session_artifacts
+            from .report_critique import self_critique_loop
+
+            # Assemble evidence pack
+            session.evidence_pack = assemble_evidence_pack(session)
+            yield {"event": "evidence_pack_assembled", "data": {"version": "2.0"}}
+
+            # Generate report from evidence pack
+            from .agentic_router import generate_report_from_evidence_pack
+            session.report_draft = generate_report_from_evidence_pack(session.evidence_pack, session)
+            yield {"event": "report_generated", "data": {"length": len(session.report_draft)}}
+
+            # Self-critique loop
+            yield {"event": "critique_start", "data": {"max_iterations": 2}}
+            critique_result = await self_critique_loop(
+                session.report_draft, session.evidence_pack, session,
+                max_iterations=2, timeout_s=60.0,
+            )
+            session.report_draft = critique_result["final_report"]
+            session.report_critique = critique_result
+            yield {"event": "critique_end", "data": {
+                "iterations": critique_result["iterations"],
+                "issues_found": sum(c.get("issues_found", 0) for c in critique_result.get("critique_log", [])),
+            }}
+
+            # Save artifacts to disk
+            session.artifacts_dir = save_session_artifacts(session)
+            yield {"event": "artifacts_saved", "data": {"dir": session.artifacts_dir}}
+
+        except Exception as e:
+            logger.warning(f"B-level report pipeline failed (react), falling back: {e}")
+
         # ── Done ──
         session.status = "done"
         yield {"event": "done", "data": session.to_dict()}
@@ -2643,6 +2703,13 @@ async def _run_agent_rules(
 
     async def _emit_chunk(text: str):
         await reasoning_queue.put({"event": "reasoning_chunk", "data": {"text": text}})
+
+    # Wall-clock budget for rule-based pipeline: 20 minutes
+    import time as _time
+    WALL_CLOCK_BUDGET_S = 20 * 60
+    _wall_clock_start = _time.monotonic()
+    if _session:
+        _session.wall_clock_start = _wall_clock_start
 
     try:
         # ── Phase 0: Early region resolution for science context ──
@@ -2808,6 +2875,19 @@ async def _run_agent_rules(
 
         step_count = len(session.steps)
         for step_index, step in enumerate(session.steps):
+            # Wall-clock budget check
+            elapsed = _time.monotonic() - _wall_clock_start
+            if elapsed > WALL_CLOCK_BUDGET_S:
+                logger.warning(f"Wall clock budget exceeded ({elapsed:.0f}s > {WALL_CLOCK_BUDGET_S}s)")
+                yield {"event": "budget_exceeded", "data": {
+                    "elapsed_s": round(elapsed), "budget_s": WALL_CLOCK_BUDGET_S,
+                    "steps_completed": step_index, "steps_total": step_count,
+                }}
+                for remaining in session.steps[step_index:]:
+                    remaining.status = StepStatus.SKIPPED
+                    remaining.error = "Skipped: wall clock budget exceeded"
+                break
+
             step.status = StepStatus.RUNNING
             yield {"event": "step_start", "data": {**step.to_dict(), "step_index": step_index, "step_count": step_count}}
 
@@ -3014,6 +3094,40 @@ async def _run_agent_rules(
             session.narrative = _generate_narrative_fallback(session)
 
         yield {"event": "narrative", "data": {"narrative": session.narrative}}
+
+        # ── B-level: EvidencePack + Report + Critique + Artifacts ──
+        try:
+            from .evidence_pack import assemble_evidence_pack, save_session_artifacts
+            from .report_critique import self_critique_loop
+
+            # Assemble evidence pack
+            session.evidence_pack = assemble_evidence_pack(session)
+            yield {"event": "evidence_pack_assembled", "data": {"version": "2.0"}}
+
+            # Generate report from evidence pack
+            from .agentic_router import generate_report_from_evidence_pack
+            session.report_draft = generate_report_from_evidence_pack(session.evidence_pack, session)
+            yield {"event": "report_generated", "data": {"length": len(session.report_draft)}}
+
+            # Self-critique loop
+            yield {"event": "critique_start", "data": {"max_iterations": 2}}
+            critique_result = await self_critique_loop(
+                session.report_draft, session.evidence_pack, session,
+                max_iterations=2, timeout_s=60.0,
+            )
+            session.report_draft = critique_result["final_report"]
+            session.report_critique = critique_result
+            yield {"event": "critique_end", "data": {
+                "iterations": critique_result["iterations"],
+                "issues_found": sum(c.get("issues_found", 0) for c in critique_result.get("critique_log", [])),
+            }}
+
+            # Save artifacts to disk
+            session.artifacts_dir = save_session_artifacts(session)
+            yield {"event": "artifacts_saved", "data": {"dir": session.artifacts_dir}}
+
+        except Exception as e:
+            logger.warning(f"B-level report pipeline failed (rules), falling back: {e}")
 
         # ── Done ───────────────────────────────────────
         session.status = "done"

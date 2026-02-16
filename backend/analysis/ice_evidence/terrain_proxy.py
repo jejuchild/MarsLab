@@ -101,7 +101,10 @@ def _try_hirise_dtm(
 
     try:
         import rasterio
-        from analysis.epsilon_terrace.terrace_detect import latlon_to_pixel
+        try:
+            from analysis.epsilon_terrace.terrace_detect import latlon_to_pixel
+        except ImportError:
+            from backend.analysis.epsilon_terrace.terrace_detect import latlon_to_pixel
 
         ds = rasterio.open(dtm_file)
         elev = ds.read(1).astype(np.float64)

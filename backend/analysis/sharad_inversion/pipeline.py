@@ -86,12 +86,18 @@ def run_inversion_pipeline(
         from analysis.epsilon_terrace.terrace_detect import extract_radial_profiles
         from analysis.epsilon_terrace.sharad_pick import pick_subsurface_interface
         from analysis.epsilon_terrace.epsilon_calc import compute_epsilon
-    except ImportError as e:
-        return InversionPipelineResult(
-            success=False,
-            error=f"Missing epsilon_terrace module: {e}",
-            assumptions=all_assumptions,
-        )
+    except ImportError:
+        try:
+            from backend.analysis.epsilon_terrace.run import find_nearby_dtms
+            from backend.analysis.epsilon_terrace.terrace_detect import extract_radial_profiles
+            from backend.analysis.epsilon_terrace.sharad_pick import pick_subsurface_interface
+            from backend.analysis.epsilon_terrace.epsilon_calc import compute_epsilon
+        except ImportError as e:
+            return InversionPipelineResult(
+                success=False,
+                error=f"Missing epsilon_terrace module: {e}",
+                assumptions=all_assumptions,
+            )
 
     _step("Pipeline initialization", notes=f"Analyzing {len(sharad_product_ids)} SHARAD products, buffer={buffer_km}km")
 
@@ -281,6 +287,29 @@ def run_inversion_pipeline(
                 eps_lo = (SPEED_OF_LIGHT / v_hi) ** 2
                 eps_hi = (SPEED_OF_LIGHT / v_lo) ** 2
 
+                # ── Gaussian error propagation ──
+                # σ_ε = ε × 2 × √((σ_t/t)² + (σ_d/d)²)
+                rel_sigma_t = dt_s / t_s if t_s > 0 else 0.5
+                rel_sigma_d = dd / d if d > 0 else 0.15
+                eps_sigma = epsilon_r * 2.0 * math.sqrt(rel_sigma_t**2 + rel_sigma_d**2)
+                eps_1sigma_lo = epsilon_r - eps_sigma
+                eps_1sigma_hi = epsilon_r + eps_sigma
+                eps_2sigma_lo = epsilon_r - 2.0 * eps_sigma
+                eps_2sigma_hi = epsilon_r + 2.0 * eps_sigma
+
+                # ── Sensitivity analysis ──
+                # εr at depth ±10%
+                d_plus10 = d * 1.10
+                d_minus10 = d * 0.90
+                sens_d_plus10 = (SPEED_OF_LIGHT * t_s / (2.0 * d_plus10)) ** 2
+                sens_d_minus10 = (SPEED_OF_LIGHT * t_s / (2.0 * d_minus10)) ** 2
+                # εr at TWTT ±1 range bin
+                one_bin_s = SHARAD_DT_US * 1e-6
+                t_plus1 = t_s + one_bin_s
+                t_minus1 = max(t_s - one_bin_s, t_s * 0.5)
+                sens_t_plus1 = (SPEED_OF_LIGHT * t_plus1 / (2.0 * d)) ** 2
+                sens_t_minus1 = (SPEED_OF_LIGHT * t_minus1 / (2.0 * d)) ** 2
+
                 # Quality classification
                 if 2.0 < epsilon_r < 6.0 and (eps_hi / max(eps_lo, 0.01)) < 10:
                     quality = "good"
@@ -306,10 +335,22 @@ def run_inversion_pipeline(
                         result={"epsilon_r": round(epsilon_r, 3)},
                     ),
                     DerivationStep(
-                        step_number=3, description="Propagate uncertainty",
+                        step_number=3, description="Propagate uncertainty (interval bounds)",
                         formula="εr_low = (c·(Δt-δt) / (2·(d+δd)))²; εr_high = (c·(Δt+δt) / (2·(d-δd)))²",
                         inputs={"dt_s": dt_s, "dd_m": dd},
                         result={"epsilon_r_low": round(eps_lo, 3), "epsilon_r_high": round(eps_hi, 3)},
+                    ),
+                    DerivationStep(
+                        step_number=4, description="Gaussian error propagation",
+                        formula="σ_ε = ε × 2 × √((σ_t/t)² + (σ_d/d)²)",
+                        inputs={"rel_sigma_t": round(rel_sigma_t, 4), "rel_sigma_d": round(rel_sigma_d, 4)},
+                        result={"epsilon_r_sigma": round(eps_sigma, 4), "1sigma": [round(eps_1sigma_lo, 3), round(eps_1sigma_hi, 3)]},
+                    ),
+                    DerivationStep(
+                        step_number=5, description="Sensitivity analysis",
+                        formula="εr(d±10%), εr(Δt±1 bin)",
+                        inputs={"d_plus10": round(d_plus10, 2), "d_minus10": round(d_minus10, 2), "t_plus1_us": round(t_plus1 * 1e6, 4), "t_minus1_us": round(t_minus1 * 1e6, 4)},
+                        result={"eps_d+10%": round(sens_d_plus10, 3), "eps_d-10%": round(sens_d_minus10, 3), "eps_t+1bin": round(sens_t_plus1, 3), "eps_t-1bin": round(sens_t_minus1, 3)},
                     ),
                 ]
 
@@ -325,6 +366,15 @@ def run_inversion_pipeline(
                     quality=quality,
                     interpretation=interpretation,
                     derivation=derivation_steps_local,
+                    epsilon_r_sigma=round(eps_sigma, 4),
+                    epsilon_r_1sigma_lo=round(eps_1sigma_lo, 4),
+                    epsilon_r_1sigma_hi=round(eps_1sigma_hi, 4),
+                    epsilon_r_2sigma_lo=round(eps_2sigma_lo, 4),
+                    epsilon_r_2sigma_hi=round(eps_2sigma_hi, 4),
+                    sensitivity_depth_plus10=round(sens_d_plus10, 4),
+                    sensitivity_depth_minus10=round(sens_d_minus10, 4),
+                    sensitivity_twt_plus1bin=round(sens_t_plus1, 4),
+                    sensitivity_twt_minus1bin=round(sens_t_minus1, 4),
                 )
 
                 _step(
@@ -414,6 +464,25 @@ def run_inversion_pipeline(
         },
     )
 
+    # Aggregate Gaussian sigma and sensitivity from best inversion
+    best_sigma = None
+    best_1sigma = None
+    best_sensitivity = None
+    if good_inversions:
+        # Use the inversion closest to the median εr
+        best_inv = min(good_inversions, key=lambda inv: abs(inv.inversion.epsilon_r - best_eps))
+        bi = best_inv.inversion
+        if bi.epsilon_r_sigma is not None:
+            best_sigma = bi.epsilon_r_sigma
+            best_1sigma = [bi.epsilon_r_1sigma_lo, bi.epsilon_r_1sigma_hi]
+        if bi.sensitivity_depth_plus10 is not None:
+            best_sensitivity = {
+                "depth_plus10": bi.sensitivity_depth_plus10,
+                "depth_minus10": bi.sensitivity_depth_minus10,
+                "twt_plus1bin": bi.sensitivity_twt_plus1bin,
+                "twt_minus1bin": bi.sensitivity_twt_minus1bin,
+            }
+
     return InversionPipelineResult(
         success=len(all_inversions) > 0,
         sharad_products_analyzed=len(sharad_product_ids),
@@ -424,6 +493,9 @@ def run_inversion_pipeline(
         best_epsilon_r_ci=best_ci,
         best_interpretation=best_interp,
         reflector_confidence=reflector_conf,
+        best_epsilon_r_sigma=best_sigma,
+        best_epsilon_r_1sigma=best_1sigma,
+        sensitivity=best_sensitivity,
         assumptions=all_assumptions,
         derivation_log=all_derivation,
         notes=f"Analyzed {len(sharad_product_ids)} SHARAD products, found {dtm_intersections} DTM intersections, completed {len(all_inversions)} inversions" if all_inversions else "No dielectric inversions possible — no DTM-SHARAD terrace intersections found",
@@ -440,8 +512,12 @@ def _run_hyperbola_validation(
     try:
         from analysis.ice_evidence.hyperbola_fit import auto_detect_apexes, fit_hyperbola
         from analysis.ice_evidence.models import HyperbolaFitRequest
-    except ImportError as e:
-        return HyperbolaValidation(notes=f"hyperbola_fit module unavailable: {e}")
+    except ImportError:
+        try:
+            from backend.analysis.ice_evidence.hyperbola_fit import auto_detect_apexes, fit_hyperbola
+            from backend.analysis.ice_evidence.models import HyperbolaFitRequest
+        except ImportError as e:
+            return HyperbolaValidation(notes=f"hyperbola_fit module unavailable: {e}")
 
     try:
         # Use the best reflector pick as apex for hyperbola fitting

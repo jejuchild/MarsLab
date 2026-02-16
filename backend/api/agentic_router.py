@@ -783,6 +783,646 @@ def _fig_markdown(b64: str, caption: str, explanation: str) -> list[str]:
     ]
 
 
+def generate_report_from_evidence_pack(
+    evidence_pack: Dict,
+    session: AgentSession,
+) -> str:
+    """
+    Generate a B-level 7-section report from an EvidencePack.
+
+    This is the new report template replacing _build_report_markdown for new sessions.
+    Sections: 1-Objective, 2-Subsurface+Dielectric, 3-Surface+CNN,
+    4-Cross-Instrument, 5-Engineering, 6-Climate+TI, 7-Score+Landing.
+    """
+    from typing import Any
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    lines: list[str] = []
+    ep = evidence_pack
+
+    # Inline figure helper
+    figures_map: Dict[str, str] = {}
+    for fig in (session.figures or []):
+        if fig.get("base64") and fig.get("id"):
+            figures_map[fig["id"]] = fig["base64"]
+
+    def _fig(fig_id: str, caption: str, explanation: str):
+        b64 = figures_map.get(fig_id)
+        if b64:
+            lines.extend(_fig_markdown(b64, caption, explanation))
+
+    # ── Title ──
+    region = ep.get("region", {})
+    lines.append("# MarsLab — Mission Assessment Report")
+    lines.append("")
+    lines.append(f"**Generated:** {now}  ")
+    lines.append(f"**Session:** `{ep.get('session_id', 'N/A')}`  ")
+    lines.append(f"**Region:** {region.get('name', 'Unknown')}  ")
+    lines.append(f"**Instruments:** {', '.join(ep.get('instruments_searched', []))}  ")
+    lines.append(f"**Report Version:** B-level (EvidencePack v{ep.get('version', '2.0')})  ")
+    lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 1. MISSION OBJECTIVE
+    # ══════════════════════════════════════════════════════════════════
+    lines.append("## 1. Mission Objective")
+    lines.append("")
+    lines.append(ep.get("objective", "N/A"))
+    lines.append("")
+    ctx = region.get("science_context", "")
+    if ctx:
+        lines.append(f"*Science context:* {ctx}")
+        lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 2. SUBSURFACE POTENTIAL (SHARAD)
+    # ══════════════════════════════════════════════════════════════════
+    sharad = ep.get("sharad", {})
+    lines.append("## 2. Subsurface Potential (SHARAD Radar Analysis)")
+    lines.append("")
+
+    n_analyzed = sharad.get("analyzed_count", 0)
+    n_detect = sharad.get("subsurface_detections", 0)
+    depth = sharad.get("depth_summary") or {}
+    dielectric = ep.get("dielectric", {})
+    is_fallback = dielectric.get("is_fallback", True)
+
+    lines.append("| Parameter | Value |")
+    lines.append("|-----------|-------|")
+    lines.append(f"| SHARAD Coverage | {sharad.get('coverage', 'NONE')} |")
+    lines.append(f"| Total Tracks | {sharad.get('total_tracks', 0)} |")
+    if n_analyzed:
+        lines.append(f"| Radargrams Analyzed | {n_analyzed} |")
+    lines.append(f"| Subsurface Reflector Detections | **{n_detect}** |")
+    if depth:
+        lines.append(f"| Estimated Depth Range | {depth.get('min_depth_m', 'N/A')} – {depth.get('max_depth_m', 'N/A')} m |")
+        lines.append(f"| Median Depth | {depth.get('median_depth_m', 'N/A')} m |")
+        if is_fallback:
+            lines.append(f"| Dielectric Constant (εr) | {depth.get('epsilon_r_assumed', 3.15)} (**ASSUMED** — water-ice) |")
+        else:
+            eps_val = dielectric.get("epsilon_r", "N/A")
+            method_label = dielectric.get("best_method", "unknown").replace("_", " ").title()
+            lines.append(f"| Dielectric Constant (εr) | **{eps_val}** (measured — {method_label}) |")
+    lines.append("")
+
+    if n_detect > 0 and depth:
+        try:
+            med_d = float(depth.get('median_depth_m', 50))
+        except (TypeError, ValueError):
+            med_d = 50.0
+        if med_d <= 10:
+            depth_qual = "**Shallow ice** — potentially accessible for in-situ resource extraction without deep drilling."
+        elif med_d <= 30:
+            depth_qual = "Moderate depth — drilling infrastructure required for extraction."
+        elif med_d <= 80:
+            depth_qual = "Significant depth — substantial drilling capability needed."
+        else:
+            depth_qual = "**Too deep for practical ice extraction** — reduces site utility for ISRU."
+
+        if is_fallback:
+            physics_attempted = dielectric.get("physics_attempted", False)
+            fallback_reason = (
+                "Physics-based inversion was attempted but failed."
+                if physics_attempted else
+                "Physics-based inversion was not possible due to lack of co-located HiRISE DTM data."
+            )
+            lines.append(
+                f"**FALLBACK ESTIMATE:** SHARAD detected **{n_detect} subsurface reflector(s)**. "
+                f"Depth is estimated at **{depth.get('min_depth_m', 'N/A')}–{depth.get('max_depth_m', 'N/A')} m** "
+                f"(median {depth.get('median_depth_m', 'N/A')} m) using **assumed** εr = {depth.get('epsilon_r_assumed', 3.15)} (water-ice). "
+                f"This depth is **not independently measured**. {fallback_reason}"
+            )
+            lines.append("")
+            lines.append(f"> {depth_qual}")
+        else:
+            lines.append(
+                f"SHARAD analysis detected **{n_detect} subsurface reflector(s)**. "
+                f"Using εr estimated via morphological + radar inversion, "
+                f"the interface depth is **{depth.get('min_depth_m', 'N/A')}–{depth.get('max_depth_m', 'N/A')} m** "
+                f"(median {depth.get('median_depth_m', 'N/A')} m). {depth_qual}"
+            )
+    elif n_analyzed > 0:
+        lines.append(
+            f"{n_analyzed} SHARAD radargrams were analyzed but no subsurface "
+            f"reflectors exceeded the detection threshold (SNR >= 4.0)."
+        )
+    else:
+        lines.append(
+            f"No high-resolution radargram data was available for quantitative analysis. "
+            f"Coverage level: {sharad.get('coverage', 'NONE')}."
+        )
+    lines.append("")
+
+    _fig("sharad_radargram",
+         "Figure 1: SHARAD Radargram",
+         "Red line marks the surface return. Yellow line marks subsurface reflector. "
+         "SNR >= 4.0 detection threshold applied.")
+
+    # ── 2b. Dielectric Constant ──
+    lines.append("## 2b. Dielectric Constant Estimation (εr)")
+    lines.append("")
+    lines.append(
+        "Dielectric constant (εr) constrains subsurface composition. "
+        "Pure water ice: εr ~ 3.1, dry regolith: εr ~ 4-6, basalt: εr ~ 7-9. "
+        "εr MUST be estimated via morphological + radar inversion when data permits."
+    )
+    lines.append("")
+
+    method_hierarchy = dielectric.get("method_hierarchy", [])
+    has_dielectric = dielectric.get("epsilon_r") is not None and not is_fallback
+
+    if has_dielectric or dielectric.get("terrace_estimates_count", 0) > 0 or dielectric.get("physics_inversions_completed", 0) > 0:
+        lines.append("| Method | εr | Interpretation |")
+        lines.append("|--------|-----|----------------|")
+
+        if dielectric.get("terrace_estimates_count", 0) > 0:
+            med_eps = dielectric.get("terrace_median_epsilon_r")
+            med_eps_s = f"{med_eps:.2f}" if isinstance(med_eps, (int, float)) else "N/A"
+            lines.append(f"| Terraced Crater Method | **{med_eps_s}** ({dielectric.get('terrace_estimates_count', 0)} estimates) | Morphological |")
+
+        if dielectric.get("physics_inversions_completed", 0) > 0:
+            eps_val = dielectric.get("epsilon_r")
+            eps_s = f"{eps_val:.2f}" if isinstance(eps_val, (int, float)) else "N/A"
+            ci = dielectric.get("epsilon_r_ci")
+            ci_str = f" ({ci[0]:.2f}–{ci[1]:.2f})" if ci and len(ci) == 2 else ""
+            conf = dielectric.get("reflector_confidence", 0)
+            lines.append(f"| Physics-Based Inversion | **{eps_s}{ci_str}** (confidence: {conf:.0%}) | DTM-constrained, no εr assumption |")
+
+        lines.append("")
+
+        # Ice probability assessment
+        any_eps = dielectric.get("epsilon_r")
+        if any_eps is not None:
+            try:
+                eps_val = float(any_eps)
+                lines.append("### Ice Probability Assessment")
+                lines.append("")
+                if eps_val < 2.5:
+                    lines.append(f"εr = {eps_val:.2f}: Below pure-ice range. **Ice unlikely.**")
+                elif eps_val <= 3.5:
+                    lines.append(f"εr = {eps_val:.2f}: Within water-ice range (2.5-3.5). **Ice presence is probable.**")
+                elif eps_val <= 5.0:
+                    lines.append(f"εr = {eps_val:.2f}: Ice-cemented regolith or mixture. **Possible ice content.**")
+                else:
+                    lines.append(f"εr = {eps_val:.2f}: Rocky/basaltic subsurface. **Ice unlikely.**")
+                lines.append("")
+            except (TypeError, ValueError):
+                pass
+
+        # Terrace details
+        estimates = dielectric.get("terrace_estimates", [])
+        if estimates:
+            lines.append("### Terrace Crater Details")
+            lines.append("")
+            lines.append("| Crater | Depth (m) | εr | Quality |")
+            lines.append("|--------|-----------|-----|---------|")
+            for est in estimates[:5]:
+                lines.append(f"| {est.get('crater_id', '?')} | {est.get('depth_true_m', '?')} | {est.get('epsilon_r', '?')} | {est.get('quality', '?')} |")
+            lines.append("")
+    else:
+        lines.append("**No dielectric inversion was performed.**")
+        lines.append("")
+        failure_reasons = []
+        for entry in method_hierarchy:
+            if entry.get("status") == "attempted_failed":
+                failure_reasons.append(f"- {entry['method'].replace('_', ' ').title()}: {entry.get('reason', 'unknown')}")
+        if failure_reasons:
+            lines.append("Attempted methods and failure reasons:")
+            lines.extend(failure_reasons)
+        else:
+            lines.append("Dielectric inversion requires SHARAD subsurface reflectors and co-located HiRISE DTM data with terraced crater morphology.")
+        lines.append("")
+        lines.append("All depth estimates use **assumed εr = 3.15** (water-ice). This is a non-physical fallback.")
+        lines.append("")
+
+    # ── Uncertainty & Sensitivity Analysis ──
+    gaussian = dielectric.get("epsilon_r_gaussian")
+    sensitivity_table = dielectric.get("sensitivity_table")
+
+    if sensitivity_table or gaussian:
+        lines.append("### Uncertainty & Sensitivity Analysis")
+        lines.append("")
+
+        if gaussian:
+            lines.append(
+                f"**Gaussian 1σ:** εr = {gaussian['mean']:.3f} ± {gaussian['sigma']:.3f} "
+                f"(range: {gaussian['1sigma_lo']:.3f} – {gaussian['1sigma_hi']:.3f})"
+            )
+            lines.append(
+                f"**Gaussian 2σ:** {gaussian['2sigma_lo']:.3f} – {gaussian['2sigma_hi']:.3f}"
+            )
+            lines.append("")
+
+        if sensitivity_table:
+            lines.append("| Perturbation | εr | Δεr |")
+            lines.append("|---|---|---|")
+            for row in sensitivity_table:
+                eps = row.get("epsilon_r", "—")
+                delta = row.get("delta")
+                delta_str = f"{delta:+.3f}" if isinstance(delta, (int, float)) else "—"
+                eps_str = f"{eps:.3f}" if isinstance(eps, (int, float)) else str(eps)
+                lines.append(f"| {row['perturbation']} | {eps_str} | {delta_str} |")
+            lines.append("")
+
+        _fig("sensitivity_table",
+             "Figure: εr Sensitivity Analysis",
+             "Bar chart showing dielectric constant under different perturbations.")
+
+    # ── Method hierarchy table (always shown) ──
+    if method_hierarchy:
+        lines.append("### εr Estimation Methods Attempted")
+        lines.append("")
+        lines.append("| Method | Status | εr | Notes |")
+        lines.append("|--------|--------|-----|-------|")
+        for entry in method_hierarchy:
+            method_name = entry["method"].replace("_", " ").title()
+            status = entry["status"].replace("_", " ").title()
+            eps_val = entry.get("epsilon_r")
+            eps_str = f"{eps_val:.2f}" if isinstance(eps_val, (int, float)) else "—"
+            reason = entry.get("reason", "")
+            lines.append(f"| {method_name} | {status} | {eps_str} | {reason} |")
+        lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 3. SURFACE COMPOSITION (CRISM)
+    # ══════════════════════════════════════════════════════════════════
+    crism = ep.get("crism", {})
+    lines.append("## 3. Surface / Near-Surface Composition (CRISM)")
+    lines.append("")
+
+    if crism.get("crism_count", 0) > 0:
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| CRISM Products Analyzed | {crism.get('crism_count', 0)} |")
+        lines.append(f"| Significant Ice Signatures | **{crism.get('high_ice_count', 0)}** |")
+        lines.append(f"| Significant Hydration | {crism.get('high_hyd_count', 0)} |")
+        lines.append("")
+
+        high_ice = crism.get("high_ice_count", 0)
+        if high_ice > 0:
+            lines.append(
+                f"**{high_ice}** CRISM products show ice spectral signatures "
+                f"(>5% of pixels above 0.3 threshold)."
+            )
+        else:
+            lines.append("No significant CRISM ice signatures exceeded the detection threshold.")
+        lines.append("")
+
+        top_ice = crism.get("top_ice_candidates", [])
+        if top_ice:
+            lines.append("### Ranked Ice Candidates")
+            lines.append("")
+            lines.append("| Obs ID | Lat | Lon | Ice Score | Ice % |")
+            lines.append("|--------|-----|-----|-----------|-------|")
+            for c in top_ice[:10]:
+                lat = c.get("lat")
+                lon = c.get("lon")
+                lat_s = f"{lat:.3f}" if lat is not None else "N/A"
+                lon_s = f"{lon:.3f}" if lon is not None else "N/A"
+                lines.append(
+                    f"| {c.get('obs_id', '?')} | {lat_s} | {lon_s} | "
+                    f"{c.get('ice_mean_score', 0):.3f} | {c.get('ice_percent', 0):.1f}% |"
+                )
+            lines.append("")
+
+        hotspot = crism.get("ice_hotspot")
+        if hotspot and hotspot.get("center_lat") is not None:
+            lines.append(
+                f"**Ice Hotspot Centroid:** ({hotspot['center_lat']:.4f}, "
+                f"{hotspot['center_lon']:.4f}) — {hotspot.get('n_products', 0)} "
+                f"high-ice products, max {hotspot.get('max_ice_pct', 0)}% ice."
+            )
+            lines.append("")
+
+        _fig("crism_ice_map",
+             "Figure 2: CRISM Ice Score Map",
+             "Per-pixel ice probability score (0-1). Warmer colors = higher ice spectral response.")
+    else:
+        lines.append("*No CRISM mineral data available for this region.*")
+        lines.append("")
+
+    # ── 3b. CNN Classification ──
+    cnn = ep.get("cnn", {})
+    if cnn.get("observations_classified", 0) > 0:
+        lines.append("### 3b. CNN Mineral Classification (CRISM TRR3)")
+        lines.append("")
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| Observations Classified | {cnn.get('observations_classified', 0)} |")
+        top_minerals = cnn.get("top_minerals", [])
+        if top_minerals:
+            top_names = ", ".join(m.get("name", "?") for m in top_minerals[:5])
+            lines.append(f"| Top Minerals | {top_names} |")
+        lines.append(f"| H₂O Ice Detected | **{'Yes' if cnn.get('ice_detected') else 'No'}** |")
+        if cnn.get("ice_detected"):
+            lines.append(f"| H₂O Total Pixels | {cnn.get('h2o_total_pixels', 0):,} |")
+        lines.append("")
+
+        _fig("cnn_mineral_map",
+             "Figure 3: CNN Mineral Map",
+             "Per-pixel mineral classification via 1D CNN-Attention (95% confidence threshold).")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 4. CROSS-INSTRUMENT CONSISTENCY
+    # ══════════════════════════════════════════════════════════════════
+    cross = ep.get("cross_instrument", {})
+    lines.append("## 4. Cross-Instrument Consistency Analysis")
+    lines.append("")
+
+    if cross.get("notes"):
+        for note in cross["notes"]:
+            lines.append(note)
+            lines.append("")
+
+    dist = cross.get("sharad_crism_min_distance_km")
+    if dist is not None:
+        lines.append("| Metric | Value |")
+        lines.append("|--------|-------|")
+        lines.append(f"| SHARAD–CRISM Min Separation | **{dist:.0f} km** |")
+        lines.append(f"| Coincident Detections (< 100 km) | {cross.get('coincident_detections', 0)} |")
+        lines.append(f"| Evidence Consistency | {cross.get('evidence_consistency', 'N/A')} |")
+        lines.append("")
+
+    # Geometric intersections
+    geo_crism = cross.get("sharad_crism_geometric_intersections", 0)
+    geo_hirise = cross.get("sharad_hirise_geometric_intersections", 0)
+    geo_dtm = cross.get("sharad_dtm_geometric_intersections", 0)
+    if geo_crism or geo_hirise or geo_dtm:
+        lines.append("### SHARAD Track Intersections")
+        lines.append("")
+        lines.append("| Instrument | SHARAD Tracks Crossing |")
+        lines.append("|------------|----------------------|")
+        if geo_crism:
+            lines.append(f"| CRISM | **{geo_crism}** |")
+        if geo_hirise:
+            lines.append(f"| HiRISE | **{geo_hirise}** |")
+        if geo_dtm:
+            lines.append(f"| HiRISE DTM | **{geo_dtm}** |")
+        lines.append("")
+
+    # Targeted subsurface at ice
+    targeted = cross.get("targeted_ice_subsurface", {})
+    if targeted and targeted.get("ice_locations_checked", 0) > 0:
+        checked = targeted.get("ice_locations_checked", 0)
+        with_sharad = targeted.get("ice_locations_with_sharad", 0)
+        reflectors = targeted.get("reflectors_at_ice", 0)
+        lines.append(
+            f"**Targeted subsurface at ice:** Checked {checked} locations, "
+            f"{with_sharad} had nearby SHARAD, **{reflectors}** showed subsurface reflectors."
+        )
+        lines.append("")
+
+    if not cross.get("notes") and dist is None:
+        lines.append("*Insufficient data for cross-instrument analysis.*")
+        lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 5. ENGINEERING FEASIBILITY
+    # ══════════════════════════════════════════════════════════════════
+    eng = ep.get("engineering", {})
+    lines.append("## 5. Engineering Feasibility (Terrain)")
+    lines.append("")
+
+    if eng.get("safety") and eng["safety"] != "UNKNOWN":
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| Safety Rating | **{eng.get('safety', 'UNKNOWN')}** |")
+        lines.append(f"| Mean Slope | {eng.get('mean_slope', 'N/A')} deg |")
+        lines.append(f"| Max Slope | {eng.get('max_slope', 'N/A')} deg |")
+        lines.append(f"| Elevation | {eng.get('elevation_m', 'N/A')} m |")
+        grid_size = eng.get("grid_size", 0)
+        if grid_size:
+            lines.append(f"| Grid Points | {grid_size} |")
+            lines.append(f"| Favorable Zones (< 5°) | {eng.get('favorable_zones', 0)} / {grid_size} |")
+        lines.append("")
+
+        _fig("slope_grid",
+             "Figure 4: Slope Grid Analysis",
+             "Mean slope at each grid point. Green = favorable (< 5°), Red = hazardous.")
+    else:
+        lines.append("*Slope data not available for this region.*")
+        lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 6. CLIMATE + THERMAL INERTIA
+    # ══════════════════════════════════════════════════════════════════
+    clim = ep.get("climate", {})
+    ti = ep.get("thermal_inertia", {})
+    lines.append("## 6. Climate + Thermal Inertia")
+    lines.append("")
+
+    if clim.get("annual_stats"):
+        annual = clim["annual_stats"]
+        lines.append("### Climate (Parametric MCD Model)")
+        lines.append("")
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| Mean Annual Temperature | **{annual.get('temp_mean_k', 'N/A')} K** |")
+        lines.append(f"| Temperature Range | {annual.get('temp_min_k', 'N/A')} – {annual.get('temp_max_k', 'N/A')} K |")
+        lines.append(f"| Surface Pressure | {annual.get('pressure_pa', 'N/A')} Pa |")
+        lines.append(f"| Dust Opacity (mean/peak) | {annual.get('dust_tau_mean', 'N/A')} / {annual.get('dust_tau_peak', 'N/A')} |")
+        lines.append(f"| Wind (mean/gust) | {annual.get('wind_mean_ms', 'N/A')} / {annual.get('wind_gust_max_ms', 'N/A')} m/s |")
+        lines.append(f"| CO₂ Frost Probability | {annual.get('frost_max_probability', 0):.0%} |")
+        lines.append(f"| Climate Score | **{clim.get('climate_score', 0)} / 10** |")
+        lines.append("")
+        summary = clim.get("climate_summary", "")
+        if summary:
+            lines.append(summary)
+            lines.append("")
+    else:
+        lines.append("*Climate model data not computed for this region.*")
+        lines.append("")
+
+    if ti.get("ti_median") is not None:
+        lines.append("### Thermal Inertia (TES)")
+        lines.append("")
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| Median TI | **{ti.get('ti_median', 'N/A')}** J/(m²·K·s^0.5) |")
+        lines.append(f"| Classification | {ti.get('classification', 'N/A')} |")
+        lines.append(f"| TI Score | **{ti.get('ti_score', 0)} / 10** |")
+        lines.append("")
+        dist_pct = ti.get("distribution_pct", {})
+        if dist_pct:
+            lines.append("**Surface Material Distribution:**")
+            lines.append(f"- Dusty (< 150): {dist_pct.get('dusty_lt150', 0)}%")
+            lines.append(f"- Mixed (150-300): {dist_pct.get('mixed_150_300', 0)}%")
+            lines.append(f"- Consolidated (300-600): {dist_pct.get('consolidated_300_600', 0)}%")
+            lines.append(f"- Bedrock (> 600): {dist_pct.get('bedrock_gt600', 0)}%")
+            lines.append("")
+        explanation = ti.get("ti_explanation", "")
+        if explanation:
+            lines.append(explanation)
+            lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 7. ASSESSMENT SCORE + LANDING SITE
+    # ══════════════════════════════════════════════════════════════════
+    scoring = ep.get("scoring", {})
+    landing = ep.get("landing_site", {})
+    score_range = scoring.get("score_range", {})
+    score_lo = score_range.get("low", scoring.get("overall_score", 0))
+    score_hi = score_range.get("high", scoring.get("overall_score", 0))
+
+    lines.append("## 7. Assessment Score + Landing Site Decision")
+    lines.append("")
+    lines.append(f"**Score: {score_lo}–{score_hi} / 100** (point estimate: {scoring.get('overall_score', 'N/A')})")
+    lines.append(f"**Recommendation:** {str(scoring.get('recommendation', 'N/A')).replace('_', ' ')}")
+    lines.append("")
+
+    strengths = scoring.get("strengths", [])
+    if strengths:
+        lines.append("**Strengths:**")
+        for s in strengths:
+            lines.append(f"- {s}")
+        lines.append("")
+
+    uncertainties = scoring.get("uncertainties", [])
+    if uncertainties:
+        lines.append("**Uncertainties:**")
+        for u in uncertainties:
+            lines.append(f"- {u}")
+        lines.append("")
+
+    # Landing site
+    primary = landing.get("primary_site")
+    if primary and primary.get("lat") is not None:
+        lines.append("### Primary Landing Site")
+        lines.append("")
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| **Latitude** | **{_fmt_lat(primary['lat'])}** |")
+        lines.append(f"| **Longitude** | **{_fmt_lon(primary['lon'])}** |")
+        lines.append(f"| Composite Score | {primary.get('score', 'N/A')} / 100 |")
+        lines.append(f"| Mean Slope | {primary.get('mean_slope', 'N/A')} deg |")
+        lines.append("")
+        for r in primary.get("reasons", []):
+            lines.append(f"- {r}")
+        lines.append("")
+
+    secondary = landing.get("secondary_site")
+    if secondary and secondary.get("lat") is not None:
+        lines.append("### Secondary Site")
+        lines.append("")
+        lines.append(f"({_fmt_lat(secondary['lat'])}, {_fmt_lon(secondary['lon'])}) — score {secondary.get('score', 'N/A')}/100")
+        lines.append("")
+
+    trade_offs = landing.get("trade_offs", [])
+    if trade_offs:
+        lines.append("### Trade-offs")
+        for t in trade_offs:
+            lines.append(f"- {t}")
+        lines.append("")
+
+    # ── Narrative (if available) ──
+    narrative = ep.get("narrative", "")
+    if narrative:
+        lines.append("## Detailed Analysis")
+        lines.append("")
+        lines.append(narrative)
+        lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # APPENDIX A: DATA CONFIDENCE + PHYSICS ASSESSMENT
+    # ══════════════════════════════════════════════════════════════════
+    lines.append("## Appendix A: Data Confidence + Physics Assessment")
+    lines.append("")
+    lines.append("| Metric | Value |")
+    lines.append("|--------|-------|")
+    lines.append(f"| Total Products Found | {ep.get('total_products_found', 0)} |")
+    lines.append(f"| Available Locally | {ep.get('total_available_locally', 0)} |")
+    lines.append(f"| Downloaded This Session | {ep.get('total_downloaded', 0)} |")
+    lines.append(f"| SHARAD Tracks | {sharad.get('total_tracks', 0)} |")
+    lines.append(f"| CRISM Products | {crism.get('crism_count', 0)} |")
+    eps_source = dielectric.get("best_method", "assumed").replace("_", " ").title()
+    lines.append(f"| εr Estimation Method | {eps_source} |")
+    lines.append(f"| Depth Mode | {'Physics-Based' if not is_fallback else 'FALLBACK (assumed εr)'} |")
+    lines.append("")
+
+    if is_fallback:
+        lines.append(
+            "**Depth estimation mode: FALLBACK (assumed εr = 3.15).** "
+            "All depth values are computed from an assumed dielectric constant and should NOT "
+            "be treated as independent physical evidence of ice."
+        )
+    else:
+        lines.append(
+            f"**Depth estimation mode: PHYSICS-BASED (εr via {eps_source}).** "
+            "Dielectric constant was independently measured."
+        )
+    lines.append("")
+
+    # Physics warnings
+    warnings = ep.get("physics_pipeline_warnings", [])
+    if warnings:
+        lines.append("### Physics Pipeline Warnings")
+        for w in warnings:
+            lines.append(f"- **WARNING:** {w}")
+        lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # APPENDIX B: PHYSICS DERIVATION LOG
+    # ══════════════════════════════════════════════════════════════════
+    derivation_log = dielectric.get("derivation_log", [])
+    assumptions = dielectric.get("assumptions", [])
+    if derivation_log or assumptions:
+        lines.append("## Appendix B: Physics Derivation Log")
+        lines.append("")
+
+        if assumptions:
+            lines.append("### Assumptions")
+            lines.append("")
+            lines.append("| Parameter | Value | Source | Justification |")
+            lines.append("|-----------|-------|--------|---------------|")
+            for a in assumptions:
+                if isinstance(a, dict):
+                    lines.append(
+                        f"| {a.get('param', '?')} | {a.get('value', '?')} | "
+                        f"{a.get('source', '?')} | {a.get('justification', '')} |"
+                    )
+            lines.append("")
+
+        if derivation_log:
+            lines.append("### Derivation Steps")
+            lines.append("")
+            for step in derivation_log:
+                if isinstance(step, dict):
+                    lines.append(f"**Step {step.get('step_number', '?')}:** {step.get('description', '')}")
+                    if step.get("formula"):
+                        lines.append(f"  Formula: `{step['formula']}`")
+                    if step.get("result"):
+                        lines.append(f"  Result: {json.dumps(step['result'])}")
+                    lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
+    # APPENDIX C: EXECUTION LOG
+    # ══════════════════════════════════════════════════════════════════
+    lines.append("## Appendix C: Execution Log")
+    lines.append("")
+    lines.append("| # | Step | Instrument | Status | Result |")
+    lines.append("|---|------|------------|--------|--------|")
+    for i, step in enumerate(session.steps, 1):
+        inst = step.instrument or "—"
+        status = step.status.value.upper()
+        summary = step.result.summary if step.result else (step.error or "—")
+        lines.append(f"| {i} | {step.description} | {inst} | {status} | {summary} |")
+    lines.append("")
+
+    # ── Self-critique metadata ──
+    if session.report_critique:
+        crit = session.report_critique
+        n_iters = crit.get("iterations", 0)
+        total_issues = sum(c.get("issues_found", 0) for c in crit.get("critique_log", []))
+        lines.append(f"*Report reviewed {n_iters} time(s), {total_issues} issue(s) patched.*")
+        lines.append("")
+
+    # ── Footer ──
+    lines.append("---")
+    lines.append("*Report generated by MarsLab Agentic AI (B-level, EvidencePack pipeline)*")
+
+    return "\n".join(lines)
+
+
 def _build_report_markdown(session: AgentSession) -> str:
     """Build a decision-oriented Markdown mission assessment report.
 
@@ -1239,6 +1879,68 @@ def _build_report_markdown(session: AgentSession) -> str:
             )
             lines.append("")
 
+        # Geometric intersection counts
+        geo_crism = cross.get("sharad_crism_geometric_intersections", 0)
+        geo_hirise = cross.get("sharad_hirise_geometric_intersections", 0)
+        geo_dtm = cross.get("sharad_dtm_geometric_intersections", 0)
+        if geo_crism or geo_hirise or geo_dtm:
+            lines.append("### SHARAD Track Intersections (Geometric)")
+            lines.append("")
+            lines.append("| Instrument | SHARAD Tracks Crossing |")
+            lines.append("|------------|----------------------|")
+            if geo_crism:
+                lines.append(f"| CRISM Footprints | **{geo_crism}** |")
+            if geo_hirise:
+                lines.append(f"| HiRISE Footprints | **{geo_hirise}** |")
+            if geo_dtm:
+                lines.append(f"| HiRISE DTM Footprints | **{geo_dtm}** |")
+            lines.append("")
+
+    # Targeted subsurface at CRISM/CNN ice locations
+    targeted = synthesis.get("targeted_ice_subsurface", {})
+    if targeted and targeted.get("ice_locations_checked", 0) > 0:
+        lines.append("### Targeted Subsurface at Ice Locations")
+        lines.append("")
+        checked = targeted.get("ice_locations_checked", 0)
+        with_sharad = targeted.get("ice_locations_with_sharad", 0)
+        reflectors = targeted.get("reflectors_at_ice", 0)
+        lines.append(
+            f"Checked **{checked}** CRISM/CNN ice locations for SHARAD subsurface confirmation: "
+            f"**{with_sharad}** had nearby SHARAD tracks, **{reflectors}** showed subsurface reflectors."
+        )
+        lines.append("")
+
+        picks = targeted.get("targeted_picks", [])
+        if picks:
+            lines.append("| Ice Source | Location | SHARAD Track | Distance | Reflector | Depth (assumed) | SNR |")
+            lines.append("|-----------|----------|-------------|----------|-----------|-----------------|-----|")
+            for p in picks:
+                lat = p.get("ice_lat", 0)
+                lon = p.get("ice_lon", 0)
+                loc_str = f"{abs(lat):.1f}°{'N' if lat >= 0 else 'S'}, {abs(lon):.1f}°{'E' if lon >= 0 else 'W'}"
+                sharad_id = p.get("sharad_product_id", "N/A")
+                dist = p.get("distance_km", 0)
+                detected = p.get("reflector_detected", False)
+                depth = p.get("depth_m_assumed")
+                snr = p.get("median_snr")
+                ref_str = "Yes" if detected else "No"
+                depth_str = f"~{depth:.0f} m" if depth else "—"
+                snr_str = f"{snr:.1f}" if snr else "—"
+                lines.append(
+                    f"| {p.get('ice_source', '?')} | {loc_str} | {sharad_id} | "
+                    f"{dist:.1f} km | {ref_str} | {depth_str} | {snr_str} |"
+                )
+            lines.append("")
+
+            # Highlight co-located evidence
+            colocated = [p for p in picks if p.get("reflector_detected")]
+            if colocated:
+                lines.append(
+                    f"**Co-located surface + subsurface ice evidence at {len(colocated)} location(s)** — "
+                    "this represents the strongest evidence tier for accessible subsurface ice."
+                )
+                lines.append("")
+
     # ── 5. Engineering Feasibility (Terrain — Final Filter) ──
     eng = synthesis.get("engineering_feasibility", {})
     if eng:
@@ -1681,7 +2383,11 @@ async def agent_report(
     if session.status != "done":
         raise HTTPException(status_code=400, detail="Session has not completed yet")
 
-    md_content = _build_report_markdown(session)
+    # Use pre-built B-level report if available, else fall back to legacy builder
+    if session.report_draft:
+        md_content = session.report_draft
+    else:
+        md_content = _build_report_markdown(session)
     region_slug = (session.region_name or "report").replace(" ", "_").lower()[:30]
     base_filename = f"marslab_{region_slug}_{session_id}"
 
@@ -1728,3 +2434,14 @@ async def agent_report(
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{base_filename}.md"'},
     )
+
+
+@router.get("/evidence/{session_id}")
+async def agent_evidence(session_id: str):
+    """Download the EvidencePack JSON for a completed session."""
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+    if not session.evidence_pack:
+        raise HTTPException(status_code=404, detail="No evidence pack available (legacy session)")
+    return session.evidence_pack

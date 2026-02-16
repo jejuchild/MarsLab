@@ -322,8 +322,8 @@ interface LayerPanelProps {
   onCustomDatasetToggle?: (id: string, visible: boolean) => void;
 
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
-  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null) => void;
+  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "assistant" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "assistant" | "report" | "guided" | "region_stats" | "crater_detect" | null) => void;
 
   // Fly-To navigation
   onFlyToCoords?: (lat: number, lon: number) => void;
@@ -358,6 +358,10 @@ interface LayerPanelProps {
   // Measurement Tools
   showMeasurementTools?: boolean;
   onToggleMeasurementTools?: (v: boolean) => void;
+
+  // Panel Intelligence
+  autoOpenEnabled?: boolean;
+  onAutoOpenChange?: (v: boolean) => void;
 
   // Mobile mode
   isMobile?: boolean;
@@ -648,6 +652,8 @@ export default function LayerPanel({
   overlapStats,
   showMeasurementTools = false,
   onToggleMeasurementTools,
+  autoOpenEnabled = true,
+  onAutoOpenChange,
   isMobile = false,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
@@ -892,6 +898,26 @@ export default function LayerPanel({
             </span>
           </label>
 
+          {/* Auto-open panels toggle */}
+          <label
+            className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+              autoOpenEnabled
+                ? "bg-teal-500/20 border border-teal-400/50"
+                : "bg-[#1a2333] border border-[#232f48] hover:border-teal-400/30"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={autoOpenEnabled}
+              onChange={(e) => onAutoOpenChange?.(e.target.checked)}
+              className="rounded bg-[#0a0f18] border-[#232f48] text-teal-400 focus:ring-0 focus:ring-offset-0"
+            />
+            <span className="material-symbols-outlined text-xs text-teal-400">auto_fix_high</span>
+            <span className={`text-[11px] font-medium ${autoOpenEnabled ? "text-teal-300" : "text-[#92a4c9]"}`}>
+              Auto-open panels
+            </span>
+          </label>
+
           {/* Region Layer */}
           <label
             className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
@@ -1129,6 +1155,27 @@ export default function LayerPanel({
               </div>
               {analysisMode === "agentic" && (
                 <span className="text-[8px] px-1.5 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30 font-bold uppercase">
+                  ON
+                </span>
+              )}
+            </button>
+
+            {/* Research Assistant */}
+            <button
+              onClick={() => onAnalysisModeChange?.(analysisMode === "assistant" ? null : "assistant")}
+              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
+                analysisMode === "assistant"
+                  ? "bg-teal-500/20 border border-teal-500/50 text-teal-400"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-teal-500/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">assistant</span>
+              <div className="flex-1">
+                <span className="text-[11px] font-medium">Research Assistant <span className="text-[8px] px-1 py-0.5 rounded bg-teal-500/20 text-teal-400 border border-teal-500/30 font-bold">NEW</span></span>
+                <p className="text-[9px] text-[#6b7c9c]">Workflow-based analysis with approval gates</p>
+              </div>
+              {analysisMode === "assistant" && (
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400 border border-teal-500/30 font-bold uppercase">
                   ON
                 </span>
               )}

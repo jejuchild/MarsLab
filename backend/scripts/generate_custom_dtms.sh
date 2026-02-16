@@ -497,27 +497,36 @@ phase_6_asp_process() {
         log "  Step 2/4: Map-projecting images..."
         cam2map4stereo.py "$cub_a" "$cub_b" 2>&1 | tail -5
 
-        local map_a="${cub_a%.cub}.map.cub"
-        local map_b="${cub_b%.cub}.map.cub"
+        # cam2map4stereo.py may use a shorter output name (e.g. {obs}_RED.map.cub)
+        # rather than preserving the full .mos_hijitreged.norm suffix, so glob for it
+        local map_a map_b
+        map_a=$(ls "${obs_a}"*RED*.map.cub 2>/dev/null | head -1)
+        map_b=$(ls "${obs_b}"*RED*.map.cub 2>/dev/null | head -1)
 
-        if [[ ! -f "$map_a" || ! -f "$map_b" ]]; then
+        if [[ -z "$map_a" || -z "$map_b" || ! -f "$map_a" || ! -f "$map_b" ]]; then
             err "cam2map4stereo failed"
             ls -la *.map.cub 2>/dev/null || echo "  No .map.cub files found"
             set -e
             continue
         fi
-        ok "Map-projection complete"
+        ok "Map-projection complete: $(basename "$map_a"), $(basename "$map_b")"
 
         # Step 3: Stereo correlation
         log "  Step 3/4: Running stereo correlation (${NUM_CORES} cores)..."
         mkdir -p "$out_dir"
+        # Limit processes to avoid OOM: asp_mgm uses ~7GB per tile
+        local stereo_procs=$(( $(grep MemTotal /proc/meminfo | awk '{print int($2/1024/1024)}') / 8 ))
+        [ "$stereo_procs" -gt "$NUM_CORES" ] && stereo_procs="$NUM_CORES"
+        [ "$stereo_procs" -lt 2 ] && stereo_procs=2
+        log "  Using ${stereo_procs} parallel processes (memory-safe)"
+
         parallel_stereo \
             "$map_a" "$map_b" \
             "${out_dir}/run" \
             --stereo-algorithm asp_mgm \
             --subpixel-mode 3 \
             --alignment-method none \
-            --processes "$NUM_CORES" \
+            --processes "$stereo_procs" \
             2>&1 | tail -10
 
         if [[ ! -f "${out_dir}/run-PC.tif" ]]; then

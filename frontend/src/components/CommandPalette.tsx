@@ -263,6 +263,14 @@ const ACTIONS: CommandAction[] = [
     action: { type: "set_analysis", mode: "agentic" },
   },
   {
+    id: "analysis-assistant",
+    label: "Open Research Assistant",
+    category: "analysis",
+    icon: "assistant",
+    keywords: ["assistant", "workflow", "research", "plan", "sharad", "ice", "terrace", "approval"],
+    action: { type: "set_analysis", mode: "assistant" },
+  },
+  {
     id: "analysis-report",
     label: "Generate Landing Site Report",
     category: "analysis",
