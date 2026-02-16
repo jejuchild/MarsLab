@@ -416,6 +416,7 @@ export default function MainPage() {
   // Crater/Landform Detection
   const [craterDetectCenter, setCraterDetectCenter] = useState<{lat: number; lon: number} | null>(null);
   const [craterDetectFeatures, setCraterDetectFeatures] = useState<DetectedFeature[]>([]);
+  const [epsilonTarget, setEpsilonTarget] = useState<DetectedFeature | null>(null);
 
   // Temporal Change Detection modal
   const [showTemporalComparison, setShowTemporalComparison] = useState<{lat: number; lon: number; instrument?: string} | null>(null);
@@ -1125,6 +1126,15 @@ export default function MainPage() {
       setCraterDetectCenter(null);
       setCraterDetectFeatures([]);
     }
+    if (mode !== "agentic") {
+      setEpsilonTarget(null);
+    }
+  }, []);
+
+  // Handle "Run ε Inversion" from CraterDetectPanel → opens AgenticPanel with pre-filled objective
+  const handleRunEpsilon = useCallback((feature: DetectedFeature) => {
+    setEpsilonTarget(feature);
+    setAnalysisMode("agentic");
   }, []);
 
   // Guided Workflow action handler
@@ -1585,7 +1595,8 @@ export default function MainPage() {
       />
     ) : analysisMode === "agentic" ? (
       <AgenticPanel
-        onClose={() => setAnalysisMode(null)}
+        onClose={() => { setAnalysisMode(null); setEpsilonTarget(null); }}
+        initialObjective={epsilonTarget ? `Run terrain εr inversion for terraced crater at (${epsilonTarget.lat.toFixed(3)}, ${epsilonTarget.lon.toFixed(3)}), diameter ${epsilonTarget.diameter_km?.toFixed(1) ?? "?"} km, terrace depth ${epsilonTarget.terrace_depth_m?.toFixed(0) ?? "?"} m. Search for SHARAD and HiRISE DTM data, then compute dielectric constant.` : undefined}
       />
     ) : analysisMode === "report" ? (
       <Suspense fallback={<div className="flex items-center justify-center h-full text-[#6b7c9c] text-xs">Loading...</div>}>
@@ -1619,6 +1630,7 @@ export default function MainPage() {
             navigate(`/download?lat=${lat}&lon=${lon}&instrument=SHARAD`);
           }}
           onFeaturesChanged={setCraterDetectFeatures}
+          onRunEpsilonInversion={handleRunEpsilon}
         />
       </Suspense>
     ) : (

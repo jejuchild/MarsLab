@@ -303,8 +303,10 @@ function applyEvent(s: SessionData, event: AgentEvent, narrativePhase: boolean):
  * =======================================================*/
 export default function AgenticPanel({
   onClose,
+  initialObjective,
 }: {
   onClose: () => void;
+  initialObjective?: string;
 }) {
   // Reducer holds all session-execution state
   const [session, dispatch] = useReducer(sessionReducer, INITIAL_SESSION);
@@ -488,6 +490,21 @@ export default function AgenticPanel({
       dispatch({ type: "EVENT", event: { event: "error", data: { error: e instanceof Error ? e.message : "Unknown error" } }, narrativePhase: false });
     }
   }, [objective, autoDownload, consumeSSEStream]);
+
+  // Auto-start when initialObjective is provided (e.g., from terraced crater ε inversion)
+  const autoStartPending = useRef(false);
+  useEffect(() => {
+    if (initialObjective && session.status === "idle" && !autoStartPending.current && !objective) {
+      setObjective(initialObjective);
+      autoStartPending.current = true;
+    }
+  }, [initialObjective, session.status, objective]);
+  useEffect(() => {
+    if (autoStartPending.current && objective === initialObjective && session.status === "idle") {
+      autoStartPending.current = false;
+      handleRun();
+    }
+  }, [objective, initialObjective, session.status, handleRun]);
 
   const handleOpenHistory = useCallback(async () => {
     setShowHistory(true);

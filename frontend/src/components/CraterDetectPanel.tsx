@@ -24,6 +24,8 @@ export type DetectedFeature = {
   sinuosity?: number;
   path?: [number, number][];
   boundary?: [number, number][];
+  terrace_depth_m?: number;
+  terrace_ring_radii_km?: number[];
 };
 
 type ScanPhase =
@@ -80,6 +82,7 @@ interface CraterDetectPanelProps {
   onSearchHiRISE?: (lat: number, lon: number) => void;
   onSearchSHARAD?: (lat: number, lon: number) => void;
   onFeaturesChanged?: (features: DetectedFeature[]) => void;
+  onRunEpsilonInversion?: (feature: DetectedFeature) => void;
 }
 
 /* =========================================================
@@ -92,6 +95,7 @@ export default function CraterDetectPanel({
   onSearchHiRISE,
   onSearchSHARAD,
   onFeaturesChanged,
+  onRunEpsilonInversion,
 }: CraterDetectPanelProps) {
   // Scan config
   const [radiusKm, setRadiusKm] = useState(100);
@@ -470,6 +474,7 @@ export default function CraterDetectPanel({
                   onFlyTo={onFlyTo}
                   onSearchHiRISE={onSearchHiRISE}
                   onSearchSHARAD={onSearchSHARAD}
+                  onRunEpsilonInversion={onRunEpsilonInversion}
                 />
               ))}
             </div>
@@ -503,11 +508,13 @@ function FeatureRow({
   onFlyTo,
   onSearchHiRISE,
   onSearchSHARAD,
+  onRunEpsilonInversion,
 }: {
   feature: DetectedFeature;
   onFlyTo?: (lat: number, lon: number) => void;
   onSearchHiRISE?: (lat: number, lon: number) => void;
   onSearchSHARAD?: (lat: number, lon: number) => void;
+  onRunEpsilonInversion?: (feature: DetectedFeature) => void;
 }) {
   const color = FEATURE_COLORS[f.type] || "#6b7c9c";
   const [expanded, setExpanded] = useState(false);
@@ -593,6 +600,12 @@ function FeatureRow({
                 <div className="font-mono text-rose-400">{f.n_terraces}</div>
               </div>
             )}
+            {f.terrace_depth_m != null && f.terrace_depth_m > 0 && (
+              <div className="bg-[#0d1219] rounded px-1.5 py-1">
+                <div className="text-[8px] text-[#4a5568]">Terrace Depth</div>
+                <div className="font-mono text-rose-400">{f.terrace_depth_m.toFixed(0)} m</div>
+              </div>
+            )}
             {f.sinuosity != null && f.sinuosity > 0 && (
               <div className="bg-[#0d1219] rounded px-1.5 py-1">
                 <div className="text-[8px] text-[#4a5568]">Sinuosity</div>
@@ -654,6 +667,21 @@ function FeatureRow({
               </span>
               SHARAD
             </button>
+            {f.type === "terraced_crater" && f.terrace_depth_m != null && f.terrace_depth_m > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRunEpsilonInversion?.(f);
+                }}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-[9px] text-rose-400 hover:text-rose-300 hover:border-rose-500/50 hover:bg-rose-500/20 transition-colors"
+                title="Run dielectric inversion using terrace depth + SHARAD"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>
+                  science
+                </span>
+                Run ε Inversion
+              </button>
+            )}
           </div>
         </div>
       )}

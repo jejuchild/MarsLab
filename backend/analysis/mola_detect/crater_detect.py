@@ -59,6 +59,8 @@ class DetectedFeature:
     area_km2: float = 0.0
     boundary: list = field(default_factory=list)  # [[lat,lon], ...] for polygons
     sinuosity: float = 0.0
+    terrace_depth_m: float = 0.0  # depth of deepest bench below rim
+    terrace_ring_radii_km: list = field(default_factory=list)  # radial distances of bench midpoints
 
 
 # ---------------------------------------------------------------------------
@@ -247,10 +249,13 @@ def _classify_terraces(
     centroid_c: float,
     radius_px: float,
     px_m: float,
-) -> int:
+) -> tuple[int, float, list[float]]:
     """Radial-profile terrace detection at MOLA scale.
 
-    Returns the number of detected terrace benches (0 if none).
+    Returns (n_terraces, terrace_depth_m, ring_radii_km):
+        n_terraces: number of detected terrace benches (0 if none)
+        terrace_depth_m: depth of deepest bench below rim elevation
+        ring_radii_km: radial distance of each bench midpoint from crater center
 
     Algorithm mirrors the HiRISE terrace detector but uses parameters tuned
     for the coarser 200 m/px MOLA DEM.
@@ -259,7 +264,7 @@ def _classify_terraces(
     step_px = 1  # 200 m per pixel
     max_r_px = int(radius_px * 1.1)  # sample slightly beyond estimated rim
     if max_r_px < 3:
-        return 0
+        return 0, 0.0, []
 
     azimuths = np.linspace(0, 2 * math.pi, _TERRACE_N_AZIMUTHS, endpoint=False)
     n_samples = max(1, max_r_px // step_px)
@@ -282,7 +287,7 @@ def _classify_terraces(
         median_prof = np.nanmedian(all_profiles, axis=0)
 
     if np.all(np.isnan(median_prof)):
-        return 0
+        return 0, 0.0, []
 
     # Smooth
     smooth = _smooth_1d(median_prof, window=_TERRACE_SMOOTH_WIN)
@@ -296,7 +301,7 @@ def _classify_terraces(
     outer_idx = min(n_samples, int(_TERRACE_OUTER_FRAC * radius_px / step_px))
 
     if outer_idx <= inner_idx:
-        return 0
+        return 0, 0.0, []
 
     # Find contiguous flat segments
     is_flat = np.abs(slope) < _TERRACE_SLOPE_THRESH
@@ -318,7 +323,22 @@ def _classify_terraces(
     # Filter: minimum bench width
     benches = [(s, e) for s, e in benches if (e - s + 1) >= _TERRACE_MIN_BENCH_PX]
 
-    return len(benches)
+    if not benches:
+        return 0, 0.0, []
+
+    # Compute terrace depth and ring radii
+    rim_elev = float(np.nanmax(smooth))
+    terrace_depth_m = 0.0
+    ring_radii_km: list[float] = []
+    for s, e in benches:
+        midpoint_idx = (s + e) / 2.0
+        ring_radii_km.append(round(midpoint_idx * step_m / 1000.0, 2))
+        bench_elev = float(np.nanmedian(smooth[s:e + 1]))
+        depth = rim_elev - bench_elev
+        if depth > terrace_depth_m:
+            terrace_depth_m = depth
+
+    return len(benches), round(terrace_depth_m, 1), ring_radii_km
 
 
 def _assign_confidence(
@@ -552,7 +572,7 @@ def detect_craters_and_volcanics(
         })
 
         radius_px = props["eq_diameter_px"] / 2.0
-        n_terraces = _classify_terraces(
+        n_terraces, terrace_depth, ring_radii = _classify_terraces(
             elev_filled,
             props["centroid_r"],
             props["centroid_c"],
@@ -560,12 +580,15 @@ def detect_craters_and_volcanics(
             px_m,
         )
         feat.n_terraces = n_terraces
+        feat.terrace_depth_m = terrace_depth
+        feat.terrace_ring_radii_km = ring_radii
         if n_terraces >= 1:
             feat.feature_type = "terraced_crater"
             feat.morphology = "terraced"
             feat.description = (
                 f"Terraced crater ({n_terraces} "
-                f"bench{'es' if n_terraces > 1 else ''}), "
+                f"bench{'es' if n_terraces > 1 else ''}, "
+                f"terrace depth {terrace_depth:.0f} m), "
                 f"d/D={feat.depth_diameter_ratio:.4f}, "
                 f"circularity={feat.circularity:.3f}"
             )

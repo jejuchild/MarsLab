@@ -1806,6 +1806,417 @@ def sharad_physics_inversion(
 
 
 # =============================================================================
+# Task: Find SHARAD Track Geometric Intersections with Other Instruments
+# =============================================================================
+
+def find_sharad_intersections(
+    products: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Find which SHARAD tracks geometrically intersect CRISM/HiRISE/DTM footprints.
+
+    Uses Liang-Barsky line-vs-bbox clipping for precise intersection testing.
+    Returns intersection counts and pairs for cross-instrument correlation.
+    """
+    import json
+    import os
+
+    result: Dict[str, Any] = {
+        "sharad_crism_intersections": 0,
+        "sharad_hirise_intersections": 0,
+        "sharad_dtm_intersections": 0,
+        "intersection_pairs": [],
+        "crism_ice_with_sharad": [],
+    }
+
+    try:
+        from .proximity_router import _bbox_from_geometry, _line_intersects_bbox
+    except ImportError:
+        logger.warning("proximity_router not available for intersection analysis")
+        return result
+
+    # Load SHARAD_HIGHRES index for track geometries
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sharad_index_path = os.path.join(backend_dir, "sharad_highres_data", "index.geojson")
+    if not os.path.exists(sharad_index_path):
+        return result
+
+    with open(sharad_index_path) as f:
+        sharad_index = json.load(f)
+
+    def _norm_lon(lon: float) -> float:
+        """Normalize longitude to -180..180."""
+        while lon > 180:
+            lon -= 360
+        while lon < -180:
+            lon += 360
+        return lon
+
+    # Build SHARAD track lookup: product_id → coordinates (normalized to -180..180)
+    sharad_tracks: Dict[str, list] = {}
+    for feat in sharad_index.get("features", []):
+        pid = feat.get("properties", {}).get("product_id", "")
+        coords = feat.get("geometry", {}).get("coordinates", [])
+        if pid and coords:
+            sharad_tracks[pid] = [[_norm_lon(c[0]), c[1]] for c in coords]
+
+    if not sharad_tracks:
+        return result
+
+    # Get product IDs in the session grouped by instrument
+    non_sharad_products = [
+        p for p in products
+        if p.get("instrument") not in ("SHARAD", "SHARAD_HIGHRES")
+    ]
+
+    if not non_sharad_products:
+        return result
+
+    # Load footprint indices for non-SHARAD instruments
+    try:
+        from .registry import get_registry
+        registry = get_registry()
+    except Exception:
+        return result
+
+    # Build footprint lookup: product_id → {bbox, instrument}
+    # Use lowercase keys for case-insensitive matching
+    footprint_cache: Dict[str, Dict] = {}
+    loaded_instruments: set = set()
+
+    for p in non_sharad_products:
+        inst = p.get("instrument", "").upper()
+        if inst in loaded_instruments:
+            continue
+        loaded_instruments.add(inst)
+
+        try:
+            index = registry.load_index(inst)
+        except Exception:
+            continue
+
+        for feat in index.get("features", []):
+            props = feat.get("properties", {})
+            fp_id = (props.get("product_id") or props.get("ProductId") or
+                     props.get("id") or props.get("PRODUCT_ID") or "")
+            geom = feat.get("geometry")
+            if not fp_id or not geom:
+                continue
+            bbox = _bbox_from_geometry(geom)
+            if bbox:
+                # Buffer Point geometries to approximate footprint size
+                # CRISM targeted obs ~10 km, HiRISE ~6 km
+                if geom.get("type") == "Point":
+                    import math as _math
+                    lat_c = (bbox["lat_min"] + bbox["lat_max"]) / 2
+                    buf_deg = 0.1  # ~6 km at equator
+                    cos_lat = max(_math.cos(_math.radians(lat_c)), 0.3)
+                    bbox["lat_min"] -= buf_deg
+                    bbox["lat_max"] += buf_deg
+                    bbox["lon_min"] -= buf_deg / cos_lat
+                    bbox["lon_max"] += buf_deg / cos_lat
+                # Normalize bbox longitudes to -180..180
+                bbox["lon_min"] = _norm_lon(bbox["lon_min"])
+                bbox["lon_max"] = _norm_lon(bbox["lon_max"])
+                footprint_cache[fp_id.lower()] = {
+                    "bbox": bbox,
+                    "instrument": inst,
+                    "geom": geom,
+                }
+
+    def _find_footprint(product_id: str) -> Optional[Dict]:
+        """Find footprint by exact or prefix match (case-insensitive)."""
+        pid_lower = product_id.lower()
+        # Exact match
+        if pid_lower in footprint_cache:
+            return footprint_cache[pid_lower]
+        # Prefix match: registry IDs may have suffixes (e.g., frt00009326_07_if164j_mtr3)
+        for cache_id, fp_data in footprint_cache.items():
+            if cache_id.startswith(pid_lower):
+                return fp_data
+        return None
+
+    # Test intersections: each session product vs all SHARAD tracks
+    for p in non_sharad_products:
+        pid = p["product_id"]
+        fp = _find_footprint(pid)
+        if not fp:
+            continue
+
+        bbox = fp["bbox"]
+        inst = fp["instrument"]
+
+        matching_sharad = []
+        for sharad_pid, track_coords in sharad_tracks.items():
+            if _line_intersects_bbox(track_coords, bbox):
+                matching_sharad.append(sharad_pid)
+                result["intersection_pairs"].append({
+                    "sharad_id": sharad_pid,
+                    "target_id": pid,
+                    "target_instrument": inst,
+                })
+
+        if matching_sharad:
+            if inst == "CRISM" or inst == "CRISM_TRR3":
+                result["sharad_crism_intersections"] += len(matching_sharad)
+            elif inst == "HIRISE":
+                result["sharad_hirise_intersections"] += len(matching_sharad)
+            elif inst == "HIRISE_DTM":
+                result["sharad_dtm_intersections"] += len(matching_sharad)
+
+    # Limit pairs list to avoid huge output
+    result["intersection_pairs"] = result["intersection_pairs"][:50]
+
+    return result
+
+
+# =============================================================================
+# Task: Targeted Subsurface Analysis at CRISM Ice Locations
+# =============================================================================
+
+def targeted_subsurface_at_ice(
+    products: List[Dict[str, Any]],
+    all_results: Dict[str, Any],
+) -> TaskResult:
+    """
+    Check SHARAD subsurface at locations where CRISM/CNN detected surface ice.
+
+    For each CRISM/CNN ice location:
+    1. Find the nearest SHARAD_HIGHRES track (within 30 km)
+    2. Call pick_subsurface_interface at the ice lat/lon
+    3. Report whether a subsurface reflector exists at that location
+    """
+    import json
+    import os
+    import math
+
+    ice_locations = []
+
+    # Gather ice locations from mineral analysis
+    mineral_result = all_results.get("mineral")
+    if mineral_result and hasattr(mineral_result, 'data'):
+        mineral_data = mineral_result.data if hasattr(mineral_result, 'data') else mineral_result
+        # Ice hotspot
+        hotspot = mineral_data.get("ice_hotspot") if isinstance(mineral_data, dict) else None
+        if hotspot and hotspot.get("center_lat") is not None:
+            ice_locations.append({
+                "source": "CRISM",
+                "lat": hotspot["center_lat"],
+                "lon": hotspot["center_lon"],
+                "product_id": "ice_hotspot",
+                "ice_percent": hotspot.get("max_ice_pct"),
+            })
+        # Top ice candidates
+        top_ice = mineral_data.get("top_ice_candidates", []) if isinstance(mineral_data, dict) else []
+        for c in top_ice[:5]:
+            if c.get("lat") is not None and c.get("lon") is not None:
+                ice_locations.append({
+                    "source": "CRISM",
+                    "lat": c["lat"],
+                    "lon": c["lon"],
+                    "product_id": c.get("obs_id", c.get("product_id", "")),
+                    "ice_percent": c.get("ice_percent"),
+                })
+
+    # Gather ice locations from CNN H2O
+    cnn_result = all_results.get("mineral_cnn")
+    if cnn_result and hasattr(cnn_result, 'data'):
+        cnn_data = cnn_result.data if hasattr(cnn_result, 'data') else cnn_result
+        h2o_hotspot = cnn_data.get("h2o_hotspot") if isinstance(cnn_data, dict) else None
+        if h2o_hotspot and h2o_hotspot.get("center_lat") is not None:
+            ice_locations.append({
+                "source": "CNN_H2O",
+                "lat": h2o_hotspot["center_lat"],
+                "lon": h2o_hotspot["center_lon"],
+                "product_id": "h2o_hotspot",
+                "ice_percent": h2o_hotspot.get("max_h2o_percent"),
+            })
+
+    # Deduplicate ice locations (same lat/lon within 0.01°)
+    unique_locs: list = []
+    for loc in ice_locations:
+        dup = False
+        for u in unique_locs:
+            if abs(loc["lat"] - u["lat"]) < 0.01 and abs(loc["lon"] - u["lon"]) < 0.01:
+                dup = True
+                break
+        if not dup:
+            unique_locs.append(loc)
+    ice_locations = unique_locs
+
+    if not ice_locations:
+        return TaskResult(
+            task_type="targeted_subsurface_at_ice",
+            success=True,
+            data={
+                "ice_locations_checked": 0,
+                "ice_locations_with_sharad": 0,
+                "reflectors_at_ice": 0,
+                "targeted_picks": [],
+                "note": "No CRISM/CNN ice locations available to target.",
+            },
+            summary="No CRISM/CNN ice locations to check against SHARAD.",
+        )
+
+    # Load SHARAD index
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    sharad_index_path = os.path.join(backend_dir, "sharad_highres_data", "index.geojson")
+    if not os.path.exists(sharad_index_path):
+        return TaskResult(
+            task_type="targeted_subsurface_at_ice",
+            success=True,
+            data={"ice_locations_checked": len(ice_locations), "targeted_picks": [],
+                  "note": "SHARAD index not found."},
+            summary="SHARAD index not found for targeted subsurface analysis.",
+        )
+
+    with open(sharad_index_path) as f:
+        sharad_index = json.load(f)
+
+    # Build track center lookup
+    tracks = []
+    for feat in sharad_index.get("features", []):
+        pid = feat.get("properties", {}).get("product_id", "")
+        coords = feat.get("geometry", {}).get("coordinates", [])
+        if not pid or not coords:
+            continue
+        # Compute track center for quick distance filtering
+        mid = coords[len(coords) // 2]
+        tracks.append({"product_id": pid, "coords": coords, "mid_lat": mid[1], "mid_lon": mid[0]})
+
+    # Import pick function
+    try:
+        from backend.analysis.epsilon_terrace.sharad_pick import pick_subsurface_interface
+    except ImportError:
+        try:
+            from analysis.epsilon_terrace.sharad_pick import pick_subsurface_interface
+        except ImportError:
+            return TaskResult(
+                task_type="targeted_subsurface_at_ice",
+                success=False,
+                error="sharad_pick module not available",
+                summary="SHARAD pick module unavailable for targeted analysis.",
+            )
+
+    # For each ice location, find nearest SHARAD track and pick
+    targeted_picks = []
+    locations_with_sharad = 0
+    reflectors_at_ice = 0
+
+    for ice_loc in ice_locations:
+        ice_lat = ice_loc["lat"]
+        ice_lon = ice_loc["lon"]
+
+        # Find nearest SHARAD track point within 30 km
+        best_track = None
+        best_dist = 30.0  # km threshold
+
+        for track in tracks:
+            # Quick pre-filter: skip tracks whose latitude range doesn't include target
+            track_lats = [c[1] for c in track["coords"]]
+            if ice_lat < min(track_lats) - 1 or ice_lat > max(track_lats) + 1:
+                continue
+            for coord in track["coords"][::3]:  # Sample every 3rd point
+                d = haversine_distance_km(ice_lat, ice_lon, coord[1], coord[0])
+                if d < best_dist:
+                    best_dist = d
+                    best_track = track
+
+        if best_track is None:
+            targeted_picks.append({
+                "ice_source": ice_loc["source"],
+                "ice_lat": ice_lat,
+                "ice_lon": ice_lon,
+                "ice_product_id": ice_loc["product_id"],
+                "sharad_product_id": None,
+                "distance_km": None,
+                "reflector_detected": False,
+                "note": "No SHARAD track within 30 km",
+            })
+            continue
+
+        locations_with_sharad += 1
+
+        # Run subsurface pick at ice location
+        try:
+            pick_result = pick_subsurface_interface(
+                best_track["product_id"],
+                ice_lat, ice_lon,
+                window_km=15.0,
+                min_snr=2.0,
+            )
+
+            reflector_detected = bool(pick_result.picks) and pick_result.median_twt_us > 0
+            if reflector_detected:
+                reflectors_at_ice += 1
+
+            # Compute assumed depth (clearly labeled)
+            depth_assumed = None
+            if pick_result.median_twt_us > 0:
+                _ICE_EPSILON = 3.15
+                _C = 299_792_458.0
+                v_ice = _C / math.sqrt(_ICE_EPSILON)
+                depth_assumed = round(v_ice * pick_result.median_twt_us * 1e-6 / 2, 1)
+
+            pick_entry = {
+                "ice_source": ice_loc["source"],
+                "ice_lat": ice_lat,
+                "ice_lon": ice_lon,
+                "ice_product_id": ice_loc["product_id"],
+                "ice_percent": ice_loc.get("ice_percent"),
+                "sharad_product_id": best_track["product_id"],
+                "distance_km": round(best_dist, 1),
+                "reflector_detected": reflector_detected,
+                "n_picks": len(pick_result.picks),
+                "median_snr": round(max((p.snr for p in pick_result.picks), default=0), 1),
+                "twt_us": round(pick_result.median_twt_us, 4) if pick_result.median_twt_us else None,
+                "depth_m_assumed": depth_assumed,
+                "epsilon_r_note": "Depth uses assumed εr=3.15 (not measured)",
+            }
+            if pick_result.error:
+                pick_entry["error"] = pick_result.error
+            targeted_picks.append(pick_entry)
+
+        except Exception as e:
+            logger.warning(f"Targeted pick failed at ({ice_lat}, {ice_lon}): {e}")
+            targeted_picks.append({
+                "ice_source": ice_loc["source"],
+                "ice_lat": ice_lat,
+                "ice_lon": ice_lon,
+                "ice_product_id": ice_loc["product_id"],
+                "sharad_product_id": best_track["product_id"],
+                "distance_km": round(best_dist, 1),
+                "reflector_detected": False,
+                "error": str(e),
+            })
+
+    # Build summary
+    summary_parts = [
+        f"Checked {len(ice_locations)} ice locations: {locations_with_sharad} had SHARAD coverage, "
+        f"{reflectors_at_ice} showed subsurface reflectors."
+    ]
+    for p in targeted_picks:
+        if p.get("reflector_detected"):
+            summary_parts.append(
+                f"  Reflector at ({p['ice_lat']:.2f}, {p['ice_lon']:.2f}): "
+                f"SHARAD {p['sharad_product_id']}, depth~{p.get('depth_m_assumed', '?')}m, "
+                f"SNR={p.get('median_snr', '?')}"
+            )
+
+    return TaskResult(
+        task_type="targeted_subsurface_at_ice",
+        success=True,
+        data={
+            "ice_locations_checked": len(ice_locations),
+            "ice_locations_with_sharad": locations_with_sharad,
+            "reflectors_at_ice": reflectors_at_ice,
+            "targeted_picks": targeted_picks,
+        },
+        summary="\n".join(summary_parts),
+    )
+
+
+# =============================================================================
 # Task: CRISM Spectral Analysis (SAM + Band Parameters)
 # =============================================================================
 
@@ -2215,6 +2626,24 @@ def synthesize_results(
     # Cross-instrument consistency analysis
     cross = _compute_cross_instrument(all_results)
     synthesis["cross_instrument"] = cross
+
+    # SHARAD geometric intersections with other instruments
+    all_products_flat = []
+    for key, res in all_results.items():
+        if key.startswith("search_") and res.success:
+            all_products_flat.extend(res.data.get("products", []))
+    if all_products_flat:
+        intersection_stats = find_sharad_intersections(all_products_flat)
+        synthesis["sharad_intersections"] = intersection_stats
+        # Propagate counts to cross_instrument
+        cross["sharad_crism_geometric_intersections"] = intersection_stats.get("sharad_crism_intersections", 0)
+        cross["sharad_hirise_geometric_intersections"] = intersection_stats.get("sharad_hirise_intersections", 0)
+        cross["sharad_dtm_geometric_intersections"] = intersection_stats.get("sharad_dtm_intersections", 0)
+
+    # Targeted subsurface analysis at CRISM/CNN ice locations
+    targeted_result = all_results.get("targeted_subsurface_at_ice")
+    if targeted_result and hasattr(targeted_result, "data") and targeted_result.data:
+        synthesis["targeted_ice_subsurface"] = targeted_result.data
 
     # ── Science Distance Computation ──
     # Distance between best landing site and nearest science target
@@ -2896,3 +3325,170 @@ def _compute_cross_instrument(all_results: Dict[str, 'TaskResult']) -> Dict[str,
     cross["stratigraphic_interpretation"] = stratigraphic
 
     return cross
+
+
+# =============================================================================
+# Task: Terrain ε Inversion (MOLA terraced crater → SHARAD pipeline)
+# =============================================================================
+
+def terrain_epsilon_inversion(
+    lat: float,
+    lon: float,
+    diameter_km: float,
+    terrace_depth_m: float,
+    products: List[Dict[str, Any]],
+    bbox: "RegionBBox",
+) -> TaskResult:
+    """
+    Run εr inversion for a terraced crater detected by MOLA scan.
+
+    Bridges MOLA landform detection to the existing epsilon_terrace and
+    sharad_inversion pipelines:
+    1. Search SHARAD_HIGHRES + HIRISE_DTM near the crater
+    2. Run terrace_dielectric_analysis (terrace depth + SHARAD TWT → εr)
+    3. Cross-validate with sharad_physics_inversion if tracks exist
+    4. Return combined results with formula: εr = (c·Δt / 2d)²
+
+    Parameters
+    ----------
+    lat, lon : float
+        Terraced crater center coordinates.
+    diameter_km : float
+        Crater diameter in km (from MOLA detection).
+    terrace_depth_m : float
+        Terrace bench depth below rim (from MOLA detection).
+    products : list
+        Available instrument products in the region.
+    bbox : RegionBBox
+        Region bounding box for searches.
+    """
+    import numpy as np
+
+    # Find SHARAD and DTM products near this crater
+    sharad_nearby = []
+    dtm_nearby = []
+    search_radius_km = max(diameter_km * 2, 50.0)
+
+    for p in products:
+        p_lat = p.get("lat") or p.get("center_lat", 0)
+        p_lon = p.get("lon") or p.get("center_lon", 0)
+        if p_lat == 0 and p_lon == 0:
+            continue
+        dist = haversine_distance_km(lat, lon, p_lat, p_lon)
+        if dist > search_radius_km:
+            continue
+        inst = p.get("instrument", "")
+        if inst == "SHARAD_HIGHRES":
+            sharad_nearby.append(p)
+        elif inst == "HIRISE_DTM":
+            dtm_nearby.append(p)
+
+    if not sharad_nearby:
+        return TaskResult(
+            task_type="terrain_epsilon_inversion",
+            success=True,
+            data={
+                "crater_lat": lat,
+                "crater_lon": lon,
+                "diameter_km": diameter_km,
+                "terrace_depth_m": terrace_depth_m,
+                "sharad_tracks_nearby": 0,
+                "dtm_products_nearby": len(dtm_nearby),
+                "epsilon_r": None,
+                "reason": "no_sharad_tracks",
+            },
+            summary=(
+                f"No SHARAD tracks within {search_radius_km:.0f} km of "
+                f"terraced crater at ({lat:.3f}, {lon:.3f}). "
+                f"Cannot compute εr without radar data."
+            ),
+        )
+
+    # Run terrace dielectric analysis using existing pipeline
+    # Build a minimal subsurface result for the terrace pipeline
+    sub_result = TaskResult(
+        task_type="subsurface",
+        success=True,
+        data={
+            "tracks": [{
+                "subsurface_detected": True,
+                "estimated_depth_m": terrace_depth_m,
+                "product_id": sp["product_id"],
+            } for sp in sharad_nearby[:3]],
+        },
+    )
+
+    terrace_result = terrace_dielectric_analysis(sub_result, products, bbox)
+
+    # Also run physics inversion for cross-validation
+    physics_result = sharad_physics_inversion(products, bbox)
+
+    # Combine results
+    terrace_eps = terrace_result.data.get("median_epsilon_r")
+    physics_eps = physics_result.data.get("best_epsilon_r")
+
+    combined_eps = None
+    interpretation = "insufficient_data"
+    method_used = []
+
+    if terrace_eps is not None:
+        combined_eps = terrace_eps
+        interpretation = terrace_result.data.get("interpretation", "unknown")
+        method_used.append("terrace_dielectric")
+
+    if physics_eps is not None:
+        if combined_eps is not None:
+            # Average the two estimates
+            combined_eps = round((combined_eps + physics_eps) / 2, 2)
+            method_used.append("physics_inversion")
+        else:
+            combined_eps = physics_eps
+            interpretation = "physics_inversion_only"
+            method_used.append("physics_inversion")
+
+    # Generate interpretation from combined εr
+    if combined_eps is not None:
+        if combined_eps < 2.5:
+            interpretation = "dry regolith or porous ice"
+        elif combined_eps < 3.5:
+            interpretation = "ice-rich subsurface (consistent with water ice)"
+        elif combined_eps < 5.0:
+            interpretation = "ice-cemented regolith"
+        else:
+            interpretation = "basaltic regolith or dense rock"
+
+    data = {
+        "crater_lat": lat,
+        "crater_lon": lon,
+        "diameter_km": diameter_km,
+        "terrace_depth_m": terrace_depth_m,
+        "sharad_tracks_nearby": len(sharad_nearby),
+        "dtm_products_nearby": len(dtm_nearby),
+        "epsilon_r": combined_eps,
+        "interpretation": interpretation,
+        "method_used": method_used,
+        "formula": "εr = (c · Δt / (2 · depth))²",
+        "terrace_analysis": terrace_result.data,
+        "physics_analysis": physics_result.data,
+    }
+
+    if combined_eps is not None:
+        summary = (
+            f"Terrain εr inversion at ({lat:.3f}, {lon:.3f}): "
+            f"εr = {combined_eps:.2f} ({interpretation}). "
+            f"Methods: {', '.join(method_used)}. "
+            f"Crater: {diameter_km:.1f} km, terrace depth {terrace_depth_m:.0f} m."
+        )
+    else:
+        summary = (
+            f"Terrain εr inversion at ({lat:.3f}, {lon:.3f}): "
+            f"No reliable εr estimate. "
+            f"{len(sharad_nearby)} SHARAD tracks, {len(dtm_nearby)} DTMs nearby."
+        )
+
+    return TaskResult(
+        task_type="terrain_epsilon_inversion",
+        success=True,
+        data=data,
+        summary=summary,
+    )

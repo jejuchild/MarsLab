@@ -85,6 +85,10 @@ def _feature_to_dict(f) -> dict:
             step = max(1, len(boundary) // 80)
             boundary = boundary[::step]
         d["boundary"] = [[round(p[0], 4), round(p[1], 4)] for p in boundary]
+    if f.terrace_depth_m > 0:
+        d["terrace_depth_m"] = round(f.terrace_depth_m, 1)
+    if f.terrace_ring_radii_km:
+        d["terrace_ring_radii_km"] = [round(r, 2) for r in f.terrace_ring_radii_km]
     return d
 
 

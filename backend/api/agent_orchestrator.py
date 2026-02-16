@@ -40,8 +40,10 @@ from .agent_tasks import (
     terrace_dielectric_analysis,
     sharad_physics_inversion,
     crism_spectral_analysis,
+    targeted_subsurface_at_ice,
     synthesize_results,
     recommend_site,
+    terrain_epsilon_inversion,
 )
 from .mars_climate import climate_analysis_for_region
 from .thermal_inertia import thermal_inertia_analysis_for_region
@@ -513,6 +515,7 @@ STRATEGY:
 3. Call check_local_data to see what is available locally, then download_products for missing data.
 4. Run analyses: analyze_subsurface, analyze_minerals, analyze_slope, classify_minerals_cnn, estimate_dielectric.
 5. **MANDATORY PHYSICS INVERSION**: After analyze_subsurface, you MUST attempt run_sharad_inversion if SHARAD_HIGHRES data exists. If it fails, attempt terrace_dielectric. You MUST report the εr source (physics-based or assumed fallback) in your reasoning. NEVER silently assume εr = 3.15 as evidence of ice.
+5b. **MANDATORY TARGETED SUBSURFACE AT ICE**: After analyze_minerals, if CRISM ice or CNN H2O was detected, you MUST run targeted_subsurface_at_ice to check SHARAD subsurface at those exact ice locations. This is the strongest evidence: co-located surface + subsurface ice.
 6. Call recommend_site to cross-reference everything into a landing site recommendation.
 7. Call finish with your final summary and recommendation.
 
@@ -761,6 +764,64 @@ async def _tool_sharad_physics(session: "AgentSession", params: dict):
     )
 
 
+async def _tool_terrain_epsilon(session: "AgentSession", params: dict):
+    """Run εr inversion for a terraced crater detected by MOLA scan."""
+    products = getattr(session, "_all_products", [])
+    if not session.bbox:
+        return TaskResult(task_type="terrain_epsilon_inversion", success=False, summary="No region", data={}), \
+            "Error: No region resolved."
+    lat = params.get("lat", session.bbox.center_lat)
+    lon = params.get("lon", session.bbox.center_lon)
+    diameter_km = params.get("diameter_km", 0)
+    terrace_depth_m = params.get("terrace_depth_m", 0)
+    result = terrain_epsilon_inversion(lat, lon, diameter_km, terrace_depth_m, products, session.bbox)
+    session.all_results["terrain_epsilon_inversion"] = result
+    data = result.data
+    eps = data.get("epsilon_r")
+    if eps is not None:
+        return result, (
+            f"Terrain εr inversion at ({lat:.3f}, {lon:.3f}): εr={eps:.2f}, "
+            f"interpretation: {data.get('interpretation', '?')}. "
+            f"Crater: {diameter_km:.1f} km, terrace depth {terrace_depth_m:.0f} m. "
+            f"Methods: {', '.join(data.get('method_used', []))}."
+        )
+    return result, (
+        f"Terrain εr inversion at ({lat:.3f}, {lon:.3f}): no reliable estimate. "
+        f"{data.get('sharad_tracks_nearby', 0)} SHARAD tracks, "
+        f"{data.get('dtm_products_nearby', 0)} DTMs nearby."
+    )
+
+
+async def _tool_targeted_subsurface(session: "AgentSession", params: dict):
+    """Check SHARAD subsurface at CRISM/CNN ice locations."""
+    products = getattr(session, "_all_products", [])
+    result = targeted_subsurface_at_ice(products, session.all_results)
+    session.all_results["targeted_subsurface_at_ice"] = result
+    data = result.data
+    checked = data.get("ice_locations_checked", 0)
+    with_sharad = data.get("ice_locations_with_sharad", 0)
+    reflectors = data.get("reflectors_at_ice", 0)
+
+    if reflectors > 0:
+        picks_detail = []
+        for p in data.get("targeted_picks", []):
+            if p.get("reflector_detected"):
+                picks_detail.append(
+                    f"{p['ice_source']} ice at ({p['ice_lat']:.2f}, {p['ice_lon']:.2f}) → "
+                    f"SHARAD {p['sharad_product_id']} reflector at ~{p.get('depth_m_assumed', '?')}m "
+                    f"(SNR={p.get('median_snr', '?')})"
+                )
+        return result, (
+            f"Targeted subsurface at ice: {checked} ice locations checked, "
+            f"{with_sharad} had SHARAD coverage, {reflectors} confirmed subsurface reflectors. "
+            + "; ".join(picks_detail[:3])
+        )
+    return result, (
+        f"Targeted subsurface at ice: {checked} ice locations checked, "
+        f"{with_sharad} had SHARAD coverage, no subsurface reflectors detected at ice locations."
+    )
+
+
 async def _tool_crism_spectral(session: "AgentSession", params: dict):
     """Run CRISM spectral analysis with SAM classification."""
     products = getattr(session, "_all_products", [])
@@ -852,17 +913,30 @@ async def _tool_ice_evidence(session: "AgentSession", params: dict):
         return TaskResult(task_type="ice_evidence", success=False, error="No bbox"), "No region defined"
 
     try:
-        from analysis.ice_evidence.models import (
-            IceEvidenceRequest, CandidateLocation, RegionSpec,
-            SharadSpec, CrismSpec, DtmSpec, EvidenceParams,
-        )
-        from analysis.ice_evidence.sharad_reflectors import evaluate_reflector_evidence
-        from analysis.ice_evidence.terrain_proxy import evaluate_terrain_evidence
-        from analysis.ice_evidence.crism_proxy import evaluate_crism_evidence
-        from analysis.ice_evidence.hyperbola_fit import auto_detect_apexes, fit_hyperbola
-        from analysis.ice_evidence.fusion import fuse_evidence
-        from analysis.ice_evidence.io import save_evidence_result
-        from analysis.ice_evidence.models import E1Hyperbola, HyperbolaFitRequest
+        try:
+            from analysis.ice_evidence.models import (
+                IceEvidenceRequest, CandidateLocation, RegionSpec,
+                SharadSpec, CrismSpec, DtmSpec, EvidenceParams,
+            )
+            from analysis.ice_evidence.sharad_reflectors import evaluate_reflector_evidence
+            from analysis.ice_evidence.terrain_proxy import evaluate_terrain_evidence
+            from analysis.ice_evidence.crism_proxy import evaluate_crism_evidence
+            from analysis.ice_evidence.hyperbola_fit import auto_detect_apexes, fit_hyperbola
+            from analysis.ice_evidence.fusion import fuse_evidence
+            from analysis.ice_evidence.io import save_evidence_result
+            from analysis.ice_evidence.models import E1Hyperbola, HyperbolaFitRequest
+        except ImportError:
+            from backend.analysis.ice_evidence.models import (
+                IceEvidenceRequest, CandidateLocation, RegionSpec,
+                SharadSpec, CrismSpec, DtmSpec, EvidenceParams,
+            )
+            from backend.analysis.ice_evidence.sharad_reflectors import evaluate_reflector_evidence
+            from backend.analysis.ice_evidence.terrain_proxy import evaluate_terrain_evidence
+            from backend.analysis.ice_evidence.crism_proxy import evaluate_crism_evidence
+            from backend.analysis.ice_evidence.hyperbola_fit import auto_detect_apexes, fit_hyperbola
+            from backend.analysis.ice_evidence.fusion import fuse_evidence
+            from backend.analysis.ice_evidence.io import save_evidence_result
+            from backend.analysis.ice_evidence.models import E1Hyperbola, HyperbolaFitRequest
 
         b = session.bbox
         candidate = CandidateLocation(
@@ -1035,10 +1109,20 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
         "params": {},
         "executor": _tool_sharad_physics,
     },
+    "targeted_subsurface_at_ice": {
+        "description": "Check SHARAD subsurface reflectors at locations where CRISM/CNN detected surface ice signals. Must run after analyze_minerals. Co-located surface + subsurface ice is the strongest evidence tier.",
+        "params": {},
+        "executor": _tool_targeted_subsurface,
+    },
     "run_crism_spectral": {
         "description": "Run CRISM spectral analysis: continuum removal, band parameters (BD1500/BD1900/BD2100/BD2200), and SAM mineral classification against USGS endmembers.",
         "params": {},
         "executor": _tool_crism_spectral,
+    },
+    "terrain_epsilon_inversion": {
+        "description": "Run εr inversion for a terraced crater detected by MOLA scan. Uses terrace depth + SHARAD travel time to compute dielectric constant.",
+        "params": {"lat": "float — crater latitude", "lon": "float — crater longitude", "diameter_km": "float — crater diameter", "terrace_depth_m": "float — terrace bench depth below rim"},
+        "executor": _tool_terrain_epsilon,
     },
     "finish": {
         "description": "Call when analysis is complete. Provide summary and recommendation.",
@@ -1248,6 +1332,8 @@ def _infer_tool_from_text(text: str, session: "AgentSession") -> dict:
         return {"tool": "classify_minerals_cnn", "params": {}}
     if any(kw in t for kw in ["dielectric", "permittivity", "ice vs rock"]):
         return {"tool": "estimate_dielectric", "params": {}}
+    if any(kw in t for kw in ["terrain epsilon", "terraced crater inversion", "mola epsilon", "crater epsilon", "terrain εr"]):
+        return {"tool": "terrain_epsilon_inversion", "params": {}}
     if any(kw in t for kw in ["physics inversion", "sharad inversion", "dielectric inversion", "compute epsilon"]):
         return {"tool": "run_sharad_inversion", "params": {}}
     if any(kw in t for kw in ["spectral analysis", "sam classification", "band parameter", "continuum removal"]):
@@ -1456,6 +1542,13 @@ def _generate_plan_rules(objective: str) -> Dict[str, Any]:
         steps.append({
             "type": "crism_spectral",
             "description": "Run CRISM spectral analysis: continuum removal + SAM classification",
+        })
+
+    # 4b. Terrain εr inversion for terraced crater objectives
+    if any(kw in obj_lower for kw in ["terraced crater", "terrain εr", "terrain epsilon", "crater epsilon", "mola epsilon", "terrace depth"]):
+        steps.append({
+            "type": "terrain_epsilon_inversion",
+            "description": "Run εr inversion for terraced crater using terrace depth + SHARAD travel time",
         })
 
     # 5. Climate + Thermal Inertia (always run for comprehensive assessment)
@@ -2825,6 +2918,16 @@ async def _run_agent_rules(
                     )
                     step.result = result
                     session.all_results["sharad_physics_inversion"] = result
+
+                elif step.type == "terrain_epsilon_inversion":
+                    # Extract crater params from step description or session context
+                    lat = session.bbox.center_lat if session.bbox else 0
+                    lon = session.bbox.center_lon if session.bbox else 0
+                    result = terrain_epsilon_inversion(
+                        lat, lon, 0, 0, all_products, session.bbox,
+                    )
+                    step.result = result
+                    session.all_results["terrain_epsilon_inversion"] = result
 
                 elif step.type == "crism_spectral":
                     result = crism_spectral_analysis(

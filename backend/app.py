@@ -484,6 +484,12 @@ app.include_router(ice_evidence_router)  # /api/ice/* — Ice Evidence Synthesiz
 from api.mola_detect_router import router as mola_detect_router
 app.include_router(mola_detect_router)  # /api/mola-detect/* — MOLA Landform Detection
 
+from api.terrain_features import router as terrain_features_router
+app.include_router(terrain_features_router)  # /api/terrain/features_in_view
+
+from backend.agent.workflow_router import router as workflow_router
+app.include_router(workflow_router)  # /api/workflow/* — Workflow Research Assistant
+
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
     """
