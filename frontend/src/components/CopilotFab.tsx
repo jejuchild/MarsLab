@@ -21,36 +21,29 @@ let _nextId = 0;
 const TOOL_ICONS: Record<string, string> = {
   fly_to_location: "flight",
   load_instrument: "layers",
-  find_intersections: "join",
   select_product: "info",
-  search_minerals: "science",
+  search: "search",
 };
 
-export type IntersectionPair = {
-  product_a: string;
-  product_b: string;
-  instrument_a: string;
-  instrument_b: string;
-  lat: number;
-  lon: number;
-};
-
-export type MineralSearchResult = {
+export type SearchResult = {
   product_id: string;
-  obs_id: string;
+  instrument: string;
   lat: number;
   lon: number;
-  ice_percent: number;
-  hyd_percent: number;
+  ice_percent?: number;
+  hyd_percent?: number;
+  paired_product?: string;
+  paired_instrument?: string;
+  near_landform_type?: string;
+  near_landform_distance_km?: number;
 };
 
 export default function CopilotFab({
   hidden = false,
   onFlyTo,
   onLoadInstrument,
-  onShowIntersections,
   onSelectInstrumentProduct,
-  onSearchMinerals,
+  onSearchResults,
   loadedInstruments = [],
   visibleProductCount = 0,
   currentLat,
@@ -59,9 +52,8 @@ export default function CopilotFab({
   hidden?: boolean;
   onFlyTo?: (lat: number, lon: number) => void;
   onLoadInstrument?: (instrument: string) => void;
-  onShowIntersections?: (pairs: IntersectionPair[]) => void;
   onSelectInstrumentProduct?: (instrument: string) => void;
-  onSearchMinerals?: (results: MineralSearchResult[]) => void;
+  onSearchResults?: (results: SearchResult[], params: Record<string, unknown>) => void;
   loadedInstruments?: string[];
   visibleProductCount?: number;
   currentLat?: number | null;
@@ -140,20 +132,15 @@ export default function CopilotFab({
               }
               loadDelay += 200;
             }
-          } else if (tool === "find_intersections" && onShowIntersections) {
-            const pairs = params.pairs as IntersectionPair[] | undefined;
-            if (pairs && pairs.length > 0) {
-              onShowIntersections(pairs);
-            }
           } else if (tool === "select_product" && onSelectInstrumentProduct) {
             const inst = params.instrument as string;
             if (inst) {
               onSelectInstrumentProduct(inst);
             }
-          } else if (tool === "search_minerals" && onSearchMinerals) {
-            const results = params.results as MineralSearchResult[] | undefined;
+          } else if (tool === "search" && onSearchResults) {
+            const results = params.results as SearchResult[] | undefined;
             if (results && results.length > 0) {
-              onSearchMinerals(results);
+              onSearchResults(results, params);
             }
           }
 
@@ -179,7 +166,7 @@ export default function CopilotFab({
       setStreaming(false);
       setStreamText("");
     }
-  }, [input, streaming, messages, loadedInstruments, visibleProductCount, currentLat, currentLon, onFlyTo, onLoadInstrument, onShowIntersections, onSelectInstrumentProduct, onSearchMinerals]);
+  }, [input, streaming, messages, loadedInstruments, visibleProductCount, currentLat, currentLon, onFlyTo, onLoadInstrument, onSelectInstrumentProduct, onSearchResults]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }

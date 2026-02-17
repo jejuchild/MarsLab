@@ -680,37 +680,45 @@ export default function MainPage() {
     setFlyToProductId(p.productId);
   }, []);
 
-  // Handle MARVIS intersection results — auto-load instruments, fly to first pair, select
-  const handleShowIntersections = useCallback((pairs: Array<{
-    product_a: string;
-    product_b: string;
-    instrument_a: string;
-    instrument_b: string;
+  // Handle MARVIS unified search results — auto-load instruments, fly to best, select
+  const handleSearchResults = useCallback((results: Array<{
+    product_id: string;
+    instrument: string;
     lat: number;
     lon: number;
-  }>) => {
-    if (pairs.length === 0) return;
-    const first = pairs[0];
+    ice_percent?: number;
+    hyd_percent?: number;
+    paired_product?: string;
+    paired_instrument?: string;
+    near_landform_type?: string;
+    near_landform_distance_km?: number;
+  }>, params: Record<string, unknown>) => {
+    if (results.length === 0) return;
+    const best = results[0];
+    const primaryInst = (best.instrument || params.instrument || "") as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
 
-    // Ensure both instruments are loaded
-    const instA = first.instrument_a as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
-    const instB = first.instrument_b as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
-    handleLoadFootprints(instA);
-    setTimeout(() => handleLoadFootprints(instB), 200);
+    // Load primary instrument
+    handleLoadFootprints(primaryInst);
 
-    // Fly to the intersection point
-    setFlyToCoords({ lat: first.lat, lon: first.lon });
+    // If intersection search, also load secondary instrument (staggered)
+    if (best.paired_instrument) {
+      const secInst = best.paired_instrument as typeof primaryInst;
+      setTimeout(() => handleLoadFootprints(secInst), 200);
+    }
 
-    // Select the first product in the inspector
+    // Fly to the best result
+    setFlyToCoords({ lat: best.lat, lon: best.lon });
+
+    // Select the best product in the inspector
     setTimeout(() => {
       setSelected({
-        instrument: first.instrument_a as InspectorContext["instrument"],
-        productId: first.product_a,
-        lat: first.lat,
-        lon: first.lon,
+        instrument: primaryInst as InspectorContext["instrument"],
+        productId: best.product_id,
+        lat: best.lat,
+        lon: best.lon,
       });
       panelManager.ensurePanelVisible("feature_select");
-      setHighlightProductId(first.product_a);
+      setHighlightProductId(best.product_id);
     }, 400);
   }, [handleLoadFootprints, panelManager.ensurePanelVisible]);
 
@@ -734,51 +742,6 @@ export default function MainPage() {
     }
   }, [panelManager.ensurePanelVisible]);
 
-  // Handle MARVIS mineral search results — auto-load CRISM_TRR3, fly to best, select
-  const handleSearchMinerals = useCallback((results: Array<{
-    product_id: string;
-    obs_id: string;
-    lat: number;
-    lon: number;
-    ice_percent: number;
-    hyd_percent: number;
-  }>) => {
-    if (results.length === 0) return;
-    const best = results[0];
-
-    // Load CRISM_TRR3 footprints
-    handleLoadFootprints("CRISM_TRR3");
-
-    // Fly to the best result
-    setFlyToCoords({ lat: best.lat, lon: best.lon });
-
-    // After fly + footprints load, try to select the product in inspector
-    setTimeout(() => {
-      const trr3Product = visibleProductsRef.current.find(
-        (p: VisibleProduct) =>
-          p.instrument === "CRISM_TRR3" &&
-          p.productId.toLowerCase().startsWith(best.obs_id.toLowerCase())
-      );
-
-      if (trr3Product) {
-        setSelected({
-          instrument: "CRISM_TRR3",
-          productId: trr3Product.productId,
-          lat: trr3Product.lat ?? best.lat,
-          lon: trr3Product.lon ?? best.lon,
-        });
-        setHighlightProductId(trr3Product.productId);
-      } else {
-        setSelected({
-          instrument: "CRISM_TRR3" as InspectorContext["instrument"],
-          productId: best.product_id,
-          lat: best.lat,
-          lon: best.lon,
-        });
-      }
-      panelManager.ensurePanelVisible("feature_select");
-    }, 600);
-  }, [handleLoadFootprints, panelManager.ensurePanelVisible]);
 
   // Handle download from Inspector quick actions
   const handleDownloadProduct = useCallback((productId: string, instrument: string) => {
@@ -1918,9 +1881,8 @@ export default function MainPage() {
           hidden={analysisMode === "agentic"}
           onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
           onLoadInstrument={(inst) => handleLoadFootprints(inst as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3")}
-          onShowIntersections={handleShowIntersections}
           onSelectInstrumentProduct={handleSelectInstrumentProduct}
-          onSearchMinerals={handleSearchMinerals}
+          onSearchResults={handleSearchResults}
           loadedInstruments={
             (Object.entries(instrumentVisibility) as [string, boolean][])
               .filter(([, v]) => v)

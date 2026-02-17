@@ -826,39 +826,23 @@ async def _stream_groq(
                     logger.info(f"Suppressed redundant fly_to_location (already near target)")
                     continue
 
-            # Run intersection search server-side and attach results
-            if tool_name == "find_intersections":
-                inst_a = params.get("instrument_a", "")
-                inst_b = params.get("instrument_b", "")
-                if context and context.current_lat is not None and context.current_lon is not None:
-                    vp_bbox = {
-                        "lat_min": context.current_lat - 5.0,
-                        "lat_max": context.current_lat + 5.0,
-                        "lon_min": context.current_lon - 8.0,
-                        "lon_max": context.current_lon + 8.0,
-                    }
-                else:
-                    msg_text = "Navigate to a region first so I can search for intersections there."
-                    await queue.put({"event": "chunk", "data": {"text": msg_text}})
-                    await queue.put({"event": "done", "data": {"full_text": msg_text}})
-                    await queue.put(None)
-                    return True
+            # Run compound search server-side and attach results
+            if tool_name == "search":
+                if params.get("mineral_type") and params.get("min_percent") is None:
+                    params["min_percent"] = 10.0
                 try:
-                    from api.proximity_router import find_viewport_intersections
-                    pairs = find_viewport_intersections(inst_a, inst_b, vp_bbox, limit=20)
+                    results = compound_search(
+                        instrument=params.get("instrument", ""),
+                        intersect_with=params.get("intersect_with"),
+                        mineral_type=params.get("mineral_type"),
+                        min_percent=params.get("min_percent"),
+                        near_landform=params.get("near_landform"),
+                        viewport_lat=context.current_lat if context else None,
+                        viewport_lon=context.current_lon if context else None,
+                        limit=10,
+                    )
                 except Exception as exc:
-                    logger.error(f"Intersection search error: {exc}")
-                    pairs = []
-                params["pairs"] = pairs
-
-            # Run mineral search server-side and attach results
-            if tool_name == "search_minerals":
-                mt = params.get("mineral_type", "ice")
-                min_pct = params.get("min_percent", 10.0)
-                try:
-                    results = search_mineral_products(mt, min_pct, limit=10)
-                except Exception as exc:
-                    logger.error(f"Mineral search error: {exc}")
+                    logger.error(f"Compound search error: {exc}")
                     results = []
                 params["results"] = results
 
@@ -902,22 +886,25 @@ _LOAD_RE = re.compile(
     + "|".join(INSTRUMENT_LIST)
     + r")\b",
 )
-_INTERSECT_RE = re.compile(
-    r"(?i)\b(?:find|show|search|get|where)\b.*?\b(?:intersect|overlap|cross)\b"
-    r"|\b(?:intersect|overlap|cross)\b.*?\b(?:find|show|search)\b",
-)
-_INTERSECT_INST_RE = re.compile(
-    r"(?i)\b(" + "|".join(INSTRUMENT_LIST) + r")\b",
-)
 _SELECT_RE = re.compile(
     r"(?i)\b(?:pick|select|open|inspect|choose)\b.*?\b("
     + "|".join(INSTRUMENT_LIST)
     + r")\b"
     r"|\b(" + "|".join(INSTRUMENT_LIST) + r")\b.*?\b(?:pick|select|open|inspect|choose|panel)\b",
 )
-_MINERAL_RE = re.compile(
-    r"(?i)\b(?:find|search|where|locate|show)\b.*?\b(?:h2o|ice|water|hydrat\w*|mineral|clay)\b"
-    r"|\b(?:h2o|ice|water|hydrat\w*|mineral)\b.*?\b(?:find|search|where|more than|greater|above|>)\b",
+# Unified search regex (replaces _INTERSECT_RE and _MINERAL_RE)
+_SEARCH_RE = re.compile(
+    r"(?i)\b(?:find|search|where|locate)\b"
+    r".*?\b(" + "|".join(INSTRUMENT_LIST) + r")\b",
+)
+_SEARCH_INTERSECT_RE = re.compile(
+    r"(?i)\b(?:intersect\w*|overlap\w*|cross\w*)\b"
+    r".*?\b(" + "|".join(INSTRUMENT_LIST) + r")\b"
+    r"|\b(" + "|".join(INSTRUMENT_LIST) + r")\b"
+    r".*?\b(?:intersect\w*|overlap\w*|cross\w*)\b",
+)
+_SEARCH_LANDFORM_RE = re.compile(
+    r"(?i)\b(terraced[_ ]?crater|crater|volcanic|volcano|graben|channel|wrinkle[_ ]?ridge|ridge|lda|lobate[_ ]?debris)\b",
 )
 _MINERAL_PCT_RE = re.compile(
     r"(?:more\s+than|greater\s+than|above|over|>|>=)\s*(\d+(?:\.\d+)?)\s*%?"
@@ -940,58 +927,67 @@ async def _stream_llama(
     # ── Check for tool-like intents via regex (since LLaMA lacks function calling)
     nav_match = _NAV_RE.search(message)
     load_match = _LOAD_RE.search(message)
-    intersect_match = _INTERSECT_RE.search(message)
-    mineral_match = _MINERAL_RE.search(message)
+    search_match = _SEARCH_RE.search(message)
 
-    if intersect_match:
-        inst_matches = _INTERSECT_INST_RE.findall(message)
-        if len(inst_matches) >= 2:
-            inst_a = inst_matches[0].upper()
-            inst_b = inst_matches[1].upper()
-            params = {"instrument_a": inst_a, "instrument_b": inst_b}
-            if context and context.current_lat is not None and context.current_lon is not None:
-                vp_bbox = {
-                    "lat_min": context.current_lat - 5.0,
-                    "lat_max": context.current_lat + 5.0,
-                    "lon_min": context.current_lon - 8.0,
-                    "lon_max": context.current_lon + 8.0,
-                }
-                try:
-                    from api.proximity_router import find_viewport_intersections
-                    pairs = find_viewport_intersections(inst_a, inst_b, vp_bbox, limit=20)
-                except Exception as exc:
-                    logger.error(f"LLaMA intersection search error: {exc}")
-                    pairs = []
-                params["pairs"] = pairs
-            else:
-                params["pairs"] = []
-            confirm = _tool_confirmation("find_intersections", params, context)
+    # Unified search: handles mineral, landform, intersection, and compound queries
+    if search_match:
+        instrument = search_match.group(1).upper()
+        params: dict = {"instrument": instrument}
+
+        # Check for intersection with second instrument
+        intersect_m = _SEARCH_INTERSECT_RE.search(message)
+        if intersect_m:
+            second = (intersect_m.group(1) or intersect_m.group(2) or "").upper()
+            if second and second != instrument:
+                params["intersect_with"] = second
+
+        # Check for landform filter
+        landform_m = _SEARCH_LANDFORM_RE.search(message)
+        if landform_m:
+            lf = landform_m.group(1).lower().replace(" ", "_")
+            if lf == "volcano":
+                lf = "volcanic"
+            elif lf == "ridge":
+                lf = "wrinkle_ridge"
+            elif lf == "lobate_debris":
+                lf = "lda"
+            params["near_landform"] = lf
+
+        # Check for mineral filter
+        mineral_m = _MINERAL_TYPE_RE.search(message)
+        if mineral_m:
+            params["mineral_type"] = "ice"
+        pct_m = _MINERAL_PCT_RE.search(message)
+        if pct_m:
+            params["min_percent"] = float(pct_m.group(1) or pct_m.group(2))
+
+        # Only dispatch if there's at least one filter beyond just the instrument
+        has_filter = any(k in params for k in ("intersect_with", "mineral_type", "near_landform", "min_percent"))
+        if has_filter:
+            if params.get("mineral_type") and "min_percent" not in params:
+                params["min_percent"] = 10.0
+            try:
+                results = compound_search(
+                    instrument=instrument,
+                    intersect_with=params.get("intersect_with"),
+                    mineral_type=params.get("mineral_type"),
+                    min_percent=params.get("min_percent"),
+                    near_landform=params.get("near_landform"),
+                    viewport_lat=context.current_lat if context else None,
+                    viewport_lon=context.current_lon if context else None,
+                    limit=10,
+                )
+            except Exception as exc:
+                logger.error(f"LLaMA compound search error: {exc}")
+                results = []
+            params["results"] = results
+            confirm = _tool_confirmation("search", params, context)
             await queue.put({"event": "tool_call", "data": {
-                "tool": "find_intersections", "params": params, "message": confirm,
+                "tool": "search", "params": params, "message": confirm,
             }})
             await queue.put({"event": "done", "data": {"full_text": ""}})
             await queue.put(None)
             return
-
-    if mineral_match:
-        pct_match = _MINERAL_PCT_RE.search(message)
-        min_pct = float(pct_match.group(1) or pct_match.group(2)) if pct_match else 10.0
-        type_match = _MINERAL_TYPE_RE.search(message)
-        mineral_type = "ice" if (type_match and type_match.group(1).lower() in ("h2o", "ice", "water")) else "hyd"
-        params = {"mineral_type": mineral_type, "min_percent": min_pct}
-        try:
-            results = search_mineral_products(mineral_type, min_pct, limit=10)
-        except Exception as exc:
-            logger.error(f"LLaMA mineral search error: {exc}")
-            results = []
-        params["results"] = results
-        confirm = _tool_confirmation("search_minerals", params, context)
-        await queue.put({"event": "tool_call", "data": {
-            "tool": "search_minerals", "params": params, "message": confirm,
-        }})
-        await queue.put({"event": "done", "data": {"full_text": ""}})
-        await queue.put(None)
-        return
 
     if nav_match:
         # Extract region name from the message (everything after the nav keyword)
