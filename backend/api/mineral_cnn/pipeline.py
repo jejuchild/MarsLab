@@ -65,7 +65,27 @@ class ClassificationResult:
 # Disk Cache
 # ============================================================
 def _result_dir(obs_id: str) -> str:
-    return os.path.join(RESULTS_DIR, obs_id)
+    """Get result directory path for obs_id, with case-insensitive fallback.
+
+    First tries exact match, then case-insensitive search if not found.
+    This handles cases where obs_id is provided in different case.
+    """
+    exact_path = os.path.join(RESULTS_DIR, obs_id)
+    if os.path.exists(exact_path):
+        return exact_path
+
+    # Fallback: case-insensitive search
+    if os.path.exists(RESULTS_DIR):
+        obs_id_lower = obs_id.lower()
+        try:
+            for dirname in os.listdir(RESULTS_DIR):
+                if dirname.lower() == obs_id_lower:
+                    return os.path.join(RESULTS_DIR, dirname)
+        except (OSError, PermissionError) as e:
+            logging.debug(f"Case-insensitive search failed: {e}")
+
+    # Not found; return exact path (will fail gracefully later)
+    return exact_path
 
 
 def has_cached_result(obs_id: str) -> bool:

@@ -12,8 +12,15 @@ export interface RegolithSample {
   delta_bins?: number | null;
   twt_us?: number | null;
   thickness_m?: number | null;
+  thickness_low_m?: number | null;
+  thickness_high_m?: number | null;
   snr?: number | null;
   confidence?: number | null;
+  ringing_rejected?: boolean;
+  clutter_available?: boolean;
+  clutter_flagged?: boolean;
+  clutter_snr?: number | null;
+  mode?: string;
 }
 
 export interface OverlaySegment {
@@ -40,6 +47,11 @@ export interface RegolithSummary {
   mean_confidence?: number | null;
   dem_source: string;
   total_distance_km: number;
+  shallow_mode_enabled?: boolean;
+  ring_reject_rate?: number;
+  clutter_available?: boolean;
+  clutter_flag_rate?: number;
+  epsilon_uncertainty?: number;
 }
 
 export interface RegolithParameters {
@@ -50,6 +62,11 @@ export interface RegolithParameters {
   dem_source: string;
   speed_of_light_mps: number;
   sample_interval_us: number;
+  mode?: string;
+  epsilon_uncertainty?: number;
+  clutter_mode?: string;
+  clutter_snr_threshold?: number;
+  clutter_bin_tolerance?: number;
 }
 
 export interface RegolithResult {
@@ -67,7 +84,14 @@ export async function fetchRegolithProfile(
   snrThreshold: number = 3.5,
   searchLo: number = 10,
   searchHi: number = 150,
-  dtmProductId: string = "",
+  options?: {
+    dtm_product_id?: string;
+    mode?: string;
+    epsilon_uncertainty?: number;
+    clutter_mode?: string;
+    clutter_snr_threshold?: number;
+    clutter_bin_tolerance?: number;
+  },
 ): Promise<RegolithResult> {
   const params = new URLSearchParams({
     product_id: productId,
@@ -76,7 +100,13 @@ export async function fetchRegolithProfile(
     search_lo: searchLo.toString(),
     search_hi: searchHi.toString(),
   });
-  if (dtmProductId) params.set("dtm_product_id", dtmProductId);
+
+  if (options?.dtm_product_id) params.set("dtm_product_id", options.dtm_product_id);
+  if (options?.mode) params.set("mode", options.mode);
+  if (options?.epsilon_uncertainty !== undefined) params.set("epsilon_uncertainty", options.epsilon_uncertainty.toString());
+  if (options?.clutter_mode) params.set("clutter_mode", options.clutter_mode);
+  if (options?.clutter_snr_threshold !== undefined) params.set("clutter_snr_threshold", options.clutter_snr_threshold.toString());
+  if (options?.clutter_bin_tolerance !== undefined) params.set("clutter_bin_tolerance", options.clutter_bin_tolerance.toString());
 
   const res = await fetch(`/api/regolith/thickness_profile?${params}`);
   if (!res.ok) {
@@ -92,7 +122,14 @@ export function getExportCsvUrl(
   snrThreshold: number,
   searchLo: number,
   searchHi: number,
-  dtmProductId: string = "",
+  options?: {
+    dtm_product_id?: string;
+    mode?: string;
+    epsilon_uncertainty?: number;
+    clutter_mode?: string;
+    clutter_snr_threshold?: number;
+    clutter_bin_tolerance?: number;
+  },
 ): string {
   const params = new URLSearchParams({
     product_id: productId,
@@ -101,6 +138,13 @@ export function getExportCsvUrl(
     search_lo: searchLo.toString(),
     search_hi: searchHi.toString(),
   });
-  if (dtmProductId) params.set("dtm_product_id", dtmProductId);
+
+  if (options?.dtm_product_id) params.set("dtm_product_id", options.dtm_product_id);
+  if (options?.mode) params.set("mode", options.mode);
+  if (options?.epsilon_uncertainty !== undefined) params.set("epsilon_uncertainty", options.epsilon_uncertainty.toString());
+  if (options?.clutter_mode) params.set("clutter_mode", options.clutter_mode);
+  if (options?.clutter_snr_threshold !== undefined) params.set("clutter_snr_threshold", options.clutter_snr_threshold.toString());
+  if (options?.clutter_bin_tolerance !== undefined) params.set("clutter_bin_tolerance", options.clutter_bin_tolerance.toString());
+
   return `/api/regolith/export_csv?${params}`;
 }

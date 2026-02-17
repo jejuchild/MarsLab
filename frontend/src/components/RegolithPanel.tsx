@@ -43,18 +43,32 @@ export default function RegolithPanel({
   const [snrThreshold, setSnrThreshold] = useState(3.5);
   const [searchLo, setSearchLo] = useState(10);
   const [searchHi, setSearchHi] = useState(150);
+  const [mode, setMode] = useState<"default" | "shallow">("default");
+  const [epsilonUncertainty, setEpsilonUncertainty] = useState(0.5);
+  const [clutterMode, setClutterMode] = useState<"off" | "mask">("off");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Panel width
   const [panelWidth, setPanelWidth] = useState(420);
 
   // Track whether params changed since last run
-  const lastRunRef = useRef({ epsilonR: 2.5, snrThreshold: 3.5, searchLo: 10, searchHi: 150 });
+  const lastRunRef = useRef({
+    epsilonR: 2.5,
+    snrThreshold: 3.5,
+    searchLo: 10,
+    searchHi: 150,
+    mode: "default",
+    epsilonUncertainty: 0.5,
+    clutterMode: "off",
+  });
   const paramsChanged =
     epsilonR !== lastRunRef.current.epsilonR ||
     snrThreshold !== lastRunRef.current.snrThreshold ||
     searchLo !== lastRunRef.current.searchLo ||
-    searchHi !== lastRunRef.current.searchHi;
+    searchHi !== lastRunRef.current.searchHi ||
+    mode !== lastRunRef.current.mode ||
+    epsilonUncertainty !== lastRunRef.current.epsilonUncertainty ||
+    clutterMode !== lastRunRef.current.clutterMode;
 
   /* ── Resize ─────────────────────────────────────────── */
   const handleResizeStart = useCallback(
@@ -83,13 +97,33 @@ export default function RegolithPanel({
 
   /* ── Fetch analysis ─────────────────────────────────── */
   const runAnalysis = useCallback(
-    async (er: number, snr: number, lo: number, hi: number) => {
+    async (
+      er: number,
+      snr: number,
+      lo: number,
+      hi: number,
+      md: string,
+      epsilonUncert: number,
+      clutter: string,
+    ) => {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchRegolithProfile(productId, er, snr, lo, hi);
+        const data = await fetchRegolithProfile(productId, er, snr, lo, hi, {
+          mode: md,
+          epsilon_uncertainty: epsilonUncert,
+          clutter_mode: clutter,
+        });
         setResult(data);
-        lastRunRef.current = { epsilonR: er, snrThreshold: snr, searchLo: lo, searchHi: hi };
+        lastRunRef.current = {
+          epsilonR: er,
+          snrThreshold: snr,
+          searchLo: lo,
+          searchHi: hi,
+          mode: md,
+          epsilonUncertainty: epsilonUncert,
+          clutterMode: clutter,
+        };
         onOverlayUpdate?.(data.overlay_segments);
       } catch (e: any) {
         setError(e.message || "Analysis failed");
@@ -102,7 +136,7 @@ export default function RegolithPanel({
 
   // Auto-run on mount
   useEffect(() => {
-    runAnalysis(epsilonR, snrThreshold, searchLo, searchHi);
+    runAnalysis(epsilonR, snrThreshold, searchLo, searchHi, mode, epsilonUncertainty, clutterMode);
     return () => onOverlayUpdate?.([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
