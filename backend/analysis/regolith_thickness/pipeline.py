@@ -32,6 +32,33 @@ from analysis.shared.overlay import interpolate_colormap, CMAP_THICKNESS
 
 logger = logging.getLogger(__name__)
 
+# ── PHASE 1: RTE SHALLOW-MODE CONSTANTS ─────────────────────────────────
+RING_GUARD_BINS_DEFAULT = 4      # reject peaks in first 4 bins (default)
+RING_GUARD_BINS_SHALLOW = 3      # reject peaks in first 3 bins (shallow mode)
+MEDIAN_KERNEL_DEFAULT = 15       # coherence filter kernel (default)
+MEDIAN_KERNEL_SHALLOW = 11       # coherence filter kernel (shallow mode)
+OUTLIER_THRESHOLD_DEFAULT = 15   # outlier rejection threshold in bins (default)
+OUTLIER_THRESHOLD_SHALLOW = 12   # outlier rejection threshold in bins (shallow mode)
+
+
+def _apply_mode_defaults(
+    mode: str,
+    search_lo: int,
+    search_hi: int,
+) -> tuple:
+    """Apply mode-based defaults for search window.
+
+    If user specifies explicit search_lo/hi, those take precedence.
+    Only apply defaults if user is using the default values.
+    """
+    if mode == "shallow":
+        # Shallow mode defaults: search_lo=2, search_hi=120
+        if search_lo == 10:  # user not overriding
+            search_lo = 2
+        if search_hi == 150:  # user not overriding
+            search_hi = 120
+    return search_lo, search_hi
+
 
 class RegolithThicknessEstimator(AnalysisModule):
     """Estimate along-track regolith thickness from a single SHARAD track."""
@@ -51,12 +78,19 @@ class RegolithThicknessEstimator(AnalysisModule):
         search_lo: int = 10,
         search_hi: int = 150,
         dtm_product_id: str = "",
+        mode: str = "default",
+        epsilon_uncertainty: float = 0.5,
+        clutter_mode: str = "off",
+        clutter_snr_threshold: float = 3.0,
+        clutter_bin_tolerance: int = 3,
     ) -> RegolithResult:
         """Execute the full RTE pipeline. Returns RegolithResult."""
         try:
             self._result = self._run_impl(
                 product_id, epsilon_r, snr_threshold,
                 search_lo, search_hi, dtm_product_id,
+                mode, epsilon_uncertainty,
+                clutter_mode, clutter_snr_threshold, clutter_bin_tolerance,
             )
         except Exception as exc:
             logger.exception("RTE pipeline failed for %s", product_id)
@@ -93,6 +127,11 @@ class RegolithThicknessEstimator(AnalysisModule):
         search_lo: int,
         search_hi: int,
         dtm_product_id: str,
+        mode: str = "default",
+        epsilon_uncertainty: float = 0.5,
+        clutter_mode: str = "off",
+        clutter_snr_threshold: float = 3.0,
+        clutter_bin_tolerance: int = 3,
     ) -> RegolithResult:
         # Late imports to avoid circular deps at module load
         from api.sharad_highres_router import (
@@ -102,9 +141,14 @@ class RegolithThicknessEstimator(AnalysisModule):
         )
 
         logger.info(
-            "RTE: product=%s εr=%.2f snr≥%.1f search=[%d,%d]",
-            product_id, epsilon_r, snr_threshold, search_lo, search_hi,
+            "RTE: product=%s εr=%.2f snr≥%.1f search=[%d,%d] mode=%s",
+            product_id, epsilon_r, snr_threshold, search_lo, search_hi, mode,
         )
+
+        # ── PHASE 1: Apply mode defaults ────────────────────────────────
+        search_lo, search_hi = _apply_mode_defaults(mode, search_lo, search_hi)
+        logger.debug("RTE: after mode=%s defaults: search=[%d,%d]",
+                     mode, search_lo, search_hi)
 
         # ── Step 1: Load SHARAD data ────────────────────────────────
         power, total_rows = _get_power(product_id)
@@ -135,12 +179,16 @@ class RegolithThicknessEstimator(AnalysisModule):
         detected = np.zeros(n_traces, dtype=bool)
         delta_bins_arr = np.zeros(n_traces, dtype=np.int32)
         snr_arr = np.zeros(n_traces, dtype=np.float32)
+        ringing_rejected = np.zeros(n_traces, dtype=bool)  # PHASE 1: track ringing
 
         valid_surface = surface >= 0
         valid_indices = np.where(valid_surface)[0]
 
         logger.debug("RTE: %d/%d traces have valid surface pick",
                       len(valid_indices), n_traces)
+
+        # PHASE 1: mode-aware ring guard bins and thresholds
+        ring_guard_bins = RING_GUARD_BINS_SHALLOW if mode == "shallow" else RING_GUARD_BINS_DEFAULT
 
         for i in valid_indices:
             sb = int(surface[i])
@@ -155,8 +203,16 @@ class RegolithThicknessEstimator(AnalysisModule):
             peak_val = float(band[peak_idx])
             snr = peak_val / noise
 
-            # Reject peaks in first 5 bins (surface ringing artifact)
-            if peak_idx < 5:
+            # PHASE 1: Enhanced surface ringing rejection
+            # Guard band check: reject if peak is in first N bins
+            if peak_idx < ring_guard_bins:
+                ringing_rejected[i] = True
+                continue
+
+            # PHASE 1: Power proximity check: reject if too close to surface power
+            surface_peak_power = power[i, sb] if sb < n_bins else 0.0
+            if surface_peak_power > 0 and peak_val > 0.6 * surface_peak_power:
+                ringing_rejected[i] = True
                 continue
 
             if snr >= snr_threshold:
@@ -172,8 +228,13 @@ class RegolithThicknessEstimator(AnalysisModule):
         coherence = np.zeros(n_traces, dtype=np.float32)
 
         if n_valid >= 10:
+            # PHASE 1: mode-aware coherence filtering parameters
+            median_kernel = MEDIAN_KERNEL_SHALLOW if mode == "shallow" else MEDIAN_KERNEL_DEFAULT
+            outlier_threshold = OUTLIER_THRESHOLD_SHALLOW if mode == "shallow" else OUTLIER_THRESHOLD_DEFAULT
             coherence = self._coherence_filter(
                 detected, delta_bins_arr, snr_arr, coherence,
+                median_kernel=median_kernel,
+                outlier_threshold=outlier_threshold,
             )
         elif n_valid > 0:
             coherence[detected] = 0.5
@@ -186,6 +247,26 @@ class RegolithThicknessEstimator(AnalysisModule):
             (velocity * twt_us * 1e-6) / 2.0,
             0.0,
         )
+
+        # PHASE 3: Compute epsilon_uncertainty band
+        # thickness_low_m corresponds to higher εr (lower depth)
+        # thickness_high_m corresponds to lower εr (higher depth)
+        thickness_low_m = np.zeros(n_traces, dtype=np.float64)
+        thickness_high_m = np.zeros(n_traces, dtype=np.float64)
+
+        if epsilon_uncertainty > 0:
+            velocity_low = SPEED_OF_LIGHT / math.sqrt(epsilon_r + epsilon_uncertainty)
+            velocity_high = SPEED_OF_LIGHT / math.sqrt(max(epsilon_r - epsilon_uncertainty, 1.0))
+            thickness_low_m = np.where(
+                detected,
+                (velocity_low * twt_us * 1e-6) / 2.0,
+                0.0,
+            )
+            thickness_high_m = np.where(
+                detected,
+                (velocity_high * twt_us * 1e-6) / 2.0,
+                0.0,
+            )
 
         # ── Step 7: Confidence score ────────────────────────────────
         dem_bonus = 1.0 if dem_source == "HiRISE_DTM" else 0.5
@@ -220,8 +301,19 @@ class RegolithThicknessEstimator(AnalysisModule):
                 delta_bins=int(delta_bins_arr[i]) if detected[i] else None,
                 twt_us=round(float(twt_us[i]), 4) if detected[i] else None,
                 thickness_m=round(float(thickness_m[i]), 1) if detected[i] else None,
+                # PHASE 3: epsilon_uncertainty band
+                thickness_low_m=round(float(thickness_low_m[i]), 1) if detected[i] and epsilon_uncertainty > 0 else None,
+                thickness_high_m=round(float(thickness_high_m[i]), 1) if detected[i] and epsilon_uncertainty > 0 else None,
                 snr=round(float(snr_arr[i]), 2) if detected[i] else None,
                 confidence=round(float(confidence[i]), 3),
+                # PHASE 1: surface ringing rejection
+                ringing_rejected=bool(ringing_rejected[i]),
+                # PHASE 2: clutter fields (initialized, will be updated in phase 2)
+                clutter_available=False,
+                clutter_flagged=False,
+                clutter_snr=None,
+                # PHASE 1: mode parameter
+                mode=mode,
             )
             profile.append(sample)
 
@@ -234,6 +326,9 @@ class RegolithThicknessEstimator(AnalysisModule):
         valid_thick = thickness_m[detected]
         valid_snr = snr_arr[detected]
         valid_conf = confidence[detected]
+
+        # PHASE 1: Calculate ring rejection rate
+        ring_reject_rate = float(ringing_rejected.sum()) / max(len(valid_indices), 1) if len(valid_indices) > 0 else 0.0
 
         summary = RegolithSummary(
             product_id=product_id,
@@ -250,6 +345,11 @@ class RegolithThicknessEstimator(AnalysisModule):
             mean_confidence=round(float(valid_conf.mean()), 3) if n_valid else None,
             dem_source=dem_source,
             total_distance_km=round(float(distances_km[-1]), 2) if n_traces else 0.0,
+            # PHASE 1: shallow mode fields
+            shallow_mode_enabled=(mode == "shallow"),
+            ring_reject_rate=round(ring_reject_rate, 4),
+            # PHASE 3: epsilon_uncertainty
+            epsilon_uncertainty=epsilon_uncertainty,
         )
 
         params = RegolithParameters(
@@ -258,6 +358,14 @@ class RegolithThicknessEstimator(AnalysisModule):
             search_lo=search_lo,
             search_hi=search_hi,
             dem_source=dem_source,
+            # PHASE 1: mode parameter
+            mode=mode,
+            # PHASE 2: clutter parameters
+            clutter_mode=clutter_mode,
+            clutter_snr_threshold=clutter_snr_threshold,
+            clutter_bin_tolerance=clutter_bin_tolerance,
+            # PHASE 3: epsilon_uncertainty parameter
+            epsilon_uncertainty=epsilon_uncertainty,
         )
 
         logger.info(
@@ -285,18 +393,29 @@ class RegolithThicknessEstimator(AnalysisModule):
         delta_bins: np.ndarray,
         snr: np.ndarray,
         coherence: np.ndarray,
+        median_kernel: int = 15,
+        outlier_threshold: int = 15,
     ) -> np.ndarray:
-        """Apply median-based coherence filtering to raw detections."""
+        """Apply median-based coherence filtering to raw detections.
+
+        Args:
+            detected: boolean array of detection flags
+            delta_bins: delta bin indices (or 0 if not detected)
+            snr: SNR values
+            coherence: coherence score array (updated in place)
+            median_kernel: kernel size for median filter (PHASE 1: mode-aware)
+            outlier_threshold: bin distance threshold for outlier rejection (PHASE 1: mode-aware)
+        """
         from scipy.ndimage import median_filter
 
         det_idx = np.where(detected)[0]
         vals = delta_bins[det_idx].astype(np.float64)
 
         # Median filter on valid picks only
-        filtered = median_filter(vals, size=min(15, len(vals)))
+        filtered = median_filter(vals, size=min(median_kernel, len(vals)))
 
-        # Outlier rejection: > 15 bins from smoothed trend
-        outlier_mask = np.abs(vals - filtered) > 15
+        # Outlier rejection: > threshold bins from smoothed trend
+        outlier_mask = np.abs(vals - filtered) > outlier_threshold
         for j, idx in enumerate(det_idx):
             if outlier_mask[j]:
                 detected[idx] = False
