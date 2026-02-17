@@ -1,0 +1,122 @@
+{
+  "session_id": "25e609d4-6c07-411b-adfa-583c63417b3d",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hi, I'm MARVIS — your Mars research assistant. Ask me anything about Mars, or tell me what you'd like to investigate.",
+      "timestamp": "2026-02-16T13:53:56.042612Z",
+      "actions": [],
+      "suggestions": [
+        "What can you do?",
+        "Find ice in Arcadia",
+        "Analyze a crater"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "hello",
+      "timestamp": "2026-02-16T13:53:56.086680Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hey there! What are you curious about on Mars?",
+      "timestamp": "2026-02-16T13:53:56.514117Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "your name?",
+      "timestamp": "2026-02-16T13:54:04.694043Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hi! I'm MARVIS, your Mars research assistant. Ask me anything about Mars — ice, craters, minerals, or just pick a region to explore.",
+      "timestamp": "2026-02-16T13:54:05.131894Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "where have many craters",
+      "timestamp": "2026-02-16T13:54:17.705027Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "I'm here to help — just tell me what you're curious about!",
+      "timestamp": "2026-02-16T13:54:18.136614Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "region which has lots of craters",
+      "timestamp": "2026-02-16T13:54:30.059664Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "I'm here to help — just tell me what you're curious about!",
+      "timestamp": "2026-02-16T13:54:30.494103Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": null,
+  "current_bbox": null,
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": null,
+  "previous_regions": [],
+  "persona_name": "MARVIS",
+  "pending_actions": [],
+  "tool_context": {},
+  "report_markdown": null,
+  "created_at": "2026-02-16T13:53:56.042519Z",
+  "updated_at": "2026-02-16T13:54:30.494264Z"
+}

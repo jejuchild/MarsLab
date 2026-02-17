@@ -1,0 +1,1643 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -170.272175,
+              39.000569444444444
+            ],
+            [
+              -170.13096944444445,
+              39.000569444444444
+            ],
+            [
+              -170.13096944444445,
+              39.171527777777776
+            ],
+            [
+              -170.272175,
+              39.171527777777776
+            ],
+            [
+              -170.272175,
+              39.000569444444444
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_060706_2195_060416_2195_A01",
+        "title": "HiRISE DTM - Amazonis Planitia",
+        "dtm_file": "DTEEC_060706_2195_060416_2195_A01.IMG",
+        "ortho_file": "ESP_060706_2195_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_060706_2195",
+        "west": -170.272175,
+        "east": -170.13096944444445,
+        "south": 39.000569444444444,
+        "north": 39.171527777777776,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -162.5552888888889,
+              40.47676666666667
+            ],
+            [
+              -162.42205833333333,
+              40.47676666666667
+            ],
+            [
+              -162.42205833333333,
+              40.62711388888889
+            ],
+            [
+              -162.5552888888889,
+              40.62711388888889
+            ],
+            [
+              -162.5552888888889,
+              40.47676666666667
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEED_042996_2210_043273_2210_A01",
+        "title": "HiRISE DTM - Possible Multi-Terraced Crater in Arcadia Planitia",
+        "dtm_file": "DTEED_042996_2210_043273_2210_A01.IMG",
+        "ortho_file": "ESP_042996_2210_RED_A_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_042996_2210",
+        "west": -162.5552888888889,
+        "east": -162.42205833333333,
+        "south": 40.47676666666667,
+        "north": 40.62711388888889,
+        "resolution_m": 2.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164.4526972222222,
+              39.682719444444444
+            ],
+            [
+              -164.30086944444446,
+              39.682719444444444
+            ],
+            [
+              -164.30086944444446,
+              39.93915277777777
+            ],
+            [
+              -164.4526972222222,
+              39.93915277777777
+            ],
+            [
+              -164.4526972222222,
+              39.682719444444444
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_060719_2200_060785_2200_A01",
+        "title": "HiRISE DTM - Candidate Landing Site for SpaceX Starship in Arcadia Region",
+        "dtm_file": "DTEEC_060719_2200_060785_2200_A01.IMG",
+        "ortho_file": "ESP_060785_2200_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_060719_2200",
+        "west": -164.4526972222222,
+        "east": -164.30086944444446,
+        "south": 39.682719444444444,
+        "north": 39.93915277777777,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164.45973055555555,
+              39.07539722222223
+            ],
+            [
+              -164.3180361111111,
+              39.07539722222223
+            ],
+            [
+              -164.3180361111111,
+              39.27945
+            ],
+            [
+              -164.45973055555555,
+              39.27945
+            ],
+            [
+              -164.45973055555555,
+              39.07539722222223
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_061075_2195_061141_2195_A01",
+        "title": "HiRISE DTM - Candidate Landing Site for SpaceX Starship in Arcadia Region",
+        "dtm_file": "DTEEC_061075_2195_061141_2195_A01.IMG",
+        "ortho_file": "ESP_061075_2195_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_061075_2195",
+        "west": -164.45973055555555,
+        "east": -164.3180361111111,
+        "south": 39.07539722222223,
+        "north": 39.27945,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -166.69365555555555,
+              40.44708333333333
+            ],
+            [
+              -166.5813472222222,
+              40.44708333333333
+            ],
+            [
+              -166.5813472222222,
+              40.59102777777778
+            ],
+            [
+              -166.69365555555555,
+              40.59102777777778
+            ],
+            [
+              -166.69365555555555,
+              40.44708333333333
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_035651_2210_036917_2210_A01",
+        "title": "HiRISE DTM - Doubly-Terraced Elongated Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_035651_2210_036917_2210_A01.IMG",
+        "ortho_file": "ESP_035651_2210_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_035651_2210",
+        "west": -166.69365555555555,
+        "east": -166.5813472222222,
+        "south": 40.44708333333333,
+        "north": 40.59102777777778,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              87.87882777777777,
+              38.48086388888889
+            ],
+            [
+              88.01744722222222,
+              38.48086388888889
+            ],
+            [
+              88.01744722222222,
+              38.636405555555555
+            ],
+            [
+              87.87882777777777,
+              38.636405555555555
+            ],
+            [
+              87.87882777777777,
+              38.48086388888889
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_072039_2190_072250_2190_A01",
+        "title": "HiRISE DTM - Terraced Crater in Utopia Planitia",
+        "dtm_file": "DTEEC_072039_2190_072250_2190_A01.IMG",
+        "ortho_file": "ESP_072250_2190_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_072039_2190",
+        "west": 87.87882777777777,
+        "east": 88.01744722222222,
+        "south": 38.48086388888889,
+        "north": 38.636405555555555,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -157.47076388888888,
+              39.87566666666667
+            ],
+            [
+              -157.32483333333332,
+              39.87566666666667
+            ],
+            [
+              -157.32483333333332,
+              40.095736111111115
+            ],
+            [
+              -157.47076388888888,
+              40.095736111111115
+            ],
+            [
+              -157.47076388888888,
+              39.87566666666667
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_038143_2205_055536_2205_A01",
+        "title": "HiRISE DTM - Hardened Dunes in Arcadia Planitia",
+        "dtm_file": "DTEEC_038143_2205_055536_2205_A01.IMG",
+        "ortho_file": "ESP_055536_2205_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_038143_2205",
+        "west": -157.47076388888888,
+        "east": -157.32483333333332,
+        "south": 39.87566666666667,
+        "north": 40.095736111111115,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -166.19195833333333,
+              44.31718333333334
+            ],
+            [
+              -166.08145833333333,
+              44.31718333333334
+            ],
+            [
+              -166.08145833333333,
+              44.45143055555556
+            ],
+            [
+              -166.19195833333333,
+              44.45143055555556
+            ],
+            [
+              -166.19195833333333,
+              44.31718333333334
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_037352_2245_037418_2245_A01",
+        "title": "HiRISE DTM - Terraced Bullseye-Like Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_037352_2245_037418_2245_A01.IMG",
+        "ortho_file": "ESP_037352_2245_RED_A_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_037352_2245",
+        "west": -166.19195833333333,
+        "east": -166.08145833333333,
+        "south": 44.31718333333334,
+        "north": 44.45143055555556,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -166.38856944444444,
+              47.1497
+            ],
+            [
+              -166.22810555555554,
+              47.1497
+            ],
+            [
+              -166.22810555555554,
+              47.311233333333334
+            ],
+            [
+              -166.38856944444444,
+              47.311233333333334
+            ],
+            [
+              -166.38856944444444,
+              47.1497
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_034240_2275_033950_2275_A01",
+        "title": "HiRISE DTM - Possible Terraced Bullseye-Like Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_034240_2275_033950_2275_A01.IMG",
+        "ortho_file": "ESP_034240_2275_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_034240_2275",
+        "west": -166.38856944444444,
+        "east": -166.22810555555554,
+        "south": 47.1497,
+        "north": 47.311233333333334,
+        "resolution_m": 0.99
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              169.60135277777778,
+              9.277744444444446
+            ],
+            [
+              169.74364999999997,
+              9.277744444444446
+            ],
+            [
+              169.74364999999997,
+              9.677624999999999
+            ],
+            [
+              169.60135277777778,
+              9.677624999999999
+            ],
+            [
+              169.60135277777778,
+              9.277744444444446
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEED_025459_1895_026514_1895_A01",
+        "title": "HiRISE DTM - Terraced Slopes Visible in CTX Image",
+        "dtm_file": "DTEED_025459_1895_026514_1895_A01.IMG",
+        "ortho_file": "",
+        "source_url": "https://www.uahirise.org/dtm/ESP_025459_1895",
+        "west": 169.60135277777778,
+        "east": 169.74364999999997,
+        "south": 9.277744444444446,
+        "north": 9.677624999999999,
+        "resolution_m": 2.02
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -162.48524166666667,
+              42.38914444444445
+            ],
+            [
+              -162.3326361111111,
+              42.38914444444445
+            ],
+            [
+              -162.3326361111111,
+              42.59314722222222
+            ],
+            [
+              -162.48524166666667,
+              42.59314722222222
+            ],
+            [
+              -162.48524166666667,
+              42.38914444444445
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_033963_2230_033818_2230_A01",
+        "title": "HiRISE DTM - Possible Terraced Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_033963_2230_033818_2230_A01.IMG",
+        "ortho_file": "ESP_033963_2230_RED_A_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_033963_2230",
+        "west": -162.48524166666667,
+        "east": -162.3326361111111,
+        "south": 42.38914444444445,
+        "north": 42.59314722222222,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -167.16723055555553,
+              38.99855277777778
+            ],
+            [
+              -167.02670833333335,
+              38.99855277777778
+            ],
+            [
+              -167.02670833333335,
+              39.17793611111111
+            ],
+            [
+              -167.16723055555553,
+              39.17793611111111
+            ],
+            [
+              -167.16723055555553,
+              38.99855277777778
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_035862_2195_035928_2195_A01",
+        "title": "HiRISE DTM - Terraced Bullseye-Like Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_035862_2195_035928_2195_A01.IMG",
+        "ortho_file": "ESP_035928_2195_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_035862_2195",
+        "west": -167.16723055555553,
+        "east": -167.02670833333335,
+        "south": 38.99855277777778,
+        "north": 39.17793611111111,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -160.8700388888889,
+              44.06713611111111
+            ],
+            [
+              -160.716675,
+              44.06713611111111
+            ],
+            [
+              -160.716675,
+              44.24221111111111
+            ],
+            [
+              -160.8700388888889,
+              44.24221111111111
+            ],
+            [
+              -160.8700388888889,
+              44.06713611111111
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_034108_2245_034174_2245_A01",
+        "title": "HiRISE DTM - Possible Terraced Bullseye-Like Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_034108_2245_034174_2245_A01.IMG",
+        "ortho_file": "ESP_034174_2245_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_034108_2245",
+        "west": -160.8700388888889,
+        "east": -160.716675,
+        "south": 44.06713611111111,
+        "north": 44.24221111111111,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -151.36098888888887,
+              47.63081944444445
+            ],
+            [
+              -151.23776944444444,
+              47.63081944444445
+            ],
+            [
+              -151.23776944444444,
+              47.758808333333334
+            ],
+            [
+              -151.36098888888887,
+              47.758808333333334
+            ],
+            [
+              -151.36098888888887,
+              47.63081944444445
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_035914_2280_035624_2280_A01",
+        "title": "HiRISE DTM - Possible Terraced Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_035914_2280_035624_2280_A01.IMG",
+        "ortho_file": "ESP_035914_2280_RED_A_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_035914_2280",
+        "west": -151.36098888888887,
+        "east": -151.23776944444444,
+        "south": 47.63081944444445,
+        "north": 47.758808333333334,
+        "resolution_m": 0.99
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -153.9186861111111,
+              43.727219444444444
+            ],
+            [
+              -153.743125,
+              43.727219444444444
+            ],
+            [
+              -153.743125,
+              43.939474999999995
+            ],
+            [
+              -153.9186861111111,
+              43.939474999999995
+            ],
+            [
+              -153.9186861111111,
+              43.727219444444444
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_035690_2240_035189_2240_A01",
+        "title": "HiRISE DTM - Possible Terraced Bullseye-Like Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_035690_2240_035189_2240_A01.IMG",
+        "ortho_file": "ESP_035189_2240_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_035690_2240",
+        "west": -153.9186861111111,
+        "east": -153.743125,
+        "south": 43.727219444444444,
+        "north": 43.939474999999995,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -162.99845,
+              46.23127777777778
+            ],
+            [
+              -162.82482777777778,
+              46.23127777777778
+            ],
+            [
+              -162.82482777777778,
+              46.39460277777778
+            ],
+            [
+              -162.99845,
+              46.39460277777778
+            ],
+            [
+              -162.99845,
+              46.23127777777778
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_019590_2265_020078_2265_A01",
+        "title": "HiRISE DTM - Rayed Crater in Arcadia Region in Themis V35985012",
+        "dtm_file": "DTEEC_019590_2265_020078_2265_A01.IMG",
+        "ortho_file": "ESP_019590_2265_RED_A_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_019590_2265",
+        "west": -162.99845,
+        "east": -162.82482777777778,
+        "south": 46.23127777777778,
+        "north": 46.39460277777778,
+        "resolution_m": 0.99
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -154.8289111111111,
+              53.061575
+            ],
+            [
+              -154.6131111111111,
+              53.061575
+            ],
+            [
+              -154.6131111111111,
+              53.253147222222225
+            ],
+            [
+              -154.8289111111111,
+              53.253147222222225
+            ],
+            [
+              -154.8289111111111,
+              53.061575
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_035057_2335_034767_2335_A01",
+        "title": "HiRISE DTM - Terraced Crater",
+        "dtm_file": "DTEEC_035057_2335_034767_2335_A01.IMG",
+        "ortho_file": "ESP_034767_2335_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_035057_2335",
+        "west": -154.8289111111111,
+        "east": -154.6131111111111,
+        "south": 53.061575,
+        "north": 53.253147222222225,
+        "resolution_m": 0.99
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168.14135833333333,
+              47.89794166666667
+            ],
+            [
+              -167.993025,
+              47.89794166666667
+            ],
+            [
+              -167.993025,
+              47.969208333333334
+            ],
+            [
+              -168.14135833333333,
+              47.969208333333334
+            ],
+            [
+              -168.14135833333333,
+              47.89794166666667
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_034095_2285_033805_2285_A01",
+        "title": "HiRISE DTM - Possible Terraced Bullseye-Like Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_034095_2285_033805_2285_A01.IMG",
+        "ortho_file": "ESP_034095_2285_RED_A_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_034095_2285",
+        "west": -168.14135833333333,
+        "east": -167.993025,
+        "south": 47.89794166666667,
+        "north": 47.969208333333334,
+        "resolution_m": 0.99
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -171.44872777777778,
+              45.583669444444446
+            ],
+            [
+              -171.3020138888889,
+              45.583669444444446
+            ],
+            [
+              -171.3020138888889,
+              45.690949999999994
+            ],
+            [
+              -171.44872777777778,
+              45.690949999999994
+            ],
+            [
+              -171.44872777777778,
+              45.583669444444446
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_034082_2260_033014_2260_A01",
+        "title": "HiRISE DTM - Possible Terraced Bullseye-Like Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_034082_2260_033014_2260_A01.IMG",
+        "ortho_file": "ESP_034082_2260_RED_A_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_034082_2260",
+        "west": -171.44872777777778,
+        "east": -171.3020138888889,
+        "south": 45.583669444444446,
+        "north": 45.690949999999994,
+        "resolution_m": 0.99
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168.48467777777776,
+              38.043775
+            ],
+            [
+              -168.3399388888889,
+              38.043775
+            ],
+            [
+              -168.3399388888889,
+              38.256505555555556
+            ],
+            [
+              -168.48467777777776,
+              38.256505555555556
+            ],
+            [
+              -168.48467777777776,
+              38.043775
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_025735_2185_025801_2185_A01",
+        "title": "HiRISE DTM - Fresh 1-Kilometer Impact Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_025735_2185_025801_2185_A01.IMG",
+        "ortho_file": "ESP_025801_2185_RED_A_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/dtm/ESP_025735_2185",
+        "west": -168.48467777777776,
+        "east": -168.3399388888889,
+        "south": 38.043775,
+        "north": 38.256505555555556,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -165.23,
+              46.471
+            ],
+            [
+              -165.056,
+              46.471
+            ],
+            [
+              -165.056,
+              46.6514
+            ],
+            [
+              -165.23,
+              46.6514
+            ],
+            [
+              -165.23,
+              46.471
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_018522_2270_019010_2270_A01",
+        "title": "HiRISE DTM - DTEEC_018522_2270_019010_2270_A01",
+        "dtm_file": "DTEEC_018522_2270_019010_2270_A01.IMG",
+        "ortho_file": "ESP_018522_2270_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_018522_2270",
+        "west": -165.23,
+        "east": -165.056,
+        "south": 46.471,
+        "north": 46.6514,
+        "resolution_m": 59124.51
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -175.584,
+              50.0117
+            ],
+            [
+              -175.379,
+              50.0117
+            ],
+            [
+              -175.379,
+              50.383
+            ],
+            [
+              -175.584,
+              50.383
+            ],
+            [
+              -175.584,
+              50.0117
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_025366_2305_025498_2305_A01",
+        "title": "HiRISE DTM - DTEEC_025366_2305_025498_2305_A01",
+        "dtm_file": "DTEEC_025366_2305_025498_2305_A01.IMG",
+        "ortho_file": "ESP_025366_2305_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_025366_2305",
+        "west": -175.584,
+        "east": -175.379,
+        "south": 50.0117,
+        "north": 50.383,
+        "resolution_m": 59028.74
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -162.998,
+              52.2832
+            ],
+            [
+              -162.819,
+              52.2832
+            ],
+            [
+              -162.819,
+              52.4137
+            ],
+            [
+              -162.998,
+              52.4137
+            ],
+            [
+              -162.998,
+              52.2832
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_027027_2325_027370_2325_A01",
+        "title": "HiRISE DTM - DTEEC_027027_2325_027370_2325_A01",
+        "dtm_file": "DTEEC_027027_2325_027370_2325_A01.IMG",
+        "ortho_file": "ESP_027027_2325_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_027027_2325",
+        "west": -162.998,
+        "east": -162.819,
+        "south": 52.2832,
+        "north": 52.4137,
+        "resolution_m": 58989.63
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -169.397835,
+              54.414423
+            ],
+            [
+              -169.157213,
+              54.414423
+            ],
+            [
+              -169.157213,
+              54.734071
+            ],
+            [
+              -169.397835,
+              54.734071
+            ],
+            [
+              -169.397835,
+              54.414423
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_007235_2350_006945_2350_A01",
+        "title": "HiRISE DTM - Terraced Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_007235_2350_006945_2350_A01.IMG",
+        "ortho_file": "",
+        "source_url": "https://www.uahirise.org/dtm/PSP_007235_2350",
+        "west": -169.397835,
+        "east": -169.157213,
+        "south": 54.414423,
+        "north": 54.734071,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -169.228608,
+              54.103807
+            ],
+            [
+              -168.946241,
+              54.103807
+            ],
+            [
+              -168.946241,
+              54.638984
+            ],
+            [
+              -169.228608,
+              54.638984
+            ],
+            [
+              -169.228608,
+              54.103807
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_007736_2345_008303_2345_A01",
+        "title": "HiRISE DTM - Terraced Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_007736_2345_008303_2345_A01.IMG",
+        "ortho_file": "",
+        "source_url": "https://www.uahirise.org/dtm/PSP_007736_2345",
+        "west": -169.228608,
+        "east": -168.946241,
+        "south": 54.103807,
+        "north": 54.638984,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -169.534345,
+              54.203785
+            ],
+            [
+              -169.256915,
+              54.203785
+            ],
+            [
+              -169.256915,
+              54.755752
+            ],
+            [
+              -169.534345,
+              54.755752
+            ],
+            [
+              -169.534345,
+              54.203785
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_007947_2350_009160_2350_A01",
+        "title": "HiRISE DTM - Terraced Crater in Arcadia Planitia",
+        "dtm_file": "DTEEC_007947_2350_009160_2350_A01.IMG",
+        "ortho_file": "",
+        "source_url": "https://www.uahirise.org/dtm/PSP_007947_2350",
+        "west": -169.534345,
+        "east": -169.256915,
+        "south": 54.203785,
+        "north": 54.755752,
+        "resolution_m": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -154.2052,
+              52.8996
+            ],
+            [
+              -154.0156,
+              52.8996
+            ],
+            [
+              -154.0156,
+              53.1595
+            ],
+            [
+              -154.2052,
+              53.1595
+            ],
+            [
+              -154.2052,
+              52.8996
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_034200_2335_034266_2335_A01",
+        "title": "HiRISE DTM - DTEEC_034200_2335_034266_2335_A01",
+        "dtm_file": "DTEEC_034200_2335_034266_2335_A01.IMG",
+        "ortho_file": "ESP_034200_2335_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_034200_2335",
+        "west": -154.2052,
+        "east": -154.0156,
+        "south": 52.8996,
+        "north": 53.1595,
+        "resolution_m": 58979.39
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -148.1945,
+              54.1041
+            ],
+            [
+              -147.9886,
+              54.1041
+            ],
+            [
+              -147.9886,
+              54.3185
+            ],
+            [
+              -148.1945,
+              54.3185
+            ],
+            [
+              -148.1945,
+              54.1041
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_053320_2345_053241_2345_A01",
+        "title": "HiRISE DTM - DTEEC_053320_2345_053241_2345_A01",
+        "dtm_file": "DTEEC_053320_2345_053241_2345_A01.IMG",
+        "ortho_file": "ESP_053241_2345_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_053320_2345",
+        "west": -148.1945,
+        "east": -147.9886,
+        "south": 54.1041,
+        "north": 54.3185,
+        "resolution_m": 58958.24
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -147.9836,
+              54.0402
+            ],
+            [
+              -147.7863,
+              54.0402
+            ],
+            [
+              -147.7863,
+              54.253
+            ],
+            [
+              -147.9836,
+              54.253
+            ],
+            [
+              -147.9836,
+              54.0402
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_071085_2345_071006_2345_A01",
+        "title": "HiRISE DTM - DTEEC_071085_2345_071006_2345_A01",
+        "dtm_file": "DTEEC_071085_2345_071006_2345_A01.IMG",
+        "ortho_file": "ESP_071006_2345_RED_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_071085_2345",
+        "west": -147.9836,
+        "east": -147.7863,
+        "south": 54.0402,
+        "north": 54.253,
+        "resolution_m": 58958.24
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -153.4721,
+              54.9129
+            ],
+            [
+              -153.2793,
+              54.9129
+            ],
+            [
+              -153.2793,
+              55.1203
+            ],
+            [
+              -153.4721,
+              55.1203
+            ],
+            [
+              -153.4721,
+              54.9129
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_025497_2355_025352_2355_A01",
+        "title": "HiRISE DTM - DTEEC_025497_2355_025352_2355_A01",
+        "dtm_file": "DTEEC_025497_2355_025352_2355_A01.IMG",
+        "ortho_file": "ESP_025352_2355_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_025497_2355",
+        "west": -153.4721,
+        "east": -153.2793,
+        "south": 54.9129,
+        "north": 55.1203,
+        "resolution_m": 58915.54
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -154.0566,
+              54.8818
+            ],
+            [
+              -153.839,
+              54.8818
+            ],
+            [
+              -153.839,
+              55.1744
+            ],
+            [
+              -154.0566,
+              55.1744
+            ],
+            [
+              -154.0566,
+              54.8818
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_036257_2355_035334_2355_A01",
+        "title": "HiRISE DTM - DTEEC_036257_2355_035334_2355_A01",
+        "dtm_file": "DTEEC_036257_2355_035334_2355_A01.IMG",
+        "ortho_file": "ESP_035334_2355_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_036257_2355",
+        "west": -154.0566,
+        "east": -153.839,
+        "south": 54.8818,
+        "north": 55.1744,
+        "resolution_m": 58915.54
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -150.0218,
+              50.1427
+            ],
+            [
+              -149.8501,
+              50.1427
+            ],
+            [
+              -149.8501,
+              50.319
+            ],
+            [
+              -150.0218,
+              50.319
+            ],
+            [
+              -150.0218,
+              50.1427
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_072575_2305_072496_2305_A01",
+        "title": "HiRISE DTM - DTEEC_072575_2305_072496_2305_A01",
+        "dtm_file": "DTEEC_072575_2305_072496_2305_A01.IMG",
+        "ortho_file": "ESP_072496_2305_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_072575_2305",
+        "west": -150.0218,
+        "east": -149.8501,
+        "south": 50.1427,
+        "north": 50.319,
+        "resolution_m": 59028.74
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -170.241,
+              34.9965
+            ],
+            [
+              -170.1042,
+              34.9965
+            ],
+            [
+              -170.1042,
+              35.193
+            ],
+            [
+              -170.241,
+              35.193
+            ],
+            [
+              -170.241,
+              34.9965
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_073578_2155_073077_2155_A01",
+        "title": "HiRISE DTM - DTEEC_073578_2155_073077_2155_A01",
+        "dtm_file": "DTEEC_073578_2155_073077_2155_A01.IMG",
+        "ortho_file": "ESP_073077_2155_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_073578_2155",
+        "west": -170.241,
+        "east": -170.1042,
+        "south": 34.9965,
+        "north": 35.193,
+        "resolution_m": 59391.55
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -145.44,
+              54.1293
+            ],
+            [
+              -145.2632,
+              54.1293
+            ],
+            [
+              -145.2632,
+              54.2662
+            ],
+            [
+              -145.44,
+              54.2662
+            ],
+            [
+              -145.44,
+              54.1293
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_079498_2345_079419_2345_A01",
+        "title": "HiRISE DTM - DTEEC_079498_2345_079419_2345_A01",
+        "dtm_file": "DTEEC_079498_2345_079419_2345_A01.IMG",
+        "ortho_file": "ESP_079419_2345_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_079498_2345",
+        "west": -145.44,
+        "east": -145.2632,
+        "south": 54.1293,
+        "north": 54.2662,
+        "resolution_m": 58958.24
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -177.7255,
+              39.9388
+            ],
+            [
+              -177.5622,
+              39.9388
+            ],
+            [
+              -177.5622,
+              40.2018
+            ],
+            [
+              -177.7255,
+              40.2018
+            ],
+            [
+              -177.7255,
+              39.9388
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_028531_2205_016782_2205_A01",
+        "title": "HiRISE DTM - DTEEC_028531_2205_016782_2205_A01",
+        "dtm_file": "DTEEC_028531_2205_016782_2205_A01.IMG",
+        "ortho_file": "ESP_016782_2205_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_028531_2205",
+        "west": -177.7255,
+        "east": -177.5622,
+        "south": 39.9388,
+        "north": 40.2018,
+        "resolution_m": 59273.38
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -151.6571,
+              46.7215
+            ],
+            [
+              -151.4992,
+              46.7215
+            ],
+            [
+              -151.4992,
+              46.9284
+            ],
+            [
+              -151.6571,
+              46.9284
+            ],
+            [
+              -151.6571,
+              46.7215
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_041888_2270_041954_2270_A01",
+        "title": "HiRISE DTM - DTEEC_041888_2270_041954_2270_A01",
+        "dtm_file": "DTEEC_041888_2270_041954_2270_A01.IMG",
+        "ortho_file": "ESP_041888_2270_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_041888_2270",
+        "west": -151.6571,
+        "east": -151.4992,
+        "south": 46.7215,
+        "north": 46.9284,
+        "resolution_m": 59118.73
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -146.5529,
+              54.3925
+            ],
+            [
+              -146.3651,
+              54.3925
+            ],
+            [
+              -146.3651,
+              54.5411
+            ],
+            [
+              -146.5529,
+              54.5411
+            ],
+            [
+              -146.5529,
+              54.3925
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_062828_2350_062248_2350_A01",
+        "title": "HiRISE DTM - DTEEC_062828_2350_062248_2350_A01",
+        "dtm_file": "DTEEC_062828_2350_062248_2350_A01.IMG",
+        "ortho_file": "ESP_062248_2350_IRB_C_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_062828_2350",
+        "west": -146.5529,
+        "east": -146.3651,
+        "south": 54.3925,
+        "north": 54.5411,
+        "resolution_m": 58953.35
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -166.5011,
+              38.734
+            ],
+            [
+              -166.3524,
+              38.734
+            ],
+            [
+              -166.3524,
+              39.0958
+            ],
+            [
+              -166.5011,
+              39.0958
+            ],
+            [
+              -166.5011,
+              38.734
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEED_055378_2190_055444_2190_A01",
+        "title": "HiRISE DTM - DTEED_055378_2190_055444_2190_A01",
+        "dtm_file": "DTEED_055378_2190_055444_2190_A01.IMG",
+        "ortho_file": "ESP_055378_2190_IRB_B_01_ORTHO.JP2",
+        "source_url": "https://www.uahirise.org/ESP_055378_2190",
+        "west": -166.5011,
+        "east": -166.3524,
+        "south": 38.734,
+        "north": 39.0958,
+        "resolution_m": 118648.4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -161.172033,
+              45.607749
+            ],
+            [
+              -161.01758,
+              45.607749
+            ],
+            [
+              -161.01758,
+              45.744704
+            ],
+            [
+              -161.172033,
+              45.744704
+            ],
+            [
+              -161.172033,
+              45.607749
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DTEEC_034319_2260_034754_2260_A01",
+        "title": "DTEEC_034319_2260_034754_2260_A01 (CUSTOM)",
+        "dtm_file": "DTEEC_034319_2260_034754_2260_A01.tif",
+        "ortho_file": "",
+        "custom": true,
+        "west": -161.172033,
+        "east": -161.01758,
+        "south": 45.607749,
+        "north": 45.744704,
+        "resolution_m": 1.0
+      }
+    }
+  ]
+}

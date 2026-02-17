@@ -1,0 +1,100 @@
+{
+  "session_id": "383f8fbc-8f8e-4fef-9255-b4a430ffbaa7",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hi, I'm MARVIS — your Mars research assistant. Ask me anything about Mars, or tell me what you'd like to investigate.",
+      "timestamp": "2026-02-16T12:55:47.292059Z",
+      "actions": [],
+      "suggestions": [
+        "What can you do?",
+        "Find ice in Arcadia",
+        "Analyze a crater"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "hi",
+      "timestamp": "2026-02-16T12:55:47.342892Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hey there! What are you curious about on Mars?",
+      "timestamp": "2026-02-16T12:55:47.983490Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "what's your name",
+      "timestamp": "2026-02-16T12:55:54.348804Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hi! I'm MARVIS, your Mars research assistant. Ask me anything about Mars — ice, craters, minerals, or just pick a region to explore.",
+      "timestamp": "2026-02-16T12:55:54.785361Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "how's the weather in mars",
+      "timestamp": "2026-02-16T12:56:13.147610Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "What would you like to explore on Mars? I can help with ice deposits, crater analysis, minerals, and more.",
+      "timestamp": "2026-02-16T12:56:13.563033Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": null,
+  "current_bbox": null,
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": null,
+  "previous_regions": [],
+  "persona_name": "MARVIS",
+  "pending_actions": [],
+  "tool_context": {},
+  "report_markdown": null,
+  "created_at": "2026-02-16T12:55:47.292017Z",
+  "updated_at": "2026-02-16T12:56:13.563207Z"
+}

@@ -1,0 +1,138 @@
+{
+  "session_id": "64268491-01d9-4579-980c-cf636bc8d857",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hi, I'm MARVIS — your Mars research assistant. Ask me anything about Mars, or tell me what you'd like to investigate.",
+      "timestamp": "2026-02-16T13:13:07.073281Z",
+      "actions": [],
+      "suggestions": [
+        "What can you do?",
+        "Find ice in Arcadia",
+        "Analyze a crater"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "explore arcadia",
+      "timestamp": "2026-02-16T13:13:07.075380Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Looking up Arcadia Planitia...",
+      "timestamp": "2026-02-16T13:13:07.075953Z",
+      "actions": [
+        {
+          "action_id": "0cb9e3ee",
+          "tool_name": "resolve_region",
+          "description": "Look up Arcadia Planitia",
+          "params": {
+            "query": "Arcadia Planitia"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "bbox": {
+              "min_lat": 33.87,
+              "max_lat": 64.17,
+              "min_lon": 165.86,
+              "max_lon": -149.57
+            },
+            "region_name": "Arcadia Planitia"
+          },
+          "error": null,
+          "started_at": "2026-02-16T13:13:07.076027Z",
+          "completed_at": "2026-02-16T13:13:07.076084Z"
+        }
+      ],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "arcadia's crater",
+      "timestamp": "2026-02-16T13:13:07.077660Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Looking up Arcadia Planitia...",
+      "timestamp": "2026-02-16T13:13:07.078076Z",
+      "actions": [
+        {
+          "action_id": "64bc7597",
+          "tool_name": "resolve_region",
+          "description": "Look up Arcadia Planitia",
+          "params": {
+            "query": "Arcadia Planitia"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "bbox": {
+              "min_lat": 33.87,
+              "max_lat": 64.17,
+              "min_lon": 165.86,
+              "max_lon": -149.57
+            },
+            "region_name": "Arcadia Planitia"
+          },
+          "error": null,
+          "started_at": "2026-02-16T13:13:07.078143Z",
+          "completed_at": "2026-02-16T13:13:07.078173Z"
+        }
+      ],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": "Arcadia Planitia",
+  "current_bbox": {
+    "min_lat": 33.87,
+    "max_lat": 64.17,
+    "min_lon": 165.86,
+    "max_lon": -149.57
+  },
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": "analyze_crater",
+  "previous_regions": [],
+  "persona_name": "MARVIS",
+  "pending_actions": [],
+  "tool_context": {
+    "region_bbox": {
+      "min_lat": 33.87,
+      "max_lat": 64.17,
+      "min_lon": 165.86,
+      "max_lon": -149.57
+    },
+    "region_name": "Arcadia Planitia"
+  },
+  "report_markdown": null,
+  "created_at": "2026-02-16T13:13:07.073257Z",
+  "updated_at": "2026-02-16T13:13:07.078252Z"
+}

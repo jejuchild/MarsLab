@@ -1,0 +1,32 @@
+{
+  "session_id": "adfc063d-2a3a-45c1-8f9e-5ba7dab74ef8",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hello! I'm your Mars research copilot. Tell me what you'd like to investigate — ice deposits, crater morphology, mineral composition, or just pick a region to explore.",
+      "timestamp": "2026-02-16T12:16:11.854190Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze craters",
+        "Explore Arcadia Planitia"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": null,
+  "current_bbox": null,
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": null,
+  "pending_actions": [],
+  "tool_context": {},
+  "report_markdown": null,
+  "created_at": "2026-02-16T12:16:11.854126Z",
+  "updated_at": "2026-02-16T12:16:11.854227Z"
+}

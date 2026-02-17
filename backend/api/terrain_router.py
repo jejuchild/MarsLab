@@ -815,13 +815,15 @@ def compute_hirise_dtm_patch(
     window = Window(col_start, row_start, col_end - col_start, row_end - row_start)
     elev = ds.read(1, window=window).astype(np.float64)
 
-    # Handle nodata
+    # Handle nodata — must replace BEFORE zoom to prevent NaN bleeding
+    # during bilinear interpolation at valid/nodata boundaries
     if ds.nodata is not None:
         nodata_mask = elev == ds.nodata
         elev[nodata_mask] = np.nan
-
-    # Also handle extreme negative values (common nodata for DTMs)
     elev[elev < -1e30] = np.nan
+    nodata_mask = np.isnan(elev)
+    fill_val = np.nanmean(elev) if np.any(~nodata_mask) else 0.0
+    elev[nodata_mask] = fill_val
 
     # Resample to target grid size if needed
     original_rows, original_cols = elev.shape
@@ -829,7 +831,14 @@ def compute_hirise_dtm_patch(
         from scipy.ndimage import zoom
         zoom_factor_y = grid_size / original_rows
         zoom_factor_x = grid_size / original_cols
-        elev = zoom(elev, (zoom_factor_y, zoom_factor_x), order=1)
+        elev = zoom(elev, (zoom_factor_y, zoom_factor_x), order=1, mode='nearest')
+        # Re-apply nodata mask after zoom
+        if np.any(nodata_mask):
+            mask_zoomed = zoom(nodata_mask.astype(np.float64),
+                               (zoom_factor_y, zoom_factor_x), order=1, mode='nearest')
+            elev[mask_zoomed > 0.5] = np.nan
+    else:
+        elev[nodata_mask] = np.nan
 
     rows, cols = elev.shape
 
@@ -967,15 +976,34 @@ async def get_hirise_dtm_elevation_grid(
         ds, dtm_props = _get_hirise_dtm(product_id)
 
         # Read the full raster (HiRISE DTMs are typically not huge)
-        data = ds.read(1)
+        data = ds.read(1).astype(np.float64)
         original_height, original_width = data.shape
+
+        # Handle nodata BEFORE zoom to prevent bilinear interpolation
+        # between valid values and nodata sentinels (e.g. -32767)
+        nodata = ds.nodata
+        if nodata is not None:
+            nodata_mask = data == nodata
+            data[nodata_mask] = np.nan
+        else:
+            nodata_mask = np.zeros(data.shape, dtype=bool)
+        data[data < -1e30] = np.nan
+        nodata_mask = nodata_mask | np.isnan(data)
+        fill_val = np.nanmean(data) if np.any(~nodata_mask) else 0.0
+        data[nodata_mask] = fill_val
 
         # Calculate downsample factor
         scale = min(max_size / original_height, max_size / original_width, 1.0)
 
         if scale < 1.0:
             # Downsample using scipy zoom (order=1 for bilinear, fast)
-            data = zoom(data, scale, order=1)
+            data = zoom(data, scale, order=1, mode='nearest')
+            # Re-apply nodata mask after zoom
+            if np.any(nodata_mask):
+                mask_zoomed = zoom(nodata_mask.astype(np.float64), scale, order=1, mode='nearest')
+                data[mask_zoomed > 0.5] = np.nan
+        else:
+            data[nodata_mask] = np.nan
 
         rows, cols = data.shape
 
@@ -1003,11 +1031,6 @@ async def get_hirise_dtm_elevation_grid(
                 lon_e -= 360
 
             west, south, east, north = lon_w, lat_s, lon_e, lat_n
-
-        # Handle nodata
-        nodata = ds.nodata
-        if nodata is not None:
-            data = np.where(data == nodata, np.nan, data)
 
         # Convert to list (flattened row-major)
         elevations = data.flatten().tolist()

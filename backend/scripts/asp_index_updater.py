@@ -35,7 +35,14 @@ DEFAULT_INSTALL_DIR = BACKEND_DIR / "hirise_dtm_data"
 
 
 def extract_bounds(tif_path: str) -> dict:
-    """Extract geographic bounding box from a GeoTIFF."""
+    """Extract geographic bounding box from a GeoTIFF.
+
+    Handles both geographic and projected coordinate systems.
+    For projected CRS (e.g. Sinusoidal from point2dem), reprojects
+    corner coordinates to geographic lat/lon.
+    """
+    from osgeo import osr
+
     ds = gdal.Open(tif_path)
     if ds is None:
         raise FileNotFoundError(f"Cannot open: {tif_path}")
@@ -44,21 +51,54 @@ def extract_bounds(tif_path: str) -> dict:
     cols = ds.RasterXSize
     rows = ds.RasterYSize
 
-    # GeoTransform: (origin_x, pixel_width, 0, origin_y, 0, pixel_height)
+    # Corner coordinates in the file's CRS
     x_min = gt[0]
     x_max = gt[0] + cols * gt[1]
     y_max = gt[3]  # origin is top-left
     y_min = gt[3] + rows * gt[5]  # gt[5] is negative
 
-    # Compute resolution in meters (approximate for Mars equirectangular)
-    resolution_m = abs(gt[1]) * 3389500 * 3.14159265 / 180.0
+    resolution_m = abs(gt[1])  # pixel size in file units
+
+    # Check if the CRS is projected (meters) vs geographic (degrees)
+    srs = osr.SpatialReference()
+    srs.ImportFromWkt(ds.GetProjection())
+
+    if srs.IsProjected():
+        # Transform corners from projected CRS to geographic lat/lon
+        geo_srs = srs.CloneGeogCS()
+        transform = osr.CoordinateTransformation(srs, geo_srs)
+
+        corners = [
+            (x_min, y_min), (x_max, y_min),
+            (x_max, y_max), (x_min, y_max),
+        ]
+        lons, lats = [], []
+        for x, y in corners:
+            lon, lat, _ = transform.TransformPoint(x, y)
+            lons.append(lon)
+            lats.append(lat)
+
+        west, east = min(lons), max(lons)
+        south, north = min(lats), max(lats)
+        # resolution_m is already in meters for projected CRS
+    else:
+        west, east = min(x_min, x_max), max(x_min, x_max)
+        south, north = min(y_min, y_max), max(y_min, y_max)
+        # Convert degree pixel size to meters (Mars radius ~3389.5 km)
+        resolution_m = abs(gt[1]) * 3389500 * 3.14159265 / 180.0
+
+    # Convert 0-360 longitudes to -180/180
+    if west > 180:
+        west -= 360
+    if east > 180:
+        east -= 360
 
     ds = None
     return {
-        "west": min(x_min, x_max),
-        "east": max(x_min, x_max),
-        "south": min(y_min, y_max),
-        "north": max(y_min, y_max),
+        "west": round(west, 6),
+        "east": round(east, 6),
+        "south": round(south, 6),
+        "north": round(north, 6),
         "resolution_m": round(resolution_m, 1),
     }
 

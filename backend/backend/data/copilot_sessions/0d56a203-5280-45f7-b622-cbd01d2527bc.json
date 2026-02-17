@@ -1,0 +1,159 @@
+{
+  "session_id": "0d56a203-5280-45f7-b622-cbd01d2527bc",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hi, I'm MARVIS — your Mars research assistant. Ask me anything about Mars, or tell me what you'd like to investigate.",
+      "timestamp": "2026-02-16T12:33:40.296138Z",
+      "actions": [],
+      "suggestions": [
+        "What can you do?",
+        "Find ice in Arcadia",
+        "Analyze a crater"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "hello",
+      "timestamp": "2026-02-16T12:33:40.301147Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hey there! What are you curious about on Mars?",
+      "timestamp": "2026-02-16T12:33:40.810776Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "what is your name?",
+      "timestamp": "2026-02-16T12:33:40.813716Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hi! I'm MARVIS, your Mars research assistant. Ask me anything about Mars — ice, craters, minerals, or just pick a region to explore.",
+      "timestamp": "2026-02-16T12:33:41.225395Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "lol",
+      "timestamp": "2026-02-16T12:33:41.232564Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Ha! Anything else you'd like to explore on Mars?",
+      "timestamp": "2026-02-16T12:33:41.659997Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "crater",
+      "timestamp": "2026-02-16T12:33:41.663934Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Looking up Jezero Crater...",
+      "timestamp": "2026-02-16T12:33:41.664439Z",
+      "actions": [
+        {
+          "action_id": "0f88ebd2",
+          "tool_name": "resolve_region",
+          "description": "Look up Jezero Crater",
+          "params": {
+            "query": "Jezero Crater"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "bbox": {
+              "min_lat": 18.01,
+              "max_lat": 18.81,
+              "min_lon": 77.27,
+              "max_lon": 78.11
+            },
+            "region_name": "Jezero Crater"
+          },
+          "error": null,
+          "started_at": "2026-02-16T12:33:41.664515Z",
+          "completed_at": "2026-02-16T12:33:41.664567Z"
+        }
+      ],
+      "suggestions": [
+        "Analyze Jezero crater",
+        "Look at Gale Crater",
+        "Find terraced craters"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": "Jezero Crater",
+  "current_bbox": {
+    "min_lat": 18.01,
+    "max_lat": 18.81,
+    "min_lon": 77.27,
+    "max_lon": 78.11
+  },
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": "analyze_crater",
+  "previous_regions": [],
+  "persona_name": "MARVIS",
+  "pending_actions": [],
+  "tool_context": {
+    "region_bbox": {
+      "min_lat": 18.01,
+      "max_lat": 18.81,
+      "min_lon": 77.27,
+      "max_lon": 78.11
+    },
+    "region_name": "Jezero Crater"
+  },
+  "report_markdown": null,
+  "created_at": "2026-02-16T12:33:40.296111Z",
+  "updated_at": "2026-02-16T12:33:41.664669Z"
+}

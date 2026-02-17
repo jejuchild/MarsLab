@@ -490,8 +490,8 @@ app.include_router(terrain_features_router)  # /api/terrain/features_in_view
 from agent.workflow_router import router as workflow_router
 app.include_router(workflow_router)  # /api/workflow/* — Workflow Research Assistant
 
-from copilot.router import router as copilot_router
-app.include_router(copilot_router)  # /api/copilot/* — Adaptive Research Copilot
+from api.marvis_chat import router as marvis_chat_router
+app.include_router(marvis_chat_router)  # /api/marvis/chat — MARVIS lightweight chat
 
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
@@ -822,6 +822,9 @@ def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
         out_width = int(ds.width / scale)
         out_height = int(ds.height / scale)
 
+        # Capture nodata before closing
+        nodata_val = ds.nodata
+
         # Read with resampling
         data = ds.read(
             1,
@@ -832,7 +835,11 @@ def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
 
         if use_hillshade:
             # Generate hillshade from elevation data
-            nodata_mask = (data == 0) | (data == -32768) | np.isnan(data.astype(float))
+            nodata_mask = (data == 0) | np.isnan(data.astype(float))
+            if nodata_val is not None:
+                nodata_mask = nodata_mask | (data == nodata_val)
+            else:
+                nodata_mask = nodata_mask | (data == -32768)
             # Compute gradient for hillshade
             dy, dx = np.gradient(data.astype(float))
             azimuth_rad = np.radians(315)

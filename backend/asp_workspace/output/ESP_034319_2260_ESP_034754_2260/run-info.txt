@@ -1,0 +1,8 @@
+images: ESP_034319_2260_RED.map.cub ESP_034754_2260_RED.map.cub 
+cameras: 
+input_dem: 
+output_prefix: /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run
+alignment_method: none
+stereo_session: isis
+left_image_crop_win: 0 0 0 0
+right_image_crop_win: 0 0 0 0

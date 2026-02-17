@@ -1,0 +1,20 @@
+{
+  "id": "custom_ab50afbc",
+  "name": "test_mars_jezero",
+  "bounds": {
+    "west": 77.0,
+    "south": 18.0,
+    "east": 77.5,
+    "north": 18.5
+  },
+  "crs": "GEOGCS[\"unknown\",DATUM[\"unknown\",SPHEROID[\"unknown\",3396190,169.894447223612]],PRIMEM[\"Reference meridian\",0],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]],AXIS[\"Latitude\",NORTH],AXIS[\"Longitude\",EAST]]",
+  "crs_valid": true,
+  "crs_warning": null,
+  "width": 512,
+  "height": 512,
+  "bands": 1,
+  "dtype": "float32",
+  "nodata": -9999.0,
+  "created_at": "2026-02-03T05:54:54.752039+00:00",
+  "original_filename": "test_mars_jezero.tif"
+}

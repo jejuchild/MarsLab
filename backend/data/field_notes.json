@@ -1,0 +1,54 @@
+[
+  {
+    "id": "a0e09d52",
+    "product_id": "DTEED_042996_2210_043273_2210_A01",
+    "instrument": "HIRISE_DTM",
+    "lat": 40.55194027777778,
+    "lon": -162.4886736111111,
+    "tags": [
+      "Chansu"
+    ],
+    "memo": "overlap",
+    "created_at": "2026-02-06T09:07:43.119875+00:00",
+    "updated_at": "2026-02-06T09:07:43.119875+00:00"
+  },
+  {
+    "id": "a529b78c",
+    "product_id": "R_0771601_001_SS19_700_A",
+    "instrument": "SHARAD_HIGHRES",
+    "lat": 0.0,
+    "lon": 0.0,
+    "tags": [
+      "Chansu"
+    ],
+    "memo": "overlap",
+    "created_at": "2026-02-06T09:07:13.304456+00:00",
+    "updated_at": "2026-02-06T09:07:13.304456+00:00"
+  },
+  {
+    "id": "26a04f55",
+    "product_id": "frt00016c7c_07_brcarj_mtr3",
+    "instrument": "CRISM",
+    "lat": 51.45131707810587,
+    "lon": -125.55552115825158,
+    "tags": [
+      "Chansu"
+    ],
+    "memo": "ice?",
+    "created_at": "2026-02-06T07:06:51.277628+00:00",
+    "updated_at": "2026-02-06T07:06:51.277628+00:00"
+  },
+  {
+    "id": "63420e23",
+    "product_id": "DTEEC_060706_2195_060416_2195_A01",
+    "instrument": "HIRISE_DTM",
+    "lat": 39.086049,
+    "lon": -170.201573,
+    "tags": [
+      "Chansu"
+    ],
+    "memo": "dtm",
+    "created_at": "2026-02-06T04:53:03.832642+00:00",
+    "updated_at": "2026-02-06T04:53:03.832642+00:00"
+  }
+]

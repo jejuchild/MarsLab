@@ -1,0 +1,2055 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -48.2423413,
+              21.8892236
+            ],
+            [
+              -47.6367163,
+              21.8892236
+            ],
+            [
+              -47.6367163,
+              22.6587236
+            ],
+            [
+              -48.2423413,
+              22.6587236
+            ],
+            [
+              -48.2423413,
+              21.8892236
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "b21_017819_2025_xn_22n048w",
+        "title": "MRO CTX, 22n048w Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/b21_017819_2025_xn_22n048w",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/b21_017819_2025_xn_22n048w/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -48.2423413,
+        "bbox_south": 21.8892236,
+        "bbox_east": -47.6367163,
+        "bbox_north": 22.6587236
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -141.6026047,
+              38.1079779
+            ],
+            [
+              -137.1973524,
+              38.1079779
+            ],
+            [
+              -137.1973524,
+              41.4921368
+            ],
+            [
+              -141.6026047,
+              41.4921368
+            ],
+            [
+              -141.6026047,
+              38.1079779
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Acheron_Fossae_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Acheron Fossae Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Acheron_Fossae_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Acheron_Fossae_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -141.6026047,
+        "bbox_south": 38.1079779,
+        "bbox_east": -137.1973524,
+        "bbox_north": 41.4921368
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -41.800754,
+              18.3079786
+            ],
+            [
+              -38.1992173,
+              18.3079786
+            ],
+            [
+              -38.1992173,
+              21.6921376
+            ],
+            [
+              -41.800754,
+              21.6921376
+            ],
+            [
+              -41.800754,
+              18.3079786
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Acidalia_Plantia_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Acidalia Plantia Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Acidalia_Plantia_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Acidalia_Plantia_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -41.800754,
+        "bbox_south": 18.3079786,
+        "bbox_east": -38.1992173,
+        "bbox_north": 21.6921376
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -9.9921439,
+              -1.2920214
+            ],
+            [
+              -6.6078162,
+              -1.2920214
+            ],
+            [
+              -6.6078162,
+              2.0921376
+            ],
+            [
+              -9.9921439,
+              2.0921376
+            ],
+            [
+              -9.9921439,
+              -1.2920214
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Arabia_Terra_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Arabia Terra Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Arabia_Terra_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Arabia_Terra_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -9.9921439,
+        "bbox_south": -1.2920214,
+        "bbox_east": -6.6078162,
+        "bbox_north": 2.0921376
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -21.6935908,
+              0.7079787
+            ],
+            [
+              -18.3063952,
+              0.7079787
+            ],
+            [
+              -18.3063952,
+              4.0921377
+            ],
+            [
+              -21.6935908,
+              4.0921377
+            ],
+            [
+              -21.6935908,
+              0.7079787
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Aram_Chaos_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Aram Chaos Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Aram_Chaos_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Aram_Chaos_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -21.6935908,
+        "bbox_south": 0.7079787,
+        "bbox_east": -18.3063952,
+        "bbox_north": 4.0921377
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              169.6807093,
+              37.0237318
+            ],
+            [
+              174.3355609,
+              37.0237318
+            ],
+            [
+              174.3355609,
+              40.8666014
+            ],
+            [
+              169.6807093,
+              40.8666014
+            ],
+            [
+              169.6807093,
+              37.0237318
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Arcadia_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Arcadia Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Arcadia_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Arcadia_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 169.6807093,
+        "bbox_south": 37.0237318,
+        "bbox_east": 174.3355609,
+        "bbox_north": 40.8666014
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -173.645143,
+              44.5079794
+            ],
+            [
+              -168.7548608,
+              44.5079794
+            ],
+            [
+              -168.7548608,
+              47.8921384
+            ],
+            [
+              -173.645143,
+              47.8921384
+            ],
+            [
+              -173.645143,
+              44.5079794
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Arcadia_Planitia_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Arcadia Planitia Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Arcadia_Planitia_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Arcadia_Planitia_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -173.645143,
+        "bbox_south": 44.5079794,
+        "bbox_east": -168.7548608,
+        "bbox_north": 47.8921384
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              94.1612715,
+              -33.914489
+            ],
+            [
+              98.8963428,
+              -33.914489
+            ],
+            [
+              98.8963428,
+              -30.148971
+            ],
+            [
+              94.1612715,
+              -30.148971
+            ],
+            [
+              94.1612715,
+              -33.914489
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Ausonia_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Ausonia Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Ausonia_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Ausonia_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 94.1612715,
+        "bbox_south": -33.914489,
+        "bbox_east": 98.8963428,
+        "bbox_north": -30.148971
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              160.1914394,
+              8.2036983
+            ],
+            [
+              163.8111954,
+              8.2036983
+            ],
+            [
+              163.8111954,
+              11.7431501
+            ],
+            [
+              160.1914394,
+              11.7431501
+            ],
+            [
+              160.1914394,
+              8.2036983
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Cerberus_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Cerberus Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Cerberus_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Cerberus_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 160.1914394,
+        "bbox_south": 8.2036983,
+        "bbox_east": 163.8111954,
+        "bbox_north": 11.7431501
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              175.4436543,
+              -14.6816851
+            ],
+            [
+              175.5607333,
+              -14.6816851
+            ],
+            [
+              175.5607333,
+              -14.4953141
+            ],
+            [
+              175.4436543,
+              -14.4953141
+            ],
+            [
+              175.4436543,
+              -14.6816851
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DEM_1m_ColumbiaHills_fixed",
+        "title": "MRO CTX, Columbia Hills DEM",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/DEM_1m_ColumbiaHills_fixed",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/DEM_1m_ColumbiaHills_fixed/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 175.4436543,
+        "bbox_south": -14.6816851,
+        "bbox_east": 175.5607333,
+        "bbox_north": -14.4953141
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -167.9347281,
+              -30.6920214
+            ],
+            [
+              -164.0652861,
+              -30.6920214
+            ],
+            [
+              -164.0652861,
+              -27.3078624
+            ],
+            [
+              -167.9347281,
+              -27.3078624
+            ],
+            [
+              -167.9347281,
+              -30.6920214
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Columbus_Crater_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Columbus Crater Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Columbus_Crater_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Columbus_Crater_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -167.9347281,
+        "bbox_south": -30.6920214,
+        "bbox_east": -164.0652861,
+        "bbox_north": -27.3078624
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -171.7900514,
+              -50.8920221
+            ],
+            [
+              -166.6099322,
+              -50.8920221
+            ],
+            [
+              -166.6099322,
+              -47.5078632
+            ],
+            [
+              -171.7900514,
+              -47.5078632
+            ],
+            [
+              -171.7900514,
+              -50.8920221
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Copernicus_Crater_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Copernicus Crater Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Copernicus_Crater_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Copernicus_Crater_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -171.7900514,
+        "bbox_south": -50.8920221,
+        "bbox_east": -166.6099322,
+        "bbox_north": -47.5078632
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -71.7280511,
+              -13.3920212
+            ],
+            [
+              -64.8714999,
+              -13.3920212
+            ],
+            [
+              -64.8714999,
+              -10.0078622
+            ],
+            [
+              -71.7280511,
+              -10.0078622
+            ],
+            [
+              -71.7280511,
+              -13.3920212
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Coprates_EMelas_Chasm_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Coprates EMelas Chasm Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Coprates_EMelas_Chasm_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Coprates_EMelas_Chasm_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -71.7280511,
+        "bbox_south": -13.3920212,
+        "bbox_east": -64.8714999,
+        "bbox_north": -10.0078622
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              136.2768326,
+              -7.2137273
+            ],
+            [
+              139.3864225,
+              -7.2137273
+            ],
+            [
+              139.3864225,
+              -3.5804738
+            ],
+            [
+              136.2768326,
+              -3.5804738
+            ],
+            [
+              136.2768326,
+              -7.2137273
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "curiosity_ctx_mosaic",
+        "title": "MRO CTX, Curiosity Roving Site Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/curiosity_ctx_mosaic",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/curiosity_ctx_mosaic/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 136.2768326,
+        "bbox_south": -7.2137273,
+        "bbox_east": 139.3864225,
+        "bbox_north": -3.5804738
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              19.405687,
+              37.2289685
+            ],
+            [
+              25.7660719,
+              37.2289685
+            ],
+            [
+              25.7660719,
+              42.8254527
+            ],
+            [
+              19.405687,
+              42.8254527
+            ],
+            [
+              19.405687,
+              37.2289685
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Deuteronilus1_2_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Deuteronilus Mensae Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Deuteronilus1_2_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Deuteronilus1_2_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 19.405687,
+        "bbox_south": 37.2289685,
+        "bbox_east": 25.7660719,
+        "bbox_north": 42.8254527
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -71.9531972,
+              -18.1329985
+            ],
+            [
+              -68.5407462,
+              -18.1329985
+            ],
+            [
+              -68.5407462,
+              -9.2929365
+            ],
+            [
+              -71.9531972,
+              -9.2929365
+            ],
+            [
+              -71.9531972,
+              -18.1329985
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "CTX_DEM_East_Melas",
+        "title": "MRO CTX, East Melas DEM",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/CTX_DEM_East_Melas",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/CTX_DEM_East_Melas/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -71.9531972,
+        "bbox_south": -18.1329985,
+        "bbox_east": -68.5407462,
+        "bbox_north": -9.2929365
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -71.9531972,
+              -18.1329985
+            ],
+            [
+              -68.5407462,
+              -18.1329985
+            ],
+            [
+              -68.5407462,
+              -9.2929365
+            ],
+            [
+              -71.9531972,
+              -9.2929365
+            ],
+            [
+              -71.9531972,
+              -18.1329985
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "CTX_Shade_East_Melas",
+        "title": "MRO CTX, East Melas Hillshade",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/CTX_Shade_East_Melas",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/CTX_Shade_East_Melas/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -71.9531972,
+        "bbox_south": -18.1329985,
+        "bbox_east": -68.5407462,
+        "bbox_north": -9.2929365
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -36.8964858,
+              -5.7920213
+            ],
+            [
+              -33.5035541,
+              -5.7920213
+            ],
+            [
+              -33.5035541,
+              -2.4078623
+            ],
+            [
+              -36.8964858,
+              -2.4078623
+            ],
+            [
+              -36.8964858,
+              -5.7920213
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "NE_Marineris_Crater_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Eastern Valles Marineris Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/NE_Marineris_Crater_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/NE_Marineris_Crater_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -36.8964858,
+        "bbox_south": -5.7920213,
+        "bbox_east": -33.5035541,
+        "bbox_north": -2.4078623
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -50.9875215,
+              -20.4920206
+            ],
+            [
+              -47.4124717,
+              -20.4920206
+            ],
+            [
+              -47.4124717,
+              -17.1078616
+            ],
+            [
+              -50.9875215,
+              -17.1078616
+            ],
+            [
+              -50.9875215,
+              -20.4920206
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "SE_Marineris_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Equatorial Valles Marineries Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/SE_Marineris_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/SE_Marineris_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -50.9875215,
+        "bbox_south": -20.4920206,
+        "bbox_east": -47.4124717,
+        "bbox_north": -17.1078616
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -170.0774884,
+              37.3079786
+            ],
+            [
+              -165.7225105,
+              37.3079786
+            ],
+            [
+              -165.7225105,
+              40.6921376
+            ],
+            [
+              -170.0774884,
+              40.6921376
+            ],
+            [
+              -170.0774884,
+              37.3079786
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Erebus_Montes_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Erebus Montes Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Erebus_Montes_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Erebus_Montes_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -170.0774884,
+        "bbox_south": 37.3079786,
+        "bbox_east": -165.7225105,
+        "bbox_north": 40.6921376
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              135.1842593,
+              -6.5732988
+            ],
+            [
+              139.2413012,
+              -6.5732988
+            ],
+            [
+              139.2413012,
+              -2.8077809
+            ],
+            [
+              135.1842593,
+              -2.8077809
+            ],
+            [
+              135.1842593,
+              -6.5732988
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Gale_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Gale Crater Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Gale_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Gale_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 135.1842593,
+        "bbox_south": -6.5732988,
+        "bbox_east": 139.2413012,
+        "bbox_north": -2.8077809
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              173.2463549,
+              -16.2218451
+            ],
+            [
+              178.4633349,
+              -16.2218451
+            ],
+            [
+              178.4633349,
+              -10.9930557
+            ],
+            [
+              173.2463549,
+              -10.9930557
+            ],
+            [
+              173.2463549,
+              -16.2218451
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Gusev_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Gusev Crater Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Gusev_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Gusev_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 173.2463549,
+        "bbox_south": -16.2218451,
+        "bbox_east": 178.4633349,
+        "bbox_north": -10.9930557
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.5853118,
+              -28.5240883
+            ],
+            [
+              79.4329052,
+              -28.5240883
+            ],
+            [
+              79.4329052,
+              -25.0797866
+            ],
+            [
+              75.5853118,
+              -25.0797866
+            ],
+            [
+              75.5853118,
+              -28.5240883
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Hadriacus_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Hadriacus Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Hadriacus_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Hadriacus_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 75.5853118,
+        "bbox_south": -28.5240883,
+        "bbox_east": 79.4329052,
+        "bbox_north": -25.0797866
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -38.3864506,
+              -37.4920206
+            ],
+            [
+              -34.2135065,
+              -37.4920206
+            ],
+            [
+              -34.2135065,
+              -34.1078616
+            ],
+            [
+              -38.3864506,
+              -34.1078616
+            ],
+            [
+              -38.3864506,
+              -37.4920206
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Hale_Crater_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Hale Crater Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Hale_Crater_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Hale_Crater_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -38.3864506,
+        "bbox_south": -37.4920206,
+        "bbox_east": -34.2135065,
+        "bbox_north": -34.1078616
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              124.7528509,
+              18.2859829
+            ],
+            [
+              128.4529109,
+              18.2859829
+            ],
+            [
+              128.4529109,
+              21.8254348
+            ],
+            [
+              124.7528509,
+              21.8254348
+            ],
+            [
+              124.7528509,
+              18.2859829
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Hebrus_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Hebrus Valles Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Hebrus_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Hebrus_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 124.7528509,
+        "bbox_south": 18.2859829,
+        "bbox_east": 128.4529109,
+        "bbox_north": 21.8254348
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              99.6625132,
+              -41.8075384
+            ],
+            [
+              106.2773911,
+              -41.8075384
+            ],
+            [
+              106.2773911,
+              -37.3150663
+            ],
+            [
+              99.6625132,
+              -37.3150663
+            ],
+            [
+              99.6625132,
+              -41.8075384
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Hellas_Hellas2_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Hellas Eastern Rim Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Hellas_Hellas2_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Hellas_Hellas2_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 99.6625132,
+        "bbox_south": -41.8075384,
+        "bbox_east": 106.2773911,
+        "bbox_north": -37.3150663
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              91.7243027,
+              -37.2541428
+            ],
+            [
+              96.2500099,
+              -37.2541428
+            ],
+            [
+              96.2500099,
+              -33.6135517
+            ],
+            [
+              91.7243027,
+              -33.6135517
+            ],
+            [
+              91.7243027,
+              -37.2541428
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Hellas3_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Hellas Mesopotamia Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Hellas3_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Hellas3_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 91.7243027,
+        "bbox_south": -37.2541428,
+        "bbox_east": 96.2500099,
+        "bbox_north": -33.6135517
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              53.7314092,
+              -15.2204292
+            ],
+            [
+              57.279212,
+              -15.2204292
+            ],
+            [
+              57.279212,
+              -11.7762119
+            ],
+            [
+              53.7314092,
+              -11.7762119
+            ],
+            [
+              53.7314092,
+              -15.2204292
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Huygens_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Huygens Crater Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Huygens_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Huygens_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 53.7314092,
+        "bbox_south": -15.2204292,
+        "bbox_east": 57.279212,
+        "bbox_north": -11.7762119
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -47.0279725,
+              10.0079784
+            ],
+            [
+              -43.5720291,
+              10.0079784
+            ],
+            [
+              -43.5720291,
+              13.3921374
+            ],
+            [
+              -47.0279725,
+              13.3921374
+            ],
+            [
+              -47.0279725,
+              10.0079784
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Hypanis_Delta_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Hypanis Delta Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Hypanis_Delta_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Hypanis_Delta_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -47.0279725,
+        "bbox_south": 10.0079784,
+        "bbox_east": -43.5720291,
+        "bbox_north": 13.3921374
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              15.1635869,
+              32.1079779
+            ],
+            [
+              19.236404,
+              32.1079779
+            ],
+            [
+              19.236404,
+              35.4921368
+            ],
+            [
+              15.1635869,
+              35.4921368
+            ],
+            [
+              15.1635869,
+              32.1079779
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Ismenius_Cavus_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Ismenius Cavus Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Ismenius_Cavus_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Ismenius_Cavus_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 15.1635869,
+        "bbox_south": 32.1079779,
+        "bbox_east": 19.236404,
+        "bbox_north": 35.4921368
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.1604655,
+              18.2110274
+            ],
+            [
+              77.6991776,
+              18.2110274
+            ],
+            [
+              77.6991776,
+              18.7211945
+            ],
+            [
+              77.1604655,
+              18.7211945
+            ],
+            [
+              77.1604655,
+              18.2110274
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0",
+        "title": "MRO CTX, Jezero Mosaic, Controlled",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/JEZ_ctx_B_soc_008_orthoMosaic_6m_Eqc_latTs0_lon0/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 77.1604655,
+        "bbox_south": 18.2110274,
+        "bbox_east": 77.6991776,
+        "bbox_north": 18.7211945
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              75.1537692,
+              15.9058484
+            ],
+            [
+              78.8717121,
+              15.9058484
+            ],
+            [
+              78.8717121,
+              19.4453003
+            ],
+            [
+              75.1537692,
+              19.4453003
+            ],
+            [
+              75.1537692,
+              15.9058484
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Jezero_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Jezero Mosaic, Preliminary",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Jezero_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Jezero_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 75.1537692,
+        "bbox_south": 15.9058484,
+        "bbox_east": 78.8717121,
+        "bbox_north": 19.4453003
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -74.4641069,
+              23.1079779
+            ],
+            [
+              -70.7358719,
+              23.1079779
+            ],
+            [
+              -70.7358719,
+              26.4921368
+            ],
+            [
+              -74.4641069,
+              26.4921368
+            ],
+            [
+              -74.4641069,
+              23.1079779
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Kasei_Valles_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Kasei Valles Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Kasei_Valles_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Kasei_Valles_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -74.4641069,
+        "bbox_south": 23.1079779,
+        "bbox_east": -70.7358719,
+        "bbox_north": 26.4921368
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -21.0566936,
+              22.6079779
+            ],
+            [
+              -17.3433048,
+              22.6079779
+            ],
+            [
+              -17.3433048,
+              25.9921368
+            ],
+            [
+              -21.0566936,
+              25.9921368
+            ],
+            [
+              -21.0566936,
+              22.6079779
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Mawrth_Valles_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Mawrth Vallis Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Mawrth_Valles_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Mawrth_Valles_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -21.0566936,
+        "bbox_south": 22.6079779,
+        "bbox_east": -17.3433048,
+        "bbox_north": 25.9921368
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -24.223774,
+              20.2079782
+            ],
+            [
+              -20.5761806,
+              20.2079782
+            ],
+            [
+              -20.5761806,
+              23.5921372
+            ],
+            [
+              -24.223774,
+              23.5921372
+            ],
+            [
+              -24.223774,
+              20.2079782
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "McLaughlin_Crater_CTX_BlockAdj_dd",
+        "title": "MRO CTX, McLaughlin Crater Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/McLaughlin_Crater_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/McLaughlin_Crater_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -24.223774,
+        "bbox_south": 20.2079782,
+        "bbox_east": -20.5761806,
+        "bbox_north": 23.5921372
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -8.093484,
+              -4.8925742
+            ],
+            [
+              -2.8037058,
+              -4.8925742
+            ],
+            [
+              -2.8037058,
+              -0.6078623
+            ],
+            [
+              -8.093484,
+              -0.6078623
+            ],
+            [
+              -8.093484,
+              -4.8925742
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "S_Meridiani_Sinus_Planium_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Meridiani Planum - Sinus Meridiani Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/S_Meridiani_Sinus_Planium_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/S_Meridiani_Sinus_Planium_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -8.093484,
+        "bbox_south": -4.8925742,
+        "bbox_east": -2.8037058,
+        "bbox_north": -0.6078623
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180.0,
+              -90.0
+            ],
+            [
+              180.0,
+              -90.0
+            ],
+            [
+              180.0,
+              90.0
+            ],
+            [
+              -180.0,
+              90.0
+            ],
+            [
+              -180.0,
+              -90.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "CTX_beta01_uncontrolled_5m_Caltech",
+        "title": "MRO CTX, Mosaic Global Uncontrolled (Caltech)",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/CTX_beta01_uncontrolled_5m_Caltech",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/CTX_beta01_uncontrolled_5m_Caltech/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -180.0,
+        "bbox_south": -90.0,
+        "bbox_east": 180.0,
+        "bbox_north": 90.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              133.935732,
+              3.728413
+            ],
+            [
+              137.2761299,
+              3.728413
+            ],
+            [
+              137.2761299,
+              5.0696168
+            ],
+            [
+              133.935732,
+              5.0696168
+            ],
+            [
+              133.935732,
+              3.728413
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "InSightCTXMosaic_112917",
+        "title": "MRO CTX, Mosaic InSight",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/InSightCTXMosaic_112917",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/InSightCTXMosaic_112917/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 133.935732,
+        "bbox_south": 3.728413,
+        "bbox_east": 137.2761299,
+        "bbox_north": 5.0696168
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -136.0,
+              12.0
+            ],
+            [
+              -124.0,
+              12.0
+            ],
+            [
+              -124.0,
+              24.0
+            ],
+            [
+              -136.0,
+              24.0
+            ],
+            [
+              -136.0,
+              12.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "olympus_mons.eq",
+        "title": "MRO CTX, Mosaic Olympus Mons",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/olympus_mons.eq",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/olympus_mons.eq/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -136.0,
+        "bbox_south": 12.0,
+        "bbox_east": -124.0,
+        "bbox_north": 24.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -162.2288716,
+              -42.2920198
+            ],
+            [
+              -157.7711517,
+              -42.2920198
+            ],
+            [
+              -157.7711517,
+              -38.9078609
+            ],
+            [
+              -162.2288716,
+              -38.9078609
+            ],
+            [
+              -162.2288716,
+              -42.2920198
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Newton_Crater_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Newton Crater Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Newton_Crater_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Newton_Crater_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -162.2288716,
+        "bbox_south": -42.2920198,
+        "bbox_east": -157.7711517,
+        "bbox_north": -38.9078609
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -94.2030863,
+              -8.1920214
+            ],
+            [
+              -90.7969111,
+              -8.1920214
+            ],
+            [
+              -90.7969111,
+              -4.8078624
+            ],
+            [
+              -94.2030863,
+              -4.8078624
+            ],
+            [
+              -94.2030863,
+              -8.1920214
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Noactis_Landing_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Noctis Landing Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Noactis_Landing_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Noactis_Landing_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -94.2030863,
+        "bbox_south": -8.1920214,
+        "bbox_east": -90.7969111,
+        "bbox_north": -4.8078624
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              45.7924416,
+              40.4042625
+            ],
+            [
+              50.4234213,
+              40.4042625
+            ],
+            [
+              50.4234213,
+              43.94363
+            ],
+            [
+              45.7924416,
+              43.94363
+            ],
+            [
+              45.7924416,
+              40.4042625
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Protonilus_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Protonilus Mensae Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Protonilus_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Protonilus_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 45.7924416,
+        "bbox_south": 40.4042625,
+        "bbox_east": 50.4234213,
+        "bbox_north": 43.94363
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -61.6328714,
+              -30.592021
+            ],
+            [
+              -57.767141,
+              -30.592021
+            ],
+            [
+              -57.767141,
+              -27.207862
+            ],
+            [
+              -61.6328714,
+              -27.207862
+            ],
+            [
+              -61.6328714,
+              -30.592021
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "S_Nectaris_Fossae_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Southern Nectaris Fossae Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/S_Nectaris_Fossae_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/S_Nectaris_Fossae_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -61.6328714,
+        "bbox_south": -30.592021,
+        "bbox_east": -57.767141,
+        "bbox_north": -27.207862
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -5.510915,
+              -2.0681165
+            ],
+            [
+              -5.489104,
+              -2.0681165
+            ],
+            [
+              -5.489104,
+              -2.0391995
+            ],
+            [
+              -5.510915,
+              -2.0391995
+            ],
+            [
+              -5.510915,
+              -2.0681165
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "DEM_1m_VictoriaCrater",
+        "title": "MRO CTX, Victoria Crater DEM",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/DEM_1m_VictoriaCrater",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/DEM_1m_VictoriaCrater/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -5.510915,
+        "bbox_south": -2.0681165,
+        "bbox_east": -5.489104,
+        "bbox_north": -2.0391995
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -50.1289484,
+              20.6079779
+            ],
+            [
+              -46.4710639,
+              20.6079779
+            ],
+            [
+              -46.4710639,
+              23.9921368
+            ],
+            [
+              -50.1289484,
+              23.9921368
+            ],
+            [
+              -50.1289484,
+              20.6079779
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Viking_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Viking 1 Landing Site Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Viking_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Viking_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -50.1289484,
+        "bbox_south": 20.6079779,
+        "bbox_east": -46.4710639,
+        "bbox_north": 23.9921368
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              133.7852899,
+              46.3960605
+            ],
+            [
+              135.0173759,
+              46.3960605
+            ],
+            [
+              135.0173759,
+              48.9848625
+            ],
+            [
+              133.7852899,
+              48.9848625
+            ],
+            [
+              133.7852899,
+              46.3960605
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "b16_015887_2280_xn_48n225w",
+        "title": "MRO CTX, Viking 2 Landing Site Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/b16_015887_2280_xn_48n225w",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/b16_015887_2280_xn_48n225w/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 133.7852899,
+        "bbox_south": 46.3960605,
+        "bbox_east": 135.0173759,
+        "bbox_north": 48.9848625
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -77.591529,
+              -7.4890436
+            ],
+            [
+              -76.5878504,
+              -7.4890436
+            ],
+            [
+              -76.5878504,
+              -3.9755598
+            ],
+            [
+              -77.591529,
+              -3.9755598
+            ],
+            [
+              -77.591529,
+              -7.4890436
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "West_Candor_Chasma_longlat",
+        "title": "MRO CTX, West Candor Chasma Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/West_Candor_Chasma_longlat",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/West_Candor_Chasma_longlat/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -77.591529,
+        "bbox_south": -7.4890436,
+        "bbox_east": -76.5878504,
+        "bbox_north": -3.9755598
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -77.591529,
+              -7.4890436
+            ],
+            [
+              -76.5878504,
+              -7.4890436
+            ],
+            [
+              -76.5878504,
+              -3.9755598
+            ],
+            [
+              -77.591529,
+              -3.9755598
+            ],
+            [
+              -77.591529,
+              -7.4890436
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "West_Candor_Chasma_DEM_longlat",
+        "title": "MRO CTX, West Candor DEM",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/West_Candor_Chasma_DEM_longlat",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/West_Candor_Chasma_DEM_longlat/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -77.591529,
+        "bbox_south": -7.4890436,
+        "bbox_east": -76.5878504,
+        "bbox_north": -3.9755598
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -11.7437774,
+              -39.0682654
+            ],
+            [
+              -7.2644644,
+              -39.0682654
+            ],
+            [
+              -7.2644644,
+              -35.3919929
+            ],
+            [
+              -11.7437774,
+              -35.3919929
+            ],
+            [
+              -11.7437774,
+              -39.0682654
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Noachis_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Western Noachis Terra Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Noachis_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Noachis_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": -11.7437774,
+        "bbox_south": -39.0682654,
+        "bbox_east": -7.2644644,
+        "bbox_north": -35.3919929
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              155.3902904,
+              -3.1240146
+            ],
+            [
+              158.821433,
+              -3.1240146
+            ],
+            [
+              158.821433,
+              0.3024043
+            ],
+            [
+              155.3902904,
+              0.3024043
+            ],
+            [
+              155.3902904,
+              -3.1240146
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "product_id": "Zephyria_CTX_BlockAdj_dd",
+        "title": "MRO CTX, Zephyria Planum Mosaic",
+        "instrument": "CTX",
+        "tile_endpoint": "https://trek.nasa.gov/tiles/Mars/EQ/Zephyria_CTX_BlockAdj_dd",
+        "tile_url": "https://trek.nasa.gov/tiles/Mars/EQ/Zephyria_CTX_BlockAdj_dd/1.0.0/default/default028mm/{z}/{y}/{x}.png",
+        "bbox_west": 155.3902904,
+        "bbox_south": -3.1240146,
+        "bbox_east": 158.821433,
+        "bbox_north": 0.3024043
+      }
+    }
+  ]
+}

@@ -1,0 +1,1295 @@
+{
+  "scores": {
+    "arcadia_planitia": {
+      "ice": 70,
+      "slope": 93,
+      "subsurface": 80,
+      "coverage": 100,
+      "composite": 85,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.47,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 129,
+        "scored_count": 60,
+        "high_ice_count": 20,
+        "sharad_track_count": 92,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX",
+          "HIRISE_DTM",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 129,
+          "CRISM_TRR3": 61,
+          "SHARAD_HIGHRES": 92,
+          "CTX": 4,
+          "HIRISE_DTM": 32
+        }
+      }
+    },
+    "amazonis_planitia": {
+      "ice": 70,
+      "slope": 100,
+      "subsurface": 80,
+      "coverage": 100,
+      "composite": 86,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 0.53,
+        "slope_favorable_pct": 100.0,
+        "crism_count": 69,
+        "scored_count": 34,
+        "high_ice_count": 12,
+        "sharad_track_count": 91,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX",
+          "HIRISE_DTM",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 69,
+          "CRISM_TRR3": 35,
+          "SHARAD_HIGHRES": 91,
+          "CTX": 4,
+          "HIRISE_DTM": 22
+        }
+      }
+    },
+    "utopia_planitia": {
+      "ice": 70,
+      "slope": 88,
+      "subsurface": 55,
+      "coverage": 100,
+      "composite": 76,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.0,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 397,
+        "scored_count": 394,
+        "high_ice_count": 161,
+        "sharad_track_count": 4,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX",
+          "HIRISE_DTM",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 397,
+          "CRISM_TRR3": 20,
+          "SHARAD_HIGHRES": 4,
+          "CTX": 5,
+          "HIRISE_DTM": 1
+        }
+      }
+    },
+    "elysium_planitia": {
+      "ice": null,
+      "slope": 90,
+      "subsurface": 80,
+      "coverage": 75,
+      "composite": 82,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.13,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 7,
+        "instruments_with_data": [
+          "CTX",
+          "HIRISE_DTM",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "SHARAD_HIGHRES": 7,
+          "CTX": 6,
+          "HIRISE_DTM": 1
+        }
+      }
+    },
+    "isidis_planitia": {
+      "ice": null,
+      "slope": 90,
+      "subsurface": 30,
+      "coverage": 50,
+      "composite": 55,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.55,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 2,
+        "instruments_with_data": [
+          "CTX",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "SHARAD_HIGHRES": 2,
+          "CTX": 3
+        }
+      }
+    },
+    "hellas_planitia": {
+      "ice": null,
+      "slope": 86,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 59,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.13,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 4
+        }
+      }
+    },
+    "argyre_planitia": {
+      "ice": null,
+      "slope": 67,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 48,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 5.75,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "chryse_planitia": {
+      "ice": 70,
+      "slope": 86,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 70,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.31,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 23,
+        "scored_count": 23,
+        "high_ice_count": 13,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 23,
+          "CTX": 4
+        }
+      }
+    },
+    "acidalia_planitia": {
+      "ice": 70,
+      "slope": 87,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 70,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.31,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 289,
+        "scored_count": 287,
+        "high_ice_count": 102,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 289,
+          "CTX": 7
+        }
+      }
+    },
+    "terra_sabaea": {
+      "ice": 70,
+      "slope": 86,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 70,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.64,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 140,
+        "scored_count": 137,
+        "high_ice_count": 27,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 140,
+          "CTX": 8
+        }
+      }
+    },
+    "terra_cimmeria": {
+      "ice": 10,
+      "slope": 97,
+      "subsurface": 80,
+      "coverage": 100,
+      "composite": 71,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.66,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 1,
+        "scored_count": 1,
+        "high_ice_count": 0,
+        "sharad_track_count": 7,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX",
+          "HIRISE_DTM",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 1,
+          "SHARAD_HIGHRES": 7,
+          "CTX": 10,
+          "HIRISE_DTM": 1
+        }
+      }
+    },
+    "terra_sirenum": {
+      "ice": 10,
+      "slope": 88,
+      "subsurface": 30,
+      "coverage": 75,
+      "composite": 48,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.23,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 1,
+        "scored_count": 1,
+        "high_ice_count": 0,
+        "sharad_track_count": 1,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 1,
+          "SHARAD_HIGHRES": 1,
+          "CTX": 4
+        }
+      }
+    },
+    "noachis_terra": {
+      "ice": null,
+      "slope": 99,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 66,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.25,
+        "slope_favorable_pct": 88.9,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 8
+        }
+      }
+    },
+    "arabia_terra": {
+      "ice": 70,
+      "slope": 91,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 72,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.14,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 170,
+        "scored_count": 166,
+        "high_ice_count": 32,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 170,
+          "CTX": 10
+        }
+      }
+    },
+    "xanthe_terra": {
+      "ice": null,
+      "slope": 74,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 52,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 4.39,
+        "slope_favorable_pct": 44.4,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 3
+        }
+      }
+    },
+    "tharsis": {
+      "ice": null,
+      "slope": 98,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 66,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.13,
+        "slope_favorable_pct": 88.9,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 2
+        }
+      }
+    },
+    "olympus_mons": {
+      "ice": null,
+      "slope": 87,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 59,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.34,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 2
+        }
+      }
+    },
+    "alba_mons": {
+      "ice": 70,
+      "slope": 97,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 74,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.66,
+        "slope_favorable_pct": 88.9,
+        "crism_count": 12,
+        "scored_count": 12,
+        "high_ice_count": 5,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 12,
+          "CRISM_TRR3": 3,
+          "CTX": 1
+        }
+      }
+    },
+    "elysium_mons": {
+      "ice": null,
+      "slope": 84,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 58,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 2.61,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "ascraeus_mons": {
+      "ice": null,
+      "slope": 99,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 66,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.41,
+        "slope_favorable_pct": 88.9,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "pavonis_mons": {
+      "ice": null,
+      "slope": 92,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 62,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.69,
+        "slope_favorable_pct": 88.9,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "arsia_mons": {
+      "ice": null,
+      "slope": 96,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 64,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.92,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "syrtis_major": {
+      "ice": null,
+      "slope": 88,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 60,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 2.66,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 2
+        }
+      }
+    },
+    "valles_marineris": {
+      "ice": 10,
+      "slope": 79,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 46,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 4.33,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 1,
+        "scored_count": 1,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 1,
+          "CTX": 9
+        }
+      }
+    },
+    "noctis_labyrinthus": {
+      "ice": null,
+      "slope": 90,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 61,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.16,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 2
+        }
+      }
+    },
+    "ius_chasma": {
+      "ice": null,
+      "slope": 69,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 49,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 6.09,
+        "slope_favorable_pct": 44.4,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 4
+        }
+      }
+    },
+    "coprates_chasma": {
+      "ice": null,
+      "slope": 68,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 49,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 6.8,
+        "slope_favorable_pct": 44.4,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 4
+        }
+      }
+    },
+    "hebes_chasma": {
+      "ice": null,
+      "slope": 73,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 52,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 4.12,
+        "slope_favorable_pct": 33.3,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "juventae_chasma": {
+      "ice": 10,
+      "slope": 68,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 42,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 4.7,
+        "slope_favorable_pct": 44.4,
+        "crism_count": 1,
+        "scored_count": 1,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 1,
+          "CTX": 1
+        }
+      }
+    },
+    "north_pole": {
+      "ice": 40,
+      "slope": 93,
+      "subsurface": 30,
+      "coverage": 75,
+      "composite": 57,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 6.27,
+        "slope_favorable_pct": 50.0,
+        "crism_count": 2,
+        "scored_count": 1,
+        "high_ice_count": 1,
+        "sharad_track_count": 1,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 2,
+          "SHARAD_HIGHRES": 1,
+          "CTX": 1
+        }
+      }
+    },
+    "south_pole": {
+      "ice": null,
+      "slope": 81,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 56,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 3.25,
+        "slope_favorable_pct": 50.0,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "planum_boreum": {
+      "ice": 40,
+      "slope": 91,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 61,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 6.3,
+        "slope_favorable_pct": 50.0,
+        "crism_count": 2,
+        "scored_count": 1,
+        "high_ice_count": 1,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 2,
+          "CTX": 1
+        }
+      }
+    },
+    "planum_australe": {
+      "ice": null,
+      "slope": 97,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 65,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.25,
+        "slope_favorable_pct": 75.0,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "chasma_boreale": {
+      "ice": 40,
+      "slope": 91,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 61,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 1.94,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 1,
+        "scored_count": 1,
+        "high_ice_count": 1,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 1,
+          "CTX": 1
+        }
+      }
+    },
+    "jezero_crater": {
+      "ice": null,
+      "slope": 57,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 54,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 5.26,
+        "slope_favorable_pct": 33.3,
+        "crism_count": 3,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 3,
+          "CTX": 3
+        }
+      }
+    },
+    "gale_crater": {
+      "ice": null,
+      "slope": 28,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 27,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 9.7,
+        "slope_favorable_pct": 0.0,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 3
+        }
+      }
+    },
+    "gusev_crater": {
+      "ice": null,
+      "slope": 50,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 39,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 6.02,
+        "slope_favorable_pct": 22.2,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 3
+        }
+      }
+    },
+    "meridiani_planum": {
+      "ice": null,
+      "slope": 93,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 74,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.16,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 1,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 1,
+          "CTX": 4
+        }
+      }
+    },
+    "viking_1": {
+      "ice": null,
+      "slope": 98,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 66,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.23,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 3
+        }
+      }
+    },
+    "viking_2": {
+      "ice": 10,
+      "slope": 100,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 54,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 0.67,
+        "slope_favorable_pct": 100.0,
+        "crism_count": 1,
+        "scored_count": 1,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 1,
+          "CRISM_TRR3": 1,
+          "CTX": 1
+        }
+      }
+    },
+    "schiaparelli_crater": {
+      "ice": null,
+      "slope": 88,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 60,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.68,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "huygens_crater": {
+      "ice": null,
+      "slope": 88,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 60,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 2.89,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 2
+        }
+      }
+    },
+    "holden_crater": {
+      "ice": null,
+      "slope": 59,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 44,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 6.11,
+        "slope_favorable_pct": 22.2,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "eberswalde_crater": {
+      "ice": null,
+      "slope": 71,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 51,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 4.34,
+        "slope_favorable_pct": 22.2,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "mawrth_vallis": {
+      "ice": null,
+      "slope": 83,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 68,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 3.1,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 1,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 1,
+          "CTX": 2
+        }
+      }
+    },
+    "nili_fossae": {
+      "ice": 40,
+      "slope": 70,
+      "subsurface": null,
+      "coverage": 50,
+      "composite": 54,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 4.7,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 5,
+        "scored_count": 2,
+        "high_ice_count": 1,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CRISM",
+          "CTX"
+        ],
+        "product_counts": {
+          "CRISM_MTRDR": 5,
+          "CTX": 3
+        }
+      }
+    },
+    "kasei_valles": {
+      "ice": null,
+      "slope": 96,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 64,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.41,
+        "slope_favorable_pct": 77.8,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 3
+        }
+      }
+    },
+    "ares_vallis": {
+      "ice": null,
+      "slope": 67,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 48,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 5.69,
+        "slope_favorable_pct": 44.4,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 3
+        }
+      }
+    },
+    "tiu_vallis": {
+      "ice": null,
+      "slope": 84,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 58,
+      "details": {
+        "slope_safety": "MARGINAL",
+        "slope_mean": 3.19,
+        "slope_favorable_pct": 55.6,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "simud_vallis": {
+      "ice": null,
+      "slope": 93,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 63,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.75,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 2
+        }
+      }
+    },
+    "maja_vallis": {
+      "ice": null,
+      "slope": 72,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 51,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 4.91,
+        "slope_favorable_pct": 44.4,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "mangala_vallis": {
+      "ice": null,
+      "slope": 74,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 52,
+      "details": {
+        "slope_safety": "UNFAVORABLE",
+        "slope_mean": 4.62,
+        "slope_favorable_pct": 33.3,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 1
+        }
+      }
+    },
+    "medusae_fossae": {
+      "ice": null,
+      "slope": 86,
+      "subsurface": 55,
+      "coverage": 50,
+      "composite": 64,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 2.43,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 5,
+        "instruments_with_data": [
+          "CTX",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "SHARAD_HIGHRES": 5,
+          "CTX": 1
+        }
+      }
+    },
+    "cerberus_fossae": {
+      "ice": null,
+      "slope": 94,
+      "subsurface": 80,
+      "coverage": 75,
+      "composite": 83,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 1.45,
+        "slope_favorable_pct": 66.7,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 6,
+        "instruments_with_data": [
+          "CTX",
+          "HIRISE_DTM",
+          "SHARAD_HIGHRES"
+        ],
+        "product_counts": {
+          "SHARAD_HIGHRES": 6,
+          "CTX": 2,
+          "HIRISE_DTM": 1
+        }
+      }
+    },
+    "olympus_aureole": {
+      "ice": null,
+      "slope": 100,
+      "subsurface": null,
+      "coverage": 25,
+      "composite": 67,
+      "details": {
+        "slope_safety": "FAVORABLE",
+        "slope_mean": 0.92,
+        "slope_favorable_pct": 100.0,
+        "crism_count": 0,
+        "scored_count": 0,
+        "high_ice_count": 0,
+        "sharad_track_count": 0,
+        "instruments_with_data": [
+          "CTX"
+        ],
+        "product_counts": {
+          "CTX": 2
+        }
+      }
+    }
+  },
+  "computed_at": "2026-02-15T10:46:55Z",
+  "computation_time_s": 4.9,
+  "regions_scored": 55,
+  "is_cached": false
+}

@@ -5,7 +5,7 @@
  * - ensurePanelVisible(reason) with debounce and manual-collapse cooldown
  * - Attention pulse coordination (CSS animation key)
  * - Autonomy toggle persisted to localStorage
- * - Section highlight tracking for new copilot content
+ * - Section highlight tracking for new agent content
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -16,7 +16,7 @@ export type PanelOpenReason =
   | "user_click"
   | "feature_select"
   | "search_result"
-  | "copilot_write"
+  | "agent_write"
   | "analysis_complete"
   | "planner_propose"
   | "keyboard_shortcut";
@@ -49,7 +49,7 @@ export interface PanelManagerAPI {
   stripPulseKey: number;
   clearStripPulse: () => void;
 
-  /** Section highlight for new copilot content */
+  /** Section highlight for new agent content */
   highlightedSection: string | null;
   setHighlightedSection: (id: string | null) => void;
 }

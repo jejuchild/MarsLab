@@ -1,0 +1,14 @@
+[
+  {
+    "obs_a": "ESP_034319_2260",
+    "obs_b": "ESP_034754_2260",
+    "overlap_bbox": {
+      "lat_min": 45.6075,
+      "lat_max": 45.7471,
+      "lon_min": -161.173,
+      "lon_max": -161.018
+    },
+    "emission_diff": 21.89,
+    "composite_score": 0.973
+  }
+]

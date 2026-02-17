@@ -1,0 +1,3207 @@
+{
+  "session_id": "f18a68a9-6a8f-4f92-bb97-0ac8bd455791",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hello! I'm your Mars research copilot. Tell me what you'd like to investigate — ice deposits, crater morphology, mineral composition, or just pick a region to explore.",
+      "timestamp": "2026-02-16T12:17:04.993243Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze craters",
+        "Explore Arcadia Planitia"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "hello",
+      "timestamp": "2026-02-16T12:17:10.546313Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Let's start by choosing a Mars region to explore.",
+      "timestamp": "2026-02-16T12:17:10.547448Z",
+      "actions": [],
+      "suggestions": [
+        "Explore Arcadia Planitia",
+        "Explore Jezero",
+        "Explore Deuteronilus Mensae"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "what's your name",
+      "timestamp": "2026-02-16T12:17:21.586415Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Let's start by choosing a Mars region to explore.",
+      "timestamp": "2026-02-16T12:17:21.587737Z",
+      "actions": [],
+      "suggestions": [
+        "Explore Arcadia Planitia",
+        "Explore Jezero",
+        "Explore Deuteronilus Mensae"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "where's crater",
+      "timestamp": "2026-02-16T12:19:14.270957Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Let's start by choosing a Mars region to explore.",
+      "timestamp": "2026-02-16T12:19:14.280649Z",
+      "actions": [],
+      "suggestions": [
+        "Explore Jezero",
+        "Explore Gale Crater",
+        "Explore Hellas Planitia"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "arcadia",
+      "timestamp": "2026-02-16T12:19:23.493322Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Looking up Arcadia Planitia...",
+      "timestamp": "2026-02-16T12:19:23.501423Z",
+      "actions": [
+        {
+          "action_id": "549172c0",
+          "tool_name": "resolve_region",
+          "description": "Look up Arcadia Planitia",
+          "params": {
+            "query": "Arcadia Planitia"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "bbox": {
+              "min_lat": 33.87,
+              "max_lat": 64.17,
+              "min_lon": 165.86,
+              "max_lon": -149.57
+            },
+            "region_name": "Arcadia Planitia"
+          },
+          "error": null,
+          "started_at": "2026-02-16T12:19:23.501605Z",
+          "completed_at": "2026-02-16T12:19:23.501732Z"
+        }
+      ],
+      "suggestions": [
+        "Explore Jezero",
+        "Explore Gale Crater",
+        "Explore Hellas Planitia"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "crater",
+      "timestamp": "2026-02-16T12:19:30.431742Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Searching for elevation data for terrain analysis in Arcadia Planitia...",
+      "timestamp": "2026-02-16T12:19:30.436658Z",
+      "actions": [
+        {
+          "action_id": "c028e982",
+          "tool_name": "search_products",
+          "description": "Search HIRISE_DTM data",
+          "params": {
+            "instrument": "HIRISE_DTM"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "instrument": "HIRISE_DTM",
+            "count": 32,
+            "summary": "Found 32 HIRISE_DTM products"
+          },
+          "error": null,
+          "started_at": "2026-02-16T12:19:30.436895Z",
+          "completed_at": "2026-02-16T12:19:30.442821Z"
+        },
+        {
+          "action_id": "21dcd9aa",
+          "tool_name": "search_products",
+          "description": "Search SHARAD_HIGHRES data",
+          "params": {
+            "instrument": "SHARAD_HIGHRES"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "instrument": "SHARAD_HIGHRES",
+            "count": 92,
+            "summary": "Found 92 SHARAD_HIGHRES products"
+          },
+          "error": null,
+          "started_at": "2026-02-16T12:19:30.443148Z",
+          "completed_at": "2026-02-16T12:19:30.470411Z"
+        }
+      ],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": "Arcadia Planitia",
+  "current_bbox": {
+    "min_lat": 33.87,
+    "max_lat": 64.17,
+    "min_lon": 165.86,
+    "max_lon": -149.57
+  },
+  "selected_feature": null,
+  "loaded_instruments": [
+    "HIRISE_DTM",
+    "SHARAD_HIGHRES"
+  ],
+  "loaded_products": {
+    "HIRISE_DTM": [
+      {
+        "product_id": "DTEEC_025497_2355_025352_2355_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 55.0166,
+        "lon": -153.3757,
+        "distance_km": 4425.93,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_036257_2355_035334_2355_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 55.028099999999995,
+        "lon": -153.9478,
+        "distance_km": 4429.38,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007235_2350_006945_2350_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.574247,
+        "lon": -169.277524,
+        "distance_km": 4518.67,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007947_2350_009160_2350_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.479768500000006,
+        "lon": -169.39562999999998,
+        "distance_km": 4524.37,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007736_2345_008303_2345_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.371395500000006,
+        "lon": -169.0874245,
+        "distance_km": 4530.45,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035057_2335_034767_2335_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 53.157361111111115,
+        "lon": -154.7210111111111,
+        "distance_km": 4543.19,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034200_2335_034266_2335_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 53.02955,
+        "lon": -154.1104,
+        "distance_km": 4546.22,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_027027_2325_027370_2325_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 52.34845,
+        "lon": -162.9085,
+        "distance_km": 4634.82,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_072575_2305_072496_2305_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 50.230850000000004,
+        "lon": -149.93595,
+        "distance_km": 4672.53,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_025366_2305_025498_2305_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 50.19735,
+        "lon": -175.48149999999998,
+        "distance_km": 4776.05,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035914_2280_035624_2280_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.69481388888889,
+        "lon": -151.29937916666665,
+        "distance_km": 4830.89,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_041888_2270_041954_2270_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.82495,
+        "lon": -151.57815,
+        "distance_km": 4883.55,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034095_2285_033805_2285_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.933575000000005,
+        "lon": -168.06719166666664,
+        "distance_km": 4909.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034240_2275_033950_2275_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.23046666666667,
+        "lon": -166.3083375,
+        "distance_km": 4947.34,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_018522_2270_019010_2270_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.5612,
+        "lon": -165.143,
+        "distance_km": 4983.52,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_019590_2265_020078_2265_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.31294027777778,
+        "lon": -162.9116388888889,
+        "distance_km": 4989.98,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034082_2260_033014_2260_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 45.63730972222222,
+        "lon": -171.37537083333333,
+        "distance_km": 5048.64,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035690_2240_035189_2240_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 43.833347222222216,
+        "lon": -153.83090555555555,
+        "distance_km": 5076.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034108_2245_034174_2245_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 44.15467361111111,
+        "lon": -160.79335694444444,
+        "distance_km": 5106.72,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_037352_2245_037418_2245_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 44.38430694444445,
+        "lon": -166.13670833333333,
+        "distance_km": 5114.9,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_033963_2230_033818_2230_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 42.491145833333334,
+        "lon": -162.40893888888888,
+        "distance_km": 5212.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEED_042996_2210_043273_2210_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.55194027777778,
+        "lon": -162.4886736111111,
+        "distance_km": 5327.02,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_038143_2205_055536_2205_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.98570138888889,
+        "lon": -157.3977986111111,
+        "distance_km": 5329.1,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035651_2210_036917_2210_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.51905555555555,
+        "lon": -166.6375013888889,
+        "distance_km": 5344.48,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_028531_2205_016782_2205_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.0703,
+        "lon": -177.64385,
+        "distance_km": 5369.35,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_060719_2200_060785_2200_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.810936111111104,
+        "lon": -164.37678333333332,
+        "distance_km": 5378.85,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_061075_2195_061141_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.17742361111111,
+        "lon": -164.38888333333333,
+        "distance_km": 5416.24,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035862_2195_035928_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.08824444444444,
+        "lon": -167.09696944444443,
+        "distance_km": 5430.18,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_060706_2195_060416_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.08604861111111,
+        "lon": -170.20157222222224,
+        "distance_km": 5435.54,
+        "local": true
+      },
+      {
+        "product_id": "DTEED_055378_2190_055444_2190_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 38.9149,
+        "lon": -166.42675,
+        "distance_km": 5438.62,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_025735_2185_025801_2185_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 38.15014027777778,
+        "lon": -168.41230833333333,
+        "distance_km": 5488.46,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_073578_2155_073077_2155_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 35.09475,
+        "lon": -170.1726,
+        "distance_km": 5671.59,
+        "local": true
+      }
+    ],
+    "SHARAD_HIGHRES": [
+      {
+        "product_id": "R_6591502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.294250000000005,
+        "lon": -0.011399999999994748,
+        "distance_km": 361.74,
+        "local": true
+      },
+      {
+        "product_id": "R_5601801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.46115,
+        "lon": 0.002600000000001046,
+        "distance_km": 366.22,
+        "local": true
+      },
+      {
+        "product_id": "R_6684502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.48625,
+        "lon": 0.010850000000004911,
+        "distance_km": 366.72,
+        "local": true
+      },
+      {
+        "product_id": "R_5678301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.4988,
+        "lon": -0.008949999999998681,
+        "distance_km": 367.71,
+        "local": true
+      },
+      {
+        "product_id": "R_1392701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.50995,
+        "lon": -0.0018000000000029104,
+        "distance_km": 367.83,
+        "local": true
+      },
+      {
+        "product_id": "R_6539402_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.536,
+        "lon": 0.00750000000000739,
+        "distance_km": 368.33,
+        "local": true
+      },
+      {
+        "product_id": "R_7756101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.5719,
+        "lon": -0.004499999999993065,
+        "distance_km": 369.81,
+        "local": true
+      },
+      {
+        "product_id": "R_5489701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.6343,
+        "lon": 0.023550000000000182,
+        "distance_km": 370.89,
+        "local": true
+      },
+      {
+        "product_id": "R_0653001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.7071,
+        "lon": -0.0075500000000090495,
+        "distance_km": 374.12,
+        "local": true
+      },
+      {
+        "product_id": "R_0674101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.73864999999999,
+        "lon": -0.006200000000006867,
+        "distance_km": 375.09,
+        "local": true
+      },
+      {
+        "product_id": "R_0617401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.96825,
+        "lon": 0.00549999999999784,
+        "distance_km": 406.23,
+        "local": true
+      },
+      {
+        "product_id": "R_0774301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.9172,
+        "lon": -0.001649999999997931,
+        "distance_km": 408.37,
+        "local": true
+      },
+      {
+        "product_id": "R_0724202_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.855,
+        "lon": -0.01829999999999643,
+        "distance_km": 411.25,
+        "local": true
+      },
+      {
+        "product_id": "R_0405101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 19.895449999999997,
+        "lon": 0.00039999999999906777,
+        "distance_km": 1765.78,
+        "local": true
+      },
+      {
+        "product_id": "R_3578901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 54.2945,
+        "lon": -150.70530000000002,
+        "distance_km": 4446.46,
+        "local": true
+      },
+      {
+        "product_id": "R_6629003_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.28655,
+        "lon": -148.06959999999998,
+        "distance_km": 4537.13,
+        "local": true
+      },
+      {
+        "product_id": "R_0780801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.432249999999996,
+        "lon": -149.98515,
+        "distance_km": 4546.9,
+        "local": true
+      },
+      {
+        "product_id": "R_6170101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.27185,
+        "lon": -150.0608,
+        "distance_km": 4556.77,
+        "local": true
+      },
+      {
+        "product_id": "R_0801901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3904,
+        "lon": -151.5688,
+        "distance_km": 4563.13,
+        "local": true
+      },
+      {
+        "product_id": "R_1371601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.83055,
+        "lon": -173.97835,
+        "distance_km": 4622.22,
+        "local": true
+      },
+      {
+        "product_id": "R_4047801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.598650000000006,
+        "lon": -176.5787,
+        "distance_km": 4632.2,
+        "local": true
+      },
+      {
+        "product_id": "R_2252401_001_SS04_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.355199999999996,
+        "lon": -163.07065,
+        "distance_km": 4635.03,
+        "local": true
+      },
+      {
+        "product_id": "R_7714503_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2946,
+        "lon": -162.50635,
+        "distance_km": 4636.44,
+        "local": true
+      },
+      {
+        "product_id": "R_7748801_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.252649999999996,
+        "lon": -162.4872,
+        "distance_km": 4638.83,
+        "local": true
+      },
+      {
+        "product_id": "R_2336801_001_SS04_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3656,
+        "lon": -165.01675,
+        "distance_km": 4640.81,
+        "local": true
+      },
+      {
+        "product_id": "R_1350501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.443349999999995,
+        "lon": -173.42775,
+        "distance_km": 4645.55,
+        "local": true
+      },
+      {
+        "product_id": "R_2822101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.440999999999995,
+        "lon": -172.8591,
+        "distance_km": 4645.99,
+        "local": true
+      },
+      {
+        "product_id": "R_1329401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.425700000000006,
+        "lon": -172.822,
+        "distance_km": 4646.91,
+        "local": true
+      },
+      {
+        "product_id": "R_1308301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.36415,
+        "lon": -172.0251,
+        "distance_km": 4650.75,
+        "local": true
+      },
+      {
+        "product_id": "R_3710801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.05335,
+        "lon": -162.71545,
+        "distance_km": 4651.45,
+        "local": true
+      },
+      {
+        "product_id": "R_5677601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3071,
+        "lon": -169.48095,
+        "distance_km": 4652.94,
+        "local": true
+      },
+      {
+        "product_id": "R_6524202_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2968,
+        "lon": -171.18810000000002,
+        "distance_km": 4654.64,
+        "local": true
+      },
+      {
+        "product_id": "R_5588601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.274100000000004,
+        "lon": -172.77245,
+        "distance_km": 4655.9,
+        "local": true
+      },
+      {
+        "product_id": "R_7705302_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2668,
+        "lon": -171.91805,
+        "distance_km": 4656.51,
+        "local": true
+      },
+      {
+        "product_id": "R_2758801_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 51.9875,
+        "lon": -173.4379,
+        "distance_km": 4672.5,
+        "local": true
+      },
+      {
+        "product_id": "R_3854602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 49.6913,
+        "lon": -177.14375,
+        "distance_km": 4802.68,
+        "local": true
+      },
+      {
+        "product_id": "R_0554102_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 48.853699999999996,
+        "lon": -173.93715,
+        "distance_km": 4857.45,
+        "local": true
+      },
+      {
+        "product_id": "R_3940302_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 47.6125,
+        "lon": -168.1454,
+        "distance_km": 4928.69,
+        "local": true
+      },
+      {
+        "product_id": "R_4026001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.6388,
+        "lon": -164.99105,
+        "distance_km": 4978.46,
+        "local": true
+      },
+      {
+        "product_id": "R_3990401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.602599999999995,
+        "lon": -165.09505000000001,
+        "distance_km": 4980.92,
+        "local": true
+      },
+      {
+        "product_id": "R_4018103_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.70625,
+        "lon": -168.1832,
+        "distance_km": 4982.32,
+        "local": true
+      },
+      {
+        "product_id": "R_3933702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.591300000000004,
+        "lon": -166.40480000000002,
+        "distance_km": 4985.32,
+        "local": true
+      },
+      {
+        "product_id": "R_3898101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.5499,
+        "lon": -166.21744999999999,
+        "distance_km": 4987.28,
+        "local": true
+      },
+      {
+        "product_id": "R_0709601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7294,
+        "lon": -151.38625000000002,
+        "distance_km": 5002.38,
+        "local": true
+      },
+      {
+        "product_id": "R_0722802_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7558,
+        "lon": -155.594,
+        "distance_km": 5037.52,
+        "local": true
+      },
+      {
+        "product_id": "R_2177201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.788,
+        "lon": -155.88855,
+        "distance_km": 5037.91,
+        "local": true
+      },
+      {
+        "product_id": "R_1723601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7284,
+        "lon": -155.77745,
+        "distance_km": 5040.53,
+        "local": true
+      },
+      {
+        "product_id": "R_0650301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7851,
+        "lon": -160.23645,
+        "distance_km": 5066.7,
+        "local": true
+      },
+      {
+        "product_id": "R_1297701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7297,
+        "lon": -161.3986,
+        "distance_km": 5076.1,
+        "local": true
+      },
+      {
+        "product_id": "R_4043102_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.6764,
+        "lon": -153.81745,
+        "distance_km": 5085.55,
+        "local": true
+      },
+      {
+        "product_id": "R_3908602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.63164999999999,
+        "lon": -153.7665,
+        "distance_km": 5087.7,
+        "local": true
+      },
+      {
+        "product_id": "R_0749201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.73995,
+        "lon": -164.53314999999998,
+        "distance_km": 5088.88,
+        "local": true
+      },
+      {
+        "product_id": "R_1274004_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.927350000000004,
+        "lon": -171.3076,
+        "distance_km": 5090.63,
+        "local": true
+      },
+      {
+        "product_id": "R_1403201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.718149999999994,
+        "lon": -164.73775,
+        "distance_km": 5090.88,
+        "local": true
+      },
+      {
+        "product_id": "R_0684602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.751400000000004,
+        "lon": -165.52525,
+        "distance_km": 5091.46,
+        "local": true
+      },
+      {
+        "product_id": "R_1332001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.74075,
+        "lon": -165.87605000000002,
+        "distance_km": 5093.13,
+        "local": true
+      },
+      {
+        "product_id": "R_0753201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7651,
+        "lon": -176.84555,
+        "distance_km": 5094.3,
+        "local": true
+      },
+      {
+        "product_id": "R_1237101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.75915,
+        "lon": -176.57999999999998,
+        "distance_km": 5095.27,
+        "local": true
+      },
+      {
+        "product_id": "R_0767702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7314,
+        "lon": -176.26475,
+        "distance_km": 5097.6,
+        "local": true
+      },
+      {
+        "product_id": "R_0782202_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.73045,
+        "lon": -175.6522,
+        "distance_km": 5098.87,
+        "local": true
+      },
+      {
+        "product_id": "R_1251601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.70435,
+        "lon": -175.47925,
+        "distance_km": 5100.72,
+        "local": true
+      },
+      {
+        "product_id": "R_4893602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.26035,
+        "lon": -153.88445,
+        "distance_km": 5110.24,
+        "local": true
+      },
+      {
+        "product_id": "R_0771601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.0286,
+        "lon": -161.2378,
+        "distance_km": 5116.46,
+        "local": true
+      },
+      {
+        "product_id": "R_0277201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.1353,
+        "lon": -179.06985,
+        "distance_km": 5124.9,
+        "local": true
+      },
+      {
+        "product_id": "R_3913901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.6221,
+        "lon": -160.88215,
+        "distance_km": 5138.46,
+        "local": true
+      },
+      {
+        "product_id": "R_0355001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.783950000000004,
+        "lon": -179.01715000000002,
+        "distance_km": 5145.8,
+        "local": true
+      },
+      {
+        "product_id": "R_6535401_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 42.52,
+        "lon": -166.14715,
+        "distance_km": 5224.98,
+        "local": true
+      },
+      {
+        "product_id": "R_5868801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 41.51505,
+        "lon": -158.05855,
+        "distance_km": 5244.54,
+        "local": true
+      },
+      {
+        "product_id": "R_4033901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 41.73035,
+        "lon": -162.5491,
+        "distance_km": 5257.99,
+        "local": true
+      },
+      {
+        "product_id": "R_5716501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 40.4401,
+        "lon": -165.6267,
+        "distance_km": 5346.17,
+        "local": true
+      },
+      {
+        "product_id": "R_0362901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 38.40475,
+        "lon": -176.57075,
+        "distance_km": 5470.66,
+        "local": true
+      },
+      {
+        "product_id": "R_0614702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 37.7116,
+        "lon": -161.15064999999998,
+        "distance_km": 5486.92,
+        "local": true
+      },
+      {
+        "product_id": "R_0353601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 34.7571,
+        "lon": -157.9805,
+        "distance_km": 5638.79,
+        "local": true
+      },
+      {
+        "product_id": "R_5488301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.864449999999998,
+        "lon": -157.87290000000002,
+        "distance_km": 5923.68,
+        "local": true
+      },
+      {
+        "product_id": "R_7514003_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77915,
+        "lon": -158.64815,
+        "distance_km": 5934.89,
+        "local": true
+      },
+      {
+        "product_id": "R_6657401_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.75685,
+        "lon": -158.76235,
+        "distance_km": 5937.09,
+        "local": true
+      },
+      {
+        "product_id": "R_5867501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.8846,
+        "lon": -161.6327,
+        "distance_km": 5949.45,
+        "local": true
+      },
+      {
+        "product_id": "R_6553202_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77705,
+        "lon": -160.99115,
+        "distance_km": 5951.74,
+        "local": true
+      },
+      {
+        "product_id": "R_8675101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7503,
+        "lon": -161.01045,
+        "distance_km": 5953.44,
+        "local": true
+      },
+      {
+        "product_id": "R_5838501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.8643,
+        "lon": -163.3379,
+        "distance_km": 5960.14,
+        "local": true
+      },
+      {
+        "product_id": "R_6647503_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77055,
+        "lon": -162.82055,
+        "distance_km": 5962.96,
+        "local": true
+      },
+      {
+        "product_id": "R_7590502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7457,
+        "lon": -162.81215,
+        "distance_km": 5964.37,
+        "local": true
+      },
+      {
+        "product_id": "R_8667201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7615,
+        "lon": -164.09735,
+        "distance_km": 5969.88,
+        "local": true
+      },
+      {
+        "product_id": "R_6654102_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7249,
+        "lon": -163.99885,
+        "distance_km": 5971.58,
+        "local": true
+      },
+      {
+        "product_id": "R_0577801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.815,
+        "lon": -168.06925,
+        "distance_km": 5980.42,
+        "local": true
+      },
+      {
+        "product_id": "R_6646203_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.765,
+        "lon": -168.04995,
+        "distance_km": 5983.33,
+        "local": true
+      },
+      {
+        "product_id": "R_7490301_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7569,
+        "lon": -168.0958,
+        "distance_km": 5983.92,
+        "local": true
+      },
+      {
+        "product_id": "R_7891201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.75595,
+        "lon": -168.23405,
+        "distance_km": 5984.28,
+        "local": true
+      },
+      {
+        "product_id": "R_8343501_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.73855,
+        "lon": -168.02249999999998,
+        "distance_km": 5984.84,
+        "local": true
+      },
+      {
+        "product_id": "R_6744603_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 24.8874,
+        "lon": 167.3472,
+        "distance_km": 6140.22,
+        "local": true
+      },
+      {
+        "product_id": "R_5712501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 24.446250000000003,
+        "lon": -156.35755,
+        "distance_km": 6225.82,
+        "local": true
+      },
+      {
+        "product_id": "R_7860201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 14.927299999999999,
+        "lon": -156.90825,
+        "distance_km": 6785.01,
+        "local": true
+      }
+    ]
+  },
+  "analysis_results": {},
+  "research_goal": "analyze_crater",
+  "pending_actions": [],
+  "tool_context": {
+    "region_bbox": {
+      "min_lat": 33.87,
+      "max_lat": 64.17,
+      "min_lon": 165.86,
+      "max_lon": -149.57
+    },
+    "region_name": "Arcadia Planitia",
+    "products_hirise_dtm": [
+      {
+        "product_id": "DTEEC_025497_2355_025352_2355_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 55.0166,
+        "lon": -153.3757,
+        "distance_km": 4425.93,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_036257_2355_035334_2355_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 55.028099999999995,
+        "lon": -153.9478,
+        "distance_km": 4429.38,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007235_2350_006945_2350_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.574247,
+        "lon": -169.277524,
+        "distance_km": 4518.67,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007947_2350_009160_2350_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.479768500000006,
+        "lon": -169.39562999999998,
+        "distance_km": 4524.37,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007736_2345_008303_2345_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.371395500000006,
+        "lon": -169.0874245,
+        "distance_km": 4530.45,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035057_2335_034767_2335_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 53.157361111111115,
+        "lon": -154.7210111111111,
+        "distance_km": 4543.19,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034200_2335_034266_2335_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 53.02955,
+        "lon": -154.1104,
+        "distance_km": 4546.22,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_027027_2325_027370_2325_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 52.34845,
+        "lon": -162.9085,
+        "distance_km": 4634.82,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_072575_2305_072496_2305_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 50.230850000000004,
+        "lon": -149.93595,
+        "distance_km": 4672.53,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_025366_2305_025498_2305_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 50.19735,
+        "lon": -175.48149999999998,
+        "distance_km": 4776.05,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035914_2280_035624_2280_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.69481388888889,
+        "lon": -151.29937916666665,
+        "distance_km": 4830.89,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_041888_2270_041954_2270_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.82495,
+        "lon": -151.57815,
+        "distance_km": 4883.55,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034095_2285_033805_2285_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.933575000000005,
+        "lon": -168.06719166666664,
+        "distance_km": 4909.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034240_2275_033950_2275_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.23046666666667,
+        "lon": -166.3083375,
+        "distance_km": 4947.34,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_018522_2270_019010_2270_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.5612,
+        "lon": -165.143,
+        "distance_km": 4983.52,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_019590_2265_020078_2265_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.31294027777778,
+        "lon": -162.9116388888889,
+        "distance_km": 4989.98,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034082_2260_033014_2260_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 45.63730972222222,
+        "lon": -171.37537083333333,
+        "distance_km": 5048.64,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035690_2240_035189_2240_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 43.833347222222216,
+        "lon": -153.83090555555555,
+        "distance_km": 5076.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034108_2245_034174_2245_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 44.15467361111111,
+        "lon": -160.79335694444444,
+        "distance_km": 5106.72,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_037352_2245_037418_2245_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 44.38430694444445,
+        "lon": -166.13670833333333,
+        "distance_km": 5114.9,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_033963_2230_033818_2230_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 42.491145833333334,
+        "lon": -162.40893888888888,
+        "distance_km": 5212.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEED_042996_2210_043273_2210_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.55194027777778,
+        "lon": -162.4886736111111,
+        "distance_km": 5327.02,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_038143_2205_055536_2205_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.98570138888889,
+        "lon": -157.3977986111111,
+        "distance_km": 5329.1,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035651_2210_036917_2210_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.51905555555555,
+        "lon": -166.6375013888889,
+        "distance_km": 5344.48,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_028531_2205_016782_2205_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.0703,
+        "lon": -177.64385,
+        "distance_km": 5369.35,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_060719_2200_060785_2200_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.810936111111104,
+        "lon": -164.37678333333332,
+        "distance_km": 5378.85,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_061075_2195_061141_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.17742361111111,
+        "lon": -164.38888333333333,
+        "distance_km": 5416.24,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035862_2195_035928_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.08824444444444,
+        "lon": -167.09696944444443,
+        "distance_km": 5430.18,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_060706_2195_060416_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.08604861111111,
+        "lon": -170.20157222222224,
+        "distance_km": 5435.54,
+        "local": true
+      },
+      {
+        "product_id": "DTEED_055378_2190_055444_2190_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 38.9149,
+        "lon": -166.42675,
+        "distance_km": 5438.62,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_025735_2185_025801_2185_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 38.15014027777778,
+        "lon": -168.41230833333333,
+        "distance_km": 5488.46,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_073578_2155_073077_2155_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 35.09475,
+        "lon": -170.1726,
+        "distance_km": 5671.59,
+        "local": true
+      }
+    ],
+    "all_products": [
+      {
+        "product_id": "DTEEC_025497_2355_025352_2355_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 55.0166,
+        "lon": -153.3757,
+        "distance_km": 4425.93,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_036257_2355_035334_2355_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 55.028099999999995,
+        "lon": -153.9478,
+        "distance_km": 4429.38,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007235_2350_006945_2350_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.574247,
+        "lon": -169.277524,
+        "distance_km": 4518.67,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007947_2350_009160_2350_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.479768500000006,
+        "lon": -169.39562999999998,
+        "distance_km": 4524.37,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_007736_2345_008303_2345_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 54.371395500000006,
+        "lon": -169.0874245,
+        "distance_km": 4530.45,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035057_2335_034767_2335_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 53.157361111111115,
+        "lon": -154.7210111111111,
+        "distance_km": 4543.19,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034200_2335_034266_2335_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 53.02955,
+        "lon": -154.1104,
+        "distance_km": 4546.22,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_027027_2325_027370_2325_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 52.34845,
+        "lon": -162.9085,
+        "distance_km": 4634.82,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_072575_2305_072496_2305_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 50.230850000000004,
+        "lon": -149.93595,
+        "distance_km": 4672.53,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_025366_2305_025498_2305_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 50.19735,
+        "lon": -175.48149999999998,
+        "distance_km": 4776.05,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035914_2280_035624_2280_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.69481388888889,
+        "lon": -151.29937916666665,
+        "distance_km": 4830.89,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_041888_2270_041954_2270_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.82495,
+        "lon": -151.57815,
+        "distance_km": 4883.55,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034095_2285_033805_2285_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.933575000000005,
+        "lon": -168.06719166666664,
+        "distance_km": 4909.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034240_2275_033950_2275_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 47.23046666666667,
+        "lon": -166.3083375,
+        "distance_km": 4947.34,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_018522_2270_019010_2270_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.5612,
+        "lon": -165.143,
+        "distance_km": 4983.52,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_019590_2265_020078_2265_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 46.31294027777778,
+        "lon": -162.9116388888889,
+        "distance_km": 4989.98,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034082_2260_033014_2260_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 45.63730972222222,
+        "lon": -171.37537083333333,
+        "distance_km": 5048.64,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035690_2240_035189_2240_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 43.833347222222216,
+        "lon": -153.83090555555555,
+        "distance_km": 5076.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_034108_2245_034174_2245_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 44.15467361111111,
+        "lon": -160.79335694444444,
+        "distance_km": 5106.72,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_037352_2245_037418_2245_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 44.38430694444445,
+        "lon": -166.13670833333333,
+        "distance_km": 5114.9,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_033963_2230_033818_2230_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 42.491145833333334,
+        "lon": -162.40893888888888,
+        "distance_km": 5212.58,
+        "local": true
+      },
+      {
+        "product_id": "DTEED_042996_2210_043273_2210_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.55194027777778,
+        "lon": -162.4886736111111,
+        "distance_km": 5327.02,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_038143_2205_055536_2205_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.98570138888889,
+        "lon": -157.3977986111111,
+        "distance_km": 5329.1,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035651_2210_036917_2210_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.51905555555555,
+        "lon": -166.6375013888889,
+        "distance_km": 5344.48,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_028531_2205_016782_2205_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 40.0703,
+        "lon": -177.64385,
+        "distance_km": 5369.35,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_060719_2200_060785_2200_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.810936111111104,
+        "lon": -164.37678333333332,
+        "distance_km": 5378.85,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_061075_2195_061141_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.17742361111111,
+        "lon": -164.38888333333333,
+        "distance_km": 5416.24,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_035862_2195_035928_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.08824444444444,
+        "lon": -167.09696944444443,
+        "distance_km": 5430.18,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_060706_2195_060416_2195_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 39.08604861111111,
+        "lon": -170.20157222222224,
+        "distance_km": 5435.54,
+        "local": true
+      },
+      {
+        "product_id": "DTEED_055378_2190_055444_2190_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 38.9149,
+        "lon": -166.42675,
+        "distance_km": 5438.62,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_025735_2185_025801_2185_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 38.15014027777778,
+        "lon": -168.41230833333333,
+        "distance_km": 5488.46,
+        "local": true
+      },
+      {
+        "product_id": "DTEEC_073578_2155_073077_2155_A01",
+        "instrument": "HIRISE_DTM",
+        "lat": 35.09475,
+        "lon": -170.1726,
+        "distance_km": 5671.59,
+        "local": true
+      },
+      {
+        "product_id": "R_6591502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.294250000000005,
+        "lon": -0.011399999999994748,
+        "distance_km": 361.74,
+        "local": true
+      },
+      {
+        "product_id": "R_5601801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.46115,
+        "lon": 0.002600000000001046,
+        "distance_km": 366.22,
+        "local": true
+      },
+      {
+        "product_id": "R_6684502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.48625,
+        "lon": 0.010850000000004911,
+        "distance_km": 366.72,
+        "local": true
+      },
+      {
+        "product_id": "R_5678301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.4988,
+        "lon": -0.008949999999998681,
+        "distance_km": 367.71,
+        "local": true
+      },
+      {
+        "product_id": "R_1392701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.50995,
+        "lon": -0.0018000000000029104,
+        "distance_km": 367.83,
+        "local": true
+      },
+      {
+        "product_id": "R_6539402_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.536,
+        "lon": 0.00750000000000739,
+        "distance_km": 368.33,
+        "local": true
+      },
+      {
+        "product_id": "R_7756101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.5719,
+        "lon": -0.004499999999993065,
+        "distance_km": 369.81,
+        "local": true
+      },
+      {
+        "product_id": "R_5489701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.6343,
+        "lon": 0.023550000000000182,
+        "distance_km": 370.89,
+        "local": true
+      },
+      {
+        "product_id": "R_0653001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.7071,
+        "lon": -0.0075500000000090495,
+        "distance_km": 374.12,
+        "local": true
+      },
+      {
+        "product_id": "R_0674101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.73864999999999,
+        "lon": -0.006200000000006867,
+        "distance_km": 375.09,
+        "local": true
+      },
+      {
+        "product_id": "R_0617401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.96825,
+        "lon": 0.00549999999999784,
+        "distance_km": 406.23,
+        "local": true
+      },
+      {
+        "product_id": "R_0774301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.9172,
+        "lon": -0.001649999999997931,
+        "distance_km": 408.37,
+        "local": true
+      },
+      {
+        "product_id": "R_0724202_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.855,
+        "lon": -0.01829999999999643,
+        "distance_km": 411.25,
+        "local": true
+      },
+      {
+        "product_id": "R_0405101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 19.895449999999997,
+        "lon": 0.00039999999999906777,
+        "distance_km": 1765.78,
+        "local": true
+      },
+      {
+        "product_id": "R_3578901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 54.2945,
+        "lon": -150.70530000000002,
+        "distance_km": 4446.46,
+        "local": true
+      },
+      {
+        "product_id": "R_6629003_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.28655,
+        "lon": -148.06959999999998,
+        "distance_km": 4537.13,
+        "local": true
+      },
+      {
+        "product_id": "R_0780801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.432249999999996,
+        "lon": -149.98515,
+        "distance_km": 4546.9,
+        "local": true
+      },
+      {
+        "product_id": "R_6170101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.27185,
+        "lon": -150.0608,
+        "distance_km": 4556.77,
+        "local": true
+      },
+      {
+        "product_id": "R_0801901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3904,
+        "lon": -151.5688,
+        "distance_km": 4563.13,
+        "local": true
+      },
+      {
+        "product_id": "R_1371601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.83055,
+        "lon": -173.97835,
+        "distance_km": 4622.22,
+        "local": true
+      },
+      {
+        "product_id": "R_4047801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.598650000000006,
+        "lon": -176.5787,
+        "distance_km": 4632.2,
+        "local": true
+      },
+      {
+        "product_id": "R_2252401_001_SS04_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.355199999999996,
+        "lon": -163.07065,
+        "distance_km": 4635.03,
+        "local": true
+      },
+      {
+        "product_id": "R_7714503_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2946,
+        "lon": -162.50635,
+        "distance_km": 4636.44,
+        "local": true
+      },
+      {
+        "product_id": "R_7748801_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.252649999999996,
+        "lon": -162.4872,
+        "distance_km": 4638.83,
+        "local": true
+      },
+      {
+        "product_id": "R_2336801_001_SS04_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3656,
+        "lon": -165.01675,
+        "distance_km": 4640.81,
+        "local": true
+      },
+      {
+        "product_id": "R_1350501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.443349999999995,
+        "lon": -173.42775,
+        "distance_km": 4645.55,
+        "local": true
+      },
+      {
+        "product_id": "R_2822101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.440999999999995,
+        "lon": -172.8591,
+        "distance_km": 4645.99,
+        "local": true
+      },
+      {
+        "product_id": "R_1329401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.425700000000006,
+        "lon": -172.822,
+        "distance_km": 4646.91,
+        "local": true
+      },
+      {
+        "product_id": "R_1308301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.36415,
+        "lon": -172.0251,
+        "distance_km": 4650.75,
+        "local": true
+      },
+      {
+        "product_id": "R_3710801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.05335,
+        "lon": -162.71545,
+        "distance_km": 4651.45,
+        "local": true
+      },
+      {
+        "product_id": "R_5677601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3071,
+        "lon": -169.48095,
+        "distance_km": 4652.94,
+        "local": true
+      },
+      {
+        "product_id": "R_6524202_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2968,
+        "lon": -171.18810000000002,
+        "distance_km": 4654.64,
+        "local": true
+      },
+      {
+        "product_id": "R_5588601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.274100000000004,
+        "lon": -172.77245,
+        "distance_km": 4655.9,
+        "local": true
+      },
+      {
+        "product_id": "R_7705302_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2668,
+        "lon": -171.91805,
+        "distance_km": 4656.51,
+        "local": true
+      },
+      {
+        "product_id": "R_2758801_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 51.9875,
+        "lon": -173.4379,
+        "distance_km": 4672.5,
+        "local": true
+      },
+      {
+        "product_id": "R_3854602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 49.6913,
+        "lon": -177.14375,
+        "distance_km": 4802.68,
+        "local": true
+      },
+      {
+        "product_id": "R_0554102_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 48.853699999999996,
+        "lon": -173.93715,
+        "distance_km": 4857.45,
+        "local": true
+      },
+      {
+        "product_id": "R_3940302_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 47.6125,
+        "lon": -168.1454,
+        "distance_km": 4928.69,
+        "local": true
+      },
+      {
+        "product_id": "R_4026001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.6388,
+        "lon": -164.99105,
+        "distance_km": 4978.46,
+        "local": true
+      },
+      {
+        "product_id": "R_3990401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.602599999999995,
+        "lon": -165.09505000000001,
+        "distance_km": 4980.92,
+        "local": true
+      },
+      {
+        "product_id": "R_4018103_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.70625,
+        "lon": -168.1832,
+        "distance_km": 4982.32,
+        "local": true
+      },
+      {
+        "product_id": "R_3933702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.591300000000004,
+        "lon": -166.40480000000002,
+        "distance_km": 4985.32,
+        "local": true
+      },
+      {
+        "product_id": "R_3898101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.5499,
+        "lon": -166.21744999999999,
+        "distance_km": 4987.28,
+        "local": true
+      },
+      {
+        "product_id": "R_0709601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7294,
+        "lon": -151.38625000000002,
+        "distance_km": 5002.38,
+        "local": true
+      },
+      {
+        "product_id": "R_0722802_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7558,
+        "lon": -155.594,
+        "distance_km": 5037.52,
+        "local": true
+      },
+      {
+        "product_id": "R_2177201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.788,
+        "lon": -155.88855,
+        "distance_km": 5037.91,
+        "local": true
+      },
+      {
+        "product_id": "R_1723601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7284,
+        "lon": -155.77745,
+        "distance_km": 5040.53,
+        "local": true
+      },
+      {
+        "product_id": "R_0650301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7851,
+        "lon": -160.23645,
+        "distance_km": 5066.7,
+        "local": true
+      },
+      {
+        "product_id": "R_1297701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7297,
+        "lon": -161.3986,
+        "distance_km": 5076.1,
+        "local": true
+      },
+      {
+        "product_id": "R_4043102_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.6764,
+        "lon": -153.81745,
+        "distance_km": 5085.55,
+        "local": true
+      },
+      {
+        "product_id": "R_3908602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.63164999999999,
+        "lon": -153.7665,
+        "distance_km": 5087.7,
+        "local": true
+      },
+      {
+        "product_id": "R_0749201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.73995,
+        "lon": -164.53314999999998,
+        "distance_km": 5088.88,
+        "local": true
+      },
+      {
+        "product_id": "R_1274004_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.927350000000004,
+        "lon": -171.3076,
+        "distance_km": 5090.63,
+        "local": true
+      },
+      {
+        "product_id": "R_1403201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.718149999999994,
+        "lon": -164.73775,
+        "distance_km": 5090.88,
+        "local": true
+      },
+      {
+        "product_id": "R_0684602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.751400000000004,
+        "lon": -165.52525,
+        "distance_km": 5091.46,
+        "local": true
+      },
+      {
+        "product_id": "R_1332001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.74075,
+        "lon": -165.87605000000002,
+        "distance_km": 5093.13,
+        "local": true
+      },
+      {
+        "product_id": "R_0753201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7651,
+        "lon": -176.84555,
+        "distance_km": 5094.3,
+        "local": true
+      },
+      {
+        "product_id": "R_1237101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.75915,
+        "lon": -176.57999999999998,
+        "distance_km": 5095.27,
+        "local": true
+      },
+      {
+        "product_id": "R_0767702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7314,
+        "lon": -176.26475,
+        "distance_km": 5097.6,
+        "local": true
+      },
+      {
+        "product_id": "R_0782202_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.73045,
+        "lon": -175.6522,
+        "distance_km": 5098.87,
+        "local": true
+      },
+      {
+        "product_id": "R_1251601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.70435,
+        "lon": -175.47925,
+        "distance_km": 5100.72,
+        "local": true
+      },
+      {
+        "product_id": "R_4893602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.26035,
+        "lon": -153.88445,
+        "distance_km": 5110.24,
+        "local": true
+      },
+      {
+        "product_id": "R_0771601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.0286,
+        "lon": -161.2378,
+        "distance_km": 5116.46,
+        "local": true
+      },
+      {
+        "product_id": "R_0277201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.1353,
+        "lon": -179.06985,
+        "distance_km": 5124.9,
+        "local": true
+      },
+      {
+        "product_id": "R_3913901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.6221,
+        "lon": -160.88215,
+        "distance_km": 5138.46,
+        "local": true
+      },
+      {
+        "product_id": "R_0355001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.783950000000004,
+        "lon": -179.01715000000002,
+        "distance_km": 5145.8,
+        "local": true
+      },
+      {
+        "product_id": "R_6535401_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 42.52,
+        "lon": -166.14715,
+        "distance_km": 5224.98,
+        "local": true
+      },
+      {
+        "product_id": "R_5868801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 41.51505,
+        "lon": -158.05855,
+        "distance_km": 5244.54,
+        "local": true
+      },
+      {
+        "product_id": "R_4033901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 41.73035,
+        "lon": -162.5491,
+        "distance_km": 5257.99,
+        "local": true
+      },
+      {
+        "product_id": "R_5716501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 40.4401,
+        "lon": -165.6267,
+        "distance_km": 5346.17,
+        "local": true
+      },
+      {
+        "product_id": "R_0362901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 38.40475,
+        "lon": -176.57075,
+        "distance_km": 5470.66,
+        "local": true
+      },
+      {
+        "product_id": "R_0614702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 37.7116,
+        "lon": -161.15064999999998,
+        "distance_km": 5486.92,
+        "local": true
+      },
+      {
+        "product_id": "R_0353601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 34.7571,
+        "lon": -157.9805,
+        "distance_km": 5638.79,
+        "local": true
+      },
+      {
+        "product_id": "R_5488301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.864449999999998,
+        "lon": -157.87290000000002,
+        "distance_km": 5923.68,
+        "local": true
+      },
+      {
+        "product_id": "R_7514003_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77915,
+        "lon": -158.64815,
+        "distance_km": 5934.89,
+        "local": true
+      },
+      {
+        "product_id": "R_6657401_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.75685,
+        "lon": -158.76235,
+        "distance_km": 5937.09,
+        "local": true
+      },
+      {
+        "product_id": "R_5867501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.8846,
+        "lon": -161.6327,
+        "distance_km": 5949.45,
+        "local": true
+      },
+      {
+        "product_id": "R_6553202_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77705,
+        "lon": -160.99115,
+        "distance_km": 5951.74,
+        "local": true
+      },
+      {
+        "product_id": "R_8675101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7503,
+        "lon": -161.01045,
+        "distance_km": 5953.44,
+        "local": true
+      },
+      {
+        "product_id": "R_5838501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.8643,
+        "lon": -163.3379,
+        "distance_km": 5960.14,
+        "local": true
+      },
+      {
+        "product_id": "R_6647503_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77055,
+        "lon": -162.82055,
+        "distance_km": 5962.96,
+        "local": true
+      },
+      {
+        "product_id": "R_7590502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7457,
+        "lon": -162.81215,
+        "distance_km": 5964.37,
+        "local": true
+      },
+      {
+        "product_id": "R_8667201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7615,
+        "lon": -164.09735,
+        "distance_km": 5969.88,
+        "local": true
+      },
+      {
+        "product_id": "R_6654102_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7249,
+        "lon": -163.99885,
+        "distance_km": 5971.58,
+        "local": true
+      },
+      {
+        "product_id": "R_0577801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.815,
+        "lon": -168.06925,
+        "distance_km": 5980.42,
+        "local": true
+      },
+      {
+        "product_id": "R_6646203_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.765,
+        "lon": -168.04995,
+        "distance_km": 5983.33,
+        "local": true
+      },
+      {
+        "product_id": "R_7490301_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7569,
+        "lon": -168.0958,
+        "distance_km": 5983.92,
+        "local": true
+      },
+      {
+        "product_id": "R_7891201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.75595,
+        "lon": -168.23405,
+        "distance_km": 5984.28,
+        "local": true
+      },
+      {
+        "product_id": "R_8343501_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.73855,
+        "lon": -168.02249999999998,
+        "distance_km": 5984.84,
+        "local": true
+      },
+      {
+        "product_id": "R_6744603_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 24.8874,
+        "lon": 167.3472,
+        "distance_km": 6140.22,
+        "local": true
+      },
+      {
+        "product_id": "R_5712501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 24.446250000000003,
+        "lon": -156.35755,
+        "distance_km": 6225.82,
+        "local": true
+      },
+      {
+        "product_id": "R_7860201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 14.927299999999999,
+        "lon": -156.90825,
+        "distance_km": 6785.01,
+        "local": true
+      }
+    ],
+    "products_sharad_highres": [
+      {
+        "product_id": "R_6591502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.294250000000005,
+        "lon": -0.011399999999994748,
+        "distance_km": 361.74,
+        "local": true
+      },
+      {
+        "product_id": "R_5601801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.46115,
+        "lon": 0.002600000000001046,
+        "distance_km": 366.22,
+        "local": true
+      },
+      {
+        "product_id": "R_6684502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.48625,
+        "lon": 0.010850000000004911,
+        "distance_km": 366.72,
+        "local": true
+      },
+      {
+        "product_id": "R_5678301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.4988,
+        "lon": -0.008949999999998681,
+        "distance_km": 367.71,
+        "local": true
+      },
+      {
+        "product_id": "R_1392701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.50995,
+        "lon": -0.0018000000000029104,
+        "distance_km": 367.83,
+        "local": true
+      },
+      {
+        "product_id": "R_6539402_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.536,
+        "lon": 0.00750000000000739,
+        "distance_km": 368.33,
+        "local": true
+      },
+      {
+        "product_id": "R_7756101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.5719,
+        "lon": -0.004499999999993065,
+        "distance_km": 369.81,
+        "local": true
+      },
+      {
+        "product_id": "R_5489701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.6343,
+        "lon": 0.023550000000000182,
+        "distance_km": 370.89,
+        "local": true
+      },
+      {
+        "product_id": "R_0653001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.7071,
+        "lon": -0.0075500000000090495,
+        "distance_km": 374.12,
+        "local": true
+      },
+      {
+        "product_id": "R_0674101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.73864999999999,
+        "lon": -0.006200000000006867,
+        "distance_km": 375.09,
+        "local": true
+      },
+      {
+        "product_id": "R_0617401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.96825,
+        "lon": 0.00549999999999784,
+        "distance_km": 406.23,
+        "local": true
+      },
+      {
+        "product_id": "R_0774301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.9172,
+        "lon": -0.001649999999997931,
+        "distance_km": 408.37,
+        "local": true
+      },
+      {
+        "product_id": "R_0724202_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.855,
+        "lon": -0.01829999999999643,
+        "distance_km": 411.25,
+        "local": true
+      },
+      {
+        "product_id": "R_0405101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 19.895449999999997,
+        "lon": 0.00039999999999906777,
+        "distance_km": 1765.78,
+        "local": true
+      },
+      {
+        "product_id": "R_3578901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 54.2945,
+        "lon": -150.70530000000002,
+        "distance_km": 4446.46,
+        "local": true
+      },
+      {
+        "product_id": "R_6629003_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.28655,
+        "lon": -148.06959999999998,
+        "distance_km": 4537.13,
+        "local": true
+      },
+      {
+        "product_id": "R_0780801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.432249999999996,
+        "lon": -149.98515,
+        "distance_km": 4546.9,
+        "local": true
+      },
+      {
+        "product_id": "R_6170101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.27185,
+        "lon": -150.0608,
+        "distance_km": 4556.77,
+        "local": true
+      },
+      {
+        "product_id": "R_0801901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3904,
+        "lon": -151.5688,
+        "distance_km": 4563.13,
+        "local": true
+      },
+      {
+        "product_id": "R_1371601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.83055,
+        "lon": -173.97835,
+        "distance_km": 4622.22,
+        "local": true
+      },
+      {
+        "product_id": "R_4047801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.598650000000006,
+        "lon": -176.5787,
+        "distance_km": 4632.2,
+        "local": true
+      },
+      {
+        "product_id": "R_2252401_001_SS04_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.355199999999996,
+        "lon": -163.07065,
+        "distance_km": 4635.03,
+        "local": true
+      },
+      {
+        "product_id": "R_7714503_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2946,
+        "lon": -162.50635,
+        "distance_km": 4636.44,
+        "local": true
+      },
+      {
+        "product_id": "R_7748801_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.252649999999996,
+        "lon": -162.4872,
+        "distance_km": 4638.83,
+        "local": true
+      },
+      {
+        "product_id": "R_2336801_001_SS04_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3656,
+        "lon": -165.01675,
+        "distance_km": 4640.81,
+        "local": true
+      },
+      {
+        "product_id": "R_1350501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.443349999999995,
+        "lon": -173.42775,
+        "distance_km": 4645.55,
+        "local": true
+      },
+      {
+        "product_id": "R_2822101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.440999999999995,
+        "lon": -172.8591,
+        "distance_km": 4645.99,
+        "local": true
+      },
+      {
+        "product_id": "R_1329401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.425700000000006,
+        "lon": -172.822,
+        "distance_km": 4646.91,
+        "local": true
+      },
+      {
+        "product_id": "R_1308301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.36415,
+        "lon": -172.0251,
+        "distance_km": 4650.75,
+        "local": true
+      },
+      {
+        "product_id": "R_3710801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.05335,
+        "lon": -162.71545,
+        "distance_km": 4651.45,
+        "local": true
+      },
+      {
+        "product_id": "R_5677601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.3071,
+        "lon": -169.48095,
+        "distance_km": 4652.94,
+        "local": true
+      },
+      {
+        "product_id": "R_6524202_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2968,
+        "lon": -171.18810000000002,
+        "distance_km": 4654.64,
+        "local": true
+      },
+      {
+        "product_id": "R_5588601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.274100000000004,
+        "lon": -172.77245,
+        "distance_km": 4655.9,
+        "local": true
+      },
+      {
+        "product_id": "R_7705302_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 52.2668,
+        "lon": -171.91805,
+        "distance_km": 4656.51,
+        "local": true
+      },
+      {
+        "product_id": "R_2758801_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 51.9875,
+        "lon": -173.4379,
+        "distance_km": 4672.5,
+        "local": true
+      },
+      {
+        "product_id": "R_3854602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 49.6913,
+        "lon": -177.14375,
+        "distance_km": 4802.68,
+        "local": true
+      },
+      {
+        "product_id": "R_0554102_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 48.853699999999996,
+        "lon": -173.93715,
+        "distance_km": 4857.45,
+        "local": true
+      },
+      {
+        "product_id": "R_3940302_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 47.6125,
+        "lon": -168.1454,
+        "distance_km": 4928.69,
+        "local": true
+      },
+      {
+        "product_id": "R_4026001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.6388,
+        "lon": -164.99105,
+        "distance_km": 4978.46,
+        "local": true
+      },
+      {
+        "product_id": "R_3990401_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.602599999999995,
+        "lon": -165.09505000000001,
+        "distance_km": 4980.92,
+        "local": true
+      },
+      {
+        "product_id": "R_4018103_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.70625,
+        "lon": -168.1832,
+        "distance_km": 4982.32,
+        "local": true
+      },
+      {
+        "product_id": "R_3933702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.591300000000004,
+        "lon": -166.40480000000002,
+        "distance_km": 4985.32,
+        "local": true
+      },
+      {
+        "product_id": "R_3898101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 46.5499,
+        "lon": -166.21744999999999,
+        "distance_km": 4987.28,
+        "local": true
+      },
+      {
+        "product_id": "R_0709601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7294,
+        "lon": -151.38625000000002,
+        "distance_km": 5002.38,
+        "local": true
+      },
+      {
+        "product_id": "R_0722802_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7558,
+        "lon": -155.594,
+        "distance_km": 5037.52,
+        "local": true
+      },
+      {
+        "product_id": "R_2177201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.788,
+        "lon": -155.88855,
+        "distance_km": 5037.91,
+        "local": true
+      },
+      {
+        "product_id": "R_1723601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7284,
+        "lon": -155.77745,
+        "distance_km": 5040.53,
+        "local": true
+      },
+      {
+        "product_id": "R_0650301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7851,
+        "lon": -160.23645,
+        "distance_km": 5066.7,
+        "local": true
+      },
+      {
+        "product_id": "R_1297701_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7297,
+        "lon": -161.3986,
+        "distance_km": 5076.1,
+        "local": true
+      },
+      {
+        "product_id": "R_4043102_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.6764,
+        "lon": -153.81745,
+        "distance_km": 5085.55,
+        "local": true
+      },
+      {
+        "product_id": "R_3908602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.63164999999999,
+        "lon": -153.7665,
+        "distance_km": 5087.7,
+        "local": true
+      },
+      {
+        "product_id": "R_0749201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.73995,
+        "lon": -164.53314999999998,
+        "distance_km": 5088.88,
+        "local": true
+      },
+      {
+        "product_id": "R_1274004_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.927350000000004,
+        "lon": -171.3076,
+        "distance_km": 5090.63,
+        "local": true
+      },
+      {
+        "product_id": "R_1403201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.718149999999994,
+        "lon": -164.73775,
+        "distance_km": 5090.88,
+        "local": true
+      },
+      {
+        "product_id": "R_0684602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.751400000000004,
+        "lon": -165.52525,
+        "distance_km": 5091.46,
+        "local": true
+      },
+      {
+        "product_id": "R_1332001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.74075,
+        "lon": -165.87605000000002,
+        "distance_km": 5093.13,
+        "local": true
+      },
+      {
+        "product_id": "R_0753201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7651,
+        "lon": -176.84555,
+        "distance_km": 5094.3,
+        "local": true
+      },
+      {
+        "product_id": "R_1237101_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.75915,
+        "lon": -176.57999999999998,
+        "distance_km": 5095.27,
+        "local": true
+      },
+      {
+        "product_id": "R_0767702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.7314,
+        "lon": -176.26475,
+        "distance_km": 5097.6,
+        "local": true
+      },
+      {
+        "product_id": "R_0782202_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.73045,
+        "lon": -175.6522,
+        "distance_km": 5098.87,
+        "local": true
+      },
+      {
+        "product_id": "R_1251601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.70435,
+        "lon": -175.47925,
+        "distance_km": 5100.72,
+        "local": true
+      },
+      {
+        "product_id": "R_4893602_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.26035,
+        "lon": -153.88445,
+        "distance_km": 5110.24,
+        "local": true
+      },
+      {
+        "product_id": "R_0771601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.0286,
+        "lon": -161.2378,
+        "distance_km": 5116.46,
+        "local": true
+      },
+      {
+        "product_id": "R_0277201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 44.1353,
+        "lon": -179.06985,
+        "distance_km": 5124.9,
+        "local": true
+      },
+      {
+        "product_id": "R_3913901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.6221,
+        "lon": -160.88215,
+        "distance_km": 5138.46,
+        "local": true
+      },
+      {
+        "product_id": "R_0355001_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 43.783950000000004,
+        "lon": -179.01715000000002,
+        "distance_km": 5145.8,
+        "local": true
+      },
+      {
+        "product_id": "R_6535401_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 42.52,
+        "lon": -166.14715,
+        "distance_km": 5224.98,
+        "local": true
+      },
+      {
+        "product_id": "R_5868801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 41.51505,
+        "lon": -158.05855,
+        "distance_km": 5244.54,
+        "local": true
+      },
+      {
+        "product_id": "R_4033901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 41.73035,
+        "lon": -162.5491,
+        "distance_km": 5257.99,
+        "local": true
+      },
+      {
+        "product_id": "R_5716501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 40.4401,
+        "lon": -165.6267,
+        "distance_km": 5346.17,
+        "local": true
+      },
+      {
+        "product_id": "R_0362901_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 38.40475,
+        "lon": -176.57075,
+        "distance_km": 5470.66,
+        "local": true
+      },
+      {
+        "product_id": "R_0614702_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 37.7116,
+        "lon": -161.15064999999998,
+        "distance_km": 5486.92,
+        "local": true
+      },
+      {
+        "product_id": "R_0353601_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 34.7571,
+        "lon": -157.9805,
+        "distance_km": 5638.79,
+        "local": true
+      },
+      {
+        "product_id": "R_5488301_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.864449999999998,
+        "lon": -157.87290000000002,
+        "distance_km": 5923.68,
+        "local": true
+      },
+      {
+        "product_id": "R_7514003_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77915,
+        "lon": -158.64815,
+        "distance_km": 5934.89,
+        "local": true
+      },
+      {
+        "product_id": "R_6657401_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.75685,
+        "lon": -158.76235,
+        "distance_km": 5937.09,
+        "local": true
+      },
+      {
+        "product_id": "R_5867501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.8846,
+        "lon": -161.6327,
+        "distance_km": 5949.45,
+        "local": true
+      },
+      {
+        "product_id": "R_6553202_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77705,
+        "lon": -160.99115,
+        "distance_km": 5951.74,
+        "local": true
+      },
+      {
+        "product_id": "R_8675101_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7503,
+        "lon": -161.01045,
+        "distance_km": 5953.44,
+        "local": true
+      },
+      {
+        "product_id": "R_5838501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.8643,
+        "lon": -163.3379,
+        "distance_km": 5960.14,
+        "local": true
+      },
+      {
+        "product_id": "R_6647503_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.77055,
+        "lon": -162.82055,
+        "distance_km": 5962.96,
+        "local": true
+      },
+      {
+        "product_id": "R_7590502_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7457,
+        "lon": -162.81215,
+        "distance_km": 5964.37,
+        "local": true
+      },
+      {
+        "product_id": "R_8667201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7615,
+        "lon": -164.09735,
+        "distance_km": 5969.88,
+        "local": true
+      },
+      {
+        "product_id": "R_6654102_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7249,
+        "lon": -163.99885,
+        "distance_km": 5971.58,
+        "local": true
+      },
+      {
+        "product_id": "R_0577801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.815,
+        "lon": -168.06925,
+        "distance_km": 5980.42,
+        "local": true
+      },
+      {
+        "product_id": "R_6646203_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.765,
+        "lon": -168.04995,
+        "distance_km": 5983.33,
+        "local": true
+      },
+      {
+        "product_id": "R_7490301_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.7569,
+        "lon": -168.0958,
+        "distance_km": 5983.92,
+        "local": true
+      },
+      {
+        "product_id": "R_7891201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.75595,
+        "lon": -168.23405,
+        "distance_km": 5984.28,
+        "local": true
+      },
+      {
+        "product_id": "R_8343501_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 29.73855,
+        "lon": -168.02249999999998,
+        "distance_km": 5984.84,
+        "local": true
+      },
+      {
+        "product_id": "R_6744603_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 24.8874,
+        "lon": 167.3472,
+        "distance_km": 6140.22,
+        "local": true
+      },
+      {
+        "product_id": "R_5712501_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 24.446250000000003,
+        "lon": -156.35755,
+        "distance_km": 6225.82,
+        "local": true
+      },
+      {
+        "product_id": "R_7860201_001_SS4_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "lat": 14.927299999999999,
+        "lon": -156.90825,
+        "distance_km": 6785.01,
+        "local": true
+      }
+    ]
+  },
+  "report_markdown": null,
+  "created_at": "2026-02-16T12:17:04.993185Z",
+  "updated_at": "2026-02-16T12:19:30.470777Z"
+}

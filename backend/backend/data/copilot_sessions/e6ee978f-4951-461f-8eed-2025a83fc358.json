@@ -1,0 +1,313 @@
+{
+  "session_id": "e6ee978f-4951-461f-8eed-2025a83fc358",
+  "state": "active",
+  "language": "ko",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hi, I'm MARVIS — your Mars research assistant. Ask me anything about Mars, or tell me what you'd like to investigate.",
+      "timestamp": "2026-02-16T13:02:25.546129Z",
+      "actions": [],
+      "suggestions": [
+        "What can you do?",
+        "Find ice in Arcadia",
+        "Analyze a crater"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "안녕",
+      "timestamp": "2026-02-16T13:02:32.246080Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "안녕하세요! 화성에서 무엇이 궁금하세요?",
+      "timestamp": "2026-02-16T13:02:32.673802Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "너 이름이 뭐야",
+      "timestamp": "2026-02-16T13:02:38.514089Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "안녕하세요! 저는 MARVIS, 화성 연구 도우미입니다. 화성에 대해 궁금한 것이 있으면 물어보세요!",
+      "timestamp": "2026-02-16T13:02:38.950335Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "화성은 지구랑 거리가 얼마나 돼",
+      "timestamp": "2026-02-16T13:02:48.516272Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Mars is about 225 million km from Earth on average. It's roughly half Earth's diameter (6,779 km).",
+      "timestamp": "2026-02-16T13:02:48.924412Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "오우~ 꽤 크네",
+      "timestamp": "2026-02-16T13:02:59.440260Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "궁금한 것이 있으면 말씀하세요!",
+      "timestamp": "2026-02-16T13:02:59.845231Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "바보!",
+      "timestamp": "2026-02-16T13:03:08.841870Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "궁금한 것이 있으면 말씀하세요!",
+      "timestamp": "2026-02-16T13:03:09.224462Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "없어!",
+      "timestamp": "2026-02-16T13:03:12.186768Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "궁금한 것이 있으면 말씀하세요!",
+      "timestamp": "2026-02-16T13:03:12.614653Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "아르카디아로 일단 가보자",
+      "timestamp": "2026-02-16T13:03:17.759968Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "궁금한 것이 있으면 말씀하세요!",
+      "timestamp": "2026-02-16T13:03:18.187658Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "go to arcadia",
+      "timestamp": "2026-02-16T13:03:21.680226Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "지역 확인 중...",
+      "timestamp": "2026-02-16T13:03:21.681202Z",
+      "actions": [
+        {
+          "action_id": "37dd9d54",
+          "tool_name": "resolve_region",
+          "description": "Look up Arcadia Planitia",
+          "params": {
+            "query": "Arcadia Planitia"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "bbox": {
+              "min_lat": 33.87,
+              "max_lat": 64.17,
+              "min_lon": 165.86,
+              "max_lon": -149.57
+            },
+            "region_name": "Arcadia Planitia"
+          },
+          "error": null,
+          "started_at": "2026-02-16T13:03:21.681336Z",
+          "completed_at": "2026-02-16T13:03:21.681449Z"
+        }
+      ],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "arcadia's crater",
+      "timestamp": "2026-02-16T13:03:33.304337Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "지역 확인 중...",
+      "timestamp": "2026-02-16T13:03:33.305301Z",
+      "actions": [
+        {
+          "action_id": "5b90c442",
+          "tool_name": "resolve_region",
+          "description": "Look up Arcadia Planitia",
+          "params": {
+            "query": "Arcadia Planitia"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "bbox": {
+              "min_lat": 33.87,
+              "max_lat": 64.17,
+              "min_lon": 165.86,
+              "max_lon": -149.57
+            },
+            "region_name": "Arcadia Planitia"
+          },
+          "error": null,
+          "started_at": "2026-02-16T13:03:33.305428Z",
+          "completed_at": "2026-02-16T13:03:33.305477Z"
+        }
+      ],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "crater",
+      "timestamp": "2026-02-16T13:03:39.041211Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "'crater'에 관심이 있으시군요. 특정 지역에서 Analyze crater morphology, terraces, or dielectric properties를 하고 싶으신가요, 아니면 일반적인 질문인가요?",
+      "timestamp": "2026-02-16T13:03:39.445142Z",
+      "actions": [],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": "Arcadia Planitia",
+  "current_bbox": {
+    "min_lat": 33.87,
+    "max_lat": 64.17,
+    "min_lon": 165.86,
+    "max_lon": -149.57
+  },
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": "analyze_crater",
+  "previous_regions": [],
+  "persona_name": "MARVIS",
+  "pending_actions": [],
+  "tool_context": {
+    "region_bbox": {
+      "min_lat": 33.87,
+      "max_lat": 64.17,
+      "min_lon": 165.86,
+      "max_lon": -149.57
+    },
+    "region_name": "Arcadia Planitia"
+  },
+  "report_markdown": null,
+  "created_at": "2026-02-16T13:02:25.546089Z",
+  "updated_at": "2026-02-16T13:03:39.445315Z"
+}

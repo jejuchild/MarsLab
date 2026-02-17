@@ -1,0 +1,166 @@
+{
+  "session_id": "3f1db5c5-e32e-49c6-8bab-bd490454a347",
+  "state": "active",
+  "language": "ko",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hi, I'm MARVIS — your Mars research assistant. Ask me anything about Mars, or tell me what you'd like to investigate.",
+      "timestamp": "2026-02-16T13:12:00.982418Z",
+      "actions": [],
+      "suggestions": [
+        "What can you do?",
+        "Find ice in Arcadia",
+        "Analyze a crater"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "바보\\!",
+      "timestamp": "2026-02-16T13:12:00.986464Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "궁금한 것이 있으면 말씀하세요!",
+      "timestamp": "2026-02-16T13:12:01.408743Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "없어\\!",
+      "timestamp": "2026-02-16T13:12:01.411436Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "궁금한 것이 있으면 말씀하세요!",
+      "timestamp": "2026-02-16T13:12:01.827929Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "오우~",
+      "timestamp": "2026-02-16T13:12:01.982993Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "궁금한 것이 있으면 말씀하세요!",
+      "timestamp": "2026-02-16T13:12:02.373672Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "hello",
+      "timestamp": "2026-02-16T13:12:02.378622Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "안녕하세요! 화성에서 무엇이 궁금하세요?",
+      "timestamp": "2026-02-16T13:12:02.786076Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "안녕",
+      "timestamp": "2026-02-16T13:12:02.810623Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "안녕하세요! 화성에서 무엇이 궁금하세요?",
+      "timestamp": "2026-02-16T13:12:03.223031Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "ㅋㅋㅋㅋㅋ",
+      "timestamp": "2026-02-16T13:12:03.226665Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "궁금한 것이 있으면 말씀하세요!",
+      "timestamp": "2026-02-16T13:12:03.649231Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": null,
+  "current_bbox": null,
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": null,
+  "previous_regions": [],
+  "persona_name": "MARVIS",
+  "pending_actions": [],
+  "tool_context": {},
+  "report_markdown": null,
+  "created_at": "2026-02-16T13:12:00.982366Z",
+  "updated_at": "2026-02-16T13:12:03.649385Z"
+}

@@ -1,0 +1,144 @@
+{
+  "session_id": "77a4bd23-eb98-496d-9b02-d6e4cacb8528",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hi, I'm MARVIS — your Mars research assistant. Ask me anything about Mars, or tell me what you'd like to investigate.",
+      "timestamp": "2026-02-16T12:58:00.881058Z",
+      "actions": [],
+      "suggestions": [
+        "What can you do?",
+        "Find ice in Arcadia",
+        "Analyze a crater"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "hi",
+      "timestamp": "2026-02-16T12:58:00.884042Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hey there! What are you curious about on Mars?",
+      "timestamp": "2026-02-16T12:58:01.290362Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "what's your name?",
+      "timestamp": "2026-02-16T12:58:01.293112Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hi! I'm MARVIS, your Mars research assistant. Ask me anything about Mars — ice, craters, minerals, or just pick a region to explore.",
+      "timestamp": "2026-02-16T12:58:01.705895Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "how's the weather on mars",
+      "timestamp": "2026-02-16T12:58:01.708618Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "What would you like to explore on Mars? I can help with ice deposits, crater analysis, minerals, and more.",
+      "timestamp": "2026-02-16T12:58:02.132000Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "crater",
+      "timestamp": "2026-02-16T12:58:02.134665Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Interesting — are you looking to analyze crater morphology, terraces, or dielectric properties in a specific region, or is this a general question?",
+      "timestamp": "2026-02-16T12:58:02.535417Z",
+      "actions": [],
+      "suggestions": [
+        "Analyze Jezero crater",
+        "Look at Gale Crater",
+        "Find terraced craters"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "arcadia",
+      "timestamp": "2026-02-16T12:58:02.538184Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Interesting — are you looking to analyze crater morphology, terraces, or dielectric properties in a specific region, or is this a general question?",
+      "timestamp": "2026-02-16T12:58:02.982525Z",
+      "actions": [],
+      "suggestions": [
+        "Analyze Jezero crater",
+        "Look at Gale Crater",
+        "Find terraced craters"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": null,
+  "current_bbox": null,
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": "analyze_crater",
+  "previous_regions": [],
+  "persona_name": "MARVIS",
+  "pending_actions": [],
+  "tool_context": {},
+  "report_markdown": null,
+  "created_at": "2026-02-16T12:58:00.881021Z",
+  "updated_at": "2026-02-16T12:58:02.982689Z"
+}

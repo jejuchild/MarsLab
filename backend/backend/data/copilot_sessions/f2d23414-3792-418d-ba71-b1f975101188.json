@@ -1,0 +1,307 @@
+{
+  "session_id": "f2d23414-3792-418d-ba71-b1f975101188",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hi, I'm MARVIS — your Mars research assistant. Ask me anything about Mars, or tell me what you'd like to investigate.",
+      "timestamp": "2026-02-16T13:01:42.638996Z",
+      "actions": [],
+      "suggestions": [
+        "What can you do?",
+        "Find ice in Arcadia",
+        "Analyze a crater"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "hi",
+      "timestamp": "2026-02-16T13:01:42.648697Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hey there! What are you curious about on Mars?",
+      "timestamp": "2026-02-16T13:01:43.195913Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "what's your name?",
+      "timestamp": "2026-02-16T13:01:43.198340Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hi! I'm MARVIS, your Mars research assistant. Ask me anything about Mars — ice, craters, minerals, or just pick a region to explore.",
+      "timestamp": "2026-02-16T13:01:43.629997Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "how's the weather on mars",
+      "timestamp": "2026-02-16T13:01:43.632402Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Mars averages about -60°C, with thin CO₂ atmosphere (~1% of Earth's pressure). Dust storms can engulf the entire planet. Want to check thermal inertia data for a specific region?",
+      "timestamp": "2026-02-16T13:01:44.044638Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze a crater",
+        "What can you do?"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "crater",
+      "timestamp": "2026-02-16T13:01:44.047478Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Interesting — are you looking to analyze crater morphology, terraces, or dielectric properties in a specific region, or is this a general question?",
+      "timestamp": "2026-02-16T13:01:44.463052Z",
+      "actions": [],
+      "suggestions": [
+        "Analyze Jezero crater",
+        "Look at Gale Crater",
+        "Find terraced craters"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "arcadia",
+      "timestamp": "2026-02-16T13:01:44.465549Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Looking up Arcadia Planitia...",
+      "timestamp": "2026-02-16T13:01:44.466361Z",
+      "actions": [
+        {
+          "action_id": "4ad9ce58",
+          "tool_name": "resolve_region",
+          "description": "Look up Arcadia Planitia",
+          "params": {
+            "query": "Arcadia Planitia"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "bbox": {
+              "min_lat": 33.87,
+              "max_lat": 64.17,
+              "min_lon": 165.86,
+              "max_lon": -149.57
+            },
+            "region_name": "Arcadia Planitia"
+          },
+          "error": null,
+          "started_at": "2026-02-16T13:01:44.466534Z",
+          "completed_at": "2026-02-16T13:01:44.466717Z"
+        }
+      ],
+      "suggestions": [
+        "Analyze Jezero crater",
+        "Look at Gale Crater",
+        "Find terraced craters"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "what can you do?",
+      "timestamp": "2026-02-16T13:01:44.498902Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "I can help you explore Mars orbital data — search for radar subsurface features (SHARAD), analyze mineral compositions (CRISM), study terrain elevation (HiRISE DTM), detect ice deposits, and generate research reports. Just name a region or topic!",
+      "timestamp": "2026-02-16T13:01:44.927569Z",
+      "actions": [],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "is there life on mars?",
+      "timestamp": "2026-02-16T13:01:44.930379Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "No confirmed evidence of life yet, but Mars has habitable potential — especially in subsurface environments. SHARAD radar can help probe those layers.",
+      "timestamp": "2026-02-16T13:01:45.356896Z",
+      "actions": [],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "lol",
+      "timestamp": "2026-02-16T13:01:45.359931Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Ha! Anything else you'd like to explore on Mars?",
+      "timestamp": "2026-02-16T13:01:45.763396Z",
+      "actions": [],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "thanks",
+      "timestamp": "2026-02-16T13:01:45.766433Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "You're welcome! Anything else I can help with?",
+      "timestamp": "2026-02-16T13:01:46.186369Z",
+      "actions": [],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "just exploring",
+      "timestamp": "2026-02-16T13:01:46.189487Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "I'm here if you need anything about Arcadia Planitia. Just ask!",
+      "timestamp": "2026-02-16T13:01:46.595347Z",
+      "actions": [],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "hello again",
+      "timestamp": "2026-02-16T13:01:46.598369Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Hey! We're still working on Arcadia Planitia. What would you like to do next?",
+      "timestamp": "2026-02-16T13:01:47.010639Z",
+      "actions": [],
+      "suggestions": [
+        "Search for elevation data",
+        "Search for radar data"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": "Arcadia Planitia",
+  "current_bbox": {
+    "min_lat": 33.87,
+    "max_lat": 64.17,
+    "min_lon": 165.86,
+    "max_lon": -149.57
+  },
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": "analyze_crater",
+  "previous_regions": [],
+  "persona_name": "MARVIS",
+  "pending_actions": [],
+  "tool_context": {
+    "region_bbox": {
+      "min_lat": 33.87,
+      "max_lat": 64.17,
+      "min_lon": 165.86,
+      "max_lon": -149.57
+    },
+    "region_name": "Arcadia Planitia"
+  },
+  "report_markdown": null,
+  "created_at": "2026-02-16T13:01:42.638928Z",
+  "updated_at": "2026-02-16T13:01:47.010777Z"
+}

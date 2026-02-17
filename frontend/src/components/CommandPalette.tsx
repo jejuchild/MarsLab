@@ -264,11 +264,11 @@ const ACTIONS: CommandAction[] = [
   },
   {
     id: "analysis-assistant",
-    label: "Open Research Assistant",
+    label: "Open MARVIS Agent",
     category: "analysis",
-    icon: "assistant",
-    keywords: ["assistant", "workflow", "research", "plan", "sharad", "ice", "terrace", "approval"],
-    action: { type: "set_analysis", mode: "assistant" },
+    icon: "smart_toy",
+    keywords: ["assistant", "marvis", "agent", "workflow", "research", "plan", "sharad", "ice", "terrace"],
+    action: { type: "set_analysis", mode: "agentic" },
   },
   {
     id: "analysis-report",

@@ -1,0 +1,98 @@
+ASP 3.5.0
+Build ID: 0e5ae643
+Build date: 2025-04-27
+
+/home/cspark/StereoPipeline-3.5.0-2025-04-28-x86_64-Linux/libexec/stereo_pprc ESP_034319_2260_RED.map.cub ESP_034754_2260_RED.map.cub /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run --stereo-algorithm asp_mgm --subpixel-mode 3 --alignment-method none --corr-seed-mode 1 --sgm-collar-size 256 --threads 44 
+
+uname -a
+Linux user 6.14.0-37-generic #37~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Thu Nov 20 10:25:38 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
+cat /proc/meminfo 2>/dev/null | grep MemTotal
+MemTotal:       131866160 kB
+
+cat /proc/cpuinfo 2>/dev/null | tail -n 25
+model		: 79
+model name	: Intel(R) Xeon(R) CPU E5-2699 v4 @ 2.20GHz
+stepping	: 1
+microcode	: 0xb000040
+cpu MHz		: 2799.890
+cache size	: 56320 KB
+physical id	: 1
+siblings	: 22
+core id		: 28
+cpu cores	: 22
+apicid		: 120
+initial apicid	: 120
+fpu		: yes
+fpu_exception	: yes
+cpuid level	: 20
+wp		: yes
+flags		: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 cdp_l3 pti intel_ppin ssbd ibrs ibpb stibp tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm cqm rdt_a rdseed adx smap intel_pt xsaveopt cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local dtherm ida arat pln pts vnmi md_clear flush_l1d
+vmx flags	: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid ple shadow_vmcs pml ept_violation_ve
+bugs		: cpu_meltdown spectre_v1 spectre_v2 spec_store_bypass l1tf mds swapgs taa itlb_multihit mmio_stale_data vmscape
+bogomips	: 4399.82
+clflush size	: 64
+cache_alignment	: 64
+address sizes	: 46 bits physical, 48 bits virtual
+power management:
+
+
+sysctl -a hw 2>/dev/null | grep -E "ncpu|byteorder|memsize|cpufamily|cachesize|mmx|sse|machine|model" | grep -v ipv6
+
+
+
+Vision Workbench log started at 2026-02-16 19:47:55.
+
+2026-02-16 19:47:55 {0} [ console ] : Using session: isis
+2026-02-16 19:47:55 {0} [ console ] : Loading camera model: ESP_034319_2260_RED.map.cub 
+2026-02-16 19:47:55 {0} [ console ] : Loading camera model: ESP_034754_2260_RED.map.cub 
+2026-02-16 19:47:56 {0} [ console ] : Warning: It appears that the input images are map-projected. In that case a DEM needs to be provided for stereo to give correct results.
+2026-02-16 19:47:56 {0} [ console ] : Image files:  ESP_034319_2260_RED.map.cub, ESP_034754_2260_RED.map.cub
+2026-02-16 19:47:56 {0} [ console ] : 	--> Computing statistics for left
+2026-02-16 19:48:19 {0} [ console ] : 	  left: [ lo:0.122025 hi:0.175125 m: 0.148708 s: 0.00779714]
+2026-02-16 19:48:19 {0} [ console ] : 	--> Adjusting hi and lo to -+2 sigmas around mean.
+2026-02-16 19:48:19 {0} [ console ] : 	    left changed: [ lo:0.133114 hi:0.164303]
+2026-02-16 19:48:19 {0} [ console ] : 	--> Computing statistics for right
+2026-02-16 19:48:48 {0} [ console ] : 	  right: [ lo:0.127093 hi:0.194233 m: 0.157056 s: 0.00984324]
+2026-02-16 19:48:48 {0} [ console ] : 	--> Adjusting hi and lo to -+2 sigmas around mean.
+2026-02-16 19:48:48 {0} [ console ] : 	    right changed: [ lo:0.13737 hi:0.176743]
+2026-02-16 19:48:48 {0} [ console ] : 	--> Normalizing globally to: [0.133114 0.176743]
+2026-02-16 19:48:48 {0} [ console ] : 	--> Writing normalized image: /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run-L.tif
+2026-02-16 19:49:25 {0} [ console ] : 	--> Writing normalized image: /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run-R.tif
+2026-02-16 19:50:09 {0} [ console ] : 	--> Generating image masks.
+2026-02-16 19:51:08 {0} [ console ] : Writing masks: /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run-lMask.tif /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run-rMask.tif.
+2026-02-16 19:51:28 {0} [ console ] : 	--> Using cached subsampled images.
+2026-02-16 19:51:28 {0} [ console ] : 	--> Creating previews. Subsampling by 0.0655612 by using a tile of size 64 and 44 threads.
+2026-02-16 19:51:45 {0} [ console ] : Computing interest points matches.
+2026-02-16 19:51:45 {0} [ console ] : 	    * Detecting interest points.
+2026-02-16 19:51:45 {0} [ console ] : 	--> Matching interest points using homography.
+2026-02-16 19:51:45 {0} [ console ] : 	    Looking for IP in left image.
+2026-02-16 19:51:45 {0} [ console ] : 	    Using 50 interest points per tile (1024^2 px).
+2026-02-16 19:51:45 {0} [ console ] : 	    Detecting IP
+2026-02-16 19:52:10 {0} [ console ] : 	    Removing IP near nodata with radius 4
+2026-02-16 19:52:15 {0} [ console ] : 	    Building descriptors
+2026-02-16 19:52:21 {0} [ console ] : 	    Number of interest points: 18527
+2026-02-16 19:52:21 {0} [ console ] : 	    Writing interest points: /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run-L.vwip
+2026-02-16 19:52:21 {0} [ console ] : 	    Looking for IP in right image.
+2026-02-16 19:52:21 {0} [ console ] : 	    Using 50 interest points per tile (1024^2 px).
+2026-02-16 19:52:21 {0} [ console ] : 	    Detecting IP
+2026-02-16 19:52:49 {0} [ console ] : 	    Removing IP near nodata with radius 4
+2026-02-16 19:52:54 {0} [ console ] : 	    Building descriptors
+2026-02-16 19:53:03 {0} [ console ] : 	    Number of interest points: 24997
+2026-02-16 19:53:03 {0} [ console ] : 	    Writing interest points: /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run-R.vwip
+2026-02-16 19:53:03 {0} [ console ] : Elapsed time in ip detection: 78.1962 s.
+2026-02-16 19:53:03 {0} [ console ] : 	--> Uniqueness threshold: 0.8
+2026-02-16 19:53:13 {0} [ console ] : Elapsed time in ip matching: 10.1541 s.
+2026-02-16 19:53:14 {0} [ console ] : 	    Matched points: 7079
+2026-02-16 19:53:14 {0} [ console ] : 	    Filtering interest point matches using homography.
+2026-02-16 19:53:14 {0} [ console ] : 	    Homography ip filter inlier threshold: 200
+2026-02-16 19:53:14 {0} [ console ] : 	    RANSAC iterations:                     1000
+2026-02-16 19:53:15 {0} [ console ] : Homography matrix:
+Matrix3x3((0.999907,0.000180994,158.51)(0.000873357,1.00014,-30.6973)(2.86588e-08,5.35356e-09,1))
+2026-02-16 19:53:15 {0} [ console ] : Number of inliers: 6900.
+2026-02-16 19:53:15 {0} [ console ] : Filtering time: 1.9057 seconds.
+2026-02-16 19:53:15 {0} [ console ] : 	    * Writing match file: /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run-L__R.match
+2026-02-16 19:53:17 {0} [ console ] : Convergence angle percentiles (in degrees) based on interest point matches:
+2026-02-16 19:53:17 {0} [ console ] : 	25% 21.8524, 50% 21.8923, 75% 21.9349.
+2026-02-16 19:53:17 {0} [ console ] : 
+[ 2026-Feb-16 19:53:17 ]: PREPROCESSING FINISHED

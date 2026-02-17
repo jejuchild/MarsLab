@@ -1,0 +1,91 @@
+{
+  "session_id": "1037c3fe-b96b-42ed-841b-e9f83c579c5d",
+  "state": "active",
+  "language": "en",
+  "messages": [
+    {
+      "role": "copilot",
+      "text": "Hello! I'm your Mars research copilot. Tell me what you'd like to investigate — ice deposits, crater morphology, mineral composition, or just pick a region to explore.",
+      "timestamp": "2026-02-16T12:16:09.210903Z",
+      "actions": [],
+      "suggestions": [
+        "Find ice deposits",
+        "Analyze craters",
+        "Explore Arcadia Planitia"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "user",
+      "text": "arcadia",
+      "timestamp": "2026-02-16T12:16:09.288195Z",
+      "actions": [],
+      "suggestions": [],
+      "fly_to": null,
+      "highlight_ids": []
+    },
+    {
+      "role": "copilot",
+      "text": "Looking up Arcadia Planitia...",
+      "timestamp": "2026-02-16T12:16:09.289493Z",
+      "actions": [
+        {
+          "action_id": "78e97ead",
+          "tool_name": "resolve_region",
+          "description": "Look up Arcadia Planitia",
+          "params": {
+            "query": "Arcadia Planitia"
+          },
+          "status": "completed",
+          "requires_confirmation": false,
+          "result": {
+            "success": true,
+            "bbox": {
+              "min_lat": 33.87,
+              "max_lat": 64.17,
+              "min_lon": 165.86,
+              "max_lon": -149.57
+            },
+            "region_name": "Arcadia Planitia"
+          },
+          "error": null,
+          "started_at": "2026-02-16T12:16:09.289619Z",
+          "completed_at": "2026-02-16T12:16:09.289703Z"
+        }
+      ],
+      "suggestions": [
+        "Explore Arcadia Planitia",
+        "Explore Jezero",
+        "Explore Deuteronilus Mensae"
+      ],
+      "fly_to": null,
+      "highlight_ids": []
+    }
+  ],
+  "current_region": "Arcadia Planitia",
+  "current_bbox": {
+    "min_lat": 33.87,
+    "max_lat": 64.17,
+    "min_lon": 165.86,
+    "max_lon": -149.57
+  },
+  "selected_feature": null,
+  "loaded_instruments": [],
+  "loaded_products": {},
+  "analysis_results": {},
+  "research_goal": "general_survey",
+  "pending_actions": [],
+  "tool_context": {
+    "region_bbox": {
+      "min_lat": 33.87,
+      "max_lat": 64.17,
+      "min_lon": 165.86,
+      "max_lon": -149.57
+    },
+    "region_name": "Arcadia Planitia"
+  },
+  "report_markdown": null,
+  "created_at": "2026-02-16T12:16:09.210854Z",
+  "updated_at": "2026-02-16T12:16:09.297092Z"
+}

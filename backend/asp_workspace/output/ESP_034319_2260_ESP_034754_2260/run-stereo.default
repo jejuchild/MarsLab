@@ -1,0 +1,4 @@
+# ASP stereo configuration copy
+# 2026-Feb-16 22:35:31
+# > /home/cspark/StereoPipeline-3.5.0-2025-04-28-x86_64-Linux/libexec/stereo_parse ESP_034319_2260_RED.map.cub ESP_034754_2260_RED.map.cub /disk1/cspark/MarsLab/backend/asp_workspace/output/ESP_034319_2260_ESP_034754_2260/run --stereo-algorithm asp_mgm --subpixel-mode 3 --alignment-method none --corr-seed-mode 1 --sgm-collar-size 256 --parallel-tile-size 2048 2048
+

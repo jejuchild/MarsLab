@@ -1,0 +1,5799 @@
+{
+  "sharad_product": "R_6777202_001_SS4_700_A",
+  "buffer_km": 30,
+  "dtms_found": 1,
+  "dtms": [
+    {
+      "filename": "DTEEC_072039_2190_072250_2190_A01.IMG",
+      "title": "Terraced Crater in Utopia Planitia",
+      "center_lat": 38.55863391708773,
+      "center_lon": 87.94813741429475,
+      "distance_km": 11.7
+    }
+  ],
+  "terrace_analysis": [
+    {
+      "dtm_file": "DTEEC_072039_2190_072250_2190_A01.IMG",
+      "crater_center": [
+        38.55036948727705,
+        87.94308773749383
+      ],
+      "crater_radius_m": 320.0,
+      "n_terraces_median": 4,
+      "terrace_depths": [
+        {
+          "metric": "upper_to_lower_terrace",
+          "depth_m": 1.0,
+          "uncertainty_m": 4.6,
+          "upper_elev_m": -3934.7,
+          "lower_elev_m": -3933.7,
+          "n_azimuth_samples": 27
+        },
+        {
+          "metric": "terrace_to_floor",
+          "depth_m": 83.9,
+          "uncertainty_m": 2.0,
+          "terrace_elev_m": -3933.7,
+          "floor_elev_m": -4017.6,
+          "n_azimuth_samples": 35
+        },
+        {
+          "metric": "rim_to_terrace",
+          "depth_m": 2.2,
+          "uncertainty_m": 2.0,
+          "rim_elev_m": -3931.5,
+          "terrace_elev_m": -3933.7,
+          "n_azimuth_samples": 35
+        }
+      ],
+      "error": null
+    }
+  ],
+  "sharad_picks": [
+    {
+      "dtm_file": "DTEEC_072039_2190_072250_2190_A01.IMG",
+      "crater_lat": 38.55036948727705,
+      "crater_lon": 87.94308773749383,
+      "n_picks": 635,
+      "median_twt_us": 1.0875,
+      "twt_unc_us": 0.4153,
+      "error": null,
+      "picks": [
+        {
+          "trace_idx": 18462,
+          "lat": 38.80443429686702,
+          "lon": 87.95196040217668,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 6.72,
+          "distance_to_crater_km": 15.04
+        },
+        {
+          "trace_idx": 18463,
+          "lat": 38.803829071221514,
+          "lon": 87.95186577209955,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 6.75,
+          "distance_to_crater_km": 15.0
+        },
+        {
+          "trace_idx": 18464,
+          "lat": 38.80322384531438,
+          "lon": 87.95177114324089,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.58,
+          "distance_to_crater_km": 14.96
+        },
+        {
+          "trace_idx": 18465,
+          "lat": 38.80261942719141,
+          "lon": 87.95167664125135,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 8.88,
+          "distance_to_crater_km": 14.93
+        },
+        {
+          "trace_idx": 18466,
+          "lat": 38.802014200761384,
+          "lon": 87.95158201399461,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 8.66,
+          "distance_to_crater_km": 14.89
+        },
+        {
+          "trace_idx": 18467,
+          "lat": 38.80140897406974,
+          "lon": 87.95148738753939,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.18,
+          "distance_to_crater_km": 14.86
+        },
+        {
+          "trace_idx": 18476,
+          "lat": 38.79596434622077,
+          "lon": 87.95063616283703,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 6.85,
+          "distance_to_crater_km": 14.53
+        },
+        {
+          "trace_idx": 18477,
+          "lat": 38.79535911691395,
+          "lon": 87.9505415443916,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 8.8,
+          "distance_to_crater_km": 14.5
+        },
+        {
+          "trace_idx": 18478,
+          "lat": 38.79475388734553,
+          "lon": 87.95044692591352,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 9.96,
+          "distance_to_crater_km": 14.46
+        },
+        {
+          "trace_idx": 18479,
+          "lat": 38.79414865751548,
+          "lon": 87.95035230948722,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 10.39,
+          "distance_to_crater_km": 14.43
+        },
+        {
+          "trace_idx": 18480,
+          "lat": 38.79354423547483,
+          "lon": 87.95025781991355,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 10.72,
+          "distance_to_crater_km": 14.39
+        },
+        {
+          "trace_idx": 18481,
+          "lat": 38.792939005121916,
+          "lon": 87.9501632038376,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 10.45,
+          "distance_to_crater_km": 14.35
+        },
+        {
+          "trace_idx": 18482,
+          "lat": 38.79233377450737,
+          "lon": 87.95006858939645,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 10.22,
+          "distance_to_crater_km": 14.32
+        },
+        {
+          "trace_idx": 18483,
+          "lat": 38.791729351683294,
+          "lon": 87.94997410222152,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 8.73,
+          "distance_to_crater_km": 14.28
+        },
+        {
+          "trace_idx": 18484,
+          "lat": 38.79112412054587,
+          "lon": 87.94987948854747,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 7.92,
+          "distance_to_crater_km": 14.25
+        },
+        {
+          "trace_idx": 18485,
+          "lat": 38.79051888914682,
+          "lon": 87.94978487650809,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 6.65,
+          "distance_to_crater_km": 14.21
+        },
+        {
+          "trace_idx": 18498,
+          "lat": 38.78265408938203,
+          "lon": 87.9485554961613,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 8.61,
+          "distance_to_crater_km": 13.74
+        },
+        {
+          "trace_idx": 18499,
+          "lat": 38.78204885432187,
+          "lon": 87.94846089532727,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 12.37,
+          "distance_to_crater_km": 13.71
+        },
+        {
+          "trace_idx": 18500,
+          "lat": 38.78144361900009,
+          "lon": 87.9483662952937,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 15.78,
+          "distance_to_crater_km": 13.67
+        },
+        {
+          "trace_idx": 18501,
+          "lat": 38.78083919147507,
+          "lon": 87.94827182208968,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 19.43,
+          "distance_to_crater_km": 13.64
+        },
+        {
+          "trace_idx": 18502,
+          "lat": 38.78023395563043,
+          "lon": 87.94817722365588,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 23.69,
+          "distance_to_crater_km": 13.6
+        },
+        {
+          "trace_idx": 18503,
+          "lat": 38.7796287195242,
+          "lon": 87.94808262560554,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 27.33,
+          "distance_to_crater_km": 13.56
+        },
+        {
+          "trace_idx": 18504,
+          "lat": 38.77902348315635,
+          "lon": 87.94798802877243,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 28.51,
+          "distance_to_crater_km": 13.53
+        },
+        {
+          "trace_idx": 18505,
+          "lat": 38.77841905458667,
+          "lon": 87.94789355876445,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 34.6,
+          "distance_to_crater_km": 13.49
+        },
+        {
+          "trace_idx": 18506,
+          "lat": 38.77781381769597,
+          "lon": 87.94779896353086,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 39.26,
+          "distance_to_crater_km": 13.46
+        },
+        {
+          "trace_idx": 18507,
+          "lat": 38.77720858054368,
+          "lon": 87.94770436909748,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 45.59,
+          "distance_to_crater_km": 13.42
+        },
+        {
+          "trace_idx": 18508,
+          "lat": 38.77660415119058,
+          "lon": 87.94760990148599,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 43.86,
+          "distance_to_crater_km": 13.39
+        },
+        {
+          "trace_idx": 18509,
+          "lat": 38.77599891351543,
+          "lon": 87.94751530823505,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 41.99,
+          "distance_to_crater_km": 13.35
+        },
+        {
+          "trace_idx": 18510,
+          "lat": 38.7753936737909,
+          "lon": 87.94742071605893,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 31.83,
+          "distance_to_crater_km": 13.31
+        },
+        {
+          "trace_idx": 18511,
+          "lat": 38.77478924365443,
+          "lon": 87.9473262508436,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 27.41,
+          "distance_to_crater_km": 13.28
+        },
+        {
+          "trace_idx": 18512,
+          "lat": 38.77418400519481,
+          "lon": 87.94723166040885,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 21.64,
+          "distance_to_crater_km": 13.24
+        },
+        {
+          "trace_idx": 18513,
+          "lat": 38.77357876647361,
+          "lon": 87.94713707077418,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.18,
+          "distance_to_crater_km": 13.21
+        },
+        {
+          "trace_idx": 18514,
+          "lat": 38.77297352749083,
+          "lon": 87.9470424819395,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 13.04,
+          "distance_to_crater_km": 13.17
+        },
+        {
+          "trace_idx": 18515,
+          "lat": 38.772369096309696,
+          "lon": 87.94694801950213,
+          "delta_bins": 50,
+          "twt_us": 1.875,
+          "snr": 11.31,
+          "distance_to_crater_km": 13.13
+        },
+        {
+          "trace_idx": 18516,
+          "lat": 38.77176385680405,
+          "lon": 87.94685343226638,
+          "delta_bins": 50,
+          "twt_us": 1.875,
+          "snr": 12.07,
+          "distance_to_crater_km": 13.1
+        },
+        {
+          "trace_idx": 18517,
+          "lat": 38.77115861703681,
+          "lon": 87.94675884583056,
+          "delta_bins": 50,
+          "twt_us": 1.875,
+          "snr": 10.62,
+          "distance_to_crater_km": 13.06
+        },
+        {
+          "trace_idx": 18518,
+          "lat": 38.77055418507228,
+          "lon": 87.94666438620561,
+          "delta_bins": 50,
+          "twt_us": 1.875,
+          "snr": 9.25,
+          "distance_to_crater_km": 13.03
+        },
+        {
+          "trace_idx": 18519,
+          "lat": 38.769948944782236,
+          "lon": 87.94656980136847,
+          "delta_bins": 50,
+          "twt_us": 1.875,
+          "snr": 7.75,
+          "distance_to_crater_km": 12.99
+        },
+        {
+          "trace_idx": 18520,
+          "lat": 38.76934370423055,
+          "lon": 87.94647521733121,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.67,
+          "distance_to_crater_km": 12.96
+        },
+        {
+          "trace_idx": 18521,
+          "lat": 38.76873927148264,
+          "lon": 87.94638076010153,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.99,
+          "distance_to_crater_km": 12.92
+        },
+        {
+          "trace_idx": 18522,
+          "lat": 38.768134030408135,
+          "lon": 87.94628617724591,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.8,
+          "distance_to_crater_km": 12.88
+        },
+        {
+          "trace_idx": 18523,
+          "lat": 38.76752878907203,
+          "lon": 87.94619159560693,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.81,
+          "distance_to_crater_km": 12.85
+        },
+        {
+          "trace_idx": 18524,
+          "lat": 38.76692354747437,
+          "lon": 87.94609701393387,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.22,
+          "distance_to_crater_km": 12.81
+        },
+        {
+          "trace_idx": 18525,
+          "lat": 38.76631911368182,
+          "lon": 87.94600256031467,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 6.68,
+          "distance_to_crater_km": 12.78
+        },
+        {
+          "trace_idx": 18526,
+          "lat": 38.765713871561296,
+          "lon": 87.94590798107369,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.17,
+          "distance_to_crater_km": 12.74
+        },
+        {
+          "trace_idx": 18527,
+          "lat": 38.765108629179196,
+          "lon": 87.94581340221546,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 7.3,
+          "distance_to_crater_km": 12.7
+        },
+        {
+          "trace_idx": 18528,
+          "lat": 38.7645041946033,
+          "lon": 87.94571895099085,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 7.79,
+          "distance_to_crater_km": 12.67
+        },
+        {
+          "trace_idx": 18529,
+          "lat": 38.76389895169836,
+          "lon": 87.9456243741476,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 10.3,
+          "distance_to_crater_km": 12.63
+        },
+        {
+          "trace_idx": 18530,
+          "lat": 38.763293708531826,
+          "lon": 87.94552979768702,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 12.34,
+          "distance_to_crater_km": 12.6
+        },
+        {
+          "trace_idx": 18531,
+          "lat": 38.7626884651037,
+          "lon": 87.94543522202592,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 14.12,
+          "distance_to_crater_km": 12.56
+        },
+        {
+          "trace_idx": 18532,
+          "lat": 38.7620840294832,
+          "lon": 87.94534077399409,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 15.3,
+          "distance_to_crater_km": 12.53
+        },
+        {
+          "trace_idx": 18533,
+          "lat": 38.76147878553226,
+          "lon": 87.94524619993084,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 15.8,
+          "distance_to_crater_km": 12.49
+        },
+        {
+          "trace_idx": 18534,
+          "lat": 38.76087354131974,
+          "lon": 87.9451516270839,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.02,
+          "distance_to_crater_km": 12.45
+        },
+        {
+          "trace_idx": 18535,
+          "lat": 38.76026910491585,
+          "lon": 87.94505718144606,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 14.47,
+          "distance_to_crater_km": 12.42
+        },
+        {
+          "trace_idx": 18536,
+          "lat": 38.75966386018052,
+          "lon": 87.94496260977989,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 11.49,
+          "distance_to_crater_km": 12.38
+        },
+        {
+          "trace_idx": 18544,
+          "lat": 38.7548235090275,
+          "lon": 87.94420631969143,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 12.54,
+          "distance_to_crater_km": 12.1
+        },
+        {
+          "trace_idx": 18545,
+          "lat": 38.75421907001235,
+          "lon": 87.94411188161502,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 22.09,
+          "distance_to_crater_km": 12.06
+        },
+        {
+          "trace_idx": 18546,
+          "lat": 38.753613822662224,
+          "lon": 87.9440173183544,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 32.76,
+          "distance_to_crater_km": 12.02
+        },
+        {
+          "trace_idx": 18547,
+          "lat": 38.75300857505052,
+          "lon": 87.94392275589279,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 40.84,
+          "distance_to_crater_km": 11.99
+        },
+        {
+          "trace_idx": 18548,
+          "lat": 38.752404135252036,
+          "lon": 87.94382832062598,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 45.24,
+          "distance_to_crater_km": 11.95
+        },
+        {
+          "trace_idx": 18549,
+          "lat": 38.75179888711753,
+          "lon": 87.94373375934438,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 41.14,
+          "distance_to_crater_km": 11.92
+        },
+        {
+          "trace_idx": 18550,
+          "lat": 38.751193638721446,
+          "lon": 87.9436391988617,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 36.42,
+          "distance_to_crater_km": 11.88
+        },
+        {
+          "trace_idx": 18551,
+          "lat": 38.75058839006378,
+          "lon": 87.94354463959479,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 26.96,
+          "distance_to_crater_km": 11.84
+        },
+        {
+          "trace_idx": 18552,
+          "lat": 38.74998394922074,
+          "lon": 87.94345020710142,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 18.47,
+          "distance_to_crater_km": 11.81
+        },
+        {
+          "trace_idx": 18553,
+          "lat": 38.74937870004028,
+          "lon": 87.94335564943114,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 15.34,
+          "distance_to_crater_km": 11.77
+        },
+        {
+          "trace_idx": 18554,
+          "lat": 38.74877345059824,
+          "lon": 87.94326109255967,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 9.28,
+          "distance_to_crater_km": 11.74
+        },
+        {
+          "trace_idx": 18555,
+          "lat": 38.74816820089464,
+          "lon": 87.9431665360701,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 10.24,
+          "distance_to_crater_km": 11.7
+        },
+        {
+          "trace_idx": 18561,
+          "lat": 38.7445383133386,
+          "lon": 87.94259946833654,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 35.07,
+          "distance_to_crater_km": 11.49
+        },
+        {
+          "trace_idx": 18562,
+          "lat": 38.74393306180469,
+          "lon": 87.94250491743536,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 31.77,
+          "distance_to_crater_km": 11.45
+        },
+        {
+          "trace_idx": 18563,
+          "lat": 38.743328618089215,
+          "lon": 87.94241049371256,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 30.47,
+          "distance_to_crater_km": 11.42
+        },
+        {
+          "trace_idx": 18564,
+          "lat": 38.7427233660325,
+          "lon": 87.94231594482423,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 29.06,
+          "distance_to_crater_km": 11.38
+        },
+        {
+          "trace_idx": 18565,
+          "lat": 38.74211811371425,
+          "lon": 87.94222139631746,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 23.98,
+          "distance_to_crater_km": 11.34
+        },
+        {
+          "trace_idx": 18566,
+          "lat": 38.741513669215465,
+          "lon": 87.94212697498581,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 19.11,
+          "distance_to_crater_km": 11.31
+        },
+        {
+          "trace_idx": 18567,
+          "lat": 38.74090841637441,
+          "lon": 87.94203242890859,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 14.31,
+          "distance_to_crater_km": 11.27
+        },
+        {
+          "trace_idx": 18568,
+          "lat": 38.74030316327179,
+          "lon": 87.941937882796,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 8.79,
+          "distance_to_crater_km": 11.24
+        },
+        {
+          "trace_idx": 18569,
+          "lat": 38.73969790990761,
+          "lon": 87.9418433378986,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 6.82,
+          "distance_to_crater_km": 11.2
+        },
+        {
+          "trace_idx": 18570,
+          "lat": 38.739093464364295,
+          "lon": 87.94174891975506,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 6.4,
+          "distance_to_crater_km": 11.16
+        },
+        {
+          "trace_idx": 18571,
+          "lat": 38.738488210477314,
+          "lon": 87.94165437603633,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 8.52,
+          "distance_to_crater_km": 11.13
+        },
+        {
+          "trace_idx": 18572,
+          "lat": 38.73788295632878,
+          "lon": 87.94155983353272,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 9.51,
+          "distance_to_crater_km": 11.09
+        },
+        {
+          "trace_idx": 18573,
+          "lat": 38.73727851000218,
+          "lon": 87.94146541777965,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 11.35,
+          "distance_to_crater_km": 11.06
+        },
+        {
+          "trace_idx": 18574,
+          "lat": 38.736673255330864,
+          "lon": 87.94137087687142,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 12.79,
+          "distance_to_crater_km": 11.02
+        },
+        {
+          "trace_idx": 18575,
+          "lat": 38.736068000398,
+          "lon": 87.94127633676132,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.65,
+          "distance_to_crater_km": 10.99
+        },
+        {
+          "trace_idx": 18576,
+          "lat": 38.73546274520355,
+          "lon": 87.94118179703246,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 18.27,
+          "distance_to_crater_km": 10.95
+        },
+        {
+          "trace_idx": 18577,
+          "lat": 38.73485829783245,
+          "lon": 87.94108738446666,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 20.3,
+          "distance_to_crater_km": 10.91
+        },
+        {
+          "trace_idx": 18578,
+          "lat": 38.73425304211525,
+          "lon": 87.9409928467498,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 22.14,
+          "distance_to_crater_km": 10.88
+        },
+        {
+          "trace_idx": 18579,
+          "lat": 38.73364778613645,
+          "lon": 87.94089830941411,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 20.9,
+          "distance_to_crater_km": 10.84
+        },
+        {
+          "trace_idx": 18580,
+          "lat": 38.73304252989612,
+          "lon": 87.9408037732933,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 20.55,
+          "distance_to_crater_km": 10.81
+        },
+        {
+          "trace_idx": 18581,
+          "lat": 38.73243808148054,
+          "lon": 87.94070936433111,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 19.2,
+          "distance_to_crater_km": 10.77
+        },
+        {
+          "trace_idx": 18582,
+          "lat": 38.731832824717415,
+          "lon": 87.94061482938827,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 18.67,
+          "distance_to_crater_km": 10.74
+        },
+        {
+          "trace_idx": 18583,
+          "lat": 38.731227567692756,
+          "lon": 87.94052029524335,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 17.89,
+          "distance_to_crater_km": 10.7
+        },
+        {
+          "trace_idx": 18584,
+          "lat": 38.730623118493874,
+          "lon": 87.94042588867067,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 16.57,
+          "distance_to_crater_km": 10.66
+        },
+        {
+          "trace_idx": 18585,
+          "lat": 38.73001786094645,
+          "lon": 87.94033135612041,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 15.73,
+          "distance_to_crater_km": 10.63
+        },
+        {
+          "trace_idx": 18586,
+          "lat": 38.729412603137476,
+          "lon": 87.94023682478486,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 14.67,
+          "distance_to_crater_km": 10.59
+        },
+        {
+          "trace_idx": 18587,
+          "lat": 38.72880734506692,
+          "lon": 87.9401422942471,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 13.76,
+          "distance_to_crater_km": 10.56
+        },
+        {
+          "trace_idx": 18588,
+          "lat": 38.72820289482355,
+          "lon": 87.94004789086034,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 11.84,
+          "distance_to_crater_km": 10.52
+        },
+        {
+          "trace_idx": 18589,
+          "lat": 38.72759763623026,
+          "lon": 87.93995336150012,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 8.87,
+          "distance_to_crater_km": 10.49
+        },
+        {
+          "trace_idx": 18590,
+          "lat": 38.726992377375396,
+          "lon": 87.93985883293762,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 6.53,
+          "distance_to_crater_km": 10.45
+        },
+        {
+          "trace_idx": 18591,
+          "lat": 38.72638792634878,
+          "lon": 87.9397644315228,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 6.27,
+          "distance_to_crater_km": 10.41
+        },
+        {
+          "trace_idx": 18592,
+          "lat": 38.725782666971156,
+          "lon": 87.93966990497144,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 8.03,
+          "distance_to_crater_km": 10.38
+        },
+        {
+          "trace_idx": 18593,
+          "lat": 38.72517740733198,
+          "lon": 87.93957537921767,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 8.2,
+          "distance_to_crater_km": 10.34
+        },
+        {
+          "trace_idx": 18594,
+          "lat": 38.72457214743126,
+          "lon": 87.93948085426149,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 7.99,
+          "distance_to_crater_km": 10.31
+        },
+        {
+          "trace_idx": 18595,
+          "lat": 38.72396769536019,
+          "lon": 87.93938645603171,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 7.73,
+          "distance_to_crater_km": 10.27
+        },
+        {
+          "trace_idx": 18596,
+          "lat": 38.7233624349367,
+          "lon": 87.93929193225266,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 7.16,
+          "distance_to_crater_km": 10.24
+        },
+        {
+          "trace_idx": 18597,
+          "lat": 38.72275717425169,
+          "lon": 87.93919740968796,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.77,
+          "distance_to_crater_km": 10.2
+        },
+        {
+          "trace_idx": 18598,
+          "lat": 38.72215272139733,
+          "lon": 87.9391030138464,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.36,
+          "distance_to_crater_km": 10.16
+        },
+        {
+          "trace_idx": 18599,
+          "lat": 38.72154746018956,
+          "lon": 87.93900849287554,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 14.33,
+          "distance_to_crater_km": 10.13
+        },
+        {
+          "trace_idx": 18600,
+          "lat": 38.720942198720245,
+          "lon": 87.93891397270204,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 13.37,
+          "distance_to_crater_km": 10.09
+        },
+        {
+          "trace_idx": 18601,
+          "lat": 38.72033774508263,
+          "lon": 87.93881957924843,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 12.06,
+          "distance_to_crater_km": 10.06
+        },
+        {
+          "trace_idx": 18602,
+          "lat": 38.719732483090574,
+          "lon": 87.93872506025168,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 8.79,
+          "distance_to_crater_km": 10.02
+        },
+        {
+          "trace_idx": 18603,
+          "lat": 38.71912722083695,
+          "lon": 87.93863054246916,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 6.68,
+          "distance_to_crater_km": 9.99
+        },
+        {
+          "trace_idx": 18622,
+          "lat": 38.70763203692862,
+          "lon": 87.93683561019827,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 4.65,
+          "distance_to_crater_km": 9.31
+        },
+        {
+          "trace_idx": 18623,
+          "lat": 38.70702676944628,
+          "lon": 87.93674110834903,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 5.25,
+          "distance_to_crater_km": 9.27
+        },
+        {
+          "trace_idx": 18624,
+          "lat": 38.7064215017024,
+          "lon": 87.93664660687953,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 6.09,
+          "distance_to_crater_km": 9.24
+        },
+        {
+          "trace_idx": 18625,
+          "lat": 38.70581704179863,
+          "lon": 87.93655223252055,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 6.56,
+          "distance_to_crater_km": 9.2
+        },
+        {
+          "trace_idx": 18626,
+          "lat": 38.70521177353203,
+          "lon": 87.93645773306012,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 7.07,
+          "distance_to_crater_km": 9.17
+        },
+        {
+          "trace_idx": 18627,
+          "lat": 38.704606505003895,
+          "lon": 87.93636323439628,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 7.38,
+          "distance_to_crater_km": 9.13
+        },
+        {
+          "trace_idx": 18628,
+          "lat": 38.704002044316915,
+          "lon": 87.93626886242276,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 8.05,
+          "distance_to_crater_km": 9.09
+        },
+        {
+          "trace_idx": 18629,
+          "lat": 38.70339677526608,
+          "lon": 87.9361743653509,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 7.38,
+          "distance_to_crater_km": 9.06
+        },
+        {
+          "trace_idx": 18630,
+          "lat": 38.702791505953684,
+          "lon": 87.93607986865864,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 7.77,
+          "distance_to_crater_km": 9.02
+        },
+        {
+          "trace_idx": 18631,
+          "lat": 38.70218623637979,
+          "lon": 87.9359853727628,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 7.62,
+          "distance_to_crater_km": 8.99
+        },
+        {
+          "trace_idx": 18632,
+          "lat": 38.70158177464842,
+          "lon": 87.9358910043867,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 7.88,
+          "distance_to_crater_km": 8.95
+        },
+        {
+          "trace_idx": 18637,
+          "lat": 38.69855622965582,
+          "lon": 87.93541866796448,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 9.95,
+          "distance_to_crater_km": 8.77
+        },
+        {
+          "trace_idx": 18638,
+          "lat": 38.69795095825191,
+          "lon": 87.93532417805773,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 12.31,
+          "distance_to_crater_km": 8.74
+        },
+        {
+          "trace_idx": 18639,
+          "lat": 38.697346494693,
+          "lon": 87.93522981524613,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 14.4,
+          "distance_to_crater_km": 8.7
+        },
+        {
+          "trace_idx": 18640,
+          "lat": 38.696741222766384,
+          "lon": 87.93513532693068,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.62,
+          "distance_to_crater_km": 8.67
+        },
+        {
+          "trace_idx": 18641,
+          "lat": 38.69613595057824,
+          "lon": 87.9350408389945,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 28.82,
+          "distance_to_crater_km": 8.63
+        },
+        {
+          "trace_idx": 18642,
+          "lat": 38.695531486236135,
+          "lon": 87.9349464785671,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 30.36,
+          "distance_to_crater_km": 8.6
+        },
+        {
+          "trace_idx": 18643,
+          "lat": 38.69492621352529,
+          "lon": 87.93485199222202,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 32.04,
+          "distance_to_crater_km": 8.56
+        },
+        {
+          "trace_idx": 18644,
+          "lat": 38.69432094055292,
+          "lon": 87.93475750667302,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 31.12,
+          "distance_to_crater_km": 8.52
+        },
+        {
+          "trace_idx": 18645,
+          "lat": 38.69371566731902,
+          "lon": 87.93466302192006,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 26.12,
+          "distance_to_crater_km": 8.49
+        },
+        {
+          "trace_idx": 18646,
+          "lat": 38.693111201932574,
+          "lon": 87.93456866508838,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 22.16,
+          "distance_to_crater_km": 8.45
+        },
+        {
+          "trace_idx": 18647,
+          "lat": 38.69250592817598,
+          "lon": 87.93447418192629,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 18.07,
+          "distance_to_crater_km": 8.42
+        },
+        {
+          "trace_idx": 18648,
+          "lat": 38.69190065415786,
+          "lon": 87.93437969956011,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 11.96,
+          "distance_to_crater_km": 8.38
+        },
+        {
+          "trace_idx": 18649,
+          "lat": 38.69129618798825,
+          "lon": 87.93428534469511,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.49,
+          "distance_to_crater_km": 8.35
+        },
+        {
+          "trace_idx": 18650,
+          "lat": 38.69069091344743,
+          "lon": 87.93419086391967,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 7.68,
+          "distance_to_crater_km": 8.31
+        },
+        {
+          "trace_idx": 18651,
+          "lat": 38.690085638645115,
+          "lon": 87.93409638435693,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 7.96,
+          "distance_to_crater_km": 8.28
+        },
+        {
+          "trace_idx": 18652,
+          "lat": 38.68948036358127,
+          "lon": 87.93400190517315,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 7.83,
+          "distance_to_crater_km": 8.24
+        },
+        {
+          "trace_idx": 18653,
+          "lat": 38.68887589636733,
+          "lon": 87.93390755306923,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 7.32,
+          "distance_to_crater_km": 8.2
+        },
+        {
+          "trace_idx": 18654,
+          "lat": 38.68827062078078,
+          "lon": 87.93381307630966,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 6.66,
+          "distance_to_crater_km": 8.17
+        },
+        {
+          "trace_idx": 18655,
+          "lat": 38.687665344932725,
+          "lon": 87.93371859951203,
+          "delta_bins": 57,
+          "twt_us": 2.1374999999999997,
+          "snr": 6.74,
+          "distance_to_crater_km": 8.13
+        },
+        {
+          "trace_idx": 18656,
+          "lat": 38.68706087693563,
+          "lon": 87.93362424979104,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 8.97,
+          "distance_to_crater_km": 8.1
+        },
+        {
+          "trace_idx": 18657,
+          "lat": 38.68645560056489,
+          "lon": 87.93352977500057,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 11.23,
+          "distance_to_crater_km": 8.06
+        },
+        {
+          "trace_idx": 18658,
+          "lat": 38.68585032393264,
+          "lon": 87.93343530058887,
+          "delta_bins": 56,
+          "twt_us": 2.1,
+          "snr": 10.04,
+          "distance_to_crater_km": 8.03
+        },
+        {
+          "trace_idx": 18659,
+          "lat": 38.685245047038876,
+          "lon": 87.93334082738963,
+          "delta_bins": 56,
+          "twt_us": 2.1,
+          "snr": 10.32,
+          "distance_to_crater_km": 7.99
+        },
+        {
+          "trace_idx": 18660,
+          "lat": 38.68464057799745,
+          "lon": 87.93324648084577,
+          "delta_bins": 56,
+          "twt_us": 2.1,
+          "snr": 10.42,
+          "distance_to_crater_km": 7.96
+        },
+        {
+          "trace_idx": 18661,
+          "lat": 38.684035300581,
+          "lon": 87.93315200923658,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 11.25,
+          "distance_to_crater_km": 7.92
+        },
+        {
+          "trace_idx": 18662,
+          "lat": 38.68343002290304,
+          "lon": 87.93305753842289,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 12.4,
+          "distance_to_crater_km": 7.89
+        },
+        {
+          "trace_idx": 18663,
+          "lat": 38.682824744963554,
+          "lon": 87.93296306840467,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 13.7,
+          "distance_to_crater_km": 7.85
+        },
+        {
+          "trace_idx": 18664,
+          "lat": 38.682220274877835,
+          "lon": 87.93286872462056,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 14.76,
+          "distance_to_crater_km": 7.81
+        },
+        {
+          "trace_idx": 18665,
+          "lat": 38.68161499641569,
+          "lon": 87.93277425619215,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 14.58,
+          "distance_to_crater_km": 7.78
+        },
+        {
+          "trace_idx": 18666,
+          "lat": 38.681009717692014,
+          "lon": 87.93267978855911,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 15.04,
+          "distance_to_crater_km": 7.74
+        },
+        {
+          "trace_idx": 18667,
+          "lat": 38.68040524682315,
+          "lon": 87.93258544757379,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 13.02,
+          "distance_to_crater_km": 7.71
+        },
+        {
+          "trace_idx": 18668,
+          "lat": 38.67979996757681,
+          "lon": 87.93249098153036,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 12.05,
+          "distance_to_crater_km": 7.67
+        },
+        {
+          "trace_idx": 18669,
+          "lat": 38.67919468806897,
+          "lon": 87.93239651628222,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 10.57,
+          "distance_to_crater_km": 7.64
+        },
+        {
+          "trace_idx": 18677,
+          "lat": 38.67435405883153,
+          "lon": 87.93164107335684,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 9.2,
+          "distance_to_crater_km": 7.35
+        },
+        {
+          "trace_idx": 18678,
+          "lat": 38.67374958509095,
+          "lon": 87.9315467415204,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 10.77,
+          "distance_to_crater_km": 7.32
+        },
+        {
+          "trace_idx": 18679,
+          "lat": 38.6731443029691,
+          "lon": 87.93145228422034,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 16.42,
+          "distance_to_crater_km": 7.28
+        },
+        {
+          "trace_idx": 18680,
+          "lat": 38.672539020585724,
+          "lon": 87.93135782729833,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 23.52,
+          "distance_to_crater_km": 7.25
+        },
+        {
+          "trace_idx": 18681,
+          "lat": 38.67193454606206,
+          "lon": 87.9312634978425,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 31.6,
+          "distance_to_crater_km": 7.21
+        },
+        {
+          "trace_idx": 18682,
+          "lat": 38.67132926315603,
+          "lon": 87.93116904292613,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 35.65,
+          "distance_to_crater_km": 7.18
+        },
+        {
+          "trace_idx": 18683,
+          "lat": 38.67072397998849,
+          "lon": 87.93107458797088,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 17.16,
+          "distance_to_crater_km": 7.14
+        },
+        {
+          "trace_idx": 18684,
+          "lat": 38.67011869655947,
+          "lon": 87.93098013464422,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 20.04,
+          "distance_to_crater_km": 7.11
+        },
+        {
+          "trace_idx": 18685,
+          "lat": 38.669514220991545,
+          "lon": 87.93088580836252,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 36.26,
+          "distance_to_crater_km": 7.07
+        },
+        {
+          "trace_idx": 18686,
+          "lat": 38.66890893703985,
+          "lon": 87.93079135662435,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 38.22,
+          "distance_to_crater_km": 7.04
+        },
+        {
+          "trace_idx": 18687,
+          "lat": 38.66830365282667,
+          "lon": 87.93069690526407,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 34.15,
+          "distance_to_crater_km": 7.0
+        },
+        {
+          "trace_idx": 18688,
+          "lat": 38.66769917647563,
+          "lon": 87.93060258136234,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 30.78,
+          "distance_to_crater_km": 6.96
+        },
+        {
+          "trace_idx": 18689,
+          "lat": 38.66709389173979,
+          "lon": 87.93050813117351,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 31.99,
+          "distance_to_crater_km": 6.93
+        },
+        {
+          "trace_idx": 18690,
+          "lat": 38.66648860674247,
+          "lon": 87.9304136826131,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 28.85,
+          "distance_to_crater_km": 6.89
+        },
+        {
+          "trace_idx": 18691,
+          "lat": 38.66588412960833,
+          "lon": 87.93031936109108,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 25.91,
+          "distance_to_crater_km": 6.86
+        },
+        {
+          "trace_idx": 18692,
+          "lat": 38.66527884408838,
+          "lon": 87.93022491328504,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 22.73,
+          "distance_to_crater_km": 6.82
+        },
+        {
+          "trace_idx": 18693,
+          "lat": 38.664673558306895,
+          "lon": 87.93013046752424,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 21.01,
+          "distance_to_crater_km": 6.79
+        },
+        {
+          "trace_idx": 18694,
+          "lat": 38.66406827226393,
+          "lon": 87.93003602214107,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 15.21,
+          "distance_to_crater_km": 6.75
+        },
+        {
+          "trace_idx": 18695,
+          "lat": 38.663463794085544,
+          "lon": 87.92994170337506,
+          "delta_bins": 30,
+          "twt_us": 1.125,
+          "snr": 12.94,
+          "distance_to_crater_km": 6.72
+        },
+        {
+          "trace_idx": 18696,
+          "lat": 38.66285850751995,
+          "lon": 87.9298472591629,
+          "delta_bins": 30,
+          "twt_us": 1.125,
+          "snr": 14.33,
+          "distance_to_crater_km": 6.68
+        },
+        {
+          "trace_idx": 18697,
+          "lat": 38.66225322069286,
+          "lon": 87.92975281616206,
+          "delta_bins": 30,
+          "twt_us": 1.125,
+          "snr": 18.06,
+          "distance_to_crater_km": 6.65
+        },
+        {
+          "trace_idx": 18698,
+          "lat": 38.6616487417314,
+          "lon": 87.92965849977513,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 19.48,
+          "distance_to_crater_km": 6.61
+        },
+        {
+          "trace_idx": 18699,
+          "lat": 38.66104345438165,
+          "lon": 87.92956405794516,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 19.91,
+          "distance_to_crater_km": 6.58
+        },
+        {
+          "trace_idx": 18700,
+          "lat": 38.66043816677043,
+          "lon": 87.92946961732642,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 19.79,
+          "distance_to_crater_km": 6.54
+        },
+        {
+          "trace_idx": 18701,
+          "lat": 38.65983287889773,
+          "lon": 87.92937517750195,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 18.55,
+          "distance_to_crater_km": 6.51
+        },
+        {
+          "trace_idx": 18702,
+          "lat": 38.65922839889203,
+          "lon": 87.92928086428705,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 17.0,
+          "distance_to_crater_km": 6.47
+        },
+        {
+          "trace_idx": 18703,
+          "lat": 38.65862311049669,
+          "lon": 87.92918642605011,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 13.93,
+          "distance_to_crater_km": 6.44
+        },
+        {
+          "trace_idx": 18704,
+          "lat": 38.658017821839834,
+          "lon": 87.9290919881905,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 11.22,
+          "distance_to_crater_km": 6.4
+        },
+        {
+          "trace_idx": 18705,
+          "lat": 38.657413341051104,
+          "lon": 87.928997677354,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 8.72,
+          "distance_to_crater_km": 6.37
+        },
+        {
+          "trace_idx": 18706,
+          "lat": 38.65680805187162,
+          "lon": 87.9289032414986,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 7.49,
+          "distance_to_crater_km": 6.33
+        },
+        {
+          "trace_idx": 18707,
+          "lat": 38.65620276243066,
+          "lon": 87.92880880643732,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 7.39,
+          "distance_to_crater_km": 6.3
+        },
+        {
+          "trace_idx": 18708,
+          "lat": 38.65559828085883,
+          "lon": 87.92871449797902,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 6.53,
+          "distance_to_crater_km": 6.26
+        },
+        {
+          "trace_idx": 18714,
+          "lat": 38.65196734528777,
+          "lon": 87.92814803442968,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 7.2,
+          "distance_to_crater_km": 6.05
+        },
+        {
+          "trace_idx": 18715,
+          "lat": 38.651362861888686,
+          "lon": 87.92805373151971,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 8.62,
+          "distance_to_crater_km": 6.01
+        },
+        {
+          "trace_idx": 18716,
+          "lat": 38.65075757009541,
+          "lon": 87.9279593036011,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 9.74,
+          "distance_to_crater_km": 5.98
+        },
+        {
+          "trace_idx": 18717,
+          "lat": 38.65015227804065,
+          "lon": 87.92786487605942,
+          "delta_bins": 48,
+          "twt_us": 1.7999999999999998,
+          "snr": 10.4,
+          "distance_to_crater_km": 5.94
+        },
+        {
+          "trace_idx": 18718,
+          "lat": 38.64954779385852,
+          "lon": 87.92777057552672,
+          "delta_bins": 48,
+          "twt_us": 1.7999999999999998,
+          "snr": 9.48,
+          "distance_to_crater_km": 5.91
+        },
+        {
+          "trace_idx": 18719,
+          "lat": 38.64894250128115,
+          "lon": 87.92767614998846,
+          "delta_bins": 48,
+          "twt_us": 1.7999999999999998,
+          "snr": 10.03,
+          "distance_to_crater_km": 5.87
+        },
+        {
+          "trace_idx": 18720,
+          "lat": 38.6483372084423,
+          "lon": 87.9275817252439,
+          "delta_bins": 48,
+          "twt_us": 1.7999999999999998,
+          "snr": 9.62,
+          "distance_to_crater_km": 5.84
+        },
+        {
+          "trace_idx": 18721,
+          "lat": 38.64773191534193,
+          "lon": 87.92748730129307,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 9.49,
+          "distance_to_crater_km": 5.8
+        },
+        {
+          "trace_idx": 18722,
+          "lat": 38.64712743011563,
+          "lon": 87.92739300392996,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 9.12,
+          "distance_to_crater_km": 5.77
+        },
+        {
+          "trace_idx": 18723,
+          "lat": 38.646522136492685,
+          "lon": 87.92729858114852,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 8.63,
+          "distance_to_crater_km": 5.73
+        },
+        {
+          "trace_idx": 18724,
+          "lat": 38.645916842608266,
+          "lon": 87.92720415957757,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 8.08,
+          "distance_to_crater_km": 5.7
+        },
+        {
+          "trace_idx": 18725,
+          "lat": 38.64531235659892,
+          "lon": 87.92710986459107,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 8.46,
+          "distance_to_crater_km": 5.66
+        },
+        {
+          "trace_idx": 18726,
+          "lat": 38.644707062191884,
+          "lon": 87.92701544460623,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 9.08,
+          "distance_to_crater_km": 5.63
+        },
+        {
+          "trace_idx": 18727,
+          "lat": 38.64410176752339,
+          "lon": 87.92692102541491,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 8.6,
+          "distance_to_crater_km": 5.6
+        },
+        {
+          "trace_idx": 18728,
+          "lat": 38.643496472593384,
+          "lon": 87.92682660701709,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 8.63,
+          "distance_to_crater_km": 5.56
+        },
+        {
+          "trace_idx": 18729,
+          "lat": 38.64289198553989,
+          "lon": 87.92673231478246,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 10.83,
+          "distance_to_crater_km": 5.53
+        },
+        {
+          "trace_idx": 18730,
+          "lat": 38.6422866900873,
+          "lon": 87.92663789797047,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 12.38,
+          "distance_to_crater_km": 5.49
+        },
+        {
+          "trace_idx": 18737,
+          "lat": 38.63805123087941,
+          "lon": 87.92597725363967,
+          "delta_bins": 66,
+          "twt_us": 2.475,
+          "snr": 7.2,
+          "distance_to_crater_km": 5.25
+        },
+        {
+          "trace_idx": 18738,
+          "lat": 38.63744593333576,
+          "lon": 87.92588284233815,
+          "delta_bins": 66,
+          "twt_us": 2.475,
+          "snr": 8.63,
+          "distance_to_crater_km": 5.21
+        },
+        {
+          "trace_idx": 18739,
+          "lat": 38.636841443672054,
+          "lon": 87.92578855885655,
+          "delta_bins": 66,
+          "twt_us": 2.475,
+          "snr": 10.55,
+          "distance_to_crater_km": 5.18
+        },
+        {
+          "trace_idx": 18740,
+          "lat": 38.6362361456058,
+          "lon": 87.92569414997408,
+          "delta_bins": 66,
+          "twt_us": 2.475,
+          "snr": 12.84,
+          "distance_to_crater_km": 5.14
+        },
+        {
+          "trace_idx": 18741,
+          "lat": 38.635630847278065,
+          "lon": 87.92559974188472,
+          "delta_bins": 66,
+          "twt_us": 2.475,
+          "snr": 14.97,
+          "distance_to_crater_km": 5.11
+        },
+        {
+          "trace_idx": 18742,
+          "lat": 38.63502554868887,
+          "lon": 87.92550533417153,
+          "delta_bins": 66,
+          "twt_us": 2.475,
+          "snr": 15.17,
+          "distance_to_crater_km": 5.07
+        },
+        {
+          "trace_idx": 18745,
+          "lat": 38.63321045949601,
+          "lon": 87.92522224239357,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 13.1,
+          "distance_to_crater_km": 4.97
+        },
+        {
+          "trace_idx": 18746,
+          "lat": 38.632605159861306,
+          "lon": 87.9251278382682,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 12.84,
+          "distance_to_crater_km": 4.94
+        },
+        {
+          "trace_idx": 18747,
+          "lat": 38.632000668109356,
+          "lon": 87.92503356112019,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 12.2,
+          "distance_to_crater_km": 4.9
+        },
+        {
+          "trace_idx": 18748,
+          "lat": 38.63139536795206,
+          "lon": 87.92493915816269,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 10.27,
+          "distance_to_crater_km": 4.87
+        },
+        {
+          "trace_idx": 18749,
+          "lat": 38.6307900675333,
+          "lon": 87.92484475641493,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 8.06,
+          "distance_to_crater_km": 4.83
+        },
+        {
+          "trace_idx": 18750,
+          "lat": 38.63018557499836,
+          "lon": 87.92475048164125,
+          "delta_bins": 43,
+          "twt_us": 1.6125,
+          "snr": 7.75,
+          "distance_to_crater_km": 4.8
+        },
+        {
+          "trace_idx": 18751,
+          "lat": 38.62958027405703,
+          "lon": 87.92465608064431,
+          "delta_bins": 43,
+          "twt_us": 1.6125,
+          "snr": 7.47,
+          "distance_to_crater_km": 4.76
+        },
+        {
+          "trace_idx": 18759,
+          "lat": 38.62473947341055,
+          "lon": 87.92390115896873,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 7.1,
+          "distance_to_crater_km": 4.49
+        },
+        {
+          "trace_idx": 18760,
+          "lat": 38.62413417011678,
+          "lon": 87.92380676593724,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 8.83,
+          "distance_to_crater_km": 4.45
+        },
+        {
+          "trace_idx": 18761,
+          "lat": 38.62352967471065,
+          "lon": 87.92371249945103,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 9.09,
+          "distance_to_crater_km": 4.42
+        },
+        {
+          "trace_idx": 18762,
+          "lat": 38.62292437089432,
+          "lon": 87.92361810800341,
+          "delta_bins": 27,
+          "twt_us": 1.0125,
+          "snr": 11.34,
+          "distance_to_crater_km": 4.39
+        },
+        {
+          "trace_idx": 18771,
+          "lat": 38.617479049239556,
+          "lon": 87.92276899702388,
+          "delta_bins": 58,
+          "twt_us": 2.175,
+          "snr": 9.35,
+          "distance_to_crater_km": 4.08
+        },
+        {
+          "trace_idx": 18772,
+          "lat": 38.616873742809716,
+          "lon": 87.92267461307921,
+          "delta_bins": 58,
+          "twt_us": 2.175,
+          "snr": 10.91,
+          "distance_to_crater_km": 4.05
+        },
+        {
+          "trace_idx": 18773,
+          "lat": 38.616268436118425,
+          "lon": 87.92258023076043,
+          "delta_bins": 58,
+          "twt_us": 2.175,
+          "snr": 10.86,
+          "distance_to_crater_km": 4.01
+        },
+        {
+          "trace_idx": 18774,
+          "lat": 38.6156631291657,
+          "lon": 87.9224858488169,
+          "delta_bins": 58,
+          "twt_us": 2.175,
+          "snr": 10.05,
+          "distance_to_crater_km": 3.98
+        },
+        {
+          "trace_idx": 18775,
+          "lat": 38.6150586301055,
+          "lon": 87.92239159340338,
+          "delta_bins": 58,
+          "twt_us": 2.175,
+          "snr": 8.43,
+          "distance_to_crater_km": 3.94
+        },
+        {
+          "trace_idx": 18777,
+          "lat": 38.6138480148935,
+          "lon": 87.92220283305753,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 6.48,
+          "distance_to_crater_km": 3.88
+        },
+        {
+          "trace_idx": 18778,
+          "lat": 38.613243515050364,
+          "lon": 87.92210858001583,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 6.28,
+          "distance_to_crater_km": 3.84
+        },
+        {
+          "trace_idx": 18779,
+          "lat": 38.61263820679108,
+          "lon": 87.92201420161332,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 5.95,
+          "distance_to_crater_km": 3.81
+        },
+        {
+          "trace_idx": 18780,
+          "lat": 38.61203289827035,
+          "lon": 87.92191982483652,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 7.13,
+          "distance_to_crater_km": 3.78
+        },
+        {
+          "trace_idx": 18781,
+          "lat": 38.611428397644254,
+          "lon": 87.92182557416635,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 7.35,
+          "distance_to_crater_km": 3.74
+        },
+        {
+          "trace_idx": 18782,
+          "lat": 38.610823088600995,
+          "lon": 87.92173119813846,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.15,
+          "distance_to_crater_km": 3.71
+        },
+        {
+          "trace_idx": 18783,
+          "lat": 38.610217779296306,
+          "lon": 87.92163682331928,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.4,
+          "distance_to_crater_km": 3.68
+        },
+        {
+          "trace_idx": 18785,
+          "lat": 38.60900796806002,
+          "lon": 87.92144820136683,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.84,
+          "distance_to_crater_km": 3.61
+        },
+        {
+          "trace_idx": 18786,
+          "lat": 38.608402657971325,
+          "lon": 87.92135382892191,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.91,
+          "distance_to_crater_km": 3.58
+        },
+        {
+          "trace_idx": 18787,
+          "lat": 38.60779734762121,
+          "lon": 87.92125945726866,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.49,
+          "distance_to_crater_km": 3.54
+        },
+        {
+          "trace_idx": 18788,
+          "lat": 38.60719284516815,
+          "lon": 87.92116521213136,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 7.81,
+          "distance_to_crater_km": 3.51
+        },
+        {
+          "trace_idx": 18790,
+          "lat": 38.60598222316137,
+          "lon": 87.92097647278108,
+          "delta_bins": 57,
+          "twt_us": 2.1374999999999997,
+          "snr": 7.46,
+          "distance_to_crater_km": 3.45
+        },
+        {
+          "trace_idx": 18791,
+          "lat": 38.605376911765816,
+          "lon": 87.92088210345955,
+          "delta_bins": 57,
+          "twt_us": 2.1374999999999997,
+          "snr": 8.93,
+          "distance_to_crater_km": 3.41
+        },
+        {
+          "trace_idx": 18792,
+          "lat": 38.60477240826876,
+          "lon": 87.92078786190024,
+          "delta_bins": 57,
+          "twt_us": 2.1374999999999997,
+          "snr": 8.67,
+          "distance_to_crater_km": 3.38
+        },
+        {
+          "trace_idx": 18793,
+          "lat": 38.604167096350665,
+          "lon": 87.92069349499451,
+          "delta_bins": 57,
+          "twt_us": 2.1374999999999997,
+          "snr": 8.3,
+          "distance_to_crater_km": 3.35
+        },
+        {
+          "trace_idx": 18795,
+          "lat": 38.60295727989117,
+          "lon": 87.92050488927434,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 9.87,
+          "distance_to_crater_km": 3.28
+        },
+        {
+          "trace_idx": 18796,
+          "lat": 38.60235196718912,
+          "lon": 87.92041052474195,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 11.9,
+          "distance_to_crater_km": 3.25
+        },
+        {
+          "trace_idx": 18797,
+          "lat": 38.601746654225636,
+          "lon": 87.92031616016722,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 12.88,
+          "distance_to_crater_km": 3.22
+        },
+        {
+          "trace_idx": 18798,
+          "lat": 38.60114214916273,
+          "lon": 87.92022192334817,
+          "delta_bins": 27,
+          "twt_us": 1.0125,
+          "snr": 14.58,
+          "distance_to_crater_km": 3.18
+        },
+        {
+          "trace_idx": 18799,
+          "lat": 38.60053683567675,
+          "lon": 87.92012756118883,
+          "delta_bins": 27,
+          "twt_us": 1.0125,
+          "snr": 15.69,
+          "distance_to_crater_km": 3.15
+        },
+        {
+          "trace_idx": 18800,
+          "lat": 38.59993152192929,
+          "lon": 87.92003319940395,
+          "delta_bins": 28,
+          "twt_us": 1.05,
+          "snr": 15.2,
+          "distance_to_crater_km": 3.12
+        },
+        {
+          "trace_idx": 18801,
+          "lat": 38.59932620792043,
+          "lon": 87.9199388388272,
+          "delta_bins": 28,
+          "twt_us": 1.05,
+          "snr": 12.53,
+          "distance_to_crater_km": 3.09
+        },
+        {
+          "trace_idx": 18802,
+          "lat": 38.598721701813524,
+          "lon": 87.91984460516807,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 10.32,
+          "distance_to_crater_km": 3.06
+        },
+        {
+          "trace_idx": 18803,
+          "lat": 38.59811638728213,
+          "lon": 87.91975024617277,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 12.68,
+          "distance_to_crater_km": 3.02
+        },
+        {
+          "trace_idx": 18804,
+          "lat": 38.5975110724893,
+          "lon": 87.91965588713488,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 14.46,
+          "distance_to_crater_km": 2.99
+        },
+        {
+          "trace_idx": 18805,
+          "lat": 38.59690656559951,
+          "lon": 87.91956165584509,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 16.64,
+          "distance_to_crater_km": 2.96
+        },
+        {
+          "trace_idx": 18806,
+          "lat": 38.596301250284185,
+          "lon": 87.91946729880532,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 17.02,
+          "distance_to_crater_km": 2.93
+        },
+        {
+          "trace_idx": 18807,
+          "lat": 38.595695934707386,
+          "lon": 87.91937294297355,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 17.17,
+          "distance_to_crater_km": 2.9
+        },
+        {
+          "trace_idx": 18808,
+          "lat": 38.5950914270347,
+          "lon": 87.91927871405284,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 19.15,
+          "distance_to_crater_km": 2.87
+        },
+        {
+          "trace_idx": 18809,
+          "lat": 38.59448611093542,
+          "lon": 87.91918435980212,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 20.54,
+          "distance_to_crater_km": 2.83
+        },
+        {
+          "trace_idx": 18810,
+          "lat": 38.593880794574694,
+          "lon": 87.91909000550864,
+          "delta_bins": 49,
+          "twt_us": 1.8375,
+          "snr": 20.22,
+          "distance_to_crater_km": 2.8
+        },
+        {
+          "trace_idx": 18811,
+          "lat": 38.59327547795256,
+          "lon": 87.91899565283991,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 17.99,
+          "distance_to_crater_km": 2.77
+        },
+        {
+          "trace_idx": 18812,
+          "lat": 38.5926709692359,
+          "lon": 87.9189014270779,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 17.82,
+          "distance_to_crater_km": 2.74
+        },
+        {
+          "trace_idx": 18813,
+          "lat": 38.59206565209125,
+          "lon": 87.91880707557311,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 18.36,
+          "distance_to_crater_km": 2.71
+        },
+        {
+          "trace_idx": 18814,
+          "lat": 38.591460334685166,
+          "lon": 87.9187127252761,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.86,
+          "distance_to_crater_km": 2.68
+        },
+        {
+          "trace_idx": 18815,
+          "lat": 38.59085582518563,
+          "lon": 87.91861850188252,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 15.9,
+          "distance_to_crater_km": 2.65
+        },
+        {
+          "trace_idx": 18816,
+          "lat": 38.59025050725705,
+          "lon": 87.91852415233235,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 14.83,
+          "distance_to_crater_km": 2.62
+        },
+        {
+          "trace_idx": 18817,
+          "lat": 38.58964518906704,
+          "lon": 87.91842980440677,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 12.91,
+          "distance_to_crater_km": 2.59
+        },
+        {
+          "trace_idx": 18818,
+          "lat": 38.58903987061561,
+          "lon": 87.91833545727195,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 10.88,
+          "distance_to_crater_km": 2.56
+        },
+        {
+          "trace_idx": 18819,
+          "lat": 38.588435360072104,
+          "lon": 87.91824123620249,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 11.43,
+          "distance_to_crater_km": 2.53
+        },
+        {
+          "trace_idx": 18820,
+          "lat": 38.58783004109819,
+          "lon": 87.91814689064803,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 11.53,
+          "distance_to_crater_km": 2.5
+        },
+        {
+          "trace_idx": 18821,
+          "lat": 38.58722472186284,
+          "lon": 87.91805254630117,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 11.06,
+          "distance_to_crater_km": 2.47
+        },
+        {
+          "trace_idx": 18822,
+          "lat": 38.58662021053644,
+          "lon": 87.91795832759952,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 11.12,
+          "distance_to_crater_km": 2.44
+        },
+        {
+          "trace_idx": 18823,
+          "lat": 38.5860148907786,
+          "lon": 87.91786398441599,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 10.75,
+          "distance_to_crater_km": 2.41
+        },
+        {
+          "trace_idx": 18824,
+          "lat": 38.58540957075935,
+          "lon": 87.91776964202299,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 10.42,
+          "distance_to_crater_km": 2.38
+        },
+        {
+          "trace_idx": 18825,
+          "lat": 38.58480425047867,
+          "lon": 87.91767530000372,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 10.18,
+          "distance_to_crater_km": 2.35
+        },
+        {
+          "trace_idx": 18826,
+          "lat": 38.58419973810833,
+          "lon": 87.91758108487596,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 9.37,
+          "distance_to_crater_km": 2.32
+        },
+        {
+          "trace_idx": 18827,
+          "lat": 38.58359441730514,
+          "lon": 87.91748674485353,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.95,
+          "distance_to_crater_km": 2.29
+        },
+        {
+          "trace_idx": 18828,
+          "lat": 38.58298909624054,
+          "lon": 87.91739240562157,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.48,
+          "distance_to_crater_km": 2.27
+        },
+        {
+          "trace_idx": 18829,
+          "lat": 38.58238377491455,
+          "lon": 87.91729806718003,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.0,
+          "distance_to_crater_km": 2.24
+        },
+        {
+          "trace_idx": 18830,
+          "lat": 38.581779261500294,
+          "lon": 87.9172038552088,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 7.47,
+          "distance_to_crater_km": 2.21
+        },
+        {
+          "trace_idx": 18831,
+          "lat": 38.581173939651784,
+          "lon": 87.9171095179301,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 6.84,
+          "distance_to_crater_km": 2.18
+        },
+        {
+          "trace_idx": 18832,
+          "lat": 38.58056861754187,
+          "lon": 87.91701518185864,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 6.79,
+          "distance_to_crater_km": 2.16
+        },
+        {
+          "trace_idx": 18833,
+          "lat": 38.57996410334476,
+          "lon": 87.91692097225423,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 6.74,
+          "distance_to_crater_km": 2.13
+        },
+        {
+          "trace_idx": 18834,
+          "lat": 38.57935878071237,
+          "lon": 87.91682663776231,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 6.37,
+          "distance_to_crater_km": 2.1
+        },
+        {
+          "trace_idx": 18835,
+          "lat": 38.57875345781854,
+          "lon": 87.91673230406066,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 5.54,
+          "distance_to_crater_km": 2.08
+        },
+        {
+          "trace_idx": 18839,
+          "lat": 38.57633297180546,
+          "lon": 87.91635510240947,
+          "delta_bins": 41,
+          "twt_us": 1.5374999999999999,
+          "snr": 7.76,
+          "distance_to_crater_km": 1.97
+        },
+        {
+          "trace_idx": 18840,
+          "lat": 38.57572845578161,
+          "lon": 87.91626089832693,
+          "delta_bins": 41,
+          "twt_us": 1.5374999999999999,
+          "snr": 9.3,
+          "distance_to_crater_km": 1.95
+        },
+        {
+          "trace_idx": 18841,
+          "lat": 38.575123131320005,
+          "lon": 87.91616656936404,
+          "delta_bins": 38,
+          "twt_us": 1.425,
+          "snr": 10.57,
+          "distance_to_crater_km": 1.92
+        },
+        {
+          "trace_idx": 18842,
+          "lat": 38.574517806597,
+          "lon": 87.91607224119122,
+          "delta_bins": 38,
+          "twt_us": 1.425,
+          "snr": 11.36,
+          "distance_to_crater_km": 1.9
+        },
+        {
+          "trace_idx": 18843,
+          "lat": 38.57391248161258,
+          "lon": 87.91597791297464,
+          "delta_bins": 38,
+          "twt_us": 1.425,
+          "snr": 11.71,
+          "distance_to_crater_km": 1.87
+        },
+        {
+          "trace_idx": 18844,
+          "lat": 38.573307964544824,
+          "lon": 87.9158837124638,
+          "delta_bins": 38,
+          "twt_us": 1.425,
+          "snr": 11.16,
+          "distance_to_crater_km": 1.85
+        },
+        {
+          "trace_idx": 18845,
+          "lat": 38.57270263903794,
+          "lon": 87.91578938665985,
+          "delta_bins": 27,
+          "twt_us": 1.0125,
+          "snr": 9.11,
+          "distance_to_crater_km": 1.83
+        },
+        {
+          "trace_idx": 18846,
+          "lat": 38.57209731326964,
+          "lon": 87.91569506122894,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 8.85,
+          "distance_to_crater_km": 1.8
+        },
+        {
+          "trace_idx": 18847,
+          "lat": 38.57149279541905,
+          "lon": 87.91560086308368,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 10.32,
+          "distance_to_crater_km": 1.78
+        },
+        {
+          "trace_idx": 18848,
+          "lat": 38.570887469128266,
+          "lon": 87.91550653964838,
+          "delta_bins": 54,
+          "twt_us": 2.025,
+          "snr": 11.03,
+          "distance_to_crater_km": 1.76
+        },
+        {
+          "trace_idx": 18849,
+          "lat": 38.570282142576126,
+          "lon": 87.91541221700285,
+          "delta_bins": 54,
+          "twt_us": 2.025,
+          "snr": 11.01,
+          "distance_to_crater_km": 1.74
+        },
+        {
+          "trace_idx": 18850,
+          "lat": 38.56967681576254,
+          "lon": 87.91531789431342,
+          "delta_bins": 54,
+          "twt_us": 2.025,
+          "snr": 10.5,
+          "distance_to_crater_km": 1.72
+        },
+        {
+          "trace_idx": 18851,
+          "lat": 38.56907229686808,
+          "lon": 87.91522369932213,
+          "delta_bins": 55,
+          "twt_us": 2.0625,
+          "snr": 10.65,
+          "distance_to_crater_km": 1.7
+        },
+        {
+          "trace_idx": 18852,
+          "lat": 38.568466969532025,
+          "lon": 87.91512937862802,
+          "delta_bins": 55,
+          "twt_us": 2.0625,
+          "snr": 10.5,
+          "distance_to_crater_km": 1.68
+        },
+        {
+          "trace_idx": 18853,
+          "lat": 38.5678616419346,
+          "lon": 87.9150350591405,
+          "delta_bins": 65,
+          "twt_us": 2.4375,
+          "snr": 8.65,
+          "distance_to_crater_km": 1.66
+        },
+        {
+          "trace_idx": 18854,
+          "lat": 38.56725631407575,
+          "lon": 87.91494074044266,
+          "delta_bins": 65,
+          "twt_us": 2.4375,
+          "snr": 6.66,
+          "distance_to_crater_km": 1.64
+        },
+        {
+          "trace_idx": 18855,
+          "lat": 38.56665179413739,
+          "lon": 87.91484654860488,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 5.13,
+          "distance_to_crater_km": 1.62
+        },
+        {
+          "trace_idx": 18856,
+          "lat": 38.56604646575609,
+          "lon": 87.91475223065152,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 4.74,
+          "distance_to_crater_km": 1.61
+        },
+        {
+          "trace_idx": 18857,
+          "lat": 38.56544113711338,
+          "lon": 87.91465791432148,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 4.75,
+          "distance_to_crater_km": 1.59
+        },
+        {
+          "trace_idx": 18858,
+          "lat": 38.564836616392235,
+          "lon": 87.91456372484824,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 5.89,
+          "distance_to_crater_km": 1.57
+        },
+        {
+          "trace_idx": 18859,
+          "lat": 38.56423128722708,
+          "lon": 87.91446940926248,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 6.61,
+          "distance_to_crater_km": 1.56
+        },
+        {
+          "trace_idx": 18860,
+          "lat": 38.56362595780051,
+          "lon": 87.91437509571688,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 7.36,
+          "distance_to_crater_km": 1.54
+        },
+        {
+          "trace_idx": 18861,
+          "lat": 38.563021436296545,
+          "lon": 87.91428090860792,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 8.38,
+          "distance_to_crater_km": 1.53
+        },
+        {
+          "trace_idx": 18862,
+          "lat": 38.562416106347534,
+          "lon": 87.91418659538954,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 8.85,
+          "distance_to_crater_km": 1.52
+        },
+        {
+          "trace_idx": 18863,
+          "lat": 38.561810776137115,
+          "lon": 87.91409228379429,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 9.47,
+          "distance_to_crater_km": 1.5
+        },
+        {
+          "trace_idx": 18864,
+          "lat": 38.56120544566531,
+          "lon": 87.91399797298845,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 8.5,
+          "distance_to_crater_km": 1.49
+        },
+        {
+          "trace_idx": 18865,
+          "lat": 38.560600923117505,
+          "lon": 87.91390378861492,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 7.33,
+          "distance_to_crater_km": 1.48
+        },
+        {
+          "trace_idx": 18866,
+          "lat": 38.559995592123244,
+          "lon": 87.91380947896981,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 6.11,
+          "distance_to_crater_km": 1.47
+        },
+        {
+          "trace_idx": 18867,
+          "lat": 38.55939026086759,
+          "lon": 87.91371517094773,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 4.68,
+          "distance_to_crater_km": 1.46
+        },
+        {
+          "trace_idx": 18873,
+          "lat": 38.55575988422075,
+          "lon": 87.91314958732272,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 5.05,
+          "distance_to_crater_km": 1.42
+        },
+        {
+          "trace_idx": 18874,
+          "lat": 38.55515455113605,
+          "lon": 87.9130552844058,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 5.99,
+          "distance_to_crater_km": 1.42
+        },
+        {
+          "trace_idx": 18875,
+          "lat": 38.55455002597882,
+          "lon": 87.91296110791043,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 6.38,
+          "distance_to_crater_km": 1.42
+        },
+        {
+          "trace_idx": 18878,
+          "lat": 38.55273483256314,
+          "lon": 87.91267833147012,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 7.44,
+          "distance_to_crater_km": 1.41
+        },
+        {
+          "trace_idx": 18879,
+          "lat": 38.552129498172164,
+          "lon": 87.91258403249606,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 8.26,
+          "distance_to_crater_km": 1.42
+        },
+        {
+          "trace_idx": 18880,
+          "lat": 38.55152416351981,
+          "lon": 87.9124897343109,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 9.31,
+          "distance_to_crater_km": 1.42
+        },
+        {
+          "trace_idx": 18881,
+          "lat": 38.55091882860605,
+          "lon": 87.9123954369146,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 10.75,
+          "distance_to_crater_km": 1.42
+        },
+        {
+          "trace_idx": 18882,
+          "lat": 38.550314301622265,
+          "lon": 87.91230126593219,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 9.92,
+          "distance_to_crater_km": 1.42
+        },
+        {
+          "trace_idx": 18883,
+          "lat": 38.549708966186074,
+          "lon": 87.91220697011246,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 8.67,
+          "distance_to_crater_km": 1.43
+        },
+        {
+          "trace_idx": 18884,
+          "lat": 38.54910363048852,
+          "lon": 87.91211267466464,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 7.25,
+          "distance_to_crater_km": 1.44
+        },
+        {
+          "trace_idx": 18885,
+          "lat": 38.548499102721934,
+          "lon": 87.91201850604439,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 7.24,
+          "distance_to_crater_km": 1.44
+        },
+        {
+          "trace_idx": 18886,
+          "lat": 38.54789376650196,
+          "lon": 87.91192421258984,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 6.91,
+          "distance_to_crater_km": 1.45
+        },
+        {
+          "trace_idx": 18887,
+          "lat": 38.5472884300206,
+          "lon": 87.91182991992397,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 6.88,
+          "distance_to_crater_km": 1.46
+        },
+        {
+          "trace_idx": 18899,
+          "lat": 38.540027610959406,
+          "lon": 87.91069897195133,
+          "delta_bins": 66,
+          "twt_us": 2.475,
+          "snr": 9.52,
+          "distance_to_crater_km": 1.62
+        },
+        {
+          "trace_idx": 18900,
+          "lat": 38.53942227108148,
+          "lon": 87.91060468953141,
+          "delta_bins": 66,
+          "twt_us": 2.475,
+          "snr": 10.35,
+          "distance_to_crater_km": 1.64
+        },
+        {
+          "trace_idx": 18901,
+          "lat": 38.53881693094218,
+          "lon": 87.91051040748286,
+          "delta_bins": 65,
+          "twt_us": 2.4375,
+          "snr": 11.39,
+          "distance_to_crater_km": 1.66
+        },
+        {
+          "trace_idx": 18902,
+          "lat": 38.538212398739816,
+          "lon": 87.91041625224348,
+          "delta_bins": 65,
+          "twt_us": 2.4375,
+          "snr": 11.39,
+          "distance_to_crater_km": 1.67
+        },
+        {
+          "trace_idx": 18903,
+          "lat": 38.537607058078116,
+          "lon": 87.9103219721872,
+          "delta_bins": 65,
+          "twt_us": 2.4375,
+          "snr": 10.49,
+          "distance_to_crater_km": 1.69
+        },
+        {
+          "trace_idx": 18904,
+          "lat": 38.53700171715503,
+          "lon": 87.91022769291911,
+          "delta_bins": 65,
+          "twt_us": 2.4375,
+          "snr": 8.49,
+          "distance_to_crater_km": 1.71
+        },
+        {
+          "trace_idx": 18905,
+          "lat": 38.53639637597056,
+          "lon": 87.91013341402227,
+          "delta_bins": 37,
+          "twt_us": 1.3875,
+          "snr": 8.72,
+          "distance_to_crater_km": 1.73
+        },
+        {
+          "trace_idx": 18906,
+          "lat": 38.53579184272445,
+          "lon": 87.91003926234714,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 7.88,
+          "distance_to_crater_km": 1.76
+        },
+        {
+          "trace_idx": 18907,
+          "lat": 38.53518650101759,
+          "lon": 87.90994498502543,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 7.9,
+          "distance_to_crater_km": 1.78
+        },
+        {
+          "trace_idx": 18908,
+          "lat": 38.53458115904938,
+          "lon": 87.90985070849177,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 7.42,
+          "distance_to_crater_km": 1.8
+        },
+        {
+          "trace_idx": 18909,
+          "lat": 38.53397662502051,
+          "lon": 87.9097565591766,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 7.63,
+          "distance_to_crater_km": 1.82
+        },
+        {
+          "trace_idx": 18910,
+          "lat": 38.53337128252989,
+          "lon": 87.9096622846348,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 7.02,
+          "distance_to_crater_km": 1.84
+        },
+        {
+          "trace_idx": 18911,
+          "lat": 38.53276593977791,
+          "lon": 87.90956801046404,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 6.27,
+          "distance_to_crater_km": 1.87
+        },
+        {
+          "trace_idx": 18912,
+          "lat": 38.53216059676455,
+          "lon": 87.90947373749813,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 5.8,
+          "distance_to_crater_km": 1.89
+        },
+        {
+          "trace_idx": 18918,
+          "lat": 38.52853014960339,
+          "lon": 87.90890836700504,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 5.19,
+          "distance_to_crater_km": 2.04
+        },
+        {
+          "trace_idx": 18919,
+          "lat": 38.52792480476116,
+          "lon": 87.90881409955169,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 5.87,
+          "distance_to_crater_km": 2.07
+        },
+        {
+          "trace_idx": 18920,
+          "lat": 38.527320267862144,
+          "lon": 87.90871995847114,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 5.88,
+          "distance_to_crater_km": 2.09
+        },
+        {
+          "trace_idx": 18921,
+          "lat": 38.5267149224975,
+          "lon": 87.9086256921752,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 6.13,
+          "distance_to_crater_km": 2.12
+        },
+        {
+          "trace_idx": 18922,
+          "lat": 38.52610957687151,
+          "lon": 87.9085314270838,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 6.43,
+          "distance_to_crater_km": 2.15
+        },
+        {
+          "trace_idx": 18930,
+          "lat": 38.521268418870676,
+          "lon": 87.9077775854358,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 6.74,
+          "distance_to_crater_km": 2.37
+        },
+        {
+          "trace_idx": 18949,
+          "lat": 38.509771611893605,
+          "lon": 87.9059875695821,
+          "delta_bins": 37,
+          "twt_us": 1.3875,
+          "snr": 6.31,
+          "distance_to_crater_km": 2.95
+        },
+        {
+          "trace_idx": 18950,
+          "lat": 38.509166258952426,
+          "lon": 87.90589332652368,
+          "delta_bins": 37,
+          "twt_us": 1.3875,
+          "snr": 8.25,
+          "distance_to_crater_km": 2.98
+        },
+        {
+          "trace_idx": 18951,
+          "lat": 38.508561713965285,
+          "lon": 87.90579920980457,
+          "delta_bins": 37,
+          "twt_us": 1.3875,
+          "snr": 9.94,
+          "distance_to_crater_km": 3.02
+        },
+        {
+          "trace_idx": 18952,
+          "lat": 38.507956360501765,
+          "lon": 87.90570496831857,
+          "delta_bins": 38,
+          "twt_us": 1.425,
+          "snr": 10.28,
+          "distance_to_crater_km": 3.05
+        },
+        {
+          "trace_idx": 18953,
+          "lat": 38.50735100677689,
+          "lon": 87.90561072761928,
+          "delta_bins": 38,
+          "twt_us": 1.425,
+          "snr": 10.79,
+          "distance_to_crater_km": 3.08
+        },
+        {
+          "trace_idx": 18954,
+          "lat": 38.506745652790684,
+          "lon": 87.9055164868729,
+          "delta_bins": 38,
+          "twt_us": 1.425,
+          "snr": 10.06,
+          "distance_to_crater_km": 3.11
+        },
+        {
+          "trace_idx": 18955,
+          "lat": 38.506141106759905,
+          "lon": 87.90542237371214,
+          "delta_bins": 41,
+          "twt_us": 1.5374999999999999,
+          "snr": 10.27,
+          "distance_to_crater_km": 3.14
+        },
+        {
+          "trace_idx": 18956,
+          "lat": 38.50553575225135,
+          "lon": 87.9053281353717,
+          "delta_bins": 41,
+          "twt_us": 1.5374999999999999,
+          "snr": 12.21,
+          "distance_to_crater_km": 3.18
+        },
+        {
+          "trace_idx": 18957,
+          "lat": 38.50493039748144,
+          "lon": 87.90523389740096,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 14.53,
+          "distance_to_crater_km": 3.21
+        },
+        {
+          "trace_idx": 18958,
+          "lat": 38.50432585066803,
+          "lon": 87.90513978659573,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 17.23,
+          "distance_to_crater_km": 3.24
+        },
+        {
+          "trace_idx": 18959,
+          "lat": 38.50372049537579,
+          "lon": 87.9050455506139,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 19.08,
+          "distance_to_crater_km": 3.27
+        },
+        {
+          "trace_idx": 18960,
+          "lat": 38.50311513982221,
+          "lon": 87.90495131458476,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 21.54,
+          "distance_to_crater_km": 3.31
+        },
+        {
+          "trace_idx": 18961,
+          "lat": 38.50250978400727,
+          "lon": 87.90485708017587,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 24.48,
+          "distance_to_crater_km": 3.34
+        },
+        {
+          "trace_idx": 18962,
+          "lat": 38.50190523615024,
+          "lon": 87.90476297251129,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 25.58,
+          "distance_to_crater_km": 3.37
+        },
+        {
+          "trace_idx": 18963,
+          "lat": 38.50129987981298,
+          "lon": 87.90466873967416,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 26.72,
+          "distance_to_crater_km": 3.4
+        },
+        {
+          "trace_idx": 18964,
+          "lat": 38.500694523214385,
+          "lon": 87.90457450720652,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 28.74,
+          "distance_to_crater_km": 3.44
+        },
+        {
+          "trace_idx": 18965,
+          "lat": 38.50008997457471,
+          "lon": 87.90448040189682,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 25.71,
+          "distance_to_crater_km": 3.47
+        },
+        {
+          "trace_idx": 18966,
+          "lat": 38.499484617453774,
+          "lon": 87.90438617058389,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 16.56,
+          "distance_to_crater_km": 3.5
+        },
+        {
+          "trace_idx": 18967,
+          "lat": 38.49887926007148,
+          "lon": 87.90429194089101,
+          "delta_bins": 41,
+          "twt_us": 1.5374999999999999,
+          "snr": 14.1,
+          "distance_to_crater_km": 3.54
+        },
+        {
+          "trace_idx": 18968,
+          "lat": 38.498274710649234,
+          "lon": 87.90419783793591,
+          "delta_bins": 41,
+          "twt_us": 1.5374999999999999,
+          "snr": 10.11,
+          "distance_to_crater_km": 3.57
+        },
+        {
+          "trace_idx": 18969,
+          "lat": 38.49766935274462,
+          "lon": 87.90410360898068,
+          "delta_bins": 47,
+          "twt_us": 1.7625,
+          "snr": 7.24,
+          "distance_to_crater_km": 3.6
+        },
+        {
+          "trace_idx": 18970,
+          "lat": 38.49706399457867,
+          "lon": 87.90400938206228,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 7.05,
+          "distance_to_crater_km": 3.64
+        },
+        {
+          "trace_idx": 18971,
+          "lat": 38.496458636151395,
+          "lon": 87.90391515551316,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 6.88,
+          "distance_to_crater_km": 3.67
+        },
+        {
+          "trace_idx": 18972,
+          "lat": 38.49585408568552,
+          "lon": 87.90382105569749,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 6.14,
+          "distance_to_crater_km": 3.7
+        },
+        {
+          "trace_idx": 18974,
+          "lat": 38.494643367525,
+          "lon": 87.90363260569389,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 6.43,
+          "distance_to_crater_km": 3.77
+        },
+        {
+          "trace_idx": 18975,
+          "lat": 38.4940388162765,
+          "lon": 87.90353850823227,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 7.53,
+          "distance_to_crater_km": 3.8
+        },
+        {
+          "trace_idx": 18976,
+          "lat": 38.49343345654325,
+          "lon": 87.9034442847776,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.0,
+          "distance_to_crater_km": 3.84
+        },
+        {
+          "trace_idx": 18977,
+          "lat": 38.49282809654868,
+          "lon": 87.90335006294264,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.39,
+          "distance_to_crater_km": 3.87
+        },
+        {
+          "trace_idx": 18978,
+          "lat": 38.492223544517564,
+          "lon": 87.90325596783475,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 9.69,
+          "distance_to_crater_km": 3.9
+        },
+        {
+          "trace_idx": 18979,
+          "lat": 38.49161818400068,
+          "lon": 87.90316174715375,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 11.29,
+          "distance_to_crater_km": 3.94
+        },
+        {
+          "trace_idx": 18980,
+          "lat": 38.49101282322245,
+          "lon": 87.90306752767552,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 12.98,
+          "distance_to_crater_km": 3.97
+        },
+        {
+          "trace_idx": 18981,
+          "lat": 38.49040746218289,
+          "lon": 87.90297330898312,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 14.94,
+          "distance_to_crater_km": 4.0
+        },
+        {
+          "trace_idx": 18982,
+          "lat": 38.48980290910822,
+          "lon": 87.9028792161797,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 15.0,
+          "distance_to_crater_km": 4.04
+        },
+        {
+          "trace_idx": 18983,
+          "lat": 38.489197547546354,
+          "lon": 87.90278499905789,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 17.22,
+          "distance_to_crater_km": 4.07
+        },
+        {
+          "trace_idx": 18984,
+          "lat": 38.48859218572314,
+          "lon": 87.90269078272183,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 17.22,
+          "distance_to_crater_km": 4.11
+        },
+        {
+          "trace_idx": 18985,
+          "lat": 38.48798763186588,
+          "lon": 87.9025966926884,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 16.41,
+          "distance_to_crater_km": 4.14
+        },
+        {
+          "trace_idx": 18986,
+          "lat": 38.48738226952037,
+          "lon": 87.90250247792275,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 14.05,
+          "distance_to_crater_km": 4.17
+        },
+        {
+          "trace_idx": 18987,
+          "lat": 38.48677690691355,
+          "lon": 87.90240826394275,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 13.22,
+          "distance_to_crater_km": 4.21
+        },
+        {
+          "trace_idx": 18988,
+          "lat": 38.486171544045376,
+          "lon": 87.90231405033154,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 13.92,
+          "distance_to_crater_km": 4.24
+        },
+        {
+          "trace_idx": 18989,
+          "lat": 38.48556698914455,
+          "lon": 87.9022199634355,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 12.1,
+          "distance_to_crater_km": 4.27
+        },
+        {
+          "trace_idx": 18990,
+          "lat": 38.48496162575409,
+          "lon": 87.90212575181131,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 11.9,
+          "distance_to_crater_km": 4.31
+        },
+        {
+          "trace_idx": 18991,
+          "lat": 38.4843562621023,
+          "lon": 87.90203154097269,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 11.38,
+          "distance_to_crater_km": 4.34
+        },
+        {
+          "trace_idx": 18992,
+          "lat": 38.48375170641889,
+          "lon": 87.90193745642911,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 10.62,
+          "distance_to_crater_km": 4.38
+        },
+        {
+          "trace_idx": 18997,
+          "lat": 38.48072569116669,
+          "lon": 87.90146654302755,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 6.86,
+          "distance_to_crater_km": 4.55
+        },
+        {
+          "trace_idx": 18998,
+          "lat": 38.48012032568635,
+          "lon": 87.90137233768488,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 6.84,
+          "distance_to_crater_km": 4.58
+        },
+        {
+          "trace_idx": 18999,
+          "lat": 38.47951576817681,
+          "lon": 87.90127825862972,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 6.96,
+          "distance_to_crater_km": 4.62
+        },
+        {
+          "trace_idx": 19000,
+          "lat": 38.47891040217418,
+          "lon": 87.90118405443971,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 7.23,
+          "distance_to_crater_km": 4.65
+        },
+        {
+          "trace_idx": 19001,
+          "lat": 38.47830503591023,
+          "lon": 87.90108985145181,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 7.18,
+          "distance_to_crater_km": 4.69
+        },
+        {
+          "trace_idx": 19002,
+          "lat": 38.47769966938496,
+          "lon": 87.90099564924917,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 7.56,
+          "distance_to_crater_km": 4.72
+        },
+        {
+          "trace_idx": 19003,
+          "lat": 38.47709511083189,
+          "lon": 87.90090157332972,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 7.13,
+          "distance_to_crater_km": 4.75
+        },
+        {
+          "trace_idx": 19004,
+          "lat": 38.47648974378433,
+          "lon": 87.90080737269638,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 7.24,
+          "distance_to_crater_km": 4.79
+        },
+        {
+          "trace_idx": 19005,
+          "lat": 38.47588437647545,
+          "lon": 87.90071317284817,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 7.14,
+          "distance_to_crater_km": 4.82
+        },
+        {
+          "trace_idx": 19006,
+          "lat": 38.47527981713984,
+          "lon": 87.90061909927992,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 8.05,
+          "distance_to_crater_km": 4.86
+        },
+        {
+          "trace_idx": 19007,
+          "lat": 38.47467444930867,
+          "lon": 87.90052490058397,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 9.35,
+          "distance_to_crater_km": 4.89
+        },
+        {
+          "trace_idx": 19008,
+          "lat": 38.4740690812162,
+          "lon": 87.90043070308994,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 9.52,
+          "distance_to_crater_km": 4.93
+        },
+        {
+          "trace_idx": 19009,
+          "lat": 38.47346371286242,
+          "lon": 87.90033650554717,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 9.09,
+          "distance_to_crater_km": 4.96
+        },
+        {
+          "trace_idx": 19010,
+          "lat": 38.47285915248329,
+          "lon": 87.90024243553069,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 9.3,
+          "distance_to_crater_km": 5.0
+        },
+        {
+          "trace_idx": 19011,
+          "lat": 38.47225378360723,
+          "lon": 87.90014824080744,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 9.56,
+          "distance_to_crater_km": 5.03
+        },
+        {
+          "trace_idx": 19012,
+          "lat": 38.47164841446984,
+          "lon": 87.90005404645224,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 9.76,
+          "distance_to_crater_km": 5.07
+        },
+        {
+          "trace_idx": 19013,
+          "lat": 38.47104304507114,
+          "lon": 87.89995985204818,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 10.95,
+          "distance_to_crater_km": 5.1
+        },
+        {
+          "trace_idx": 19014,
+          "lat": 38.47043848364852,
+          "lon": 87.8998657851661,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 10.87,
+          "distance_to_crater_km": 5.13
+        },
+        {
+          "trace_idx": 19015,
+          "lat": 38.46983311372755,
+          "lon": 87.89977159316446,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 11.41,
+          "distance_to_crater_km": 5.17
+        },
+        {
+          "trace_idx": 19016,
+          "lat": 38.4692277435453,
+          "lon": 87.89967740111383,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 11.79,
+          "distance_to_crater_km": 5.2
+        },
+        {
+          "trace_idx": 19017,
+          "lat": 38.46862318134011,
+          "lon": 87.89958333658198,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 10.96,
+          "distance_to_crater_km": 5.24
+        },
+        {
+          "trace_idx": 19018,
+          "lat": 38.468017810635565,
+          "lon": 87.89948914735048,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 9.36,
+          "distance_to_crater_km": 5.27
+        },
+        {
+          "trace_idx": 19019,
+          "lat": 38.46741243966971,
+          "lon": 87.89939495765307,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 10.7,
+          "distance_to_crater_km": 5.31
+        },
+        {
+          "trace_idx": 19020,
+          "lat": 38.46680706844255,
+          "lon": 87.8993007695741,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 11.84,
+          "distance_to_crater_km": 5.34
+        },
+        {
+          "trace_idx": 19021,
+          "lat": 38.466202505193884,
+          "lon": 87.8992067081758,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 13.24,
+          "distance_to_crater_km": 5.38
+        },
+        {
+          "trace_idx": 19022,
+          "lat": 38.465597133444476,
+          "lon": 87.89911252083128,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 14.79,
+          "distance_to_crater_km": 5.41
+        },
+        {
+          "trace_idx": 19023,
+          "lat": 38.46499176143375,
+          "lon": 87.89901833510514,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 15.07,
+          "distance_to_crater_km": 5.45
+        },
+        {
+          "trace_idx": 19024,
+          "lat": 38.464387197402544,
+          "lon": 87.89892427605645,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 16.28,
+          "distance_to_crater_km": 5.48
+        },
+        {
+          "trace_idx": 19025,
+          "lat": 38.46378182486957,
+          "lon": 87.89883009148146,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 18.47,
+          "distance_to_crater_km": 5.52
+        },
+        {
+          "trace_idx": 19026,
+          "lat": 38.463176452075274,
+          "lon": 87.89873590810785,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 17.12,
+          "distance_to_crater_km": 5.55
+        },
+        {
+          "trace_idx": 19027,
+          "lat": 38.46257107901967,
+          "lon": 87.89864172551874,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 15.14,
+          "distance_to_crater_km": 5.59
+        },
+        {
+          "trace_idx": 19028,
+          "lat": 38.461966513945,
+          "lon": 87.89854766876903,
+          "delta_bins": 36,
+          "twt_us": 1.3499999999999999,
+          "snr": 13.08,
+          "distance_to_crater_km": 5.62
+        },
+        {
+          "trace_idx": 19029,
+          "lat": 38.46136114036714,
+          "lon": 87.89845348774772,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 10.75,
+          "distance_to_crater_km": 5.66
+        },
+        {
+          "trace_idx": 19030,
+          "lat": 38.460755766527996,
+          "lon": 87.89835930751077,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 9.03,
+          "distance_to_crater_km": 5.69
+        },
+        {
+          "trace_idx": 19031,
+          "lat": 38.46015120067083,
+          "lon": 87.8982652535269,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 8.53,
+          "distance_to_crater_km": 5.73
+        },
+        {
+          "trace_idx": 19032,
+          "lat": 38.45954582630941,
+          "lon": 87.89817107485761,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 8.14,
+          "distance_to_crater_km": 5.76
+        },
+        {
+          "trace_idx": 19033,
+          "lat": 38.458940451686686,
+          "lon": 87.89807689697264,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 6.74,
+          "distance_to_crater_km": 5.8
+        },
+        {
+          "trace_idx": 19034,
+          "lat": 38.458335076802676,
+          "lon": 87.89798271945502,
+          "delta_bins": 52,
+          "twt_us": 1.95,
+          "snr": 6.28,
+          "distance_to_crater_km": 5.83
+        },
+        {
+          "trace_idx": 19035,
+          "lat": 38.45773050990206,
+          "lon": 87.89788866860302,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 7.24,
+          "distance_to_crater_km": 5.87
+        },
+        {
+          "trace_idx": 19036,
+          "lat": 38.457125134495804,
+          "lon": 87.8977944930697,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 7.97,
+          "distance_to_crater_km": 5.9
+        },
+        {
+          "trace_idx": 19037,
+          "lat": 38.45651975882823,
+          "lon": 87.89770031832056,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 9.09,
+          "distance_to_crater_km": 5.94
+        },
+        {
+          "trace_idx": 19038,
+          "lat": 38.45591519114511,
+          "lon": 87.89760626981688,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 9.98,
+          "distance_to_crater_km": 5.97
+        },
+        {
+          "trace_idx": 19039,
+          "lat": 38.4553098149553,
+          "lon": 87.89751209663493,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 11.58,
+          "distance_to_crater_km": 6.01
+        },
+        {
+          "trace_idx": 19040,
+          "lat": 38.45470443850417,
+          "lon": 87.89741792382019,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 12.59,
+          "distance_to_crater_km": 6.04
+        },
+        {
+          "trace_idx": 19041,
+          "lat": 38.45409987003858,
+          "lon": 87.89732387766462,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 13.63,
+          "distance_to_crater_km": 6.08
+        },
+        {
+          "trace_idx": 19042,
+          "lat": 38.45349449306523,
+          "lon": 87.89722970683377,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 13.94,
+          "distance_to_crater_km": 6.11
+        },
+        {
+          "trace_idx": 19043,
+          "lat": 38.45288911583059,
+          "lon": 87.89713553678698,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 14.54,
+          "distance_to_crater_km": 6.15
+        },
+        {
+          "trace_idx": 19044,
+          "lat": 38.452283738334664,
+          "lon": 87.8970413675241,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 17.26,
+          "distance_to_crater_km": 6.18
+        },
+        {
+          "trace_idx": 19045,
+          "lat": 38.451679168825606,
+          "lon": 87.8969473244992,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 20.85,
+          "distance_to_crater_km": 6.22
+        },
+        {
+          "trace_idx": 19046,
+          "lat": 38.45107379080743,
+          "lon": 87.89685315680315,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 25.51,
+          "distance_to_crater_km": 6.25
+        },
+        {
+          "trace_idx": 19047,
+          "lat": 38.45046841252797,
+          "lon": 87.89675898947405,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 30.74,
+          "distance_to_crater_km": 6.29
+        },
+        {
+          "trace_idx": 19048,
+          "lat": 38.44986384223643,
+          "lon": 87.89666494879661,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 34.59,
+          "distance_to_crater_km": 6.32
+        },
+        {
+          "trace_idx": 19049,
+          "lat": 38.44925846343474,
+          "lon": 87.89657078345103,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 36.68,
+          "distance_to_crater_km": 6.36
+        },
+        {
+          "trace_idx": 19050,
+          "lat": 38.44865308437176,
+          "lon": 87.89647661888924,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 39.33,
+          "distance_to_crater_km": 6.39
+        },
+        {
+          "trace_idx": 19051,
+          "lat": 38.44804770504747,
+          "lon": 87.89638245511121,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 36.95,
+          "distance_to_crater_km": 6.43
+        },
+        {
+          "trace_idx": 19052,
+          "lat": 38.447443133712525,
+          "lon": 87.89628841756361,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 38.32,
+          "distance_to_crater_km": 6.46
+        },
+        {
+          "trace_idx": 19053,
+          "lat": 38.44683775386603,
+          "lon": 87.89619425493507,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 36.84,
+          "distance_to_crater_km": 6.5
+        },
+        {
+          "trace_idx": 19054,
+          "lat": 38.44623237375823,
+          "lon": 87.89610009350709,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 38.26,
+          "distance_to_crater_km": 6.53
+        },
+        {
+          "trace_idx": 19055,
+          "lat": 38.445627801640825,
+          "lon": 87.89600605830627,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 34.11,
+          "distance_to_crater_km": 6.57
+        },
+        {
+          "trace_idx": 19056,
+          "lat": 38.445022421010805,
+          "lon": 87.8959118980276,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 32.71,
+          "distance_to_crater_km": 6.6
+        },
+        {
+          "trace_idx": 19057,
+          "lat": 38.44441704011949,
+          "lon": 87.8958177389494,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 30.86,
+          "distance_to_crater_km": 6.64
+        },
+        {
+          "trace_idx": 19058,
+          "lat": 38.44381246721961,
+          "lon": 87.89572370651204,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 29.21,
+          "distance_to_crater_km": 6.67
+        },
+        {
+          "trace_idx": 19059,
+          "lat": 38.44320708580608,
+          "lon": 87.89562954858293,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 26.35,
+          "distance_to_crater_km": 6.71
+        },
+        {
+          "trace_idx": 19060,
+          "lat": 38.44260170413128,
+          "lon": 87.89553539185422,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 26.39,
+          "distance_to_crater_km": 6.74
+        },
+        {
+          "trace_idx": 19061,
+          "lat": 38.44199632219516,
+          "lon": 87.89544123590898,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 24.84,
+          "distance_to_crater_km": 6.78
+        },
+        {
+          "trace_idx": 19062,
+          "lat": 38.44139174825189,
+          "lon": 87.89534720576653,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 23.0,
+          "distance_to_crater_km": 6.82
+        },
+        {
+          "trace_idx": 19063,
+          "lat": 38.440786365793585,
+          "lon": 87.89525305138702,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 19.72,
+          "distance_to_crater_km": 6.85
+        },
+        {
+          "trace_idx": 19064,
+          "lat": 38.44018098307398,
+          "lon": 87.8951588977909,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 18.01,
+          "distance_to_crater_km": 6.89
+        },
+        {
+          "trace_idx": 19065,
+          "lat": 38.439576408348266,
+          "lon": 87.89506487041125,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 15.42,
+          "distance_to_crater_km": 6.92
+        },
+        {
+          "trace_idx": 19066,
+          "lat": 38.43897102510643,
+          "lon": 87.89497071838073,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 14.18,
+          "distance_to_crater_km": 6.96
+        },
+        {
+          "trace_idx": 19067,
+          "lat": 38.43836564160334,
+          "lon": 87.8948765671335,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 12.62,
+          "distance_to_crater_km": 6.99
+        },
+        {
+          "trace_idx": 19068,
+          "lat": 38.43776106609519,
+          "lon": 87.89478254209948,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 12.2,
+          "distance_to_crater_km": 7.03
+        },
+        {
+          "trace_idx": 19069,
+          "lat": 38.43715568206987,
+          "lon": 87.89468839200077,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 11.22,
+          "distance_to_crater_km": 7.06
+        },
+        {
+          "trace_idx": 19070,
+          "lat": 38.436550297783285,
+          "lon": 87.89459424310215,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 10.43,
+          "distance_to_crater_km": 7.1
+        },
+        {
+          "trace_idx": 19071,
+          "lat": 38.435944913235446,
+          "lon": 87.89450009456978,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 10.38,
+          "distance_to_crater_km": 7.13
+        },
+        {
+          "trace_idx": 19072,
+          "lat": 38.4353403366839,
+          "lon": 87.8944060730801,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 10.98,
+          "distance_to_crater_km": 7.17
+        },
+        {
+          "trace_idx": 19073,
+          "lat": 38.434734951613834,
+          "lon": 87.89431192652981,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 11.54,
+          "distance_to_crater_km": 7.2
+        },
+        {
+          "trace_idx": 19074,
+          "lat": 38.434129566282486,
+          "lon": 87.89421778034571,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 11.57,
+          "distance_to_crater_km": 7.24
+        },
+        {
+          "trace_idx": 19075,
+          "lat": 38.43352498894851,
+          "lon": 87.89412376078417,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 12.24,
+          "distance_to_crater_km": 7.27
+        },
+        {
+          "trace_idx": 19076,
+          "lat": 38.43291960309497,
+          "lon": 87.89402961658196,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 12.72,
+          "distance_to_crater_km": 7.31
+        },
+        {
+          "trace_idx": 19077,
+          "lat": 38.432314216980146,
+          "lon": 87.89393547274582,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 12.96,
+          "distance_to_crater_km": 7.35
+        },
+        {
+          "trace_idx": 19078,
+          "lat": 38.43170883060406,
+          "lon": 87.89384133010951,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 13.27,
+          "distance_to_crater_km": 7.38
+        },
+        {
+          "trace_idx": 19079,
+          "lat": 38.43110425222674,
+          "lon": 87.8937473140915,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 14.6,
+          "distance_to_crater_km": 7.42
+        },
+        {
+          "trace_idx": 19080,
+          "lat": 38.43049886532843,
+          "lon": 87.89365317301996,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 14.83,
+          "distance_to_crater_km": 7.45
+        },
+        {
+          "trace_idx": 19081,
+          "lat": 38.42989347816888,
+          "lon": 87.89355903189751,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 15.37,
+          "distance_to_crater_km": 7.49
+        },
+        {
+          "trace_idx": 19082,
+          "lat": 38.42928889900912,
+          "lon": 87.89346501822388,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 17.01,
+          "distance_to_crater_km": 7.52
+        },
+        {
+          "trace_idx": 19083,
+          "lat": 38.428683511327364,
+          "lon": 87.89337087908291,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 18.81,
+          "distance_to_crater_km": 7.56
+        },
+        {
+          "trace_idx": 19084,
+          "lat": 38.42807812338435,
+          "lon": 87.89327674114156,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 18.33,
+          "distance_to_crater_km": 7.59
+        },
+        {
+          "trace_idx": 19085,
+          "lat": 38.42747273518004,
+          "lon": 87.89318260398298,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 17.1,
+          "distance_to_crater_km": 7.63
+        },
+        {
+          "trace_idx": 19086,
+          "lat": 38.426868154976944,
+          "lon": 87.89308859343514,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 15.27,
+          "distance_to_crater_km": 7.66
+        },
+        {
+          "trace_idx": 19087,
+          "lat": 38.42626276625045,
+          "lon": 87.89299445700713,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 13.18,
+          "distance_to_crater_km": 7.7
+        },
+        {
+          "trace_idx": 19088,
+          "lat": 38.42565737726271,
+          "lon": 87.89290032219552,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 11.24,
+          "distance_to_crater_km": 7.74
+        },
+        {
+          "trace_idx": 19089,
+          "lat": 38.425052796277214,
+          "lon": 87.89280631399144,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 8.23,
+          "distance_to_crater_km": 7.77
+        },
+        {
+          "trace_idx": 19095,
+          "lat": 38.421421263564206,
+          "lon": 87.89224165081264,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.27,
+          "distance_to_crater_km": 7.98
+        },
+        {
+          "trace_idx": 19096,
+          "lat": 38.420815872487026,
+          "lon": 87.89214752184218,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 9.51,
+          "distance_to_crater_km": 8.02
+        },
+        {
+          "trace_idx": 19097,
+          "lat": 38.420211289414894,
+          "lon": 87.89205351947065,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 10.12,
+          "distance_to_crater_km": 8.05
+        },
+        {
+          "trace_idx": 19098,
+          "lat": 38.41960589781555,
+          "lon": 87.89195939289765,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.95,
+          "distance_to_crater_km": 8.09
+        },
+        {
+          "trace_idx": 19099,
+          "lat": 38.419000505954905,
+          "lon": 87.8918652662732,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 10.61,
+          "distance_to_crater_km": 8.13
+        },
+        {
+          "trace_idx": 19100,
+          "lat": 38.4183959221004,
+          "lon": 87.89177126624446,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 14.94,
+          "distance_to_crater_km": 8.16
+        },
+        {
+          "trace_idx": 19101,
+          "lat": 38.4177905297176,
+          "lon": 87.89167714160041,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 20.83,
+          "distance_to_crater_km": 8.2
+        },
+        {
+          "trace_idx": 19102,
+          "lat": 38.417185137073545,
+          "lon": 87.89158301732168,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 25.79,
+          "distance_to_crater_km": 8.23
+        },
+        {
+          "trace_idx": 19103,
+          "lat": 38.41657974416823,
+          "lon": 87.89148889424207,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 32.41,
+          "distance_to_crater_km": 8.27
+        },
+        {
+          "trace_idx": 19104,
+          "lat": 38.415975159270424,
+          "lon": 87.89139489733697,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 32.81,
+          "distance_to_crater_km": 8.3
+        },
+        {
+          "trace_idx": 19105,
+          "lat": 38.41536976584293,
+          "lon": 87.89130077623749,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 33.42,
+          "distance_to_crater_km": 8.34
+        },
+        {
+          "trace_idx": 19106,
+          "lat": 38.414764372154195,
+          "lon": 87.89120665508636,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 34.42,
+          "distance_to_crater_km": 8.37
+        },
+        {
+          "trace_idx": 19107,
+          "lat": 38.414159786473995,
+          "lon": 87.89111266052342,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 34.31,
+          "distance_to_crater_km": 8.41
+        },
+        {
+          "trace_idx": 19108,
+          "lat": 38.4135543922631,
+          "lon": 87.89101854135225,
+          "delta_bins": 24,
+          "twt_us": 0.8999999999999999,
+          "snr": 30.86,
+          "distance_to_crater_km": 8.45
+        },
+        {
+          "trace_idx": 19109,
+          "lat": 38.41294899779095,
+          "lon": 87.89092442254623,
+          "delta_bins": 28,
+          "twt_us": 1.05,
+          "snr": 26.4,
+          "distance_to_crater_km": 8.48
+        },
+        {
+          "trace_idx": 19110,
+          "lat": 38.412343603057515,
+          "lon": 87.89083030452221,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 28.97,
+          "distance_to_crater_km": 8.52
+        },
+        {
+          "trace_idx": 19111,
+          "lat": 38.41173901633405,
+          "lon": 87.89073631349896,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 35.73,
+          "distance_to_crater_km": 8.55
+        },
+        {
+          "trace_idx": 19112,
+          "lat": 38.411133621078484,
+          "lon": 87.89064219745465,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 47.67,
+          "distance_to_crater_km": 8.59
+        },
+        {
+          "trace_idx": 19113,
+          "lat": 38.410528225561656,
+          "lon": 87.89054808219227,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 62.77,
+          "distance_to_crater_km": 8.62
+        },
+        {
+          "trace_idx": 19114,
+          "lat": 38.40992363805581,
+          "lon": 87.89045409309368,
+          "delta_bins": 29,
+          "twt_us": 1.0875,
+          "snr": 80.01,
+          "distance_to_crater_km": 8.66
+        },
+        {
+          "trace_idx": 19115,
+          "lat": 38.409318242016816,
+          "lon": 87.89035997897709,
+          "delta_bins": 28,
+          "twt_us": 1.05,
+          "snr": 99.5,
+          "distance_to_crater_km": 8.69
+        },
+        {
+          "trace_idx": 19127,
+          "lat": 38.40205589400187,
+          "lon": 87.88923105040764,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 137.7,
+          "distance_to_crater_km": 9.12
+        },
+        {
+          "trace_idx": 19128,
+          "lat": 38.401451302844826,
+          "lon": 87.88913707265026,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 147.74,
+          "distance_to_crater_km": 9.16
+        },
+        {
+          "trace_idx": 19129,
+          "lat": 38.400845903149765,
+          "lon": 87.88904296947211,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 166.59,
+          "distance_to_crater_km": 9.19
+        },
+        {
+          "trace_idx": 19130,
+          "lat": 38.40024050319347,
+          "lon": 87.88894886749226,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 171.55,
+          "distance_to_crater_km": 9.23
+        },
+        {
+          "trace_idx": 19131,
+          "lat": 38.399635911254094,
+          "lon": 87.88885489207486,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 165.42,
+          "distance_to_crater_km": 9.26
+        },
+        {
+          "trace_idx": 19132,
+          "lat": 38.39903051077564,
+          "lon": 87.8887607916567,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 159.75,
+          "distance_to_crater_km": 9.3
+        },
+        {
+          "trace_idx": 19133,
+          "lat": 38.39842511003595,
+          "lon": 87.88866669160291,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 144.88,
+          "distance_to_crater_km": 9.34
+        },
+        {
+          "trace_idx": 19134,
+          "lat": 38.39781970903503,
+          "lon": 87.88857259233042,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 109.89,
+          "distance_to_crater_km": 9.37
+        },
+        {
+          "trace_idx": 19135,
+          "lat": 38.39721511605243,
+          "lon": 87.88847862003297,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 91.48,
+          "distance_to_crater_km": 9.41
+        },
+        {
+          "trace_idx": 19136,
+          "lat": 38.39660971452937,
+          "lon": 87.8883845223219,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 65.87,
+          "distance_to_crater_km": 9.44
+        },
+        {
+          "trace_idx": 19137,
+          "lat": 38.39600431274508,
+          "lon": 87.88829042580888,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 47.71,
+          "distance_to_crater_km": 9.48
+        },
+        {
+          "trace_idx": 19138,
+          "lat": 38.39539971898016,
+          "lon": 87.88819645585082,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 31.23,
+          "distance_to_crater_km": 9.51
+        },
+        {
+          "trace_idx": 19139,
+          "lat": 38.394794316673725,
+          "lon": 87.88810236048218,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 16.14,
+          "distance_to_crater_km": 9.55
+        },
+        {
+          "trace_idx": 19142,
+          "lat": 38.39297891646903,
+          "lon": 87.8878202052492,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 6.58,
+          "distance_to_crater_km": 9.66
+        },
+        {
+          "trace_idx": 19143,
+          "lat": 38.39237351311801,
+          "lon": 87.88772611300371,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 6.59,
+          "distance_to_crater_km": 9.69
+        },
+        {
+          "trace_idx": 19146,
+          "lat": 38.39055810978093,
+          "lon": 87.88744396755219,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 7.24,
+          "distance_to_crater_km": 9.8
+        },
+        {
+          "trace_idx": 19147,
+          "lat": 38.38995270538532,
+          "lon": 87.88734987884628,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.06,
+          "distance_to_crater_km": 9.83
+        },
+        {
+          "trace_idx": 19148,
+          "lat": 38.38934810901256,
+          "lon": 87.88725591626772,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.48,
+          "distance_to_crater_km": 9.87
+        },
+        {
+          "trace_idx": 19149,
+          "lat": 38.38874270409483,
+          "lon": 87.88716182870557,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 7.31,
+          "distance_to_crater_km": 9.91
+        },
+        {
+          "trace_idx": 19152,
+          "lat": 38.38692729605975,
+          "lon": 87.88687969729672,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 8.93,
+          "distance_to_crater_km": 10.01
+        },
+        {
+          "trace_idx": 19153,
+          "lat": 38.38632189009744,
+          "lon": 87.88678561327342,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.49,
+          "distance_to_crater_km": 10.05
+        },
+        {
+          "trace_idx": 19154,
+          "lat": 38.385716483873935,
+          "lon": 87.88669153003077,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 7.66,
+          "distance_to_crater_km": 10.08
+        },
+        {
+          "trace_idx": 19155,
+          "lat": 38.3851118856757,
+          "lon": 87.88659757290799,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 7.25,
+          "distance_to_crater_km": 10.12
+        },
+        {
+          "trace_idx": 19156,
+          "lat": 38.38450647893005,
+          "lon": 87.88650349080872,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 7.63,
+          "distance_to_crater_km": 10.16
+        },
+        {
+          "trace_idx": 19157,
+          "lat": 38.38390107192318,
+          "lon": 87.88640940990693,
+          "delta_bins": 42,
+          "twt_us": 1.575,
+          "snr": 7.75,
+          "distance_to_crater_km": 10.19
+        },
+        {
+          "trace_idx": 19158,
+          "lat": 38.383296472942675,
+          "lon": 87.88631545512173,
+          "delta_bins": 41,
+          "twt_us": 1.5374999999999999,
+          "snr": 7.27,
+          "distance_to_crater_km": 10.23
+        },
+        {
+          "trace_idx": 19159,
+          "lat": 38.3826910654137,
+          "lon": 87.88622137577997,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 7.34,
+          "distance_to_crater_km": 10.26
+        },
+        {
+          "trace_idx": 19160,
+          "lat": 38.38208565762351,
+          "lon": 87.8861272972187,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 8.18,
+          "distance_to_crater_km": 10.3
+        },
+        {
+          "trace_idx": 19161,
+          "lat": 38.381480249572064,
+          "lon": 87.88603321902106,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 9.02,
+          "distance_to_crater_km": 10.33
+        },
+        {
+          "trace_idx": 19162,
+          "lat": 38.38087564954839,
+          "lon": 87.88593926735258,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 9.64,
+          "distance_to_crater_km": 10.37
+        },
+        {
+          "trace_idx": 19163,
+          "lat": 38.38027024097488,
+          "lon": 87.88584519113162,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 10.55,
+          "distance_to_crater_km": 10.41
+        },
+        {
+          "trace_idx": 19164,
+          "lat": 38.379664832140136,
+          "lon": 87.88575111569101,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 11.94,
+          "distance_to_crater_km": 10.44
+        },
+        {
+          "trace_idx": 19165,
+          "lat": 38.37906023133417,
+          "lon": 87.88565716635954,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 11.03,
+          "distance_to_crater_km": 10.48
+        },
+        {
+          "trace_idx": 19166,
+          "lat": 38.37845482197734,
+          "lon": 87.88556309247856,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 7.15,
+          "distance_to_crater_km": 10.51
+        },
+        {
+          "trace_idx": 19167,
+          "lat": 38.377849412359275,
+          "lon": 87.8854690193779,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 6.86,
+          "distance_to_crater_km": 10.55
+        },
+        {
+          "trace_idx": 19168,
+          "lat": 38.377244002479976,
+          "lon": 87.8853749466406,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 7.88,
+          "distance_to_crater_km": 10.58
+        },
+        {
+          "trace_idx": 19169,
+          "lat": 38.37663940063088,
+          "lon": 87.88528100042502,
+          "delta_bins": 31,
+          "twt_us": 1.1624999999999999,
+          "snr": 8.33,
+          "distance_to_crater_km": 10.62
+        },
+        {
+          "trace_idx": 19170,
+          "lat": 38.3760339902295,
+          "lon": 87.88518692966399,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 8.08,
+          "distance_to_crater_km": 10.66
+        },
+        {
+          "trace_idx": 19171,
+          "lat": 38.37542857956691,
+          "lon": 87.88509285968314,
+          "delta_bins": 32,
+          "twt_us": 1.2,
+          "snr": 8.46,
+          "distance_to_crater_km": 10.69
+        },
+        {
+          "trace_idx": 19172,
+          "lat": 38.37482316864307,
+          "lon": 87.88499879006557,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 10.92,
+          "distance_to_crater_km": 10.73
+        },
+        {
+          "trace_idx": 19173,
+          "lat": 38.37421856575085,
+          "lon": 87.88490484738229,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 10.89,
+          "distance_to_crater_km": 10.76
+        },
+        {
+          "trace_idx": 19174,
+          "lat": 38.37361315430496,
+          "lon": 87.88481077932384,
+          "delta_bins": 21,
+          "twt_us": 0.7875,
+          "snr": 10.92,
+          "distance_to_crater_km": 10.8
+        },
+        {
+          "trace_idx": 19175,
+          "lat": 38.37300774259784,
+          "lon": 87.88471671204547,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 10.86,
+          "distance_to_crater_km": 10.84
+        },
+        {
+          "trace_idx": 19176,
+          "lat": 38.372403138923346,
+          "lon": 87.88462277169819,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 11.73,
+          "distance_to_crater_km": 10.87
+        },
+        {
+          "trace_idx": 19177,
+          "lat": 38.37179772669413,
+          "lon": 87.88452870639568,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 16.99,
+          "distance_to_crater_km": 10.91
+        },
+        {
+          "trace_idx": 19178,
+          "lat": 38.37119231420373,
+          "lon": 87.88443464187309,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 21.96,
+          "distance_to_crater_km": 10.94
+        },
+        {
+          "trace_idx": 19179,
+          "lat": 38.370586901452086,
+          "lon": 87.88434057771359,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 23.76,
+          "distance_to_crater_km": 10.98
+        },
+        {
+          "trace_idx": 19180,
+          "lat": 38.36998229673449,
+          "lon": 87.88424664006403,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 29.91,
+          "distance_to_crater_km": 11.01
+        },
+        {
+          "trace_idx": 19181,
+          "lat": 38.36937688346076,
+          "lon": 87.88415257746327,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 32.44,
+          "distance_to_crater_km": 11.05
+        },
+        {
+          "trace_idx": 19182,
+          "lat": 38.36877146992583,
+          "lon": 87.88405851605921,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 30.69,
+          "distance_to_crater_km": 11.09
+        },
+        {
+          "trace_idx": 19183,
+          "lat": 38.36816686442599,
+          "lon": 87.88396458074502,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 29.2,
+          "distance_to_crater_km": 11.12
+        },
+        {
+          "trace_idx": 19184,
+          "lat": 38.36756145036899,
+          "lon": 87.88387052048266,
+          "delta_bins": 35,
+          "twt_us": 1.3125,
+          "snr": 24.76,
+          "distance_to_crater_km": 11.16
+        },
+        {
+          "trace_idx": 19185,
+          "lat": 38.36695603605077,
+          "lon": 87.88377646183382,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 21.48,
+          "distance_to_crater_km": 11.19
+        },
+        {
+          "trace_idx": 19186,
+          "lat": 38.36635062147135,
+          "lon": 87.88368240313093,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 17.61,
+          "distance_to_crater_km": 11.23
+        },
+        {
+          "trace_idx": 19187,
+          "lat": 38.3657460149284,
+          "lon": 87.88358847134737,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 13.13,
+          "distance_to_crater_km": 11.26
+        },
+        {
+          "trace_idx": 19188,
+          "lat": 38.365140599826915,
+          "lon": 87.8834944142028,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 9.68,
+          "distance_to_crater_km": 11.3
+        },
+        {
+          "trace_idx": 19189,
+          "lat": 38.36453518446421,
+          "lon": 87.88340035783789,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 7.18,
+          "distance_to_crater_km": 11.34
+        },
+        {
+          "trace_idx": 19190,
+          "lat": 38.36393057713903,
+          "lon": 87.8833064279722,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 7.07,
+          "distance_to_crater_km": 11.37
+        },
+        {
+          "trace_idx": 19191,
+          "lat": 38.36332516125425,
+          "lon": 87.88321237358228,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 8.14,
+          "distance_to_crater_km": 11.41
+        },
+        {
+          "trace_idx": 19192,
+          "lat": 38.36271974510829,
+          "lon": 87.88311831997193,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 9.15,
+          "distance_to_crater_km": 11.44
+        },
+        {
+          "trace_idx": 19193,
+          "lat": 38.3621143287011,
+          "lon": 87.8830242671411,
+          "delta_bins": 22,
+          "twt_us": 0.825,
+          "snr": 8.73,
+          "distance_to_crater_km": 11.48
+        },
+        {
+          "trace_idx": 19194,
+          "lat": 38.36150972033283,
+          "lon": 87.88293034038834,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 8.29,
+          "distance_to_crater_km": 11.51
+        },
+        {
+          "trace_idx": 19195,
+          "lat": 38.36090430340358,
+          "lon": 87.8828362891154,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 7.96,
+          "distance_to_crater_km": 11.55
+        },
+        {
+          "trace_idx": 19196,
+          "lat": 38.36029888621312,
+          "lon": 87.88274223820503,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 6.73,
+          "distance_to_crater_km": 11.59
+        },
+        {
+          "trace_idx": 19197,
+          "lat": 38.35969427706265,
+          "lon": 87.88264831378638,
+          "delta_bins": 23,
+          "twt_us": 0.8624999999999999,
+          "snr": 5.29,
+          "distance_to_crater_km": 11.62
+        },
+        {
+          "trace_idx": 19199,
+          "lat": 38.35848344137643,
+          "lon": 87.88246021669417,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 4.85,
+          "distance_to_crater_km": 11.69
+        },
+        {
+          "trace_idx": 19200,
+          "lat": 38.357878023141495,
+          "lon": 87.88236616931704,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 5.25,
+          "distance_to_crater_km": 11.73
+        },
+        {
+          "trace_idx": 19201,
+          "lat": 38.35727341294796,
+          "lon": 87.8822722480105,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 5.42,
+          "distance_to_crater_km": 11.77
+        },
+        {
+          "trace_idx": 19218,
+          "lat": 38.34698530009905,
+          "lon": 87.8806742001478,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 13.24,
+          "distance_to_crater_km": 12.37
+        },
+        {
+          "trace_idx": 19219,
+          "lat": 38.346379876903484,
+          "lon": 87.88058016756567,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 16.12,
+          "distance_to_crater_km": 12.41
+        },
+        {
+          "trace_idx": 19220,
+          "lat": 38.345774453446744,
+          "lon": 87.88048613534535,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 17.51,
+          "distance_to_crater_km": 12.45
+        },
+        {
+          "trace_idx": 19221,
+          "lat": 38.34516902972881,
+          "lon": 87.88039210390372,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 17.67,
+          "distance_to_crater_km": 12.48
+        },
+        {
+          "trace_idx": 19222,
+          "lat": 38.34456441405958,
+          "lon": 87.88029819934398,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 17.15,
+          "distance_to_crater_km": 12.52
+        },
+        {
+          "trace_idx": 19223,
+          "lat": 38.343958989819605,
+          "lon": 87.88020416945861,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 16.88,
+          "distance_to_crater_km": 12.55
+        },
+        {
+          "trace_idx": 19224,
+          "lat": 38.34335356531845,
+          "lon": 87.88011014118558,
+          "delta_bins": 53,
+          "twt_us": 1.9874999999999998,
+          "snr": 14.68,
+          "distance_to_crater_km": 12.59
+        },
+        {
+          "trace_idx": 19225,
+          "lat": 38.34274894886705,
+          "lon": 87.88001623854059,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 13.9,
+          "distance_to_crater_km": 12.63
+        },
+        {
+          "trace_idx": 19226,
+          "lat": 38.342143523843866,
+          "lon": 87.87992221140674,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 12.35,
+          "distance_to_crater_km": 12.66
+        },
+        {
+          "trace_idx": 19227,
+          "lat": 38.3415380985595,
+          "lon": 87.87982818421764,
+          "delta_bins": 40,
+          "twt_us": 1.5,
+          "snr": 10.83,
+          "distance_to_crater_km": 12.7
+        },
+        {
+          "trace_idx": 19228,
+          "lat": 38.34093348132593,
+          "lon": 87.8797342843209,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 9.13,
+          "distance_to_crater_km": 12.73
+        },
+        {
+          "trace_idx": 19229,
+          "lat": 38.34032805551954,
+          "lon": 87.87964025952145,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 8.81,
+          "distance_to_crater_km": 12.77
+        },
+        {
+          "trace_idx": 19230,
+          "lat": 38.33972262945196,
+          "lon": 87.87954623466665,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 8.78,
+          "distance_to_crater_km": 12.8
+        },
+        {
+          "trace_idx": 19231,
+          "lat": 38.339117203123216,
+          "lon": 87.879452211424,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 15.47,
+          "distance_to_crater_km": 12.84
+        },
+        {
+          "trace_idx": 19232,
+          "lat": 38.338512584846654,
+          "lon": 87.87935831463565,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 18.16,
+          "distance_to_crater_km": 12.88
+        },
+        {
+          "trace_idx": 19233,
+          "lat": 38.33790715799586,
+          "lon": 87.87926429294866,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 19.81,
+          "distance_to_crater_km": 12.91
+        },
+        {
+          "trace_idx": 19234,
+          "lat": 38.33730173088391,
+          "lon": 87.8791702716231,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 20.5,
+          "distance_to_crater_km": 12.95
+        },
+        {
+          "trace_idx": 19235,
+          "lat": 38.33669711182518,
+          "lon": 87.87907637716552,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 19.52,
+          "distance_to_crater_km": 12.98
+        },
+        {
+          "trace_idx": 19236,
+          "lat": 38.33609168419124,
+          "lon": 87.87898235697848,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 18.59,
+          "distance_to_crater_km": 13.02
+        },
+        {
+          "trace_idx": 19237,
+          "lat": 38.33548625629608,
+          "lon": 87.87888833840347,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 15.16,
+          "distance_to_crater_km": 13.06
+        },
+        {
+          "trace_idx": 19238,
+          "lat": 38.334881636455194,
+          "lon": 87.87879444627637,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.67,
+          "distance_to_crater_km": 13.09
+        },
+        {
+          "trace_idx": 19239,
+          "lat": 38.33427620803805,
+          "lon": 87.87870042925664,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 15.66,
+          "distance_to_crater_km": 13.13
+        },
+        {
+          "trace_idx": 19240,
+          "lat": 38.33367077935972,
+          "lon": 87.87860641259812,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.1,
+          "distance_to_crater_km": 13.16
+        },
+        {
+          "trace_idx": 19241,
+          "lat": 38.333065350420185,
+          "lon": 87.8785123971346,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 16.05,
+          "distance_to_crater_km": 13.2
+        },
+        {
+          "trace_idx": 19242,
+          "lat": 38.33246072953634,
+          "lon": 87.87841850769786,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 12.9,
+          "distance_to_crater_km": 13.23
+        },
+        {
+          "trace_idx": 19243,
+          "lat": 38.331855300074814,
+          "lon": 87.8783244933725,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 13.27,
+          "distance_to_crater_km": 13.27
+        },
+        {
+          "trace_idx": 19244,
+          "lat": 38.331249870352124,
+          "lon": 87.87823048024202,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 11.56,
+          "distance_to_crater_km": 13.31
+        },
+        {
+          "trace_idx": 19245,
+          "lat": 38.33064524868615,
+          "lon": 87.87813659355199,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 11.3,
+          "distance_to_crater_km": 13.34
+        },
+        {
+          "trace_idx": 19246,
+          "lat": 38.33003981844144,
+          "lon": 87.87804258155953,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 9.38,
+          "distance_to_crater_km": 13.38
+        },
+        {
+          "trace_idx": 19247,
+          "lat": 38.329434387935585,
+          "lon": 87.87794857076186,
+          "delta_bins": 20,
+          "twt_us": 0.75,
+          "snr": 9.93,
+          "distance_to_crater_km": 13.41
+        },
+        {
+          "trace_idx": 19248,
+          "lat": 38.32882976548746,
+          "lon": 87.8778546864014,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 8.95,
+          "distance_to_crater_km": 13.45
+        },
+        {
+          "trace_idx": 19249,
+          "lat": 38.32822433445959,
+          "lon": 87.87776067632466,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 9.83,
+          "distance_to_crater_km": 13.49
+        },
+        {
+          "trace_idx": 19250,
+          "lat": 38.327618903170546,
+          "lon": 87.8776666678595,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 9.77,
+          "distance_to_crater_km": 13.52
+        },
+        {
+          "trace_idx": 19251,
+          "lat": 38.32701347162032,
+          "lon": 87.87757266017215,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 8.92,
+          "distance_to_crater_km": 13.56
+        },
+        {
+          "trace_idx": 19252,
+          "lat": 38.32640884812928,
+          "lon": 87.87747877850086,
+          "delta_bins": 33,
+          "twt_us": 1.2375,
+          "snr": 7.24,
+          "distance_to_crater_km": 13.59
+        },
+        {
+          "trace_idx": 19260,
+          "lat": 38.32156700088508,
+          "lon": 87.87672700125485,
+          "delta_bins": 51,
+          "twt_us": 1.9124999999999999,
+          "snr": 9.39,
+          "distance_to_crater_km": 13.88
+        },
+        {
+          "trace_idx": 19261,
+          "lat": 38.32096156672421,
+          "lon": 87.87663300092377,
+          "delta_bins": 51,
+          "twt_us": 1.9124999999999999,
+          "snr": 10.09,
+          "distance_to_crater_km": 13.92
+        },
+        {
+          "trace_idx": 19262,
+          "lat": 38.32035613230218,
+          "lon": 87.87653900178708,
+          "delta_bins": 56,
+          "twt_us": 2.1,
+          "snr": 10.42,
+          "distance_to_crater_km": 13.95
+        },
+        {
+          "trace_idx": 19263,
+          "lat": 38.31975150594316,
+          "lon": 87.87644512865472,
+          "delta_bins": 55,
+          "twt_us": 2.0625,
+          "snr": 9.87,
+          "distance_to_crater_km": 13.99
+        },
+        {
+          "trace_idx": 19264,
+          "lat": 38.31914607099915,
+          "lon": 87.87635113107181,
+          "delta_bins": 55,
+          "twt_us": 2.0625,
+          "snr": 9.11,
+          "distance_to_crater_km": 14.02
+        },
+        {
+          "trace_idx": 19265,
+          "lat": 38.31854063579399,
+          "lon": 87.87625713426628,
+          "delta_bins": 55,
+          "twt_us": 2.0625,
+          "snr": 8.02,
+          "distance_to_crater_km": 14.06
+        },
+        {
+          "trace_idx": 19266,
+          "lat": 38.31793600865287,
+          "lon": 87.87616326346192,
+          "delta_bins": 55,
+          "twt_us": 2.0625,
+          "snr": 7.14,
+          "distance_to_crater_km": 14.1
+        },
+        {
+          "trace_idx": 19268,
+          "lat": 38.316725136937386,
+          "lon": 87.87597527331857,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 6.38,
+          "distance_to_crater_km": 14.17
+        },
+        {
+          "trace_idx": 19269,
+          "lat": 38.316119700687935,
+          "lon": 87.8758812796212,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 6.98,
+          "distance_to_crater_km": 14.2
+        },
+        {
+          "trace_idx": 19270,
+          "lat": 38.31551507250391,
+          "lon": 87.87578741150385,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 6.9,
+          "distance_to_crater_km": 14.24
+        },
+        {
+          "trace_idx": 19271,
+          "lat": 38.314909635732455,
+          "lon": 87.87569341935992,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 7.38,
+          "distance_to_crater_km": 14.28
+        },
+        {
+          "trace_idx": 19272,
+          "lat": 38.31430419869984,
+          "lon": 87.87559942841003,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 7.56,
+          "distance_to_crater_km": 14.31
+        },
+        {
+          "trace_idx": 19273,
+          "lat": 38.31369956973375,
+          "lon": 87.87550556262002,
+          "delta_bins": 39,
+          "twt_us": 1.4625,
+          "snr": 7.44,
+          "distance_to_crater_km": 14.35
+        },
+        {
+          "trace_idx": 19274,
+          "lat": 38.31309413217919,
+          "lon": 87.87541157280646,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 7.76,
+          "distance_to_crater_km": 14.38
+        },
+        {
+          "trace_idx": 19275,
+          "lat": 38.312488694363445,
+          "lon": 87.87531758377,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 8.63,
+          "distance_to_crater_km": 14.42
+        },
+        {
+          "trace_idx": 19276,
+          "lat": 38.311883256286535,
+          "lon": 87.87522359467681,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 9.87,
+          "distance_to_crater_km": 14.45
+        },
+        {
+          "trace_idx": 19277,
+          "lat": 38.311278626277556,
+          "lon": 87.87512973282365,
+          "delta_bins": 26,
+          "twt_us": 0.975,
+          "snr": 10.03,
+          "distance_to_crater_km": 14.49
+        },
+        {
+          "trace_idx": 19278,
+          "lat": 38.3106731876787,
+          "lon": 87.8750357461172,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 11.71,
+          "distance_to_crater_km": 14.53
+        },
+        {
+          "trace_idx": 19279,
+          "lat": 38.310067748818696,
+          "lon": 87.87494176018772,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 11.11,
+          "distance_to_crater_km": 14.56
+        },
+        {
+          "trace_idx": 19280,
+          "lat": 38.309462309697516,
+          "lon": 87.8748477746183,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 10.33,
+          "distance_to_crater_km": 14.6
+        },
+        {
+          "trace_idx": 19281,
+          "lat": 38.30885767864565,
+          "lon": 87.87475391586776,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 9.91,
+          "distance_to_crater_km": 14.63
+        },
+        {
+          "trace_idx": 19282,
+          "lat": 38.308252239002535,
+          "lon": 87.8746599314342,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 8.85,
+          "distance_to_crater_km": 14.67
+        },
+        {
+          "trace_idx": 19283,
+          "lat": 38.307646799098244,
+          "lon": 87.87456594861122,
+          "delta_bins": 25,
+          "twt_us": 0.9375,
+          "snr": 7.48,
+          "distance_to_crater_km": 14.71
+        },
+        {
+          "trace_idx": 19284,
+          "lat": 38.30704216726431,
+          "lon": 87.87447209218708,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 6.55,
+          "distance_to_crater_km": 14.74
+        },
+        {
+          "trace_idx": 19285,
+          "lat": 38.30643672683809,
+          "lon": 87.87437811091668,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 6.8,
+          "distance_to_crater_km": 14.78
+        },
+        {
+          "trace_idx": 19286,
+          "lat": 38.305831286150685,
+          "lon": 87.87428413000616,
+          "delta_bins": 34,
+          "twt_us": 1.275,
+          "snr": 7.97,
+          "distance_to_crater_km": 14.81
+        },
+        {
+          "trace_idx": 19287,
+          "lat": 38.30522584520214,
+          "lon": 87.87419015028924,
+          "delta_bins": 44,
+          "twt_us": 1.65,
+          "snr": 8.02,
+          "distance_to_crater_km": 14.85
+        },
+        {
+          "trace_idx": 19288,
+          "lat": 38.304621212325344,
+          "lon": 87.87409629696687,
+          "delta_bins": 44,
+          "twt_us": 1.65,
+          "snr": 8.68,
+          "distance_to_crater_km": 14.89
+        },
+        {
+          "trace_idx": 19289,
+          "lat": 38.30401577085485,
+          "lon": 87.87400231796853,
+          "delta_bins": 44,
+          "twt_us": 1.65,
+          "snr": 8.72,
+          "distance_to_crater_km": 14.92
+        },
+        {
+          "trace_idx": 19290,
+          "lat": 38.30341032912322,
+          "lon": 87.87390834058057,
+          "delta_bins": 44,
+          "twt_us": 1.65,
+          "snr": 9.47,
+          "distance_to_crater_km": 14.96
+        },
+        {
+          "trace_idx": 19291,
+          "lat": 38.30280569546437,
+          "lon": 87.87381448958396,
+          "delta_bins": 44,
+          "twt_us": 1.65,
+          "snr": 9.87,
+          "distance_to_crater_km": 14.99
+        },
+        {
+          "trace_idx": 19292,
+          "lat": 38.30220025321078,
+          "lon": 87.87372051333129,
+          "delta_bins": 44,
+          "twt_us": 1.65,
+          "snr": 9.92,
+          "distance_to_crater_km": 15.03
+        }
+      ]
+    }
+  ],
+  "epsilon_estimates": [
+    {
+      "crater_id": "DTEEC_072039_2190_072250_2190_A01",
+      "depth_metric": "terrace_to_floor",
+      "depth_true_m": 83.9,
+      "depth_unc_m": 2.0,
+      "twt_us": 1.0875,
+      "twt_unc_us": 0.4153,
+      "epsilon_r": 3.77,
+      "epsilon_low": 1.38,
+      "epsilon_high": 7.57,
+      "interpretation": "ice-cemented regolith or ice-rock mixture",
+      "quality": "good",
+      "quality_note": "",
+      "sharad_product": "R_6777202_001_SS4_700_A",
+      "n_sharad_picks": 635
+    }
+  ],
+  "summary": "1 \u03b5r estimates from 1 craters. Mean \u03b5r = 3.77 (ice-cemented regolith or ice-rock mixture)"
+}

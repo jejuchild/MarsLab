@@ -60,7 +60,8 @@ type ChatEntry =
   | { type: "thought"; text: string; iteration: number; streaming: boolean }
   | { type: "action"; tool: string; params: Record<string, unknown>; iteration: number }
   | { type: "observation"; tool: string; text: string; success: boolean; iteration: number }
-  | { type: "finish"; summary: string; recommendation: string };
+  | { type: "finish"; summary: string; recommendation: string }
+  | { type: "respond"; message: string };
 
 const TOOL_ICONS: Record<string, string> = {
   resolve_region: "location_on",
@@ -117,6 +118,7 @@ type SessionData = {
   completedSteps: number;
   chatLog: ChatEntry[];
   agentMode: "react" | "rules" | null;
+  sessionMode: "science" | "chat" | null;
   iterationCount: number;
   activeAction: { tool: string; params: Record<string, unknown> } | null;
 };
@@ -138,6 +140,7 @@ const INITIAL_SESSION: SessionData = {
   completedSteps: 0,
   chatLog: [],
   agentMode: null,
+  sessionMode: null,
   iterationCount: 0,
   activeAction: null,
 };
@@ -217,7 +220,12 @@ function applyEvent(s: SessionData, event: AgentEvent, narrativePhase: boolean):
     case "figures":
       return { ...s, figures: (event.data.figures as EvidenceFigure[]) || [] };
     case "done":
-      return { ...s, synthesis: (event.data.synthesis as Record<string, unknown>) || null, sessionState: "done" };
+      return {
+        ...s,
+        synthesis: (event.data.synthesis as Record<string, unknown>) || null,
+        sessionMode: (event.data.mode as "science" | "chat") || "science",
+        sessionState: "done",
+      };
     case "evidence_pack_assembled":
     case "report_generated":
     case "artifacts_saved":
@@ -290,14 +298,24 @@ function applyEvent(s: SessionData, event: AgentEvent, narrativePhase: boolean):
       };
     }
     case "action": {
-      if ((event.data.tool as string) === "finish") {
-        const fp = (event.data.params as Record<string, unknown>) || {};
+      const toolName = event.data.tool as string;
+      const fp = (event.data.params as Record<string, unknown>) || {};
+      if (toolName === "finish") {
         return {
           ...s,
           chatLog: [...s.chatLog, {
             type: "finish" as const,
             summary: (fp.summary as string) || "",
             recommendation: (fp.recommendation as string) || "",
+          }],
+        };
+      }
+      if (toolName === "respond") {
+        return {
+          ...s,
+          chatLog: [...s.chatLog, {
+            type: "respond" as const,
+            message: (fp.message as string) || "",
           }],
         };
       }
@@ -568,7 +586,7 @@ export default function AgenticPanel({
     if (isError) {
       dispatch({ type: "EVENT", event: { event: "error", data: { error: (data.error as string) || "Session ended with error" } }, narrativePhase: false });
     } else {
-      dispatch({ type: "EVENT", event: { event: "done", data: { synthesis: data.synthesis || null } }, narrativePhase: false });
+      dispatch({ type: "EVENT", event: { event: "done", data: { synthesis: data.synthesis || null, mode: (data.mode as string) || "science" } }, narrativePhase: false });
     }
   }, []);
 
@@ -620,7 +638,7 @@ export default function AgenticPanel({
     sessionState, sessionId, steps, narrative, synthesis, figures,
     planInfo, error, reasoningText, reasoningPhase, reasoningCollapsed,
     downloadProgress, totalSteps, completedSteps, chatLog, agentMode,
-    iterationCount, activeAction,
+    sessionMode, iterationCount, activeAction,
   } = session;
 
   // Estimated time remaining
@@ -935,6 +953,16 @@ export default function AgenticPanel({
                         {entry.success ? "check_circle" : "error"}
                       </span>
                       <span className="text-[10px] text-[#c8d6e5] leading-relaxed">{entry.text}</span>
+                    </div>
+                  </div>
+                );
+              }
+              if (entry.type === "respond") {
+                return (
+                  <div key={i} className="bg-sky-500/10 border border-sky-500/20 rounded-lg p-3">
+                    <div className="flex items-start gap-1.5">
+                      <span className="material-symbols-outlined text-xs text-sky-400 mt-0.5">chat</span>
+                      <span className="text-[10px] text-[#c8d6e5] leading-relaxed">{entry.message}</span>
                     </div>
                   </div>
                 );
@@ -1272,7 +1300,7 @@ export default function AgenticPanel({
         )}
 
         {/* Download Report + Evidence Pack */}
-        {sessionState === "done" && sessionId && (
+        {sessionState === "done" && sessionId && sessionMode === "science" && (
           <div className="bg-[#1a2333] border border-[#232f48] rounded-lg p-3">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-sm text-sky-400">download</span>

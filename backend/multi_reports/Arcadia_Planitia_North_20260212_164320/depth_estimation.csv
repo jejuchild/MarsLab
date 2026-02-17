@@ -1,0 +1,7 @@
+Material,Dielectric_Constant,Mean_Depth_m,Min_Depth_m,Max_Depth_m
+Vacuum,1.0,208.7,84.3,1675.1
+Porous Ice,2.8,124.7,50.4,1001.1
+Pure Water Ice,3.1,118.6,47.9,951.4
+Basalt (low),4.0,104.4,42.2,837.5
+Basalt (mid),5.0,93.3,37.7,749.1
+Basalt (high),6.0,85.2,34.4,683.9

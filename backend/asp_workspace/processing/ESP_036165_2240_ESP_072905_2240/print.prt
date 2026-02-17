@@ -1,0 +1,2871 @@
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED2_1.IMG
+    TO     = ESP_036165_2240_RED2_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D2_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 1
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2015
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:03.7
+    CpuTime     = 00:00:03.7
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED1_0.IMG
+    TO     = ESP_036165_2240_RED1_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D1_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 1
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2015
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 44
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2644
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 1
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 639999
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:03.8
+    CpuTime     = 00:00:03.9
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED6_0.IMG
+    TO     = ESP_036165_2240_RED6_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D6_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 1
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2015
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:03.9
+    CpuTime     = 00:00:03.8
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED3_1.IMG
+    TO     = ESP_036165_2240_RED3_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D3_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 1
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2015
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:03.9
+    CpuTime     = 00:00:03.8
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED7_1.IMG
+    TO     = ESP_036165_2240_RED7_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D7_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:03.9
+    CpuTime     = 00:00:04.0
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED3_0.IMG
+    TO     = ESP_036165_2240_RED3_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D3_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.0
+    CpuTime     = 00:00:03.7
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED5_1.IMG
+    TO     = ESP_036165_2240_RED5_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D5_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:03.9
+    CpuTime     = 00:00:03.6
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED2_0.IMG
+    TO     = ESP_036165_2240_RED2_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D2_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.0
+    CpuTime     = 00:00:03.9
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED6_1.IMG
+    TO     = ESP_036165_2240_RED6_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D6_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.0
+    CpuTime     = 00:00:03.9
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED0_1.IMG
+    TO     = ESP_036165_2240_RED0_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D0_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.0
+    CpuTime     = 00:00:04.0
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED8_1.IMG
+    TO     = ESP_036165_2240_RED8_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D8_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 43
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2645
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.0
+    CpuTime     = 00:00:04.0
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED4_0.IMG
+    TO     = ESP_036165_2240_RED4_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D4_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.0
+    CpuTime     = 00:00:03.7
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED8_0.IMG
+    TO     = ESP_036165_2240_RED8_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D8_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 47
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2641
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.1
+    CpuTime     = 00:00:03.8
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED4_1.IMG
+    TO     = ESP_036165_2240_RED4_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D4_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.1
+    CpuTime     = 00:00:03.7
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED5_0.IMG
+    TO     = ESP_036165_2240_RED5_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D5_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.1
+    CpuTime     = 00:00:03.9
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED1_1.IMG
+    TO     = ESP_036165_2240_RED1_1.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D1_1.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 2
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2014
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.1
+    CpuTime     = 00:00:03.9
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED0_0.IMG
+    TO     = ESP_036165_2240_RED0_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D0_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 0
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2016
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.2
+    CpuTime     = 00:00:04.0
+  End_Group
+End_Object
+
+
+Object = hi2isis
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2011-04-18
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:16
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Import HiRISE EDR images into Isis cube format"
+
+  Group = UserParameters
+    FROM   = /disk1/cspark/MarsLab/backend/asp_workspace/edr/ESP_036165_2240/-
+             ESP_036165_2240_RED7_0.IMG
+    TO     = ESP_036165_2240_RED7_0.cub
+    LSBGAP = true
+    UNLUT  = true
+  End_Group
+
+  Group = Results
+    From                          = /disk1/cspark/MarsLab/backend/asp_workspa-
+                                    ce/edr/ESP_036165_2240/ESP_036165_2240_RE-
+                                    D7_0.IMG
+    CalibrationBufferGaps         = 0
+    CalibrationBufferLIS          = 1
+    CalibrationBufferHIS          = 0
+    CalibrationBufferPossibleGaps = 0
+    CalibrationBufferInvalid      = 0
+    CalibrationBufferValid        = 2015
+    CalibrationImageGaps          = 0
+    CalibrationImageLIS           = 0
+    CalibrationImageHIS           = 0
+    CalibrationImagePossibleGaps  = 0
+    CalibrationImageInvalid       = 0
+    CalibrationImageValid         = 172032
+    CalibrationDarkGaps           = 0
+    CalibrationDarkLIS            = 0
+    CalibrationDarkHIS            = 0
+    CalibrationDarkPossibleGaps   = 0
+    CalibrationDarkInvalid        = 0
+    CalibrationDarkValid          = 2688
+    ObservationBufferGaps         = 0
+    ObservationBufferLIS          = 0
+    ObservationBufferHIS          = 0
+    ObservationBufferPossibleGaps = 0
+    ObservationBufferInvalid      = 0
+    ObservationBufferValid        = 480000
+    ObservationImageGaps          = 0
+    ObservationImageLIS           = 0
+    ObservationImageHIS           = 0
+    ObservationImagePossibleGaps  = 0
+    ObservationImageInvalid       = 0
+    ObservationImageValid         = 40960000
+    ObservationDarkGaps           = 0
+    ObservationDarkLIS            = 0
+    ObservationDarkHIS            = 0
+    ObservationDarkPossibleGaps   = 0
+    ObservationDarkInvalid        = 0
+    ObservationDarkValid          = 640000
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:04.3
+    CpuTime     = 00:00:04.0
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED4_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED4_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED4_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED4_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED7_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED7_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED3_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED3_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED7_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED7_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED0_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED0_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED0_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED0_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED8_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED8_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED2_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED2_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED5_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED5_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED3_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED3_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED8_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED8_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED6_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED6_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED1_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED1_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED6_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED6_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED5_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED5_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED2_1.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED2_1.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = hical
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-06-01
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:21
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Performs radiometric calibration of HiRISE channel
+                       images"
+
+  Group = UserParameters
+    FROM  = ESP_036165_2240_RED1_0.cub
+    CONF  = $mro/calibration/hical.????.conf
+    TO    = ESP_036165_2240_RED1_0.hical.cub
+    UNITS = IOF
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Failed in GainUnitConversion module"
+    File    = hical.cpp
+    Line    = 547
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Class   = "USER ERROR"
+    Code    = 2
+    Message = "Unable to determine the distance from the target to the sun"
+    File    = HiCalConf.cpp
+    Line    = 334
+    Program = hical
+  End_Group
+
+  Group = Error
+    Program = hical
+    Code    = 1
+    Message = "No existing files found with a numerical version matching
+               [MRO_SCLKSCET.?????.65536.tsc] in
+               [/home/cspark/isisdata/mro/kernels/sclk]"
+    File    = FileName.cpp
+    Line    = 669
+    Program = hical
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED5_0.hical.cub
+    FROM2    = ESP_036165_2240_RED5_1.hical.cub
+    TO       = ESP_036165_2240_RED5.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.3
+    CpuTime     = 00:00:02.0
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED6_0.hical.cub
+    FROM2    = ESP_036165_2240_RED6_1.hical.cub
+    TO       = ESP_036165_2240_RED6.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.4
+    CpuTime     = 00:00:02.0
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED8_0.hical.cub
+    FROM2    = ESP_036165_2240_RED8_1.hical.cub
+    TO       = ESP_036165_2240_RED8.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.4
+    CpuTime     = 00:00:02.0
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED2_0.hical.cub
+    FROM2    = ESP_036165_2240_RED2_1.hical.cub
+    TO       = ESP_036165_2240_RED2.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.4
+    CpuTime     = 00:00:02.0
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED0_0.hical.cub
+    FROM2    = ESP_036165_2240_RED0_1.hical.cub
+    TO       = ESP_036165_2240_RED0.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.4
+    CpuTime     = 00:00:02.1
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED4_0.hical.cub
+    FROM2    = ESP_036165_2240_RED4_1.hical.cub
+    TO       = ESP_036165_2240_RED4.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.4
+    CpuTime     = 00:00:02.1
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED7_0.hical.cub
+    FROM2    = ESP_036165_2240_RED7_1.hical.cub
+    TO       = ESP_036165_2240_RED7.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.5
+    CpuTime     = 00:00:02.2
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED3_0.hical.cub
+    FROM2    = ESP_036165_2240_RED3_1.hical.cub
+    TO       = ESP_036165_2240_RED3.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.5
+    CpuTime     = 00:00:02.2
+  End_Group
+End_Object
+
+
+Object = histitch
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2009-06-09
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:23
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Merge a HiRISE channel pair to make a single image"
+
+  Group = UserParameters
+    FROM1    = ESP_036165_2240_RED1_0.hical.cub
+    FROM2    = ESP_036165_2240_RED1_1.hical.cub
+    TO       = ESP_036165_2240_RED1.histitch.cub
+    BALANCE  = TRUE
+    SKIP     = 7
+    SEAMSIZE = 11
+    CHANNEL  = 1
+  End_Group
+
+  Group = Results
+    Balance      = TRUE
+    TruthChannel = 1
+    BalanceRatio = 1.0
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:01.5
+    CpuTime     = 00:00:02.2
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED5.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:14.7
+    CpuTime     = 00:00:14.7
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED6.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:15.1
+    CpuTime     = 00:00:15.1
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED3.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:20.3
+    CpuTime     = 00:00:20.3
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED0.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:20.4
+    CpuTime     = 00:00:20.5
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED4.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:20.5
+    CpuTime     = 00:00:20.4
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED8.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:20.5
+    CpuTime     = 00:00:20.6
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED2.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:25.4
+    CpuTime     = 00:00:25.4
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED1.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:25.5
+    CpuTime     = 00:00:25.5
+  End_Group
+End_Object
+
+
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T21:40:24
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = ESP_036165_2240_RED7.histitch.cub
+    WEB          = True
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:25.6
+    CpuTime     = 00:00:25.6
+  End_Group
+End_Object
+
+

@@ -1,0 +1,55 @@
+Object = spiceinit
+  IsisVersion       = "9.0.0  | 2026-01-05"
+  ProgramVersion    = 2021-08-10
+  ProgramPath       = /home/cspark/miniconda3/envs/asp/bin
+  ExecutionDateTime = 2026-02-15T00:20:55
+  HostName          = Unknown
+  UserName          = cspark
+  Description       = "Update SPICE data (kernels, pointing, and position) for
+                       a camera cube"
+
+  Group = UserParameters
+    FROM         = /tmp/test_red5_0.cub
+    WEB          = yes
+    ATTACH       = TRUE
+    CKSMITHED    = FALSE
+    CKRECON      = TRUE
+    CKPREDICTED  = FALSE
+    CKNADIR      = FALSE
+    SPKSMITHED   = FALSE
+    SPKRECON     = TRUE
+    SPKPREDICTED = FALSE
+    SHAPE        = SYSTEM
+    STARTPAD     = 0.0
+    ENDPAD       = 0.0
+    URL          = https://astrogeology.usgs.gov/apis/ale/v0.9.1/spiceserver/
+    PORT         = 443
+  End_Group
+
+  Group = Kernels
+    NaifIkCode                = -74699
+    LeapSecond                = $base/kernels/lsk/naif0012.tls
+    TargetAttitudeShape       = $mro/kernels/pck/pck00008.tpc
+    TargetPosition            = (Table, $base/kernels/spk/de430.bsp,
+                                 $base/kernels/spk/mar097.bsp)
+    InstrumentPointing        = (Table,
+                                 $mro/kernels/ck/mro_sc_psp_140408_140414.bc,
+                                 $mro/kernels/fk/mro_v16.tf)
+    Instrument                = $mro/kernels/ik/mro_hirise_v12.ti
+    SpacecraftClock           = $mro/kernels/sclk/MRO_SCLKSCET.00114.65536.tsc
+    InstrumentPosition        = (Table,
+                                 $mro/kernels/spk/mro_psp31_ssd_mro110c.bsp)
+    InstrumentAddendum        = $mro/kernels/iak/hiriseAddendum006.ti
+    ShapeModel                = $base/dems/molaMarsPlanetaryRadius0005.cub
+    InstrumentPositionQuality = Reconstructed
+    InstrumentPointingQuality = Reconstructed
+    CameraVersion             = 1
+  End_Group
+
+  Group = Accounting
+    ConnectTime = 00:00:12.9
+    CpuTime     = 00:00:12.9
+  End_Group
+End_Object
+
+

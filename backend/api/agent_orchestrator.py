@@ -97,6 +97,7 @@ class AgentSession:
     session_id: str
     objective: str
     status: str = "planning"  # planning, executing, synthesizing, done, error
+    mode: str = "science"  # "science" (full pipeline) or "chat" (conversational)
     region_name: Optional[str] = None
     bbox: Optional[RegionBBox] = None
     steps: List[AgentStep] = field(default_factory=list)
@@ -138,6 +139,7 @@ class AgentSession:
             "session_id": self.session_id,
             "objective": self.objective,
             "status": self.status,
+            "mode": self.mode,
             "region_name": self.region_name,
             "steps": [s.to_dict() for s in self.steps],
             "narrative": self.narrative,
@@ -221,6 +223,7 @@ def _load_sessions():
                 session_id=sid,
                 objective=rec.get("objective", ""),
                 status=rec.get("status", "done"),
+                mode=rec.get("mode", "science"),
                 region_name=rec.get("region_name"),
                 bbox=bbox,
                 steps=steps,
@@ -510,6 +513,7 @@ def _format_tool_descriptions() -> str:
 
 
 REACT_SYSTEM_PROMPT = """You are a Mars science mission AI agent. You analyze multi-instrument orbital data to evaluate landing sites, find subsurface ice, and assess engineering feasibility.
+Always respond in English.
 
 You work in a loop: Thought → Action → Observation → Thought → Action → ...
 
@@ -531,12 +535,20 @@ EXAMPLE 2 — searching for data:
 Thought: Now I should search for SHARAD high-resolution data to look for subsurface ice reflectors in this region.
 Action: {{"tool": "search_products", "params": {{"instrument": "SHARAD_HIGHRES"}}}}
 
-EXAMPLE 3 — finishing:
+EXAMPLE 3 — responding conversationally (no tool needed):
+Thought: The user is asking a clarification question. I should answer directly.
+Action: {{"tool": "respond", "params": {{"message": "The dielectric constant εr indicates subsurface composition: values near 3 suggest ice, while values above 5 suggest rock."}}}}
+
+EXAMPLE 4 — responding to informal input:
+Thought: The user made an off-topic comment. I'll acknowledge briefly and refocus.
+Action: {{"tool": "respond", "params": {{"message": "Ha — fair point. Back to the data: the SHARAD track at 42°N shows a clear reflector at ~18m depth."}}}}
+
+EXAMPLE 5 — finishing:
 Thought: I have gathered enough data. The region shows strong subsurface ice signatures and favorable terrain. I should provide my final assessment.
 Action: {{"tool": "finish", "params": {{"summary": "Jezero Crater shows strong evidence of subsurface ice at 15-30m depth with favorable landing terrain.", "recommendation": "STRONG_CANDIDATE"}}}}
 
 STRATEGY:
-1. Resolve the region first if a named location is mentioned.
+1. Resolve the region ONLY if the Region line above is absent. If it already shows coordinates, skip this step.
 2. Search ALL relevant instruments one by one: CRISM, HIRISE, SHARAD, SHARAD_HIGHRES, CTX, HIRISE_DTM. Each search_products call handles one instrument.
 3. Call check_local_data to see what is available locally, then download_products for missing data.
 4. Run analyses: analyze_subsurface, analyze_minerals, analyze_slope, classify_minerals_cnn, estimate_dielectric.
@@ -547,15 +559,30 @@ STRATEGY:
 
 RULES:
 - Output Thought: and Action: on EVERY turn. Nothing else.
-- One action per turn.
+- One action per turn. If the objective asks for multiple things (e.g. "search CRISM and SHARAD then analyze subsurface"), decompose into sequential steps — handle one instrument or analysis per turn.
 - Call check_local_data before download_products.
 - Be adaptive: if something returns 0 results, try a different approach.
-- NEVER report assumed-εr depth as physical evidence of ice. Always state whether εr was measured or assumed."""
+- NEVER report assumed-εr depth as physical evidence of ice. Always state whether εr was measured or assumed.
+
+TONE:
+- You are a research colleague, not a customer service bot.
+- Never reintroduce yourself or restate your capabilities after turn 1.
+- Never say "feel free to ask", "I'd love to help", or similar filler.
+- Keep conversational responses under 2 sentences unless the user asks for detail.
+- For informal input (humor, off-topic), respond briefly and naturally, then return to the task.
+- When you have nothing scientific to add, say so plainly — do not pad with enthusiasm."""
 
 
 async def _tool_resolve_region(session: "AgentSession", params: dict):
     """Look up a named Mars region."""
     name = params.get("region_name", "")
+    # Idempotent: skip if already resolved to the same (or similar) region
+    if session.bbox and session.region_name and name.lower() in session.region_name.lower():
+        b = session.bbox
+        return TaskResult(task_type="resolve_region", success=True, summary=f"Already resolved {session.region_name}",
+                          data={"bbox": {"min_lat": b.min_lat, "max_lat": b.max_lat,
+                                         "min_lon": b.min_lon, "max_lon": b.max_lon}}), \
+            f"Region '{session.region_name}' is already resolved: lat {b.min_lat:.1f} to {b.max_lat:.1f}, lon {b.min_lon:.1f} to {b.max_lon:.1f}. No action needed."
     bbox = resolve_region(name)
     if bbox:
         session.bbox = bbox
@@ -1150,6 +1177,11 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
         "params": {"lat": "float — crater latitude", "lon": "float — crater longitude", "diameter_km": "float — crater diameter", "terrace_depth_m": "float — terrace bench depth below rim"},
         "executor": _tool_terrain_epsilon,
     },
+    "respond": {
+        "description": "Reply conversationally when no science tool is needed (e.g. greetings, clarifications, follow-up questions).",
+        "params": {"message": "str — your response text"},
+        "executor": None,
+    },
     "finish": {
         "description": "Call when analysis is complete. Provide summary and recommendation.",
         "params": {"summary": "str — brief findings summary", "recommendation": "str — STRONG_CANDIDATE, PROMISING_WITH_CAVEATS, REQUIRES_FURTHER_INVESTIGATION, or LOW_PRIORITY"},
@@ -1170,7 +1202,7 @@ def _build_react_prompt(objective: str, session: "AgentSession", history: list) 
     parts = [f"Objective: {objective}"]
     if session.region_name and session.bbox:
         b = session.bbox
-        parts.append(f"Region: {session.region_name} (lat {b.min_lat:.1f}–{b.max_lat:.1f}, lon {b.min_lon:.1f}–{b.max_lon:.1f})")
+        parts.append(f"Region: {session.region_name} (lat {b.min_lat:.1f}–{b.max_lat:.1f}, lon {b.min_lon:.1f}–{b.max_lon:.1f}) [already resolved — do NOT call resolve_region]")
     parts.append("")
 
     # Keep only the most recent turns if history is long
@@ -1322,69 +1354,59 @@ def _find_tool_json(text: str) -> dict:
     return {}
 
 
+_TOOL_KEYWORDS: Dict[str, list] = {
+    "resolve_region":            ["resolve", "look up", "find the region", "locate", "identify the region", "bounding box"],
+    "download_products":         ["download", "fetch", "retrieve", "get the data", "acquire"],
+    "analyze_slope":             ["slope", "terrain", "terrain slope", "landing feasibility", "rover feasibility", "engineering"],
+    "analyze_subsurface":        ["subsurface", "radar", "sharad analysis", "ice depth", "reflector"],
+    "analyze_minerals":          ["mineral", "crism analysis", "hydration", "ice signature"],
+    "classify_minerals_cnn":     ["cnn", "mineral classifier", "mineral classification", "24 mineral"],
+    "estimate_dielectric":       ["dielectric", "permittivity", "ice vs rock"],
+    "terrain_epsilon_inversion": ["terrain epsilon", "terraced crater inversion", "mola epsilon", "crater epsilon", "terrain εr"],
+    "run_sharad_inversion":      ["physics inversion", "sharad inversion", "dielectric inversion", "compute epsilon"],
+    "run_crism_spectral":        ["spectral analysis", "sam classification", "band parameter", "continuum removal"],
+    "analyze_climate":           ["climate", "temperature", "dust", "wind", "frost"],
+    "analyze_thermal_inertia":   ["thermal inertia", "surface consolidation"],
+    "recommend_site":            ["recommend", "optimal site", "best location", "landing site"],
+    "check_local_data":          ["local data", "locally available", "check what we have"],
+    "targeted_subsurface_at_ice":["targeted subsurface", "co-located ice", "subsurface at ice"],
+    "evaluate_ice_evidence":     ["ice evidence", "ice probability", "evidence synthesis"],
+    "finish":                    ["finish", "conclude", "final assessment", "done", "complete"],
+}
+
+
 def _infer_tool_from_text(text: str, session: "AgentSession") -> dict:
     """Last-resort: infer a tool call from natural language when Llama
     ignores the structured format entirely.
 
-    This handles cases where Llama responds conversationally like:
-    'I'll start by looking up the region...' or
-    'Let me search for CRISM data in this area.'
+    Scoring-based: multi-word keyword matches score 2, single-word score 1.
+    Highest total wins — resolves ambiguity like 'terrain' vs 'terrain epsilon'.
     """
     t = text.lower()
 
-    # Detect region resolution intent
-    if any(kw in t for kw in ["resolve", "look up", "find the region", "locate", "identify the region", "bounding box"]):
-        region = session.region_name or "target region"
-        return {"tool": "resolve_region", "params": {"region_name": region}}
+    # Score each tool by keyword hits (multi-word=2, single-word=1)
+    best_tool, best_score = "", 0
+    for tool, keywords in _TOOL_KEYWORDS.items():
+        score = sum(2 if " " in kw else 1 for kw in keywords if kw in t)
+        if score > best_score:
+            best_tool, best_score = tool, score
 
-    # Detect instrument search intent
-    for inst in ["crism", "hirise", "sharad_highres", "sharad", "ctx", "hirise_dtm"]:
-        if inst.replace("_", " ") in t or inst in t:
-            if any(kw in t for kw in ["search", "find", "look for", "check", "query", "available", "data"]):
+    # Special case: search_products requires instrument + search intent (score 3)
+    _SEARCH_KW = ("search", "find", "look for", "check", "query", "available", "data")
+    for inst in ("crism", "hirise", "sharad_highres", "sharad", "ctx", "hirise_dtm"):
+        if (inst.replace("_", " ") in t or inst in t) and any(kw in t for kw in _SEARCH_KW):
+            if 3 > best_score:
                 return {"tool": "search_products", "params": {"instrument": inst.upper()}}
 
-    # Detect download intent
-    if any(kw in t for kw in ["download", "fetch", "retrieve", "get the data", "acquire"]):
-        return {"tool": "download_products", "params": {}}
+    if best_score == 0:
+        return {}
 
-    # Detect analysis intents
-    if any(kw in t for kw in ["slope", "terrain", "landing", "rover feasibility", "engineering"]):
-        return {"tool": "analyze_slope", "params": {}}
-    if any(kw in t for kw in ["subsurface", "radar", "sharad analysis", "ice depth", "reflector"]):
-        return {"tool": "analyze_subsurface", "params": {}}
-    if any(kw in t for kw in ["mineral", "spectral", "crism analysis", "hydration", "ice signature"]):
-        return {"tool": "analyze_minerals", "params": {}}
-    if any(kw in t for kw in ["cnn", "classifier", "classification", "24 mineral"]):
-        return {"tool": "classify_minerals_cnn", "params": {}}
-    if any(kw in t for kw in ["dielectric", "permittivity", "ice vs rock"]):
-        return {"tool": "estimate_dielectric", "params": {}}
-    if any(kw in t for kw in ["terrain epsilon", "terraced crater inversion", "mola epsilon", "crater epsilon", "terrain εr"]):
-        return {"tool": "terrain_epsilon_inversion", "params": {}}
-    if any(kw in t for kw in ["physics inversion", "sharad inversion", "dielectric inversion", "compute epsilon"]):
-        return {"tool": "run_sharad_inversion", "params": {}}
-    if any(kw in t for kw in ["spectral analysis", "sam classification", "band parameter", "continuum removal"]):
-        return {"tool": "run_crism_spectral", "params": {}}
-    if any(kw in t for kw in ["climate", "temperature", "dust", "wind", "frost"]):
-        return {"tool": "analyze_climate", "params": {}}
-    if any(kw in t for kw in ["thermal inertia", "surface consolidation", "tes"]):
-        return {"tool": "analyze_thermal_inertia", "params": {}}
-    if any(kw in t for kw in ["recommend", "optimal site", "best location", "landing site"]):
-        return {"tool": "recommend_site", "params": {}}
-    if any(kw in t for kw in ["local data", "locally available", "check what we have", "check_local"]):
-        return {"tool": "check_local_data", "params": {}}
-    if any(kw in t for kw in ["finish", "conclude", "final assessment", "done", "complete"]):
-        return {"tool": "finish", "params": {"summary": text[:200], "recommendation": "REQUIRES_FURTHER_INVESTIGATION"}}
-
-    # If session has no bbox yet, default to resolving region
-    if not session.bbox:
-        region = session.region_name or "target region"
-        return {"tool": "resolve_region", "params": {"region_name": region}}
-
-    # If no searches done yet, default to CRISM search
-    if not any(k.startswith("search_") for k in session.all_results):
-        return {"tool": "search_products", "params": {"instrument": "CRISM"}}
-
-    return {}
+    # Build params for the winning tool
+    if best_tool == "resolve_region":
+        return {"tool": best_tool, "params": {"region_name": session.region_name or "target region"}}
+    if best_tool == "finish":
+        return {"tool": best_tool, "params": {"summary": text[:200], "recommendation": "REQUIRES_FURTHER_INVESTIGATION"}}
+    return {"tool": best_tool, "params": {}}
 
 
 # =============================================================================
@@ -2251,6 +2273,24 @@ def _verify_physics_pipeline(session: "AgentSession") -> List[str]:
     return warnings
 
 
+_FILLER_PHRASES = (
+    "feel free to", "don't hesitate to", "i'd love to",
+    "ask me anything", "happy to help", "glad to assist",
+    "great question",
+)
+
+
+def _sanitize_respond(msg: str) -> str:
+    """Strip RLHF filler from conversational responses."""
+    # Remove self-intro sentence ("As MARVIS, ... I can help. ...")
+    msg = re.sub(r"(?i)^as (marvis|your|an?\b)[^.!?]*[.!?]\s*", "", msg)
+    # Remove sentences containing invitation filler
+    for filler in _FILLER_PHRASES:
+        msg = re.sub(rf"(?i)[^.!?]*\b{re.escape(filler)}\b[^.!?]*[.!?]?\s*", "", msg)
+    msg = msg.strip()
+    return msg if msg else "Understood."
+
+
 # =============================================================================
 # Main Agent Loop — ReAct (Reason + Act)
 # =============================================================================
@@ -2322,6 +2362,8 @@ async def run_agent(
 
         history: List[Dict[str, Any]] = []
         iteration = 0
+        noop_count = 0  # consecutive parse failures (grace before fallback)
+        last_tool = ""  # tracks how the loop ended ("finish" or "respond")
 
         while iteration < MAX_ITERATIONS:
             iteration += 1
@@ -2355,49 +2397,77 @@ async def run_agent(
                 "thought": thought, "iteration": iteration,
             }}
 
-            # Handle empty/malformed output — never retry, always force-execute.
-            # Llama 3.3 often ignores the Thought/Action format entirely.
-            # The NL inference fallback should catch most cases, but if even
-            # that fails, deterministically pick the next logical tool.
+            # Handle empty/malformed output — grace attempts before fallback.
             if not action or "tool" not in action:
-                logger.warning(
-                    f"Parse failed (iter {iteration}) — force-executing next logical action. "
-                    f"Raw response: {full_response[:200]}"
-                )
+                noop_count += 1
+                # Grace: if LLaMA produced meaningful text, surface it and retry
+                if noop_count <= 2 and thought and len(thought.strip()) > 20:
+                    logger.info(f"Grace attempt {noop_count}/2 (iter {iteration})")
+                    history.append({
+                        "thought": thought, "action": {},
+                        "observation": "No tool called. Use respond to reply conversationally, or call a science tool.",
+                    })
+                    continue
+                # Exhausted grace — deterministic fallback chain
+                logger.warning(f"Fallback chain fired (iter {iteration}, noop={noop_count})")
                 if not session.bbox:
                     action = {"tool": "resolve_region", "params": {
                         "region_name": session.region_name or "target region"
                     }}
-                    thought = thought or f"Resolving {session.region_name or 'target region'} coordinates."
                 elif len([k for k in session.all_results if k.startswith("search_")]) < 6:
                     all_instruments = ["CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES", "CTX", "HIRISE_DTM"]
                     searched = {k.replace("search_", "") for k in session.all_results if k.startswith("search_")}
                     next_inst = next((i for i in all_instruments if i not in searched), "CRISM")
                     action = {"tool": "search_products", "params": {"instrument": next_inst}}
-                    thought = thought or f"Searching for {next_inst} data in the region."
                 elif "subsurface" not in session.all_results:
                     action = {"tool": "analyze_subsurface", "params": {}}
-                    thought = thought or "Analyzing SHARAD radar data for subsurface ice."
                 elif "mineral" not in session.all_results:
                     action = {"tool": "analyze_minerals", "params": {}}
-                    thought = thought or "Analyzing CRISM spectral data for minerals."
                 elif "slope" not in session.all_results:
                     action = {"tool": "analyze_slope", "params": {}}
-                    thought = thought or "Analyzing terrain slope for landing feasibility."
                 else:
                     action = {"tool": "finish", "params": {
                         "summary": "Completed multi-instrument analysis.",
                         "recommendation": "REQUIRES_FURTHER_INVESTIGATION",
                     }}
-                    thought = thought or "Analysis complete. Generating final assessment."
+            else:
+                noop_count = 0  # reset on successful parse
 
             tool_name = action.get("tool", "")
             params = action.get("params", {})
 
-            # 4. Handle finish action
-            if tool_name == "finish":
+            # 4. Handle finish / respond — both end the loop
+            if tool_name in ("finish", "respond"):
+                # Guard: if this is the first turn and bbox was resolved
+                # (meaning the objective likely requires science analysis),
+                # convert an early "respond" to a "continue" nudge so that
+                # the agent doesn't accidentally skip the science pipeline.
+                if (tool_name == "respond" and iteration <= 1
+                        and session.bbox
+                        and not any(k.startswith("search_") for k in session.all_results)):
+                    logger.info(
+                        "First-turn respond with resolved bbox — "
+                        "nudging agent to continue science analysis"
+                    )
+                    sanitized_params = {**params, "message": _sanitize_respond(params.get("message", ""))}
+                    history.append({
+                        "thought": thought, "action": action,
+                        "observation": (
+                            "You responded conversationally, but this objective "
+                            "requires data analysis. Call a science tool "
+                            "(e.g. search_products) to begin the investigation."
+                        ),
+                    })
+                    yield {"event": "action", "data": {
+                        "tool": "respond", "params": sanitized_params,
+                        "iteration": iteration,
+                    }}
+                    continue
+                if tool_name == "respond":
+                    params["message"] = _sanitize_respond(params.get("message", ""))
+                last_tool = tool_name
                 yield {"event": "action", "data": {
-                    "tool": "finish", "params": params,
+                    "tool": tool_name, "params": params,
                     "iteration": iteration,
                 }}
                 break
@@ -2502,160 +2572,171 @@ async def run_agent(
                 "observation": observation,
             })
 
-        # ── Safety net: if agent loop ended without any searches, auto-run ──
-        has_searches = any(
-            k.startswith("search_") for k in session.all_results
-        )
-        if not has_searches and session.bbox:
-            logger.warning(
-                "ReAct loop ended without any searches — "
-                "running fallback data collection"
+        # ── Mode bifurcation: chat vs science ──
+        # Check BEFORE safety net so chat queries don't trigger auto-recovery
+        if last_tool == "respond":
+            # Chat mode — skip synthesis/narrative/report pipeline entirely
+            session.mode = "chat"
+            session.status = "done"
+            yield {"event": "done", "data": {**session.to_dict(), "mode": "chat"}}
+        else:
+            # Science mode — full post-processing pipeline
+            session.mode = "science"
+
+            # ── Safety net: if agent loop ended without any searches, auto-run ──
+            has_searches = any(
+                k.startswith("search_") for k in session.all_results
             )
-            yield {"event": "action_start", "data": {
-                "tool": "_auto_recovery", "params": {},
-                "iteration": iteration + 1,
+            if not has_searches and session.bbox:
+                logger.warning(
+                    "ReAct loop ended without any searches — "
+                    "running fallback data collection"
+                )
+                yield {"event": "action_start", "data": {
+                    "tool": "_auto_recovery", "params": {},
+                    "iteration": iteration + 1,
+                }}
+
+                # Run all instrument searches
+                fallback_instruments = [
+                    "CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES",
+                    "CTX", "HIRISE_DTM",
+                ]
+                for inst in fallback_instruments:
+                    try:
+                        result = await search_region(inst, session.bbox)
+                        session.all_results[f"search_{inst}"] = result
+                        if result.success:
+                            products = result.data.get("products", [])
+                            if not hasattr(session, "_all_products"):
+                                session._all_products = []
+                            session._all_products.extend(products)
+                    except Exception as e:
+                        logger.error(f"Fallback search {inst} failed: {e}")
+
+                # Check local data + run basic analyses
+                products = getattr(session, "_all_products", [])
+                if products:
+                    check_result = check_local_data(products)
+                    session.all_results["check_local"] = check_result
+
+                    try:
+                        sub_result = subsurface_scan(products)
+                        session.all_results["subsurface"] = sub_result
+                    except Exception:
+                        pass
+                    try:
+                        min_result = mineral_analysis(products)
+                        session.all_results["mineral"] = min_result
+                    except Exception:
+                        pass
+                    try:
+                        slope_result = slope_analysis(
+                            session.bbox.center_lat,
+                            session.bbox.center_lon,
+                            radius_m=5000,
+                            bbox=session.bbox,
+                        )
+                        session.all_results["slope"] = slope_result
+                    except Exception:
+                        pass
+
+                count = len(products)
+                yield {"event": "action_complete", "data": {
+                    "tool": "_auto_recovery",
+                    "observation": (
+                        f"Auto-recovery: searched {len(fallback_instruments)} "
+                        f"instruments, found {count} products, ran basic analyses."
+                    ),
+                    "success": count > 0,
+                    "iteration": iteration + 1,
+                }}
+
+            # ── Synthesize results ──
+            if "synthesize" not in session.all_results:
+                region_ctx = None
+                if session.region_name:
+                    region_ctx = get_region_context_by_name(session.region_name)
+                synth_result = synthesize_results(
+                    session.region_name or "Unknown",
+                    session.all_results,
+                    region_context=region_ctx,
+                )
+                session.synthesis = synth_result.data
+                session.all_results["synthesize"] = synth_result
+
+            # Physics pipeline verification
+            physics_warnings = _verify_physics_pipeline(session)
+            if physics_warnings:
+                session.synthesis["physics_pipeline_warnings"] = physics_warnings
+
+            # ── Generate evidence figures ──
+            try:
+                from .agentic_router import generate_evidence_figures
+                figures_data = generate_evidence_figures(session)
+                if figures_data.get("figures"):
+                    session.figures = figures_data["figures"]
+                    yield {"event": "figures", "data": figures_data}
+            except Exception as e:
+                logger.warning(f"Evidence figure generation failed (react): {e}")
+
+            # ── Generate narrative report ──
+            session.status = "synthesizing"
+            yield {"event": "thought_start", "data": {
+                "iteration": iteration + 1, "phase": "narrative",
             }}
 
-            # Run all instrument searches
-            fallback_instruments = [
-                "CRISM", "HIRISE", "SHARAD", "SHARAD_HIGHRES",
-                "CTX", "HIRISE_DTM",
-            ]
-            for inst in fallback_instruments:
-                try:
-                    result = await search_region(inst, session.bbox)
-                    session.all_results[f"search_{inst}"] = result
-                    if result.success:
-                        products = result.data.get("products", [])
-                        if not hasattr(session, "_all_products"):
-                            session._all_products = []
-                        session._all_products.extend(products)
-                except Exception as e:
-                    logger.error(f"Fallback search {inst} failed: {e}")
+            async def _do_narrative():
+                session.narrative = await _generate_narrative(
+                    session, on_chunk=_emit_chunk
+                )
+                await reasoning_queue.put(None)  # sentinel
 
-            # Check local data + run basic analyses
-            products = getattr(session, "_all_products", [])
-            if products:
-                check_result = check_local_data(products)
-                session.all_results["check_local"] = check_result
+            narr_task = asyncio.create_task(_do_narrative())
+            async for item in _drain_queue_with_heartbeat(reasoning_queue):
+                yield item
+            await narr_task
 
-                try:
-                    sub_result = subsurface_scan(products)
-                    session.all_results["subsurface"] = sub_result
-                except Exception:
-                    pass
-                try:
-                    min_result = mineral_analysis(products)
-                    session.all_results["mineral"] = min_result
-                except Exception:
-                    pass
-                try:
-                    slope_result = slope_analysis(
-                        session.bbox.center_lat,
-                        session.bbox.center_lon,
-                        radius_m=5000,
-                        bbox=session.bbox,
-                    )
-                    session.all_results["slope"] = slope_result
-                except Exception:
-                    pass
+            yield {"event": "thought_end", "data": {"phase": "narrative"}}
+            yield {"event": "narrative", "data": {"narrative": session.narrative}}
 
-            count = len(products)
-            yield {"event": "action_complete", "data": {
-                "tool": "_auto_recovery",
-                "observation": (
-                    f"Auto-recovery: searched {len(fallback_instruments)} "
-                    f"instruments, found {count} products, ran basic analyses."
-                ),
-                "success": count > 0,
-                "iteration": iteration + 1,
-            }}
+            # ── B-level: EvidencePack + Report + Critique + Artifacts ──
+            try:
+                from .evidence_pack import assemble_evidence_pack, save_session_artifacts
+                from .report_critique import self_critique_loop
 
-        # ── Synthesize results ──
-        if "synthesize" not in session.all_results:
-            region_ctx = None
-            if session.region_name:
-                region_ctx = get_region_context_by_name(session.region_name)
-            synth_result = synthesize_results(
-                session.region_name or "Unknown",
-                session.all_results,
-                region_context=region_ctx,
-            )
-            session.synthesis = synth_result.data
-            session.all_results["synthesize"] = synth_result
+                # Assemble evidence pack
+                session.evidence_pack = assemble_evidence_pack(session)
+                yield {"event": "evidence_pack_assembled", "data": {"version": "2.0"}}
 
-        # Physics pipeline verification
-        physics_warnings = _verify_physics_pipeline(session)
-        if physics_warnings:
-            session.synthesis["physics_pipeline_warnings"] = physics_warnings
+                # Generate report from evidence pack
+                from .agentic_router import generate_report_from_evidence_pack
+                session.report_draft = generate_report_from_evidence_pack(session.evidence_pack, session)
+                yield {"event": "report_generated", "data": {"length": len(session.report_draft)}}
 
-        # ── Generate evidence figures ──
-        try:
-            from .agentic_router import generate_evidence_figures
-            figures_data = generate_evidence_figures(session)
-            if figures_data.get("figures"):
-                session.figures = figures_data["figures"]
-                yield {"event": "figures", "data": figures_data}
-        except Exception as e:
-            logger.warning(f"Evidence figure generation failed (react): {e}")
+                # Self-critique loop
+                yield {"event": "critique_start", "data": {"max_iterations": 2}}
+                critique_result = await self_critique_loop(
+                    session.report_draft, session.evidence_pack, session,
+                    max_iterations=2, timeout_s=60.0,
+                )
+                session.report_draft = critique_result["final_report"]
+                session.report_critique = critique_result
+                yield {"event": "critique_end", "data": {
+                    "iterations": critique_result["iterations"],
+                    "issues_found": sum(c.get("issues_found", 0) for c in critique_result.get("critique_log", [])),
+                }}
 
-        # ── Generate narrative report ──
-        session.status = "synthesizing"
-        yield {"event": "thought_start", "data": {
-            "iteration": iteration + 1, "phase": "narrative",
-        }}
+                # Save artifacts to disk
+                session.artifacts_dir = save_session_artifacts(session)
+                yield {"event": "artifacts_saved", "data": {"dir": session.artifacts_dir}}
 
-        async def _do_narrative():
-            session.narrative = await _generate_narrative(
-                session, on_chunk=_emit_chunk
-            )
-            await reasoning_queue.put(None)  # sentinel
+            except Exception as e:
+                logger.warning(f"B-level report pipeline failed (react), falling back: {e}")
 
-        narr_task = asyncio.create_task(_do_narrative())
-        async for item in _drain_queue_with_heartbeat(reasoning_queue):
-            yield item
-        await narr_task
-
-        yield {"event": "thought_end", "data": {"phase": "narrative"}}
-        yield {"event": "narrative", "data": {"narrative": session.narrative}}
-
-        # ── B-level: EvidencePack + Report + Critique + Artifacts ──
-        try:
-            from .evidence_pack import assemble_evidence_pack, save_session_artifacts
-            from .report_critique import self_critique_loop
-
-            # Assemble evidence pack
-            session.evidence_pack = assemble_evidence_pack(session)
-            yield {"event": "evidence_pack_assembled", "data": {"version": "2.0"}}
-
-            # Generate report from evidence pack
-            from .agentic_router import generate_report_from_evidence_pack
-            session.report_draft = generate_report_from_evidence_pack(session.evidence_pack, session)
-            yield {"event": "report_generated", "data": {"length": len(session.report_draft)}}
-
-            # Self-critique loop
-            yield {"event": "critique_start", "data": {"max_iterations": 2}}
-            critique_result = await self_critique_loop(
-                session.report_draft, session.evidence_pack, session,
-                max_iterations=2, timeout_s=60.0,
-            )
-            session.report_draft = critique_result["final_report"]
-            session.report_critique = critique_result
-            yield {"event": "critique_end", "data": {
-                "iterations": critique_result["iterations"],
-                "issues_found": sum(c.get("issues_found", 0) for c in critique_result.get("critique_log", [])),
-            }}
-
-            # Save artifacts to disk
-            session.artifacts_dir = save_session_artifacts(session)
-            yield {"event": "artifacts_saved", "data": {"dir": session.artifacts_dir}}
-
-        except Exception as e:
-            logger.warning(f"B-level report pipeline failed (react), falling back: {e}")
-
-        # ── Done ──
-        session.status = "done"
-        yield {"event": "done", "data": session.to_dict()}
+            # ── Done ──
+            session.status = "done"
+            yield {"event": "done", "data": session.to_dict()}
 
     except asyncio.CancelledError:
         session.status = "error"
