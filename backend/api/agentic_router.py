@@ -394,24 +394,42 @@ def generate_evidence_figures(session: AgentSession) -> Dict:
                         f"{len(picks)} subsurface reflectors detected (SNR >= 4.0)"
                     )
 
-                    # Depth range info box
+                    # Depth / TWT info box
                     if depth_info:
-                        info_text = (
-                            f"εr = {depth_info.get('epsilon_r', 3.15)}\n"
-                            f"Depth: {depth_info.get('min', 0):.0f}"
-                            f"–{depth_info.get('max', 0):.0f} m\n"
-                            f"Median: {depth_info.get('median', 0):.0f} m"
-                        )
+                        eps_source = depth_info.get('epsilon_r_source', 'not_estimated')
+                        eps_val = depth_info.get('epsilon_r')
+                        if eps_source in ('physics_inversion', 'terrace_dielectric') and eps_val:
+                            # Physics-based εr — show depth
+                            info_text = (
+                                f"εr = {eps_val:.2f} ({eps_source})\n"
+                                f"Depth: {depth_info.get('min', 0):.0f}"
+                                f"–{depth_info.get('max', 0):.0f} m\n"
+                                f"Median: {depth_info.get('median', 0):.0f} m"
+                            )
+                            caption_parts.append(
+                                f"Estimated depth {depth_info.get('min', 0):.0f}"
+                                f"–{depth_info.get('max', 0):.0f} m "
+                                f"(εr = {eps_val:.2f}, {eps_source})"
+                            )
+                        else:
+                            # No physics εr — show TWT only
+                            twt_min = depth_info.get('min_twt_us', depth_info.get('min', 0))
+                            twt_max = depth_info.get('max_twt_us', depth_info.get('max', 0))
+                            twt_med = depth_info.get('median_twt_us', depth_info.get('median', 0))
+                            info_text = (
+                                f"TWT: {twt_min}–{twt_max} µs\n"
+                                f"Median TWT: {twt_med} µs\n"
+                                f"Depth: requires εr estimation"
+                            )
+                            caption_parts.append(
+                                f"Subsurface TWT {twt_min}–{twt_max} µs "
+                                f"(depth requires εr estimation)"
+                            )
                         ax.text(
                             0.02, 0.96, info_text, transform=ax.transAxes,
                             fontsize=8, color="cyan", va="top", fontfamily="monospace",
                             bbox=dict(facecolor="black", alpha=0.8, edgecolor="cyan",
                                       lw=0.8, boxstyle="round,pad=0.4"),
-                        )
-                        caption_parts.append(
-                            f"Estimated depth {depth_info.get('min', 0):.0f}"
-                            f"–{depth_info.get('max', 0):.0f} m "
-                            f"(εr = {depth_info.get('epsilon_r', 3.15)}, water-ice)"
                         )
                 else:
                     # Fallback: show search zone lines only
@@ -843,9 +861,10 @@ def generate_report_from_evidence_pack(
 
     n_analyzed = sharad.get("analyzed_count", 0)
     n_detect = sharad.get("subsurface_detections", 0)
-    depth = sharad.get("depth_summary") or {}
+    ref_summary = sharad.get("reflector_summary") or sharad.get("depth_summary") or {}
     dielectric = ep.get("dielectric", {})
     is_fallback = dielectric.get("is_fallback", True)
+    clutter_val = sharad.get("clutter_validation", {})
 
     lines.append("| Parameter | Value |")
     lines.append("|-----------|-------|")
@@ -854,52 +873,56 @@ def generate_report_from_evidence_pack(
     if n_analyzed:
         lines.append(f"| Radargrams Analyzed | {n_analyzed} |")
     lines.append(f"| Subsurface Reflector Detections | **{n_detect}** |")
-    if depth:
-        lines.append(f"| Estimated Depth Range | {depth.get('min_depth_m', 'N/A')} – {depth.get('max_depth_m', 'N/A')} m |")
-        lines.append(f"| Median Depth | {depth.get('median_depth_m', 'N/A')} m |")
-        if is_fallback:
-            lines.append(f"| Dielectric Constant (εr) | {depth.get('epsilon_r_assumed', 3.15)} (**ASSUMED** — water-ice) |")
-        else:
+    if ref_summary and ref_summary.get("median_twt_us") is not None:
+        lines.append(f"| TWT Range | {ref_summary.get('min_twt_us', 'N/A')} – {ref_summary.get('max_twt_us', 'N/A')} µs |")
+        lines.append(f"| Median TWT | {ref_summary.get('median_twt_us', 'N/A')} µs ({ref_summary.get('median_delta_bins', 'N/A')} bins) |")
+        lines.append(f"| Total Picks | {ref_summary.get('total_picks', 0)} |")
+        if not is_fallback:
             eps_val = dielectric.get("epsilon_r", "N/A")
             method_label = dielectric.get("best_method", "unknown").replace("_", " ").title()
             lines.append(f"| Dielectric Constant (εr) | **{eps_val}** (measured — {method_label}) |")
+        else:
+            lines.append(f"| Dielectric Constant (εr) | **Not estimated** — depth in meters not computed |")
+    # Cluttergram validation row
+    if clutter_val:
+        lines.append(
+            f"| Cluttergram Validation | {clutter_val.get('checks_total', 0)} checked, "
+            f"{clutter_val.get('rejected_count', 0)} rejected, "
+            f"{clutter_val.get('unavailable_count', 0)} unavailable |"
+        )
     lines.append("")
 
-    if n_detect > 0 and depth:
-        try:
-            med_d = float(depth.get('median_depth_m', 50))
-        except (TypeError, ValueError):
-            med_d = 50.0
-        if med_d <= 10:
-            depth_qual = "**Shallow ice** — potentially accessible for in-situ resource extraction without deep drilling."
-        elif med_d <= 30:
-            depth_qual = "Moderate depth — drilling infrastructure required for extraction."
-        elif med_d <= 80:
-            depth_qual = "Significant depth — substantial drilling capability needed."
-        else:
-            depth_qual = "**Too deep for practical ice extraction** — reduces site utility for ISRU."
-
-        if is_fallback:
-            physics_attempted = dielectric.get("physics_attempted", False)
-            fallback_reason = (
-                "Physics-based inversion was attempted but failed."
-                if physics_attempted else
-                "Physics-based inversion was not possible due to lack of co-located HiRISE DTM data."
-            )
-            lines.append(
-                f"**FALLBACK ESTIMATE:** SHARAD detected **{n_detect} subsurface reflector(s)**. "
-                f"Depth is estimated at **{depth.get('min_depth_m', 'N/A')}–{depth.get('max_depth_m', 'N/A')} m** "
-                f"(median {depth.get('median_depth_m', 'N/A')} m) using **assumed** εr = {depth.get('epsilon_r_assumed', 3.15)} (water-ice). "
-                f"This depth is **not independently measured**. {fallback_reason}"
-            )
-            lines.append("")
-            lines.append(f"> {depth_qual}")
-        else:
+    if n_detect > 0 and ref_summary:
+        if not is_fallback and dielectric.get("epsilon_r") is not None:
+            # Physics-based εr available — compute and report depth
+            import math as _math
+            eps_r = float(dielectric["epsilon_r"])
+            v = 299_792_458.0 / _math.sqrt(eps_r)
+            twt_min = ref_summary.get("min_twt_us", 0)
+            twt_max = ref_summary.get("max_twt_us", 0)
+            twt_med = ref_summary.get("median_twt_us", 0)
+            d_min = round(v * float(twt_min) * 1e-6 / 2.0, 1) if twt_min else 0
+            d_max = round(v * float(twt_max) * 1e-6 / 2.0, 1) if twt_max else 0
+            d_med = round(v * float(twt_med) * 1e-6 / 2.0, 1) if twt_med else 0
+            method_label = dielectric.get("best_method", "unknown").replace("_", " ")
             lines.append(
                 f"SHARAD analysis detected **{n_detect} subsurface reflector(s)**. "
-                f"Using εr estimated via morphological + radar inversion, "
-                f"the interface depth is **{depth.get('min_depth_m', 'N/A')}–{depth.get('max_depth_m', 'N/A')} m** "
-                f"(median {depth.get('median_depth_m', 'N/A')} m). {depth_qual}"
+                f"Using physics-based εr = {eps_r:.2f} ({method_label}), "
+                f"the interface depth is **{d_min}–{d_max} m** (median {d_med} m)."
+            )
+        else:
+            # No physics εr — report TWT only, no depth
+            lines.append(
+                f"SHARAD detected **{n_detect} subsurface reflector(s)** with two-way travel time "
+                f"**{ref_summary.get('min_twt_us', 'N/A')}–{ref_summary.get('max_twt_us', 'N/A')} µs** "
+                f"(median {ref_summary.get('median_twt_us', 'N/A')} µs, "
+                f"{ref_summary.get('median_delta_bins', 'N/A')} range bins)."
+            )
+            lines.append("")
+            lines.append(
+                "> **Depth in meters is not computed without εr estimation.** "
+                "Physics-based dielectric inversion (requiring co-located HiRISE DTM data) "
+                "is necessary to convert radar travel time to depth."
             )
     elif n_analyzed > 0:
         lines.append(
@@ -910,6 +933,18 @@ def generate_report_from_evidence_pack(
         lines.append(
             f"No high-resolution radargram data was available for quantitative analysis. "
             f"Coverage level: {sharad.get('coverage', 'NONE')}."
+        )
+
+    # Cluttergram validation subsection
+    if clutter_val and clutter_val.get("checks_total", 0) > 0:
+        lines.append("")
+        lines.append("### Cluttergram Validation")
+        lines.append(
+            f"Of {clutter_val['checks_total']} reflector picks checked against cluttergram simulations, "
+            f"**{clutter_val.get('rejected_count', 0)} were rejected** as likely surface clutter "
+            f"(clutter_likelihood_score > 0.7). "
+            f"{clutter_val.get('validated_count', 0)} picks passed validation. "
+            f"{clutter_val.get('unavailable_count', 0)} could not be checked (no cluttergram data)."
         )
     lines.append("")
 
@@ -1121,6 +1156,48 @@ def generate_report_from_evidence_pack(
         _fig("cnn_mineral_map",
              "Figure 3: CNN Mineral Map",
              "Per-pixel mineral classification via 1D CNN-Attention (95% confidence threshold).")
+
+    # ── 3c. CRISM Physics Analysis (Phase 0.3) ──
+    crism_spectral = (ep.get("crism", {}).get("spectral_analysis") or {})
+    if crism_spectral.get("observations_analyzed", 0) > 0:
+        lines.append("### 3c. CRISM Physics-Based Spectral Analysis")
+        lines.append("")
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| Observations Analyzed | {crism_spectral.get('observations_analyzed', 0)} |")
+        lines.append(f"| Mean Physics Score | {crism_spectral.get('mean_physics_score', 0):.3f} |")
+        lines.append(f"| Max Physics Score | {crism_spectral.get('max_physics_score', 0):.3f} |")
+        bp = crism_spectral.get("mean_band_params", {})
+        if bp.get("BD1500") is not None:
+            lines.append(f"| Mean BD1500 (H₂O ice) | {bp['BD1500']:.4f} |")
+        if bp.get("BD1900") is not None:
+            lines.append(f"| Mean BD1900 (H₂O) | {bp['BD1900']:.4f} |")
+        lines.append(f"| Water Ice Pixel Fraction | {crism_spectral.get('water_ice_overall_fraction', 0):.2%} |")
+        lines.append("")
+
+        # Interpretation distribution
+        interp = crism_spectral.get("interpretation_distribution", {})
+        if interp:
+            lines.append("**Interpretation Distribution:**")
+            lines.append("")
+            for label, count in sorted(interp.items(), key=lambda x: -x[1]):
+                lines.append(f"- {label}: {count} observation(s)")
+            lines.append("")
+
+        # Top physics candidates
+        top_phys = crism_spectral.get("top_physics_candidates", [])[:5]
+        if top_phys:
+            lines.append("**Top Physics-Scored CRISM Observations:**")
+            lines.append("")
+            lines.append("| Obs ID | Score | Interpretation | Lat | Lon |")
+            lines.append("|--------|-------|---------------|-----|-----|")
+            for obs in top_phys:
+                lines.append(
+                    f"| {obs.get('obs_id', '?')} | {obs.get('physics_score', 0):.3f} | "
+                    f"{obs.get('interpretation_label', '?')} | "
+                    f"{obs.get('lat', '?')} | {obs.get('lon', '?')} |"
+                )
+            lines.append("")
 
     # ══════════════════════════════════════════════════════════════════
     # 4. CROSS-INSTRUMENT CONSISTENCY
@@ -1458,79 +1535,44 @@ def _build_report_markdown(session: AgentSession) -> str:
         lines.append("")
         n_analyzed = sub.get("analyzed_count", 0)
         n_detect = sub.get("subsurface_detections", 0)
-        depth = sub.get("depth_summary", {})
-        eps_source = synthesis.get("epsilon_r_source", depth.get("epsilon_r_source", "assumed") if depth else "no_data")
-        is_fallback = synthesis.get("is_fallback", eps_source == "assumed")
+        ref = sub.get("reflector_summary") or sub.get("depth_summary") or {}
+        eps_source = synthesis.get("epsilon_r_source", "not_estimated")
+        is_fallback = synthesis.get("is_fallback", True)
 
         lines.append("| Parameter | Value |")
         lines.append("|-----------|-------|")
         if n_analyzed:
             lines.append(f"| Radargrams Analyzed | {n_analyzed} |")
         lines.append(f"| Subsurface Reflector Detections | **{n_detect}** |")
-        if depth:
-            lines.append(f"| Estimated Depth Range | {depth.get('min_depth_m', 'N/A')} – {depth.get('max_depth_m', 'N/A')} m |")
-            lines.append(f"| Median Depth | {depth.get('median_depth_m', 'N/A')} m |")
-            if is_fallback:
-                lines.append(f"| Dielectric Constant (εr) | {depth.get('epsilon_r_assumed', 3.15)} (**ASSUMED** — water-ice) |")
-            else:
-                # Physics-based εr available
+        if ref and ref.get("median_twt_us") is not None:
+            lines.append(f"| TWT Range | {ref.get('min_twt_us', 'N/A')} – {ref.get('max_twt_us', 'N/A')} µs |")
+            lines.append(f"| Median TWT | {ref.get('median_twt_us', 'N/A')} µs |")
+            if not is_fallback:
                 diel_a = synthesis.get("dielectric_analysis", {})
-                eps_val = diel_a.get("median_epsilon_r", depth.get("epsilon_r_assumed", 3.15))
+                eps_val = diel_a.get("median_epsilon_r", "N/A")
                 method_label = eps_source.replace("_", " ").title()
                 lines.append(f"| Dielectric Constant (εr) | **{eps_val}** (measured — {method_label}) |")
+            else:
+                lines.append(f"| Dielectric Constant (εr) | **Not estimated** |")
         lines.append("")
 
-        if n_detect > 0 and depth:
-            try:
-                med_d = float(depth.get('median_depth_m', 50))
-            except (TypeError, ValueError):
-                med_d = 50.0
-            if med_d <= 10:
-                depth_qual = (
-                    "This is **shallow ice** — potentially accessible for in-situ "
-                    "resource extraction without deep drilling."
-                )
-            elif med_d <= 30:
-                depth_qual = (
-                    "This depth is moderate — drilling infrastructure would be "
-                    "required for extraction."
-                )
-            elif med_d <= 80:
-                depth_qual = (
-                    "This depth is significant and would require substantial "
-                    "drilling capability."
+        if n_detect > 0 and ref:
+            if not is_fallback and synthesis.get("dielectric_analysis", {}).get("median_epsilon_r"):
+                import math as _m2
+                eps_r = float(synthesis["dielectric_analysis"]["median_epsilon_r"])
+                v = 299_792_458.0 / _m2.sqrt(eps_r)
+                twt_med = ref.get("median_twt_us", 0)
+                d_med = round(v * float(twt_med) * 1e-6 / 2.0, 1) if twt_med else 0
+                lines.append(
+                    f"SHARAD detected **{n_detect} subsurface reflector(s)**. "
+                    f"Using physics-based εr = {eps_r:.2f}, "
+                    f"the interface depth is ~{d_med} m."
                 )
             else:
-                depth_qual = (
-                    "This depth is **too deep for practical ice extraction** "
-                    "and reduces the site's utility for ISRU."
-                )
-
-            if is_fallback:
-                # Prominent fallback warning
-                physics_attempted = synthesis.get("physics_inversion_attempted", False)
-                if physics_attempted:
-                    fallback_reason = "Physics-based inversion was attempted but failed (insufficient DTM-SHARAD intersections or no terraced craters detected)."
-                else:
-                    fallback_reason = "Physics-based inversion was not possible due to lack of co-located HiRISE DTM data."
-
                 lines.append(
-                    f"**FALLBACK ESTIMATE:** SHARAD detected **{n_detect} subsurface reflector(s)**. "
-                    f"Depth is estimated at **{depth['min_depth_m']}–{depth['max_depth_m']} m** "
-                    f"(median {depth['median_depth_m']} m) using **assumed** εr = {depth.get('epsilon_r_assumed', 3.15)} (water-ice). "
-                    f"This depth is **not independently measured** — it assumes the subsurface "
-                    f"material is water ice. {fallback_reason}"
-                )
-                lines.append("")
-                lines.append(f"> {depth_qual}")
-            else:
-                lines.append(
-                    f"SHARAD analysis detected **{n_detect} subsurface reflector(s)**, "
-                    f"providing direct evidence of a dielectric interface. "
-                    f"Using εr estimated via morphological + radar inversion, "
-                    f"the interface depth is "
-                    f"**{depth['min_depth_m']}–{depth['max_depth_m']} m** "
-                    f"(median {depth['median_depth_m']} m). {depth_qual}"
+                    f"SHARAD detected **{n_detect} subsurface reflector(s)** "
+                    f"(TWT {ref.get('min_twt_us', '?')}–{ref.get('max_twt_us', '?')} µs). "
+                    f"**Depth in meters is not computed without εr estimation.**"
                 )
         elif n_analyzed > 0:
             lines.append(

@@ -1003,6 +1003,8 @@ def select_targeted_products(
             "targeting_rationale": "No CRISM ice candidates available — fallback to spatial sampling",
             "targets_used": [],
             "method": "spatial_fallback",
+            "n_sharad_targeted": 0,
+            "n_other_targeted": 0,
         }
 
     # Find intersecting products for each target
@@ -2391,7 +2393,7 @@ def targeted_subsurface_at_ice(
         if p.get("reflector_detected"):
             summary_parts.append(
                 f"  Reflector at ({p['ice_lat']:.2f}, {p['ice_lon']:.2f}): "
-                f"SHARAD {p['sharad_product_id']}, depth~{p.get('depth_m_assumed', '?')}m, "
+                f"SHARAD {p['sharad_product_id']}, TWT={p.get('twt_us', '?')} µs, "
                 f"SNR={p.get('median_snr', '?')}"
             )
 
@@ -2660,6 +2662,7 @@ def synthesize_results(
             "depth_summary": depth,  # backward-compat alias for reflector_summary
             "snr_distribution": sub.get("snr_distribution"),
             "clutter_rejection": sub.get("clutter_rejection"),
+            "clutter_validation": sub.get("clutter_validation"),
             "reflector_density_per_km": sub.get("reflector_density_per_km"),
             "epsilon_r_source": depth.get("epsilon_r_source", "not_estimated") if depth else "no_data",
         }
@@ -2817,6 +2820,9 @@ def synthesize_results(
             "water_ice_overall_fraction": spec.get("water_ice_overall_fraction", 0.0),
             "mean_band_params": spec.get("mean_band_params", {}),
             "methodology": spec.get("methodology", ""),
+            "top_physics_candidates": spec.get("top_physics_candidates", []),
+            "interpretation_distribution": spec.get("interpretation_distribution", {}),
+            "mean_physics_score": spec.get("mean_physics_score", 0.0),
         }
 
     # Climate analysis (MCD parametric model)

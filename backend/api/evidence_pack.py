@@ -61,11 +61,13 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
         "total_tracks": sub.get("total_tracks", 0),
         "analyzed_count": sub.get("analyzed_count", 0),
         "subsurface_detections": sub.get("subsurface_detections", 0),
-        "depth_summary": sub.get("depth_summary"),
+        "reflector_summary": sub.get("reflector_summary"),
+        "depth_summary": sub.get("depth_summary"),  # backward-compat alias
         "snr_distribution": sub.get("snr_distribution"),
         "clutter_rejection": sub.get("clutter_rejection"),
+        "clutter_validation": sub.get("clutter_validation"),
         "reflector_density_per_km": sub.get("reflector_density_per_km"),
-        "epsilon_r_source": sub.get("epsilon_r_source", "assumed"),
+        "epsilon_r_source": sub.get("epsilon_r_source", "not_estimated"),
     }
 
     # ── Dielectric Evidence ──
@@ -145,12 +147,24 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
 
     # ── CRISM Evidence ──
     mineral = synthesis.get("mineral_signatures", {})
+    crism_spectral = synthesis.get("crism_spectral_analysis", {})
     crism = {
         "crism_count": mineral.get("crism_count", 0),
         "high_ice_count": mineral.get("high_ice_count", 0),
         "high_hyd_count": mineral.get("high_hyd_count", 0),
         "top_ice_candidates": mineral.get("top_ice_candidates", []),
         "ice_hotspot": mineral.get("ice_hotspot"),
+        # Phase 0.3: CRISM physics analysis
+        "spectral_analysis": {
+            "observations_analyzed": crism_spectral.get("observations_analyzed", 0),
+            "mean_physics_score": crism_spectral.get("mean_physics_score", 0),
+            "max_physics_score": crism_spectral.get("max_physics_score", 0),
+            "interpretation_distribution": crism_spectral.get("interpretation_distribution", {}),
+            "top_physics_candidates": crism_spectral.get("top_physics_candidates", []),
+            "mean_band_params": crism_spectral.get("mean_band_params", {}),
+            "water_ice_overall_fraction": crism_spectral.get("water_ice_overall_fraction", 0),
+            "methodology": crism_spectral.get("methodology", ""),
+        } if crism_spectral else None,
     }
 
     # ── CNN Evidence ──
