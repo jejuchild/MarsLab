@@ -25,55 +25,12 @@ from .models import (
     OverlaySegment,
 )
 
+from analysis.shared.constants import SPEED_OF_LIGHT, SHARAD_SAMPLE_INTERVAL_US
+from analysis.shared.coordinates import lon_to_180, centric_to_graphic, cumulative_distance_m
+from analysis.shared.dem_sampling import sample_dem_along_track
+from analysis.shared.overlay import interpolate_colormap, CMAP_THICKNESS
+
 logger = logging.getLogger(__name__)
-
-# ── Physical constants ──────────────────────────────────────────────
-SPEED_OF_LIGHT = 299_792_458.0  # m/s
-SHARAD_SAMPLE_INTERVAL_US = 3.0 / 80.0  # 0.0375 µs per range bin
-MARS_MEAN_RADIUS_M = (2 * 3_396_190.0 + 3_376_200.0) / 3.0
-N_RANGE_BINS = 667
-
-# ── Overlay colormap boundaries ─────────────────────────────────────
-# thin → thick  ≡  blue → yellow → red
-_CMAP_STOPS = [
-    (0,   [70, 130, 230, 220]),    # blue  (thin, 0 m)
-    (20,  [70, 200, 220, 220]),    # cyan  (20 m)
-    (50,  [240, 220, 80, 220]),    # yellow (50 m)
-    (80,  [230, 130, 50, 220]),    # orange (80 m)
-    (150, [210, 50, 50, 220]),     # red   (≥150 m)
-]
-
-
-def _thickness_to_color(thickness_m: Optional[float]) -> List[float]:
-    """Map thickness to RGBA (0-255) using a blue→red colormap."""
-    if thickness_m is None:
-        return [120, 120, 120, 120]  # gray for no detection
-
-    t = max(0.0, thickness_m)
-    # Find enclosing stops
-    for i in range(len(_CMAP_STOPS) - 1):
-        lo_t, lo_c = _CMAP_STOPS[i]
-        hi_t, hi_c = _CMAP_STOPS[i + 1]
-        if t <= hi_t:
-            frac = (t - lo_t) / max(hi_t - lo_t, 1e-6)
-            return [
-                int(lo_c[j] + frac * (hi_c[j] - lo_c[j]))
-                for j in range(4)
-            ]
-    # Clamp to max color
-    return list(_CMAP_STOPS[-1][1])
-
-
-def _haversine_vec(lats: np.ndarray, lons: np.ndarray) -> np.ndarray:
-    """Cumulative great-circle distance on Mars (metres), vectorized."""
-    lat_r = np.radians(lats)
-    lon_r = np.radians(lons)
-    dlat = np.diff(lat_r)
-    dlon = np.diff(lon_r)
-    a = (np.sin(dlat / 2) ** 2
-         + np.cos(lat_r[:-1]) * np.cos(lat_r[1:]) * np.sin(dlon / 2) ** 2)
-    seg = MARS_MEAN_RADIUS_M * 2 * np.arcsin(np.sqrt(np.minimum(a, 1.0)))
-    return np.concatenate([[0.0], np.cumsum(seg)])
 
 
 class RegolithThicknessEstimator(AnalysisModule):
@@ -142,8 +99,6 @@ class RegolithThicknessEstimator(AnalysisModule):
             _get_power,
             _get_geometry,
             _pick_surface,
-            _lon_to_180,
-            _centric_to_graphic,
         )
 
         logger.info(
@@ -158,18 +113,18 @@ class RegolithThicknessEstimator(AnalysisModule):
 
         lats_centric = geom["lat"][:total_rows]
         lons_360 = geom["lon"][:total_rows]
-        lons_180 = _lon_to_180(lons_360)
-        lats_graphic = _centric_to_graphic(lats_centric)
+        lons_180 = lon_to_180(lons_360)
+        lats_graphic = centric_to_graphic(lats_centric)
 
         logger.debug("RTE: loaded %d traces, %d bins", total_rows, power.shape[1])
 
         # ── Step 2: Sample DEM along track ──────────────────────────
-        dem_source, surface_elevs = self._sample_dem(
+        dem_source, surface_elevs = sample_dem_along_track(
             lats_centric, lons_180, dtm_product_id,
         )
 
         # ── Step 3: Along-track distance ────────────────────────────
-        distances_m = _haversine_vec(lats_centric, lons_180)
+        distances_m = cumulative_distance_m(lats_centric, lons_180)
         distances_km = distances_m / 1000.0
 
         # ── Step 4: Vectorized near-surface reflector detection ─────
@@ -214,14 +169,13 @@ class RegolithThicknessEstimator(AnalysisModule):
                      n_valid, n_traces, 100 * n_valid / max(n_traces, 1))
 
         # ── Step 5: Coherence filtering ─────────────────────────────
-        coherence = np.zeros(n_traces, dtype=np.float32)  # 0=none, 0.3=interp, 1=coherent
+        coherence = np.zeros(n_traces, dtype=np.float32)
 
         if n_valid >= 10:
             coherence = self._coherence_filter(
                 detected, delta_bins_arr, snr_arr, coherence,
             )
         elif n_valid > 0:
-            # Too few detections for filtering — keep all, low coherence
             coherence[detected] = 0.5
 
         # ── Step 6: Convert TWT → depth ─────────────────────────────
@@ -236,7 +190,6 @@ class RegolithThicknessEstimator(AnalysisModule):
         # ── Step 7: Confidence score ────────────────────────────────
         dem_bonus = 1.0 if dem_source == "HiRISE_DTM" else 0.5
 
-        # Median delta_bins for consistency term
         if n_valid > 0:
             median_db = float(np.median(delta_bins_arr[detected]))
         else:
@@ -254,8 +207,6 @@ class RegolithThicknessEstimator(AnalysisModule):
             confidence[i] = min(c_snr + c_coh + c_con + c_dem, 1.0)
 
         # ── Step 8: Build profile ───────────────────────────────────
-        # Downsample for output: keep every trace (typically ~2k–10k)
-        # Frontend handles rendering; we cap overlay segments separately
         profile: List[RegolithSample] = []
         for i in range(n_traces):
             sample = RegolithSample(
@@ -325,7 +276,7 @@ class RegolithThicknessEstimator(AnalysisModule):
         )
 
     # ────────────────────────────────────────────────────────────────
-    # Helpers
+    # Helpers (RTE-specific — not shared)
     # ────────────────────────────────────────────────────────────────
 
     @staticmethod
@@ -353,7 +304,6 @@ class RegolithThicknessEstimator(AnalysisModule):
                 snr[idx] = 0
 
         # Continuity: require ≥5 consecutive valid traces
-        # Walk through and label runs
         run_start = -1
         for i in range(len(detected)):
             if detected[i]:
@@ -364,7 +314,6 @@ class RegolithThicknessEstimator(AnalysisModule):
                     run_len = i - run_start
                     if run_len >= 5:
                         coherence[run_start:i] = 1.0
-                    # Isolated short runs get partial coherence
                     elif run_len >= 2:
                         coherence[run_start:i] = 0.5
                     run_start = -1
@@ -377,61 +326,6 @@ class RegolithThicknessEstimator(AnalysisModule):
                 coherence[run_start:] = 0.5
 
         return coherence
-
-    @staticmethod
-    def _sample_dem(
-        lats_centric: np.ndarray,
-        lons_180: np.ndarray,
-        dtm_product_id: str,
-    ) -> tuple:
-        """Sample DEM elevation along track. Returns (source_name, elevations)."""
-        n = len(lats_centric)
-        elevations = np.full(n, np.nan, dtype=np.float64)
-
-        # Try HiRISE DTM if specified
-        if dtm_product_id:
-            try:
-                from api.sharad_report import load_dtm_along_track
-                dtm_elevs = load_dtm_along_track(
-                    dtm_product_id, lats_centric, lons_180,
-                )
-                if dtm_elevs is not None:
-                    valid = ~np.isnan(dtm_elevs)
-                    if valid.sum() > n * 0.3:
-                        elevations = dtm_elevs
-                        return "HiRISE_DTM", elevations
-            except Exception:
-                logger.debug("HiRISE DTM fallback to MOLA: %s", dtm_product_id)
-
-        # MOLA fallback (always available)
-        try:
-            import rasterio
-            from rasterio.windows import Window
-            from api.sharad_highres_router import _get_dem
-
-            ds = _get_dem()
-            inv_transform = ~ds.transform
-            cols, rows = inv_transform * (lons_180, lats_centric)
-            cols = np.round(cols).astype(int)
-            rows = np.round(rows).astype(int)
-            cols = np.clip(cols, 0, ds.width - 1)
-            rows = np.clip(rows, 0, ds.height - 1)
-
-            row_min, row_max = int(rows.min()), int(rows.max())
-            col_min, col_max = int(cols.min()), int(cols.max())
-            window = Window(col_min, row_min,
-                            col_max - col_min + 1, row_max - row_min + 1)
-            block = ds.read(1, window=window).astype(np.float64)
-            if ds.nodata is not None:
-                block[block == ds.nodata] = np.nan
-
-            local_rows = rows - row_min
-            local_cols = cols - col_min
-            elevations = block[local_rows, local_cols]
-        except Exception:
-            logger.warning("MOLA DEM sampling failed; elevations will be NaN")
-
-        return "MOLA", elevations
 
     @staticmethod
     def _build_overlay(
@@ -465,7 +359,7 @@ class RegolithThicknessEstimator(AnalysisModule):
                 end_lat=round(float(lats[j]), 5),
                 end_lon=round(float(lons[j]), 5),
                 thickness_m=round(seg_thick, 1) if seg_thick is not None else None,
-                color=_thickness_to_color(seg_thick),
+                color=interpolate_colormap(seg_thick, CMAP_THICKNESS),
             ))
 
         return segments

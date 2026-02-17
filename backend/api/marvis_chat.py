@@ -638,8 +638,8 @@ _SELECT_RE = re.compile(
     r"|\b(" + "|".join(INSTRUMENT_LIST) + r")\b.*?\b(?:pick|select|open|inspect|choose|panel)\b",
 )
 _MINERAL_RE = re.compile(
-    r"(?i)\b(?:find|search|where|locate|show)\b.*?\b(?:h2o|ice|water|hydrat|mineral|clay)\b"
-    r"|\b(?:h2o|ice|water|hydrat|mineral)\b.*?\b(?:find|search|where|more than|greater|above|>)\b",
+    r"(?i)\b(?:find|search|where|locate|show)\b.*?\b(?:h2o|ice|water|hydrat\w*|mineral|clay)\b"
+    r"|\b(?:h2o|ice|water|hydrat\w*|mineral)\b.*?\b(?:find|search|where|more than|greater|above|>)\b",
 )
 _MINERAL_PCT_RE = re.compile(
     r"(?:more\s+than|greater\s+than|above|over|>|>=)\s*(\d+(?:\.\d+)?)\s*%?"
