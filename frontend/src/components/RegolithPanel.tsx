@@ -148,7 +148,11 @@ export default function RegolithPanel({
       .map((s) => ({
         km: s.along_track_km,
         thickness: s.thickness_m,
+        thickness_low: s.thickness_low_m,
+        thickness_high: s.thickness_high_m,
         confidence: s.confidence != null ? +(s.confidence * 100).toFixed(0) : null,
+        clutter_flagged: s.clutter_flagged ?? false,
+        clutter_snr: s.clutter_snr,
       })) ?? [];
 
   const summary = result?.summary;
@@ -328,11 +332,40 @@ export default function RegolithPanel({
                           borderRadius: 6,
                         }}
                         labelFormatter={(v) => `${v} km`}
-                        formatter={(value: number, name: string) => {
+                        formatter={(value: any, name: string) => {
                           if (name === "thickness")
                             return [`${value?.toFixed(1)} m`, "Thickness"];
+                          if (name === "thickness_low")
+                            return [`${value?.toFixed(1)} m`, "Thickness (Low)"];
+                          if (name === "thickness_high")
+                            return [`${value?.toFixed(1)} m`, "Thickness (High)"];
                           if (name === "confidence") return [`${value}%`, "Confidence"];
                           return [value, name];
+                        }}
+                        content={({ active, payload }: any) => {
+                          if (active && payload && payload.length > 0) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-[#101622] border border-[#232f48] rounded-lg p-2 text-[11px]">
+                                <p className="text-slate-400 mb-1.5">{data.km.toFixed(1)} km</p>
+                                <p className="text-[#4f9cf7]">
+                                  Thickness: {data.thickness?.toFixed(1)} m
+                                </p>
+                                {epsilonUncertainty > 0 && (
+                                  <p className="text-slate-500 text-[10px]">
+                                    Range: {data.thickness_low?.toFixed(1)} – {data.thickness_high?.toFixed(1)} m
+                                  </p>
+                                )}
+                                {data.confidence !== null && (
+                                  <p className="text-[#f59e42]">Confidence: {data.confidence}%</p>
+                                )}
+                                {data.clutter_flagged && (
+                                  <p className="text-orange-400">⚠ Clutter flagged SNR {data.clutter_snr?.toFixed(1)}</p>
+                                )}
+                              </div>
+                            );
+                          }
+                          return null;
                         }}
                       />
                       <Area
@@ -345,6 +378,28 @@ export default function RegolithPanel({
                         isAnimationActive={false}
                         dot={false}
                       />
+                      {epsilonUncertainty > 0 && (
+                        <>
+                          <Area
+                            yAxisId="thick"
+                            type="monotone"
+                            dataKey="thickness_low"
+                            fill="url(#epsilonGradLow)"
+                            stroke="none"
+                            isAnimationActive={false}
+                            opacity={0.15}
+                          />
+                          <Area
+                            yAxisId="thick"
+                            type="monotone"
+                            dataKey="thickness_high"
+                            fill="url(#epsilonGradHigh)"
+                            stroke="none"
+                            isAnimationActive={false}
+                            opacity={0.15}
+                          />
+                        </>
+                      )}
                       <Line
                         yAxisId="conf"
                         type="monotone"
@@ -359,6 +414,14 @@ export default function RegolithPanel({
                         <linearGradient id="thickGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#4f9cf7" stopOpacity={0.3} />
                           <stop offset="100%" stopColor="#4f9cf7" stopOpacity={0.02} />
+                        </linearGradient>
+                        <linearGradient id="epsilonGradLow" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6fb5fb" stopOpacity={0.2} />
+                          <stop offset="100%" stopColor="#6fb5fb" stopOpacity={0.05} />
+                        </linearGradient>
+                        <linearGradient id="epsilonGradHigh" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6fb5fb" stopOpacity={0.2} />
+                          <stop offset="100%" stopColor="#6fb5fb" stopOpacity={0.05} />
                         </linearGradient>
                       </defs>
                     </ComposedChart>
