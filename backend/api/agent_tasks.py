@@ -2000,7 +2000,7 @@ def sharad_physics_inversion(
             }
             if inv.hyperbola_validation:
                 detail["hyperbola_validation"] = {
-                    "epsilon_r_hyperbola": inv.hyperbola_validation.epsilon_r_hyperbola,
+                    "epsilon_r_curvature": inv.hyperbola_validation.epsilon_r_curvature,
                     "agreement": inv.hyperbola_validation.agreement,
                     "delta_epsilon": inv.hyperbola_validation.delta_epsilon,
                 }
@@ -2059,6 +2059,182 @@ def sharad_physics_inversion(
             error=str(e),
             summary=f"SHARAD physics inversion failed: {e}",
         )
+
+
+# =============================================================================
+# Task: Hyperbola-Based εr Estimation (Phase 3)
+# =============================================================================
+
+def hyperbola_epsilon_estimation(
+    subsurface_result: Optional[TaskResult],
+    products: List[Dict[str, Any]],
+) -> TaskResult:
+    """
+    Estimate dielectric constant from SHARAD diffraction hyperbola curvature.
+
+    Phase 3: Independent εr estimation by fitting t(x) = sqrt(t0² + (2x/v)²)
+    to diffraction hyperbolas in SHARAD radargrams. Provides a third independent
+    εr constraint alongside terraced crater and physics inversion methods.
+
+    This does NOT assume εr — it measures wave velocity from the hyperbola shape.
+    """
+    if not subsurface_result or not subsurface_result.success:
+        return TaskResult(
+            task_type="hyperbola_epsilon",
+            success=True,
+            data={"estimates_count": 0, "reason": "no_subsurface_data"},
+            summary="No subsurface data for hyperbola εr estimation",
+        )
+
+    sharad_products = [p for p in products if p.get("instrument") == "SHARAD_HIGHRES"]
+    if not sharad_products:
+        return TaskResult(
+            task_type="hyperbola_epsilon",
+            success=True,
+            data={"estimates_count": 0, "reason": "no_sharad_highres"},
+            summary="No SHARAD high-res products for hyperbola analysis",
+        )
+
+    try:
+        from analysis.ice_evidence.hyperbola_fit import auto_detect_apexes, fit_hyperbola
+        from analysis.ice_evidence.models import HyperbolaFitRequest
+    except ImportError:
+        try:
+            from backend.analysis.ice_evidence.hyperbola_fit import auto_detect_apexes, fit_hyperbola
+            from backend.analysis.ice_evidence.models import HyperbolaFitRequest
+        except ImportError:
+            return TaskResult(
+                task_type="hyperbola_epsilon",
+                success=False,
+                error="hyperbola_fit module not available",
+                summary="Hyperbola fitting module unavailable",
+            )
+
+    all_fits = []
+    analyzed_tracks = []
+
+    for sp in sharad_products[:5]:  # Up to 5 tracks
+        pid = sp["product_id"]
+        try:
+            # Auto-detect diffraction apex candidates
+            apexes = auto_detect_apexes(pid, n_candidates=3)
+            if not apexes:
+                analyzed_tracks.append({"product_id": pid, "apexes_found": 0})
+                continue
+
+            track_fits = []
+            for apex in apexes[:2]:  # Fit top 2 per track
+                req = HyperbolaFitRequest(
+                    product_id=pid,
+                    apex_trace=apex["trace"],
+                    apex_bin=apex["bin"],
+                )
+                result = fit_hyperbola(req)
+                if result and result.epsr is not None and result.epsr > 0:
+                    ci = result.epsr_ci95 if result.epsr_ci95 else [result.epsr * 0.8, result.epsr * 1.2]
+                    # Quality classification
+                    quality = "good"
+                    if result.quality and result.quality.snr < 2.5:
+                        quality = "marginal"
+                    if result.quality and result.quality.support_traces < 10:
+                        quality = "marginal" if quality == "good" else "unreliable"
+                    if result.epsr > 10 or result.epsr < 1.0:
+                        quality = "unreliable"
+
+                    fit_data = {
+                        "product_id": pid,
+                        "apex_trace": apex["trace"],
+                        "apex_bin": apex["bin"],
+                        "epsilon_r": round(result.epsr, 2),
+                        "epsilon_r_ci95": [round(c, 2) for c in ci],
+                        "velocity_mps": round(result.v_mps, 0) if result.v_mps else None,
+                        "depth_m": round(result.depth_m, 1) if result.depth_m else None,
+                        "quality": quality,
+                        "snr": round(result.quality.snr, 2) if result.quality else None,
+                        "support_traces": result.quality.support_traces if result.quality else 0,
+                        "residual_rms": round(result.quality.residual, 6) if result.quality else None,
+                        "flags": result.flags or [],
+                    }
+                    track_fits.append(fit_data)
+                    all_fits.append(fit_data)
+
+            analyzed_tracks.append({
+                "product_id": pid,
+                "apexes_found": len(apexes),
+                "fits_successful": len(track_fits),
+            })
+        except Exception as e:
+            logger.warning(f"Hyperbola εr failed for {pid}: {e}")
+            analyzed_tracks.append({"product_id": pid, "error": str(e)})
+
+    if not all_fits:
+        return TaskResult(
+            task_type="hyperbola_epsilon",
+            success=True,
+            data={
+                "estimates_count": 0,
+                "tracks_analyzed": analyzed_tracks,
+                "reason": "no_valid_fits",
+            },
+            summary=f"No valid hyperbola fits from {len(analyzed_tracks)} tracks",
+        )
+
+    # Filter by quality
+    good_fits = [f for f in all_fits if f["quality"] != "unreliable"]
+    pool = good_fits if good_fits else all_fits
+
+    import numpy as np
+    eps_values = [f["epsilon_r"] for f in pool]
+    mean_eps = round(float(np.mean(eps_values)), 2)
+    median_eps = round(float(np.median(eps_values)), 2)
+
+    # Interpretation
+    if median_eps < 2.5:
+        interp = "dry regolith or porous ice"
+    elif median_eps < 3.5:
+        interp = "ice-rich subsurface (consistent with water ice)"
+    elif median_eps < 5.0:
+        interp = "ice-cemented regolith"
+    else:
+        interp = "basaltic regolith or dense rock"
+
+    # Best CI from all good fits
+    all_ci_lo = [f["epsilon_r_ci95"][0] for f in pool if f.get("epsilon_r_ci95")]
+    all_ci_hi = [f["epsilon_r_ci95"][1] for f in pool if f.get("epsilon_r_ci95")]
+    overall_ci = None
+    if all_ci_lo and all_ci_hi:
+        overall_ci = [round(min(all_ci_lo), 2), round(max(all_ci_hi), 2)]
+
+    n_good = sum(1 for f in pool if f["quality"] == "good")
+    n_marginal = sum(1 for f in pool if f["quality"] == "marginal")
+
+    # Check ice-consistency flags
+    ice_consistent_count = sum(
+        1 for f in pool if "ICE_CONSISTENT" in f.get("flags", [])
+    )
+
+    return TaskResult(
+        task_type="hyperbola_epsilon",
+        success=True,
+        data={
+            "estimates_count": len(pool),
+            "mean_epsilon_r": mean_eps,
+            "median_epsilon_r": median_eps,
+            "min_epsilon_r": round(min(eps_values), 2),
+            "max_epsilon_r": round(max(eps_values), 2),
+            "epsilon_r_ci95": overall_ci,
+            "interpretation": interp,
+            "n_good": n_good,
+            "n_marginal": n_marginal,
+            "ice_consistent_count": ice_consistent_count,
+            "fits": all_fits,
+            "tracks_analyzed": analyzed_tracks,
+        },
+        summary=(
+            f"Hyperbola εr = {median_eps} (median, {len(pool)} fits"
+            f"{f', {ice_consistent_count} ice-consistent' if ice_consistent_count else ''}): {interp}"
+        ),
+    )
 
 
 # =============================================================================
@@ -2638,6 +2814,106 @@ def crism_spectral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
 
 
 # =============================================================================
+# Phase 3: Multi-method εr Cross-Validation
+# =============================================================================
+
+def _cross_validate_epsilon_methods(
+    successful_methods: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Cross-validate εr estimates from multiple independent methods.
+
+    Performs pairwise comparison and computes weighted consensus εr.
+    Methods: physics_inversion, terraced_crater, hyperbola_curvature.
+
+    Agreement thresholds:
+      Δε < 0.5  → consistent
+      Δε < 1.5  → marginal
+      Δε ≥ 1.5  → inconsistent
+    """
+    # Method reliability weights (for consensus)
+    method_weights = {
+        "physics_inversion": 1.0,
+        "terraced_crater": 0.8,
+        "hyperbola_curvature": 0.6,
+        "standard_dtm_relief": 0.3,
+    }
+
+    # Pairwise comparisons
+    pairwise = []
+    for i in range(len(successful_methods)):
+        for j in range(i + 1, len(successful_methods)):
+            m1 = successful_methods[i]
+            m2 = successful_methods[j]
+            eps1 = float(m1["epsilon_r"])
+            eps2 = float(m2["epsilon_r"])
+            delta = abs(eps1 - eps2)
+
+            if delta < 0.5:
+                agreement = "consistent"
+            elif delta < 1.5:
+                agreement = "marginal"
+            else:
+                agreement = "inconsistent"
+
+            pairwise.append({
+                "method_a": m1["method"],
+                "method_b": m2["method"],
+                "epsilon_r_a": round(eps1, 2),
+                "epsilon_r_b": round(eps2, 2),
+                "delta_epsilon": round(delta, 2),
+                "agreement": agreement,
+            })
+
+    # Weighted consensus εr
+    total_weight = 0.0
+    weighted_sum = 0.0
+    for m in successful_methods:
+        w = method_weights.get(m["method"], 0.3)
+        eps = float(m["epsilon_r"])
+        weighted_sum += w * eps
+        total_weight += w
+
+    consensus_eps = round(weighted_sum / total_weight, 2) if total_weight > 0 else None
+
+    # Overall agreement
+    n_consistent = sum(1 for p in pairwise if p["agreement"] == "consistent")
+    n_marginal = sum(1 for p in pairwise if p["agreement"] == "marginal")
+    n_inconsistent = sum(1 for p in pairwise if p["agreement"] == "inconsistent")
+
+    if n_inconsistent > 0:
+        overall = "inconsistent"
+    elif n_marginal > 0:
+        overall = "marginal"
+    elif n_consistent > 0:
+        overall = "consistent"
+    else:
+        overall = "unknown"
+
+    # Conflict flags
+    conflicts = []
+    for p in pairwise:
+        if p["agreement"] == "inconsistent":
+            conflicts.append(
+                f"{p['method_a']} (εr={p['epsilon_r_a']}) vs "
+                f"{p['method_b']} (εr={p['epsilon_r_b']}): Δ={p['delta_epsilon']}"
+            )
+
+    return {
+        "n_methods": len(successful_methods),
+        "methods": [{"method": m["method"], "epsilon_r": round(float(m["epsilon_r"]), 2)} for m in successful_methods],
+        "pairwise_comparisons": pairwise,
+        "n_consistent": n_consistent,
+        "n_marginal": n_marginal,
+        "n_inconsistent": n_inconsistent,
+        "overall_agreement": overall,
+        "consensus_epsilon_r": consensus_eps,
+        "consensus_method_weights": {m["method"]: method_weights.get(m["method"], 0.3) for m in successful_methods},
+        "conflicts": conflicts,
+    }
+
+
+# =============================================================================
 # Task: Synthesize Results
 # =============================================================================
 
@@ -2767,6 +3043,8 @@ def synthesize_results(
             "median_epsilon_r": tdiel.get("median_epsilon_r"),
             "interpretation": tdiel.get("interpretation", ""),
             "estimates": tdiel.get("estimates", []),
+            # Phase 2: quality-weighted aggregate
+            "weighted_aggregate": tdiel.get("weighted_aggregate"),
         }
         # Override basic dielectric if terrace version has estimates
         if tdiel.get("estimates_count", 0) > 0:
@@ -2805,6 +3083,22 @@ def synthesize_results(
                 "assumptions": inv.get("assumptions", []),
             }
 
+    # Phase 3: Hyperbola-based εr estimation
+    if "hyperbola_epsilon" in all_results and all_results["hyperbola_epsilon"].success:
+        hyp = all_results["hyperbola_epsilon"].data
+        synthesis["hyperbola_epsilon"] = {
+            "estimates_count": hyp.get("estimates_count", 0),
+            "mean_epsilon_r": hyp.get("mean_epsilon_r"),
+            "median_epsilon_r": hyp.get("median_epsilon_r"),
+            "epsilon_r_ci95": hyp.get("epsilon_r_ci95"),
+            "interpretation": hyp.get("interpretation", ""),
+            "n_good": hyp.get("n_good", 0),
+            "n_marginal": hyp.get("n_marginal", 0),
+            "ice_consistent_count": hyp.get("ice_consistent_count", 0),
+            "fits": hyp.get("fits", []),
+            "tracks_analyzed": hyp.get("tracks_analyzed", []),
+        }
+
     # ── Dielectric Method Hierarchy: track what was attempted and outcomes ──
     method_hierarchy = []
     physics_inv_data = synthesis.get("sharad_physics_inversion", {})
@@ -2837,6 +3131,21 @@ def synthesize_results(
             "reason": all_results["terrace_dielectric"].data.get("reason", "unknown"),
         })
 
+    # Phase 3: Hyperbola εr in method hierarchy
+    hyperbola_data = synthesis.get("hyperbola_epsilon", {})
+    if hyperbola_data.get("estimates_count", 0) > 0:
+        method_hierarchy.append({
+            "method": "hyperbola_curvature",
+            "status": "success",
+            "epsilon_r": hyperbola_data.get("median_epsilon_r"),
+        })
+    elif "hyperbola_epsilon" in all_results:
+        method_hierarchy.append({
+            "method": "hyperbola_curvature",
+            "status": "attempted_failed",
+            "reason": all_results["hyperbola_epsilon"].data.get("reason", "unknown"),
+        })
+
     if basic_diel_data.get("estimates_count", 0) > 0 and basic_diel_data.get("method") not in ("physics_inversion", "terraced_crater"):
         method_hierarchy.append({
             "method": "standard_dtm_relief",
@@ -2845,7 +3154,7 @@ def synthesize_results(
         })
 
     # Determine effective εr source for the entire synthesis
-    successful_physics = [m for m in method_hierarchy if m["status"] == "success" and m["method"] in ("physics_inversion", "terraced_crater")]
+    successful_physics = [m for m in method_hierarchy if m["status"] == "success" and m["method"] in ("physics_inversion", "terraced_crater", "hyperbola_curvature")]
     if successful_physics:
         synthesis["epsilon_r_source"] = successful_physics[0]["method"]
         synthesis["is_fallback"] = False
@@ -2864,6 +3173,18 @@ def synthesize_results(
     # Propagate physics_attempted flag into dielectric_analysis for scoring
     if synthesis.get("dielectric_analysis") is not None:
         synthesis["dielectric_analysis"]["physics_attempted"] = synthesis.get("physics_inversion_attempted", False)
+
+    # Phase 3: Multi-method εr cross-validation
+    successful_methods = [m for m in method_hierarchy if m["status"] == "success" and m.get("epsilon_r") is not None]
+    if len(successful_methods) >= 2:
+        synthesis["epsilon_cross_validation"] = _cross_validate_epsilon_methods(successful_methods)
+    else:
+        synthesis["epsilon_cross_validation"] = {
+            "n_methods": len(successful_methods),
+            "consensus_epsilon_r": successful_methods[0]["epsilon_r"] if successful_methods else None,
+            "pairwise_comparisons": [],
+            "overall_agreement": "single_method" if len(successful_methods) == 1 else "no_methods",
+        }
 
     # CRISM Spectral Analysis (new physics-based pipeline)
     if "crism_spectral" in all_results and all_results["crism_spectral"].success:

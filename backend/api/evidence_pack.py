@@ -74,6 +74,8 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
     diel = synthesis.get("dielectric_analysis", {})
     terrace_diel = synthesis.get("terrace_dielectric", {})
     physics_inv = synthesis.get("sharad_physics_inversion", {})
+    hyperbola = synthesis.get("hyperbola_epsilon", {})
+    cross_val = synthesis.get("epsilon_cross_validation", {})
     method_hierarchy = synthesis.get("dielectric_method_hierarchy", [])
 
     # Determine best method
@@ -86,9 +88,18 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
     # Build Gaussian + sensitivity from physics inversion data
     gaussian = None
     sensitivity_table = None
-    # Phase 2: prefer quality-weighted terrace εr over raw median
+    # Phase 2+3: prefer quality-weighted terrace εr, then hyperbola, then raw median
     terrace_weighted_eps = (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r")
-    eps_val = physics_inv.get("best_epsilon_r") or terrace_weighted_eps or terrace_diel.get("median_epsilon_r") or diel.get("median_epsilon_r")
+    # Phase 3: use cross-validation consensus if available
+    consensus_eps = cross_val.get("consensus_epsilon_r")
+    eps_val = (
+        physics_inv.get("best_epsilon_r")
+        or consensus_eps
+        or terrace_weighted_eps
+        or terrace_diel.get("median_epsilon_r")
+        or hyperbola.get("median_epsilon_r")
+        or diel.get("median_epsilon_r")
+    )
     eps_ci = physics_inv.get("best_epsilon_r_ci")
 
     # Pull Gaussian data from physics inversion pipeline result
@@ -152,6 +163,15 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
         "terrace_n_marginal": (terrace_diel.get("weighted_aggregate") or {}).get("n_marginal", 0),
         "physics_inversions_completed": physics_inv.get("inversions_completed", 0),
         "physics_methodology": physics_inv.get("methodology", ""),
+        # Phase 3: Hyperbola εr
+        "hyperbola_estimates_count": hyperbola.get("estimates_count", 0),
+        "hyperbola_median_epsilon_r": hyperbola.get("median_epsilon_r"),
+        "hyperbola_epsilon_r_ci95": hyperbola.get("epsilon_r_ci95"),
+        "hyperbola_n_good": hyperbola.get("n_good", 0),
+        "hyperbola_ice_consistent": hyperbola.get("ice_consistent_count", 0),
+        "hyperbola_fits": hyperbola.get("fits", []),
+        # Phase 3: Cross-validation
+        "cross_validation": cross_val,
     }
 
     # ── CRISM Evidence ──

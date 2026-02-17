@@ -998,7 +998,52 @@ def generate_report_from_evidence_pack(
             conf = dielectric.get("reflector_confidence", 0)
             lines.append(f"| Physics-Based Inversion | **{eps_s}{ci_str}** (confidence: {conf:.0%}) | DTM-constrained, no εr assumption |")
 
+        # Phase 3: Hyperbola curvature row
+        if dielectric.get("hyperbola_estimates_count", 0) > 0:
+            h_eps = dielectric.get("hyperbola_median_epsilon_r")
+            h_eps_s = f"{h_eps:.2f}" if isinstance(h_eps, (int, float)) else "N/A"
+            h_ci = dielectric.get("hyperbola_epsilon_r_ci95")
+            h_ci_str = f" ({h_ci[0]:.2f}–{h_ci[1]:.2f})" if h_ci and len(h_ci) == 2 else ""
+            h_n = dielectric.get("hyperbola_estimates_count", 0)
+            h_ice = dielectric.get("hyperbola_ice_consistent", 0)
+            h_ice_note = f", {h_ice} ice-consistent" if h_ice else ""
+            lines.append(
+                f"| Hyperbola Curvature | **{h_eps_s}{h_ci_str}** "
+                f"({h_n} fits{h_ice_note}) | Velocity from diffraction shape |"
+            )
+
         lines.append("")
+
+        # Phase 3: Cross-validation summary
+        cross_val = dielectric.get("cross_validation", {})
+        if cross_val.get("n_methods", 0) >= 2:
+            lines.append("### εr Cross-Validation")
+            lines.append("")
+            overall = cross_val.get("overall_agreement", "unknown")
+            consensus = cross_val.get("consensus_epsilon_r")
+            lines.append(f"**Overall agreement: {overall.upper()}**")
+            if consensus is not None:
+                lines.append(f"Consensus εr = {consensus:.2f} (weighted by method reliability)")
+            lines.append("")
+            pairwise = cross_val.get("pairwise_comparisons", [])
+            if pairwise:
+                lines.append("| Method A | Method B | εr(A) | εr(B) | Δε | Agreement |")
+                lines.append("|----------|----------|-------|-------|------|-----------|")
+                for p in pairwise:
+                    ma = p.get("method_a", "?").replace("_", " ").title()
+                    mb = p.get("method_b", "?").replace("_", " ").title()
+                    lines.append(
+                        f"| {ma} | {mb} | {p.get('epsilon_r_a', '?')} | "
+                        f"{p.get('epsilon_r_b', '?')} | {p.get('delta_epsilon', '?')} | "
+                        f"{p.get('agreement', '?')} |"
+                    )
+                lines.append("")
+            conflicts = cross_val.get("conflicts", [])
+            if conflicts:
+                lines.append("**Conflicts:**")
+                for c in conflicts:
+                    lines.append(f"- {c}")
+                lines.append("")
 
         # Ice probability assessment
         any_eps = dielectric.get("epsilon_r")
@@ -1669,11 +1714,14 @@ def _build_report_markdown(session: AgentSession) -> str:
     diel = synthesis.get("dielectric_analysis", {})
     terrace_diel = synthesis.get("terrace_dielectric", {})
     physics_inv = synthesis.get("sharad_physics_inversion", {})
+    hyperbola_diel = synthesis.get("hyperbola_epsilon", {})
+    cross_val = synthesis.get("epsilon_cross_validation", {})
     method_hierarchy = synthesis.get("dielectric_method_hierarchy", [])
     has_dielectric = (
         diel.get("estimates_count", 0) > 0
         or terrace_diel.get("estimates_count", 0) > 0
         or physics_inv.get("inversions_completed", 0) > 0
+        or hyperbola_diel.get("estimates_count", 0) > 0
     )
 
     lines.append("## 2b. Dielectric Constant Estimation (εr)")
@@ -1722,6 +1770,25 @@ def _build_report_markdown(session: AgentSession) -> str:
                 f"(confidence: {conf:.0%}) | DTM-constrained, no εr assumption |"
             )
 
+        # Phase 3: Hyperbola curvature row
+        if hyperbola_diel.get("estimates_count", 0) > 0:
+            h_eps = hyperbola_diel.get("median_epsilon_r")
+            h_eps_s = f"{h_eps:.2f}" if isinstance(h_eps, (int, float)) else "N/A"
+            h_ci = hyperbola_diel.get("epsilon_r_ci95")
+            h_ci_str = ""
+            if h_ci and len(h_ci) == 2:
+                try:
+                    h_ci_str = f" ({float(h_ci[0]):.2f}-{float(h_ci[1]):.2f})"
+                except (TypeError, ValueError):
+                    pass
+            h_n = hyperbola_diel.get("estimates_count", 0)
+            h_ice = hyperbola_diel.get("ice_consistent_count", 0)
+            h_ice_note = f", {h_ice} ice-consistent" if h_ice else ""
+            lines.append(
+                f"| Hyperbola Curvature | **{h_eps_s}{h_ci_str}** "
+                f"({h_n} fits{h_ice_note}) | Velocity from diffraction shape |"
+            )
+
         if diel.get("estimates_count", 0) > 0 and diel.get("method") not in ("terraced_crater", "physics_inversion"):
             med_eps = diel.get("median_epsilon_r", "N/A")
             interp = diel.get("interpretation", "")
@@ -1729,37 +1796,68 @@ def _build_report_markdown(session: AgentSession) -> str:
 
         lines.append("")
 
-        # εr consistency comparison (when multiple methods available)
-        eps_values_for_comparison = []
-        # Phase 2: prefer weighted εr for comparison
-        terrace_compare_eps = (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r") or terrace_diel.get("median_epsilon_r")
-        if terrace_diel.get("estimates_count", 0) > 0 and terrace_compare_eps is not None:
-            eps_values_for_comparison.append(("Terraced Crater", float(terrace_compare_eps)))
-        if physics_inv.get("inversions_completed", 0) > 0 and physics_inv.get("best_epsilon_r") is not None:
-            eps_values_for_comparison.append(("Physics Inversion", float(physics_inv["best_epsilon_r"])))
+        # Phase 3: Cross-validation summary (replaces old consistency comparison)
+        if cross_val.get("n_methods", 0) >= 2:
+            lines.append("### εr Cross-Validation")
+            lines.append("")
+            overall = cross_val.get("overall_agreement", "unknown")
+            consensus = cross_val.get("consensus_epsilon_r")
+            lines.append(f"**Overall agreement: {overall.upper()}**")
+            if consensus is not None:
+                lines.append(f"Consensus εr = {consensus:.2f} (weighted by method reliability)")
+            lines.append("")
+            pairwise = cross_val.get("pairwise_comparisons", [])
+            if pairwise:
+                lines.append("| Method A | Method B | εr(A) | εr(B) | Δε | Agreement |")
+                lines.append("|----------|----------|-------|-------|------|-----------|")
+                for p in pairwise:
+                    ma = p.get("method_a", "?").replace("_", " ").title()
+                    mb = p.get("method_b", "?").replace("_", " ").title()
+                    lines.append(
+                        f"| {ma} | {mb} | {p.get('epsilon_r_a', '?')} | "
+                        f"{p.get('epsilon_r_b', '?')} | {p.get('delta_epsilon', '?')} | "
+                        f"{p.get('agreement', '?')} |"
+                    )
+                lines.append("")
+            conflicts = cross_val.get("conflicts", [])
+            if conflicts:
+                lines.append("**Conflicts:**")
+                for c in conflicts:
+                    lines.append(f"- {c}")
+                lines.append("")
+        else:
+            # Fallback: old pairwise comparison for backward compatibility
+            eps_values_for_comparison = []
+            terrace_compare_eps = (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r") or terrace_diel.get("median_epsilon_r")
+            if terrace_diel.get("estimates_count", 0) > 0 and terrace_compare_eps is not None:
+                eps_values_for_comparison.append(("Terraced Crater", float(terrace_compare_eps)))
+            if physics_inv.get("inversions_completed", 0) > 0 and physics_inv.get("best_epsilon_r") is not None:
+                eps_values_for_comparison.append(("Physics Inversion", float(physics_inv["best_epsilon_r"])))
 
-        if len(eps_values_for_comparison) >= 2:
-            lines.append("### εr Consistency Comparison")
-            lines.append("")
-            eps_vals = [v for _, v in eps_values_for_comparison]
-            delta = abs(eps_vals[0] - eps_vals[1])
-            if delta < 0.5:
-                consistency_label = "**CONSISTENT** — methods agree within 0.5"
-            elif delta < 1.5:
-                consistency_label = "**MARGINAL** — methods diverge by {:.2f}".format(delta)
-            else:
-                consistency_label = "**INCONSISTENT** — methods diverge by {:.2f}".format(delta)
-            for name, val in eps_values_for_comparison:
-                lines.append(f"- {name}: εr = {val:.2f}")
-            lines.append(f"- Agreement: {consistency_label}")
-            lines.append("")
+            if len(eps_values_for_comparison) >= 2:
+                lines.append("### εr Consistency Comparison")
+                lines.append("")
+                eps_vals = [v for _, v in eps_values_for_comparison]
+                delta = abs(eps_vals[0] - eps_vals[1])
+                if delta < 0.5:
+                    consistency_label = "**CONSISTENT** — methods agree within 0.5"
+                elif delta < 1.5:
+                    consistency_label = "**MARGINAL** — methods diverge by {:.2f}".format(delta)
+                else:
+                    consistency_label = "**INCONSISTENT** — methods diverge by {:.2f}".format(delta)
+                for name, val in eps_values_for_comparison:
+                    lines.append(f"- {name}: εr = {val:.2f}")
+                lines.append(f"- Agreement: {consistency_label}")
+                lines.append("")
 
         # Ice probability assessment based on εr
-        # Phase 2: prefer weighted terrace εr
+        # Phase 3: use consensus εr, then individual methods
         any_eps = (
-            physics_inv.get("best_epsilon_r")
+            cross_val.get("consensus_epsilon_r")
+            or physics_inv.get("best_epsilon_r")
             or (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r")
             or terrace_diel.get("median_epsilon_r")
+            or hyperbola_diel.get("median_epsilon_r")
             or diel.get("median_epsilon_r")
         )
         if any_eps is not None:
