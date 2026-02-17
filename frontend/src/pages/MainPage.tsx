@@ -61,6 +61,7 @@ const TemporalComparison = lazy(() => import("../components/TemporalComparison")
 const RegolithPanel = lazy(() => import("../components/RegolithPanel"));
 const StratigraphyPanel = lazy(() => import("../components/StratigraphyPanel"));
 const AttenuationPanel = lazy(() => import("../components/AttenuationPanel"));
+const MineralSequencePanel = lazy(() => import("../components/MineralSequencePanel"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -224,7 +225,7 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | null;
+  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Guided Workflow: user-selected location
@@ -390,6 +391,9 @@ export default function MainPage() {
 
   // Radar Attenuation Mapper — product ID for analysis
   const [attenuationProductId, setAttenuationProductId] = useState<string | null>(null);
+
+  // Mineral Sequence Mapper — obs ID for analysis
+  const [mineralSequenceObsId, setMineralSequenceObsId] = useState<string | null>(null);
 
   // Custom user-uploaded datasets
   const [showCustomData, setShowCustomData] = useState(false);
@@ -782,6 +786,13 @@ export default function MainPage() {
     setSharadTracePin(null);
     setAttenuationProductId(productId);
     setAnalysisMode("attenuation");
+  }, []);
+
+  // Handle opening Mineral Sequence analysis from Inspector CNN section
+  const handleOpenMineralSequence = useCallback((obsId: string) => {
+    setSelected(null);
+    setMineralSequenceObsId(obsId);
+    setAnalysisMode("mineral_sequence");
   }, []);
 
   // Fly to lat/lon coordinates (for search results not on map)
@@ -1249,6 +1260,12 @@ export default function MainPage() {
     if (mode !== "regolith") {
       setRegolithProductId(null);
     }
+    if (mode !== "attenuation") {
+      setAttenuationProductId(null);
+    }
+    if (mode !== "mineral_sequence") {
+      setMineralSequenceObsId(null);
+    }
   }, []);
 
   // Handle "Run ε Inversion" from CraterDetectPanel → opens StratigraphyPanel
@@ -1630,6 +1647,13 @@ export default function MainPage() {
           onClose={() => { setAttenuationProductId(null); setAnalysisMode(null); }}
         />
       </Suspense>
+    ) : mineralSequenceObsId && analysisMode === "mineral_sequence" ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading mineral sequence...</div>}>
+        <MineralSequencePanel
+          obsId={mineralSequenceObsId}
+          onClose={() => { setMineralSequenceObsId(null); setAnalysisMode(null); }}
+        />
+      </Suspense>
     ) : sharadHiresProductId ? (
       <SharadHiresInspector
         productId={sharadHiresProductId}
@@ -1671,6 +1695,7 @@ export default function MainPage() {
         onDownloadProduct={handleDownloadProduct}
         onPinSpectrum={handlePinSpectrum}
         onFindTemporalPairs={(lat, lon, instrument) => setShowTemporalComparison({ lat, lon, instrument })}
+        onOpenMineralSequence={handleOpenMineralSequence}
       />
     ) : terrainPoint ? (
       <SlopeAnalysis

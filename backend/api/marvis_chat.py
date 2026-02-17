@@ -186,10 +186,19 @@ def _find_nearest_landform(
     for offset in (-1, 0, 1):
         candidates.extend(type_bands.get(center_band + offset, []))
 
+    import math
+    lat_threshold = radius_km / 60.0 + 0.5  # ~deg latitude
+    cos_lat = max(math.cos(math.radians(lat)), 0.1)
+    lon_threshold = lat_threshold / cos_lat  # wider at high latitudes
+
     best, best_dist = None, radius_km
     for lf in candidates:
-        # Quick degree pre-filter (~60 km per degree on Mars)
-        if abs(lf["lat"] - lat) > 1.0 or abs(lf.get("lon", 0) - lon) > 1.5:
+        if abs(lf["lat"] - lat) > lat_threshold:
+            continue
+        dlon = abs(lf.get("lon", 0) - lon)
+        if dlon > 180:
+            dlon = 360 - dlon  # antimeridian wrap
+        if dlon > lon_threshold:
             continue
         d = haversine_km(lat, lon, lf["lat"], lf.get("lon", 0))
         if d < best_dist:
@@ -221,6 +230,19 @@ def compound_search(
 
     _logger = logging.getLogger(__name__)
     registry = get_registry()
+    limit = max(1, min(limit, 100))  # clamp to [1, 100]
+
+    # Normalize instrument aliases (LLM often sends variants)
+    _INST_ALIASES = {
+        "SHARAD_HIGH_RES": "SHARAD_HIGHRES", "SHARAD HIGH-RES": "SHARAD_HIGHRES",
+        "SHARAD_HIRES": "SHARAD_HIGHRES", "SHARAD HIGHRES": "SHARAD_HIGHRES",
+        "CRISM_TRDR": "CRISM_TRR3", "CRISM_MTRDR": "CRISM_TRR3",
+        "MTRDR": "CRISM_TRR3", "TRDR": "CRISM_TRR3", "TRR3": "CRISM_TRR3",
+        "HIRISE_DEM": "HIRISE_DTM",
+    }
+    instrument = _INST_ALIASES.get(instrument.upper().replace("-", "_").replace(" ", "_"), instrument).upper()
+    if intersect_with:
+        intersect_with = _INST_ALIASES.get(intersect_with.upper().replace("-", "_").replace(" ", "_"), intersect_with).upper()
 
     # Normalize mineral_type
     mineral_key = None
@@ -320,7 +342,7 @@ def compound_search(
             sec_idx = registry.load_index(sec_key)
         except Exception:
             _logger.error("Cannot load index for %s", sec_key)
-            return []
+            return [{"error": f"Cannot load {intersect_with} index"}]
 
         # Build secondary features (with optional mineral pre-filter)
         sec_passing_obs = None
@@ -347,6 +369,12 @@ def compound_search(
                         "hyd_percent": round(pct if mineral_key == "hyd" else opct, 2),
                     }
 
+        # Compute bounding extent of remaining primary features for spatial pre-filter
+        pri_lat_min = min(f["lat"] for f in features) - 2.0 if features else -90
+        pri_lat_max = max(f["lat"] for f in features) + 2.0 if features else 90
+        pri_lon_min = min(f["lon"] for f in features) - 5.0 if features else -180
+        pri_lon_max = max(f["lon"] for f in features) + 5.0 if features else 180
+
         sec_features = []
         for f in sec_idx.get("features", []):
             props = f.get("properties") or {}
@@ -365,6 +393,15 @@ def compound_search(
             centroid = _centroid_from_geometry(geom)
             if not bbox or not centroid:
                 continue
+
+            # Spatial pre-filter: skip secondary features far from any primary feature
+            if centroid["lat"] < pri_lat_min or centroid["lat"] > pri_lat_max:
+                continue
+            if centroid["lon"] < pri_lon_min or centroid["lon"] > pri_lon_max:
+                # Check antimeridian wrap
+                if not (pri_lon_min < -170 and centroid["lon"] > 170) and \
+                   not (pri_lon_max > 170 and centroid["lon"] < -170):
+                    continue
 
             sf = {"product_id": pid, "geom": geom, "bbox": bbox, "centroid": centroid}
             if sec_passing_obs is not None:
@@ -694,39 +731,41 @@ _GROQ_TOOLS = [
         "function": {
             "name": "search",
             "description": (
-                "Search for Mars orbital products with optional filters. "
-                "Use when the user asks to FIND, SEARCH, or LOCATE products from an instrument, "
-                "optionally filtered by mineral content (ice/h2o/hydration percentage), "
-                "by proximity to landforms (crater, terraced crater, volcano, channel, graben, ridge, LDA), "
-                "or by intersection/overlap with another instrument. "
-                "Examples: 'find CRISM with ice > 10%', 'find HiRISE DTM near terraced craters', "
-                "'find SHARAD intersecting CRISM with h2o > 10%'."
+                "Search for Mars orbital products. Supports compound queries with multiple filters. "
+                "IMPORTANT: If the user mentions TWO instruments (e.g. 'SHARAD intersects CRISM'), "
+                "set 'instrument' to the first and 'intersect_with' to the second. "
+                "IMPORTANT: 'sharad high-res' or 'sharad highres' = SHARAD_HIGHRES, 'crism trdr' or 'crism trr3' or 'mtrdr' = CRISM_TRR3, "
+                "'hirise dtm' = HIRISE_DTM. "
+                "Examples: "
+                "search(instrument='CRISM_TRR3', mineral_type='ice', min_percent=10) — find CRISM with ice > 10%. "
+                "search(instrument='SHARAD_HIGHRES', intersect_with='CRISM_TRR3', mineral_type='ice', min_percent=10) — SHARAD tracks crossing high-ice CRISM. "
+                "search(instrument='HIRISE_DTM', near_landform='terraced_crater') — DTMs near terraced craters."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "instrument": {
                         "type": "string",
-                        "description": "Primary instrument to search",
+                        "description": "Primary instrument. 'sharad high-res'=SHARAD_HIGHRES, 'hirise dtm'=HIRISE_DTM, 'crism trdr/mtrdr'=CRISM_TRR3.",
                         "enum": INSTRUMENT_LIST,
                     },
                     "intersect_with": {
                         "type": "string",
-                        "description": "Find products overlapping this second instrument. Only use when user says 'intersect', 'overlap', or 'cross'.",
+                        "description": "Second instrument to intersect/overlap with. MUST set this when user says 'intersect', 'overlap', 'cross', or names TWO instruments.",
                         "enum": INSTRUMENT_LIST,
                     },
                     "mineral_type": {
                         "type": "string",
-                        "description": "Filter by mineral content: 'ice' for water ice/h2o, 'hyd' for hydration/clay. Applies to CRISM/CRISM_TRR3.",
+                        "description": "'ice' for water ice/h2o/water, 'hyd' for hydration/clay. Mineral filter applies to CRISM/CRISM_TRR3.",
                         "enum": ["ice", "hyd"],
                     },
                     "min_percent": {
                         "type": "number",
-                        "description": "Minimum mineral percentage (0-100). Default 10 if mineral_type set but this is missing.",
+                        "description": "Minimum mineral percentage (0-100). Default 10 if mineral_type set.",
                     },
                     "near_landform": {
                         "type": "string",
-                        "description": "Filter to products near a landform type detected from MOLA topography.",
+                        "description": "Only products near this landform type.",
                         "enum": LANDFORM_TYPES,
                     },
                 },
@@ -735,6 +774,17 @@ _GROQ_TOOLS = [
         },
     },
 ]
+
+
+def _normalize_instrument_names(text: str) -> str:
+    """Replace common instrument aliases with canonical names to help the LLM."""
+    import re as _re
+    text = _re.sub(r"(?i)\bsharad[\s_-]*high[\s_-]*res\b", "SHARAD_HIGHRES", text)
+    text = _re.sub(r"(?i)\bsharad[\s_-]*hires\b", "SHARAD_HIGHRES", text)
+    text = _re.sub(r"(?i)\bhirise[\s_-]*dtm\b", "HIRISE_DTM", text)
+    text = _re.sub(r"(?i)\bcrism[\s_-]*tr(?:d?r|r3)\b", "CRISM_TRR3", text)
+    text = _re.sub(r"(?i)\bmtrdr\b", "CRISM_TRR3", text)
+    return text
 
 
 async def _stream_groq(
@@ -751,11 +801,14 @@ async def _stream_groq(
 
     system = _build_system(context.model_dump() if context else None)
 
+    # Normalize instrument aliases in user message to help the LLM
+    normalized_msg = _normalize_instrument_names(message)
+
     messages = [{"role": "system", "content": system}]
     for entry in history[-MAX_HISTORY_TURNS:]:
         role = "user" if entry.role == "user" else "assistant"
         messages.append({"role": role, "content": entry.content})
-    messages.append({"role": "user", "content": message})
+    messages.append({"role": "user", "content": normalized_msg})
 
     payload = {
         "model": GROQ_MODEL,

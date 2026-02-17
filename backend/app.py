@@ -502,6 +502,12 @@ app.include_router(stratigraphy_router)  # /api/stratigraphy/* — Crater Strati
 from api.attenuation_router import router as attenuation_router
 app.include_router(attenuation_router)  # /api/attenuation/* — Radar Attenuation
 
+from api.mineral_sequence_router import router as mineral_sequence_router
+app.include_router(mineral_sequence_router)  # /api/mineral-sequence/* — Mineral Sequence
+
+from api.strat_column_router import router as strat_column_router
+app.include_router(strat_column_router)  # /api/strat-column/* — Stratigraphic Column
+
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
     """

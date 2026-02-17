@@ -171,6 +171,7 @@ export default function Inspector({
   onPinSpectrum,
   onFindTemporalPairs,
   onCollapse,
+  onOpenMineralSequence,
   isMobile = false,
 }: {
   selected: InspectorContext | null;
@@ -194,6 +195,7 @@ export default function Inspector({
   onDownloadProduct?: (productId: string, instrument: string) => void;
   onPinSpectrum?: (spectrum: { productId: string; lat: number; lon: number; wavelengths: number[]; reflectance: (number | null)[] }) => void;
   onFindTemporalPairs?: (lat: number, lon: number, instrument: string) => void;
+  onOpenMineralSequence?: (obsId: string) => void;
   isMobile?: boolean;
 }) {
   const hasNote = useMemo(
@@ -1192,7 +1194,7 @@ function SpectrumTab({
 /* =========================================================
  * TRR3 Mineral Classification Section
  * =======================================================*/
-function TRR3MineralSection({ obsId }: { obsId: string }) {
+function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; onOpenMineralSequence?: (obsId: string) => void }) {
   const [status, setStatus] = useState<"checking" | "not_downloaded" | "idle" | "loading" | "done" | "error">("checking");
   const [stats, setStats] = useState<any>(null);
   const [legend, setLegend] = useState<any[]>([]);
@@ -1452,6 +1454,17 @@ function TRR3MineralSection({ obsId }: { obsId: string }) {
               </div>
             </div>
           )}
+
+          {/* Mineral Sequence button */}
+          {onOpenMineralSequence && (
+            <button
+              onClick={() => onOpenMineralSequence(obsId)}
+              className="w-full px-3 py-2 rounded text-[11px] font-medium bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">science</span>
+              Mineral Sequence Analysis
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1505,7 +1518,7 @@ function MetadataTab({ selected }: { selected: InspectorContext }) {
 
       {/* TRR3 Mineral Classification */}
       {selected.instrument === "CRISM_TRR3" && (
-        <TRR3MineralSection obsId={selected.productId.replace(/_\d{2}$/, "")} />
+        <TRR3MineralSection obsId={selected.productId.replace(/_\d{2}$/, "")} onOpenMineralSequence={onOpenMineralSequence} />
       )}
     </div>
   );
