@@ -23,6 +23,7 @@ const TOOL_ICONS: Record<string, string> = {
   load_instrument: "layers",
   find_intersections: "join",
   select_product: "info",
+  search_minerals: "science",
 };
 
 export type IntersectionPair = {
@@ -34,12 +35,22 @@ export type IntersectionPair = {
   lon: number;
 };
 
+export type MineralSearchResult = {
+  product_id: string;
+  obs_id: string;
+  lat: number;
+  lon: number;
+  ice_percent: number;
+  hyd_percent: number;
+};
+
 export default function CopilotFab({
   hidden = false,
   onFlyTo,
   onLoadInstrument,
   onShowIntersections,
   onSelectInstrumentProduct,
+  onSearchMinerals,
   loadedInstruments = [],
   visibleProductCount = 0,
   currentLat,
@@ -50,6 +61,7 @@ export default function CopilotFab({
   onLoadInstrument?: (instrument: string) => void;
   onShowIntersections?: (pairs: IntersectionPair[]) => void;
   onSelectInstrumentProduct?: (instrument: string) => void;
+  onSearchMinerals?: (results: MineralSearchResult[]) => void;
   loadedInstruments?: string[];
   visibleProductCount?: number;
   currentLat?: number | null;
@@ -138,6 +150,11 @@ export default function CopilotFab({
             if (inst) {
               onSelectInstrumentProduct(inst);
             }
+          } else if (tool === "search_minerals" && onSearchMinerals) {
+            const results = params.results as MineralSearchResult[] | undefined;
+            if (results && results.length > 0) {
+              onSearchMinerals(results);
+            }
           }
 
           // Add tool confirmation message
@@ -162,7 +179,7 @@ export default function CopilotFab({
       setStreaming(false);
       setStreamText("");
     }
-  }, [input, streaming, messages, loadedInstruments, visibleProductCount, currentLat, currentLon, onFlyTo, onLoadInstrument, onShowIntersections, onSelectInstrumentProduct]);
+  }, [input, streaming, messages, loadedInstruments, visibleProductCount, currentLat, currentLon, onFlyTo, onLoadInstrument, onShowIntersections, onSelectInstrumentProduct, onSearchMinerals]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }

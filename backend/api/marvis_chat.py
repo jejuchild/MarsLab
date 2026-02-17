@@ -24,6 +24,113 @@ from api.agent_orchestrator import _sanitize_respond
 _backend_dir = Path(__file__).parent.parent
 load_dotenv(_backend_dir / ".env")
 
+# ── Mineral score data (lazy-loaded) ─────────────────────────────────
+
+_score_stats: dict | None = None
+_crism_coords: dict | None = None  # obs_id -> (lat, lon, product_id)
+
+
+def _load_score_stats() -> dict:
+    global _score_stats
+    if _score_stats is None:
+        p = _backend_dir / "crism_score" / "score_stats.json"
+        if p.exists():
+            with open(p) as fp:
+                _score_stats = json.load(fp)
+        else:
+            _score_stats = {}
+    return _score_stats
+
+
+def _load_crism_coords() -> dict:
+    """Build obs_id -> (lat, lon, product_id) lookup from CRISM GeoJSON index."""
+    global _crism_coords
+    if _crism_coords is not None:
+        return _crism_coords
+    _crism_coords = {}
+    try:
+        from api.registry import get_registry
+        idx = get_registry().load_index("crism")
+        for f in idx.get("features", []):
+            pid = (f.get("properties") or {}).get("product_id", "")
+            m = re.match(r"^([a-z]{3}[0-9a-f]+)", pid.lower())
+            if not m:
+                continue
+            obs_id = m.group(1)
+            geom = f.get("geometry") or {}
+            if geom.get("type") == "Polygon":
+                ring = geom["coordinates"][0]
+                lat = sum(c[1] for c in ring) / len(ring)
+                lon = sum(c[0] for c in ring) / len(ring)
+            elif geom.get("type") == "Point":
+                lon, lat = geom["coordinates"][:2]
+            else:
+                continue
+            _crism_coords[obs_id] = (lat, lon, pid)
+    except Exception as exc:
+        logger.error(f"Failed to load CRISM coords: {exc}")
+    return _crism_coords
+
+
+def search_mineral_products(
+    mineral_type: str = "ice",
+    min_percent: float = 10.0,
+    limit: int = 10,
+) -> list[dict]:
+    """Search score_stats.json for CRISM observations exceeding a mineral threshold.
+
+    Returns list sorted by percentage descending:
+        [{product_id, obs_id, lat, lon, ice_percent, hyd_percent}]
+    """
+    stats = _load_score_stats()
+    coords = _load_crism_coords()
+
+    # Normalize mineral_type
+    mt = mineral_type.lower()
+    if mt in ("h2o", "water", "water ice", "ice"):
+        key = "ice"
+    else:
+        key = "hyd"
+
+    results = []
+    for obs_id, entry in stats.items():
+        section = entry.get(key)
+        if not section:
+            continue
+        vp = section.get("valid_pixels", 0)
+        if vp == 0:
+            continue
+        above = section.get("threshold_counts", {}).get("0.3", 0)
+        pct = above / vp * 100.0
+
+        if pct < min_percent:
+            continue
+
+        # Get coordinates
+        coord = coords.get(obs_id)
+        if not coord:
+            continue
+        lat, lon, pid = coord
+
+        # Also compute the other type
+        other_key = "hyd" if key == "ice" else "ice"
+        other_section = entry.get(other_key, {})
+        other_vp = other_section.get("valid_pixels", 0)
+        other_above = other_section.get("threshold_counts", {}).get("0.3", 0)
+        other_pct = (other_above / other_vp * 100.0) if other_vp else 0.0
+
+        results.append({
+            "product_id": pid,
+            "obs_id": obs_id,
+            "lat": round(lat, 3),
+            "lon": round(lon, 3),
+            "ice_percent": round(pct if key == "ice" else other_pct, 2),
+            "hyd_percent": round(pct if key == "hyd" else other_pct, 2),
+        })
+
+    results.sort(key=lambda r: r["ice_percent" if key == "ice" else "hyd_percent"], reverse=True)
+    return results[:limit]
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marvis", tags=["marvis-chat"])
 
@@ -83,7 +190,8 @@ WHEN TO USE TOOLS vs TEXT:
 - ONLY call load_instrument when the user explicitly asks to LOAD, SHOW, or ENABLE a specific instrument dataset.
 - ONLY call find_intersections when the user EXPLICITLY uses the words "intersect", "intersection", or "overlap" referring to two named instruments. NEVER call it for "pick", "select", "open", "show me a product", or general browsing.
 - ONLY call select_product when the user asks to PICK, SELECT, OPEN, INSPECT, or SHOW a specific product or a product from a specific instrument (e.g. "pick one SHARAD", "open a HiRISE product", "select that product").
-- For ALL other messages (science questions, analysis requests, "find ice", "what products", etc.) → answer with TEXT only. Do NOT call any tool.
+- ONLY call search_minerals when the user asks to FIND, SEARCH, or LOCATE observations with high ice, h2o, water, hydration, or mineral content, optionally with a percentage threshold (e.g. "find h2o more than 10%", "search for places with ice").
+- For ALL other messages (general science questions, "what products", etc.) → answer with TEXT only. Do NOT call any tool.
 - If unsure whether the user wants navigation or information, answer with text.
 
 CRITICAL — DO NOT RE-NAVIGATE:
@@ -209,6 +317,22 @@ def _tool_confirmation(tool: str, params: dict, context: Optional[SessionContext
         inst = params.get("instrument", "?")
         return f"Opening {inst} product in the inspector panel."
 
+    if tool == "search_minerals":
+        mineral_type = params.get("mineral_type", "ice")
+        results = params.get("results", [])
+        min_pct = params.get("min_percent", 10)
+        type_label = "water ice" if mineral_type == "ice" else "hydration"
+        if results:
+            best = results[0]
+            pct_key = "ice_percent" if mineral_type == "ice" else "hyd_percent"
+            return (
+                f"Found {len(results)} CRISM observations with >{min_pct:.0f}% {type_label} pixels. "
+                f"Best: {best['obs_id']} ({best.get(pct_key, 0):.1f}% at "
+                f"{best.get('lat', 0):.2f}\u00b0, {best.get('lon', 0):.2f}\u00b0). "
+                f"Flying to top result and loading CRISM TRR3."
+            )
+        return f"No CRISM observations found with >{min_pct:.0f}% {type_label} pixels. Try lowering the threshold."
+
     return "Done."
 
 
@@ -307,6 +431,28 @@ _GROQ_TOOLS = [
                     },
                 },
                 "required": ["instrument"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_minerals",
+            "description": "Search for CRISM observations with high ice or hydration content. Use when the user asks to FIND, SEARCH, or LOCATE places with h2o, ice, water, hydration, or minerals above a percentage threshold (e.g. 'find h2o more than 10%', 'search for ice').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mineral_type": {
+                        "type": "string",
+                        "description": "Type of mineral signal: 'ice' for water ice/h2o, 'hyd' for hydration/clay minerals",
+                        "enum": ["ice", "hyd"],
+                    },
+                    "min_percent": {
+                        "type": "number",
+                        "description": "Minimum percentage of pixels with signal (0-100). Default 10 if not specified.",
+                    },
+                },
+                "required": ["mineral_type"],
             },
         },
     },
@@ -427,6 +573,17 @@ async def _stream_groq(
                     pairs = []
                 params["pairs"] = pairs
 
+            # Run mineral search server-side and attach results
+            if tool_name == "search_minerals":
+                mt = params.get("mineral_type", "ice")
+                min_pct = params.get("min_percent", 10.0)
+                try:
+                    results = search_mineral_products(mt, min_pct, limit=10)
+                except Exception as exc:
+                    logger.error(f"Mineral search error: {exc}")
+                    results = []
+                params["results"] = results
+
             had_tool_call = True
             confirm = _tool_confirmation(tool_name, params, context)
             await queue.put({
@@ -480,6 +637,17 @@ _SELECT_RE = re.compile(
     + r")\b"
     r"|\b(" + "|".join(INSTRUMENT_LIST) + r")\b.*?\b(?:pick|select|open|inspect|choose|panel)\b",
 )
+_MINERAL_RE = re.compile(
+    r"(?i)\b(?:find|search|where|locate|show)\b.*?\b(?:h2o|ice|water|hydrat|mineral|clay)\b"
+    r"|\b(?:h2o|ice|water|hydrat|mineral)\b.*?\b(?:find|search|where|more than|greater|above|>)\b",
+)
+_MINERAL_PCT_RE = re.compile(
+    r"(?:more\s+than|greater\s+than|above|over|>|>=)\s*(\d+(?:\.\d+)?)\s*%?"
+    r"|(\d+(?:\.\d+)?)\s*%",
+)
+_MINERAL_TYPE_RE = re.compile(
+    r"(?i)\b(h2o|ice|water)\b",
+)
 
 
 async def _stream_llama(
@@ -495,6 +663,7 @@ async def _stream_llama(
     nav_match = _NAV_RE.search(message)
     load_match = _LOAD_RE.search(message)
     intersect_match = _INTERSECT_RE.search(message)
+    mineral_match = _MINERAL_RE.search(message)
 
     if intersect_match:
         inst_matches = _INTERSECT_INST_RE.findall(message)
@@ -525,6 +694,26 @@ async def _stream_llama(
             await queue.put({"event": "done", "data": {"full_text": ""}})
             await queue.put(None)
             return
+
+    if mineral_match:
+        pct_match = _MINERAL_PCT_RE.search(message)
+        min_pct = float(pct_match.group(1) or pct_match.group(2)) if pct_match else 10.0
+        type_match = _MINERAL_TYPE_RE.search(message)
+        mineral_type = "ice" if (type_match and type_match.group(1).lower() in ("h2o", "ice", "water")) else "hyd"
+        params = {"mineral_type": mineral_type, "min_percent": min_pct}
+        try:
+            results = search_mineral_products(mineral_type, min_pct, limit=10)
+        except Exception as exc:
+            logger.error(f"LLaMA mineral search error: {exc}")
+            results = []
+        params["results"] = results
+        confirm = _tool_confirmation("search_minerals", params, context)
+        await queue.put({"event": "tool_call", "data": {
+            "tool": "search_minerals", "params": params, "message": confirm,
+        }})
+        await queue.put({"event": "done", "data": {"full_text": ""}})
+        await queue.put(None)
+        return
 
     if nav_match:
         # Extract region name from the message (everything after the nav keyword)
