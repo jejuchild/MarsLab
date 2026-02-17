@@ -6,7 +6,7 @@ GET  /api/agent/resume/{session_id} — Reconnect to a running/completed session
 GET  /api/agent/sessions — List all past sessions (summary)
 GET  /api/agent/session/{session_id} — Get session state (polling fallback)
 GET  /api/agent/report/{session_id} — Download report (md or pdf)
-GET  /api/agent/status — Check Ollama/Llama availability
+GET  /api/agent/status — Check Groq/Llama availability
 """
 
 import base64
@@ -27,7 +27,7 @@ from .agent_orchestrator import (
     list_sessions,
     start_agent_background,
     stream_session_events,
-    _check_ollama,
+    _check_groq,
     AgentSession,
 )
 
@@ -2239,13 +2239,14 @@ def _build_report_markdown(session: AgentSession) -> str:
 
 @router.get("/status")
 async def agent_status():
-    """Check if Ollama/Llama is available for agentic AI."""
-    available = await _check_ollama()
+    """Check if Groq LLaMA is available for agentic AI."""
+    available = await _check_groq()
     return {
-        "ollama_available": available,
-        "model": "llama3.3",
+        "groq_available": available,
+        "model_light": "llama-3.1-8b-instant",
+        "model_heavy": "llama-3.3-70b-versatile",
         "fallback": "rule-based planning + template narrative",
-        "message": "Llama available via Ollama" if available else "Ollama not running — will use rule-based fallback",
+        "message": "Groq LLaMA available" if available else "GROQ_API_KEY not set — will use rule-based fallback",
     }
 
 

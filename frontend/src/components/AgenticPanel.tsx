@@ -344,7 +344,7 @@ export default function AgenticPanel({
   // UI-only state (not part of agent execution)
   const [objective, setObjective] = useState("");
   const [autoDownload, setAutoDownload] = useState(true);
-  const [ollamaStatus, setOllamaStatus] = useState<boolean | null>(null);
+  const [groqStatus, setGroqStatus] = useState<boolean | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const reasoningRef = useRef<HTMLDivElement>(null);
 
@@ -391,8 +391,8 @@ export default function AgenticPanel({
   useEffect(() => {
     fetch("/api/agent/status")
       .then((r) => r.json())
-      .then((d) => setOllamaStatus(d.ollama_available))
-      .catch(() => setOllamaStatus(false));
+      .then((d) => setGroqStatus(d.groq_available))
+      .catch(() => setGroqStatus(false));
   }, []);
 
   // Auto-scroll log
@@ -665,11 +665,11 @@ export default function AgenticPanel({
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-lg text-violet-400">smart_toy</span>
           <h2 className="text-sm font-bold text-white tracking-wide">Agentic AI</h2>
-          {ollamaStatus !== null && (
+          {groqStatus !== null && (
             <span className={`text-[8px] px-1.5 py-0.5 rounded font-mono ${
-              ollamaStatus ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"
+              groqStatus ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"
             }`}>
-              {ollamaStatus ? "LLAMA" : "RULES"}
+              {groqStatus ? "GROQ" : "RULES"}
             </span>
           )}
         </div>

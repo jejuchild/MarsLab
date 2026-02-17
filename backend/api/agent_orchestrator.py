@@ -406,9 +406,6 @@ async def _check_groq() -> bool:
     """Check if Groq API key is configured."""
     return bool(GROQ_API_KEY)
 
-# Keep old name as alias so callers still work during transition
-_check_ollama = _check_groq
-
 
 async def _call_groq(
     prompt: str,
