@@ -60,6 +60,7 @@ const CraterDetectPanel = lazy(() => import("../components/CraterDetectPanel"));
 const TemporalComparison = lazy(() => import("../components/TemporalComparison"));
 const RegolithPanel = lazy(() => import("../components/RegolithPanel"));
 const StratigraphyPanel = lazy(() => import("../components/StratigraphyPanel"));
+const AttenuationPanel = lazy(() => import("../components/AttenuationPanel"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -223,7 +224,7 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | null;
+  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Guided Workflow: user-selected location
@@ -386,6 +387,9 @@ export default function MainPage() {
 
   // Regolith Thickness Estimator — product ID for analysis
   const [regolithProductId, setRegolithProductId] = useState<string | null>(null);
+
+  // Radar Attenuation Mapper — product ID for analysis
+  const [attenuationProductId, setAttenuationProductId] = useState<string | null>(null);
 
   // Custom user-uploaded datasets
   const [showCustomData, setShowCustomData] = useState(false);
@@ -770,6 +774,14 @@ export default function MainPage() {
     setSharadTracePin(null);
     setRegolithProductId(productId);
     setAnalysisMode("regolith");
+  }, []);
+
+  // Handle opening Radar Attenuation analysis from SharadHiresInspector
+  const handleOpenAttenuation = useCallback((productId: string) => {
+    setSharadHiresProductId(null);
+    setSharadTracePin(null);
+    setAttenuationProductId(productId);
+    setAnalysisMode("attenuation");
   }, []);
 
   // Fly to lat/lon coordinates (for search results not on map)
@@ -1611,6 +1623,13 @@ export default function MainPage() {
           onClose={() => { setEpsilonTarget(null); setAnalysisMode(null); }}
         />
       </Suspense>
+    ) : attenuationProductId && analysisMode === "attenuation" ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading attenuation analysis...</div>}>
+        <AttenuationPanel
+          productId={attenuationProductId}
+          onClose={() => { setAttenuationProductId(null); setAnalysisMode(null); }}
+        />
+      </Suspense>
     ) : sharadHiresProductId ? (
       <SharadHiresInspector
         productId={sharadHiresProductId}
@@ -1619,6 +1638,7 @@ export default function MainPage() {
         onOpenFieldNote={(pid, lat, lon) => setShowFieldNoteModal({ productId: pid, instrument: "SHARAD_HIGHRES", lat, lon })}
         onLocatePoint={(lat, lon) => setSharadTracePin({ lat, lon })}
         onOpenRegolith={handleOpenRegolith}
+        onOpenAttenuation={handleOpenAttenuation}
       />
     ) : selected ? (
       <Inspector

@@ -19,6 +19,27 @@ CMAP_THICKNESS: List[Tuple[float, List[int]]] = [
     (150, [210, 50, 50, 220]),     # red   (≥150 m)
 ]
 
+# Radar attenuation: transparent (blue) → opaque (red)
+CMAP_ATTENUATION: List[Tuple[float, List[int]]] = [
+    (0.0,   [70, 130, 230, 220]),    # blue  (< 0.005 dB/m, pure ice)
+    (0.02,  [70, 200, 220, 220]),    # cyan  (0.02 dB/m)
+    (0.05,  [240, 220, 80, 220]),    # yellow (0.05 dB/m)
+    (0.08,  [230, 130, 50, 220]),    # orange (0.08 dB/m)
+    (0.15,  [210, 50, 50, 220]),     # red   (≥0.15 dB/m, opaque)
+]
+
+# Geochemical group colors for mineral sequence & strat column
+GEOCHEM_COLORS: Dict[str, List[int]] = {
+    "Fe/Mg phyllosilicates": [34, 139, 34, 220],
+    "Al phyllosilicates":    [144, 238, 144, 220],
+    "Sulfates":              [255, 215, 0, 220],
+    "Silica/Zeolite":        [200, 200, 200, 220],
+    "Ices":                  [135, 206, 250, 220],
+    "Fe oxides/hydroxides":  [178, 34, 34, 220],
+    "Other hydrated":        [186, 85, 211, 220],
+    "Unknown":               [120, 120, 120, 180],
+}
+
 NO_DATA_COLOR = [120, 120, 120, 120]  # gray for no detection
 
 

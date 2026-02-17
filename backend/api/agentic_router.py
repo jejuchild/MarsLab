@@ -1281,6 +1281,35 @@ def generate_report_from_evidence_pack(
         lines.append("")
 
     # ══════════════════════════════════════════════════════════════════
+    # 5b. ISRU ACCESSIBILITY
+    # ══════════════════════════════════════════════════════════════════
+    isru_ep = ep.get("isru", {})
+    if isru_ep and isru_ep.get("accessibility_category") not in (None, "module_unavailable"):
+        lines.append("## 5b. ISRU Accessibility")
+        lines.append("")
+        isru_depth = isru_ep.get("depth_m")
+        isru_tier = isru_ep.get("isru_tier", "unknown")
+        isru_cat = isru_ep.get("accessibility_category", "depth_unknown")
+        isru_score = isru_ep.get("accessibility_score", 0.0)
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        if isru_depth is not None:
+            d_str = f"**{isru_depth:.1f} m**"
+            d_unc = isru_ep.get("depth_uncertainty_m")
+            if d_unc:
+                d_str += f" ± {d_unc:.1f} m"
+            lines.append(f"| Depth | {d_str} |")
+        else:
+            lines.append("| Depth | Unknown (no physics εr) |")
+        lines.append(f"| ISRU Tier | **{isru_tier.replace('_', ' ').title()}** |")
+        lines.append(f"| Accessibility | {isru_cat.replace('_', ' ').title()} ({isru_score:.2f}) |")
+        lines.append(f"| Ice Purity | {isru_ep.get('ice_purity_estimate', 'unknown').replace('_', ' ').title()} |")
+        lines.append("")
+        for note in isru_ep.get("notes", []):
+            lines.append(f"- {note}")
+        lines.append("")
+
+    # ══════════════════════════════════════════════════════════════════
     # 6. CLIMATE + THERMAL INERTIA
     # ══════════════════════════════════════════════════════════════════
     clim = ep.get("climate", {})
@@ -2014,6 +2043,74 @@ def _build_report_markdown(session: AgentSession) -> str:
                 "5 degrees (favorable for landing). Red zones exceed the engineering threshold. "
                 "White dashed contour marks the 5-degree boundary.",
             ))
+
+    # ── 5b. ISRU Accessibility Assessment ──
+    isru_data = synthesis.get("isru_assessment", {})
+    if isru_data and isru_data.get("accessibility_category") != "module_unavailable":
+        lines.append("## 5b. ISRU Accessibility Assessment")
+        lines.append("")
+        depth_m = isru_data.get("depth_m")
+        depth_unc = isru_data.get("depth_uncertainty_m")
+        tier = isru_data.get("isru_tier", "unknown")
+        cat = isru_data.get("accessibility_category", "depth_unknown")
+        score = isru_data.get("accessibility_score", 0.0)
+        depth_src = isru_data.get("depth_source", "not_available")
+        purity = isru_data.get("ice_purity_estimate", "unknown")
+        slope_pen = isru_data.get("slope_penalty_factor", 1.0)
+        slope_stab = isru_data.get("slope_stability", "unknown")
+
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        if depth_m is not None:
+            depth_str = f"**{depth_m:.1f} m**"
+            if depth_unc is not None:
+                depth_str += f" ± {depth_unc:.1f} m (1σ)"
+            lines.append(f"| Depth (physics-based) | {depth_str} |")
+        else:
+            lines.append("| Depth | **Unknown** (no physics-based εr) |")
+        lines.append(f"| Depth Source | {depth_src.replace('_', ' ').title()} |")
+        lines.append(f"| ISRU Tier | **{tier.replace('_', ' ').title()}** |")
+        lines.append(f"| Accessibility Category | {cat.replace('_', ' ').title()} |")
+        lines.append(f"| Accessibility Score | {score:.2f} / 1.00 |")
+        lines.append(f"| Ice Purity | {purity.replace('_', ' ').title()} |")
+        lines.append(f"| Slope Penalty | {slope_pen:.1f}x |")
+        lines.append(f"| Slope Stability | {slope_stab.title()} |")
+        lines.append("")
+
+        # ISRU notes
+        isru_notes = isru_data.get("notes", [])
+        if isru_notes:
+            for note in isru_notes:
+                lines.append(f"- {note}")
+            lines.append("")
+
+        # Tier interpretation
+        if tier == "tier_1":
+            lines.append(
+                "**ISRU Tier 1**: Ice within ≤10 m excavation depth. This site is a "
+                "strong candidate for near-term ISRU water extraction missions."
+            )
+        elif tier == "tier_2":
+            lines.append(
+                "**ISRU Tier 2**: Ice at 10-20 m depth. Feasible with dedicated "
+                "drilling infrastructure but not for first-generation ISRU."
+            )
+        elif tier == "tier_3":
+            lines.append(
+                "**ISRU Tier 3**: Ice at 20-30 m depth. Requires major infrastructure "
+                "investment — not recommended for initial ISRU missions."
+            )
+        elif tier == "not_suitable":
+            lines.append(
+                "**Not suitable for ISRU**: Ice too deep (>30 m) for practical excavation."
+            )
+        elif cat == "depth_unknown":
+            lines.append(
+                "**ISRU assessment inconclusive**: Depth cannot be determined without "
+                "physics-based dielectric constant measurement. Recommend targeted "
+                "SHARAD+DTM dielectric inversion to resolve."
+            )
+        lines.append("")
 
     # ── 6. Climate Constraints (MCD Model) ──
     clim = synthesis.get("climate", {})

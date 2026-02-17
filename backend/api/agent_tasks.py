@@ -2963,6 +2963,7 @@ def synthesize_results(
         engineering_data=synthesis.get("engineering_feasibility", {}),
         climate_data=synthesis.get("climate", {}),
         science_distance_km=science_distance,
+        isru_data=synthesis.get("isru_assessment"),
     )
 
     evidence_strength = classify_evidence_strength(

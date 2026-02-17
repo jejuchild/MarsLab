@@ -209,6 +209,23 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
         "best_site": eng_raw.get("best_site"),
     }
 
+    # ── ISRU Accessibility (Phase 1) ──
+    isru_raw = synthesis.get("isru_assessment", {})
+    isru = {
+        "depth_m": isru_raw.get("depth_m"),
+        "depth_uncertainty_m": isru_raw.get("depth_uncertainty_m"),
+        "depth_source": isru_raw.get("depth_source", "not_available"),
+        "accessibility_category": isru_raw.get("accessibility_category", "depth_unknown"),
+        "accessibility_score": isru_raw.get("accessibility_score", 0.0),
+        "isru_tier": isru_raw.get("isru_tier", "unknown"),
+        "slope_penalty_factor": isru_raw.get("slope_penalty_factor", 1.0),
+        "slope_stability": isru_raw.get("slope_stability", "unknown"),
+        "epsilon_r": isru_raw.get("epsilon_r"),
+        "epsilon_r_ci": isru_raw.get("epsilon_r_ci"),
+        "ice_purity_estimate": isru_raw.get("ice_purity_estimate", "unknown"),
+        "notes": isru_raw.get("notes", []),
+    }
+
     # ── Climate ──
     clim_raw = synthesis.get("climate", {})
     climate = {
@@ -263,6 +280,7 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
         "cnn": cnn,
         "cross_instrument": cross_instrument,
         "engineering": engineering,
+        "isru": isru,
         "climate": climate,
         "thermal_inertia": thermal_inertia,
         "scoring": scoring,

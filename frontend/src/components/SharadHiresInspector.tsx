@@ -89,6 +89,7 @@ export default function SharadHiresInspector({
   onOpenFieldNote,
   onLocatePoint,
   onOpenRegolith,
+  onOpenAttenuation,
 }: {
   productId: string;
   onClose: () => void;
@@ -96,6 +97,7 @@ export default function SharadHiresInspector({
   onOpenFieldNote?: (productId: string, lat: number, lon: number) => void;
   onLocatePoint?: (lat: number, lon: number) => void;
   onOpenRegolith?: (productId: string) => void;
+  onOpenAttenuation?: (productId: string) => void;
 }) {
   const hasNote = useMemo(
     () => fieldNotes.some(n => n.product_id === productId),
@@ -1773,16 +1775,29 @@ export default function SharadHiresInspector({
             )}
           </Section>
 
-          {/* Regolith Thickness button */}
-          {onOpenRegolith && (
+          {/* Analysis buttons */}
+          {(onOpenRegolith || onOpenAttenuation) && (
             <Section title="Analysis">
-              <button
-                onClick={() => onOpenRegolith(productId)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-500/20 border border-indigo-500/30 rounded text-indigo-400 hover:bg-indigo-500/30 font-medium text-xs transition-colors"
-              >
-                <span className="material-symbols-outlined text-sm">layers</span>
-                Regolith Thickness
-              </button>
+              <div className="flex flex-col gap-2">
+                {onOpenRegolith && (
+                  <button
+                    onClick={() => onOpenRegolith(productId)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-500/20 border border-indigo-500/30 rounded text-indigo-400 hover:bg-indigo-500/30 font-medium text-xs transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">layers</span>
+                    Regolith Thickness
+                  </button>
+                )}
+                {onOpenAttenuation && (
+                  <button
+                    onClick={() => onOpenAttenuation(productId)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-cyan-500/20 border border-cyan-500/30 rounded text-cyan-400 hover:bg-cyan-500/30 font-medium text-xs transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">radar</span>
+                    Radar Attenuation
+                  </button>
+                )}
+              </div>
             </Section>
           )}
 

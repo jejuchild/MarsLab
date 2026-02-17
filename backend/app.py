@@ -499,6 +499,9 @@ app.include_router(regolith_router)  # /api/regolith/* — Regolith Thickness Es
 from api.stratigraphy_router import router as stratigraphy_router
 app.include_router(stratigraphy_router)  # /api/stratigraphy/* — Crater Stratigraphy
 
+from api.attenuation_router import router as attenuation_router
+app.include_router(attenuation_router)  # /api/attenuation/* — Radar Attenuation
+
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
     """

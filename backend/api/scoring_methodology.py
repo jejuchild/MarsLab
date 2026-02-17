@@ -862,6 +862,7 @@ def sensitivity_analysis(
     engineering_data: Dict[str, Any],
     climate_data: Dict[str, Any],
     science_distance_km: Optional[float] = None,
+    isru_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run sensitivity analysis on the composite score.
 
@@ -888,6 +889,7 @@ def sensitivity_analysis(
         subsurface_data, dielectric_data, cross_instrument_data,
         mineral_data, cnn_data, engineering_data, climate_data,
         science_distance_km=science_distance_km,
+        isru_data=isru_data,
     )
     baseline = baseline_result["final_score"]
 
@@ -924,6 +926,7 @@ def sensitivity_analysis(
                 mineral_data, cnn_data, engineering_data, climate_data,
                 science_distance_km=science_distance_km,
                 weights=test_w,
+                isru_data=isru_data,
             )
             results_for_key.append(res["final_score"])
             all_extremes.append(res["final_score"])
@@ -1235,6 +1238,7 @@ def full_assessment(
     cnn_data = synthesis.get("cnn_mineral_classification", {})
     engineering_data = synthesis.get("engineering_feasibility", {})
     climate_data = synthesis.get("climate", {})
+    isru_data = synthesis.get("isru_assessment")
 
     # 1. Composite score
     scoring = compute_composite_score(
@@ -1247,6 +1251,7 @@ def full_assessment(
         climate_data=climate_data,
         science_distance_km=science_distance_km,
         weights=weights,
+        isru_data=isru_data,
     )
 
     # 2. Evidence strength
@@ -1270,6 +1275,7 @@ def full_assessment(
         engineering_data=engineering_data,
         climate_data=climate_data,
         science_distance_km=science_distance_km,
+        isru_data=isru_data,
     )
 
     return {
