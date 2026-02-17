@@ -15,7 +15,6 @@ import SharadHiresInspector from "../components/SharadHiresInspector";
 import FieldNoteModal from "../components/FieldNoteModal";
 import AiAnalysisPanelRaw from "../components/AiAnalysisPanel";
 import AgenticPanelRaw from "../components/AgenticPanel";
-import AssistantPanelRaw from "../components/AssistantPanel";
 import GuidedWorkflowsRaw from "../components/GuidedWorkflows";
 import type { WorkflowAction } from "../components/GuidedWorkflows";
 import CopilotFab from "../components/CopilotFab";
@@ -48,7 +47,6 @@ const Inspector = memo(InspectorRaw);
 const LayerPanel = memo(LayerPanelRaw);
 const AiAnalysisPanel = memo(AiAnalysisPanelRaw);
 const AgenticPanel = memo(AgenticPanelRaw);
-const AssistantPanel = memo(AssistantPanelRaw);
 const GuidedWorkflows = memo(GuidedWorkflowsRaw);
 
 // Lazy-loaded heavy components (Three.js / Recharts)
@@ -224,9 +222,8 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "assistant" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
-  const [copilotGoal, setCopilotGoal] = useState<string | null>(null);
 
   // Guided Workflow: user-selected location
   const [guidedLocation, setGuidedLocation] = useState<{ lat: number; lon: number } | null>(null);
@@ -440,12 +437,6 @@ export default function MainPage() {
   });
   // Stable callbacks for memoized children (avoids breaking memo())
   const handleAgenticPanelAttention = useCallback(() => panelManager.ensurePanelVisible("analysis_complete"), [panelManager.ensurePanelVisible]);
-  const handleAssistantPanelAttention = useCallback(() => panelManager.ensurePanelVisible("copilot_write"), [panelManager.ensurePanelVisible]);
-  const handleCopilotClose = useCallback(() => { setAnalysisMode(null); setCopilotGoal(null); }, []);
-  const handleCopilotFlyTo = useCallback((lat: number, lon: number) => setFlyToCoords({ lat, lon }), []);
-  const handleCopilotHighlight = useCallback((productIds: string[]) => {
-    if (productIds.length > 0) setFlyToProductId(productIds[0]);
-  }, []);
 
   // Onboarding tour (force re-trigger)
   const [showTourForced, setShowTourForced] = useState(false);
@@ -688,6 +679,60 @@ export default function MainPage() {
     setFlyToProductId(p.productId);
   }, []);
 
+  // Handle MARVIS intersection results — auto-load instruments, fly to first pair, select
+  const handleShowIntersections = useCallback((pairs: Array<{
+    product_a: string;
+    product_b: string;
+    instrument_a: string;
+    instrument_b: string;
+    lat: number;
+    lon: number;
+  }>) => {
+    if (pairs.length === 0) return;
+    const first = pairs[0];
+
+    // Ensure both instruments are loaded
+    const instA = first.instrument_a as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
+    const instB = first.instrument_b as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
+    handleLoadFootprints(instA);
+    setTimeout(() => handleLoadFootprints(instB), 200);
+
+    // Fly to the intersection point
+    setFlyToCoords({ lat: first.lat, lon: first.lon });
+
+    // Select the first product in the inspector
+    setTimeout(() => {
+      setSelected({
+        instrument: first.instrument_a as InspectorContext["instrument"],
+        productId: first.product_a,
+        lat: first.lat,
+        lon: first.lon,
+      });
+      panelManager.ensurePanelVisible("feature_select");
+      setHighlightProductId(first.product_a);
+    }, 400);
+  }, [handleLoadFootprints, panelManager.ensurePanelVisible]);
+
+  // Handle MARVIS "select product" — pick first visible product of the given instrument
+  const handleSelectInstrumentProduct = useCallback((instrument: string) => {
+    const instUpper = instrument.toUpperCase();
+    const product = visibleProductsRef.current.find(
+      (p: VisibleProduct) => p.instrument.toUpperCase() === instUpper
+    );
+    if (product) {
+      setSelected({
+        instrument: product.instrument,
+        productId: product.productId,
+        lat: product.lat ?? 0,
+        lon: product.lon ?? 0,
+        title: product.title,
+      });
+      panelManager.ensurePanelVisible("feature_select");
+      setFlyToProductId(product.productId);
+      setHighlightProductId(product.productId);
+    }
+  }, [panelManager.ensurePanelVisible]);
+
   // Handle download from Inspector quick actions
   const handleDownloadProduct = useCallback((productId: string, instrument: string) => {
     window.open(`/download?tab=product&product_id=${encodeURIComponent(productId)}&instrument=${encodeURIComponent(instrument)}&autoDownload=true`, "_self");
@@ -711,6 +756,15 @@ export default function MainPage() {
 
   // Fly to lat/lon coordinates (for search results not on map)
   const [flyToCoords, setFlyToCoords] = useState<{ lat: number; lon: number } | null>(null);
+  // Last navigated position (persists after flyToCoords is cleared to null)
+  const [lastNavCoords, setLastNavCoords] = useState<{ lat: number; lon: number } | null>(null);
+
+  // Track last navigated position (persists after flyToCoords is cleared)
+  useEffect(() => {
+    if (flyToCoords) {
+      setLastNavCoords(flyToCoords);
+    }
+  }, [flyToCoords]);
 
   const handleFlyToCoordsComplete = useCallback(() => {
     setFlyToCoords(null);
@@ -768,14 +822,14 @@ export default function MainPage() {
       const lastLoad = Number(sessionStorage.getItem("_marslab_last_load") || "0");
       sessionStorage.setItem("_marslab_last_load", String(now));
       const isCrashLoop =
-        (urlState.mode === "assistant" || urlState.mode === "agentic") &&
+        urlState.mode === "agentic" &&
         lastLoad > 0 &&
         now - lastLoad < 3000;
       if (!isCrashLoop) {
         setAnalysisMode(urlState.mode as AnalysisMode);
       } else {
         // Break the loop: clear mode from URL
-        console.warn("[MarsLab] Crash-loop detected — skipping assistant mode restore");
+        console.warn("[MarsLab] Crash-loop detected — skipping agentic mode restore");
         updateUrl({ mode: undefined });
       }
     }
@@ -1136,7 +1190,7 @@ export default function MainPage() {
     setAnalysisMode(mode);
     // Clear state for all modes — ensures the selected mode's panel actually renders
     // (rightPanelContent priority chain: selected > terrainPoint > ... > analysisMode)
-    if (mode === "assistant" || mode === "agentic") {
+    if (mode === "agentic") {
       // These modes MUST clear higher-priority panel states to render
       setSelected(null);
       setSharadHiresProductId(null);
@@ -1528,15 +1582,7 @@ export default function MainPage() {
 
   const rightPanelContent =
     // Explicit analysis modes take priority (user deliberately opened these)
-    analysisMode === "assistant" ? (
-      <AssistantPanel
-        onClose={handleCopilotClose}
-        onFlyTo={handleCopilotFlyTo}
-        onHighlight={handleCopilotHighlight}
-        initialGoal={copilotGoal}
-        onPanelAttention={handleAssistantPanelAttention}
-      />
-    ) : analysisMode === "agentic" ? (
+    analysisMode === "agentic" ? (
       <AgenticPanel
         onClose={() => { setAnalysisMode(null); setEpsilonTarget(null); }}
         initialObjective={epsilonTarget ? `Run terrain εr inversion for terraced crater at (${epsilonTarget.lat.toFixed(3)}, ${epsilonTarget.lon.toFixed(3)}), diameter ${epsilonTarget.diameter_km?.toFixed(1) ?? "?"} km, terrace depth ${epsilonTarget.terrace_depth_m?.toFixed(0) ?? "?"} m. Search for SHARAD and HiRISE DTM data, then compute dielectric constant.` : undefined}
@@ -1811,15 +1857,22 @@ export default function MainPage() {
         craterDetectFeatures={craterDetectFeatures}
       />
 
-      {/* Copilot FAB — floating agent input */}
+      {/* MARVIS FAB — floating chat widget with grounded tool calling */}
       {!isMobile && (
         <CopilotFab
-          hidden={analysisMode === "assistant"}
-          onSubmit={(goal) => {
-            setCopilotGoal(goal);
-            handleAnalysisModeChange("assistant");
-            panelManager.ensurePanelVisible("user_click");
-          }}
+          hidden={analysisMode === "agentic"}
+          onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
+          onLoadInstrument={(inst) => handleLoadFootprints(inst as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3")}
+          onShowIntersections={handleShowIntersections}
+          onSelectInstrumentProduct={handleSelectInstrumentProduct}
+          loadedInstruments={
+            (Object.entries(instrumentVisibility) as [string, boolean][])
+              .filter(([, v]) => v)
+              .map(([k]) => k.toUpperCase())
+          }
+          visibleProductCount={visibleProducts.length}
+          currentLat={lastNavCoords?.lat ?? null}
+          currentLon={lastNavCoords?.lon ?? null}
         />
       )}
 

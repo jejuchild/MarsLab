@@ -469,6 +469,131 @@ async def _search_ode_for_bbox(
 
 
 # =============================================================================
+# Multi-instrument viewport intersection search (used by MARVIS chat)
+# =============================================================================
+
+def find_viewport_intersections(
+    instrument_a: str,
+    instrument_b: str,
+    viewport_bbox: Dict[str, float],
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """Find products from two instruments that geometrically overlap within a viewport.
+
+    Returns up to `limit` intersection pairs sorted by distance to viewport center.
+    Reuses existing geometry helpers (_geometries_overlap, _bbox_from_geometry, etc.).
+    """
+    import math as _math
+
+    registry = get_registry()
+    inst_a = instrument_a.upper()
+    inst_b = instrument_b.upper()
+
+    try:
+        index_a = registry.load_index(inst_a)
+        index_b = registry.load_index(inst_b)
+    except Exception:
+        return []
+
+    if not index_a or not index_b:
+        return []
+
+    vp_center_lat = (viewport_bbox["lat_min"] + viewport_bbox["lat_max"]) / 2
+    vp_center_lon = (viewport_bbox["lon_min"] + viewport_bbox["lon_max"]) / 2
+
+    def _norm_lon(lon: float) -> float:
+        while lon > 180:
+            lon -= 360
+        while lon < -180:
+            lon += 360
+        return lon
+
+    def _extract_features(index, instrument: str):
+        """Extract features within viewport, with bbox and optional Point buffering."""
+        features = []
+        for feat in index.get("features", []):
+            props = feat.get("properties", {})
+            pid = (props.get("product_id") or props.get("ProductId") or
+                   props.get("id") or props.get("PRODUCT_ID") or "")
+            geom = feat.get("geometry")
+            if not pid or not geom:
+                continue
+
+            bbox = _bbox_from_geometry(geom)
+            if not bbox:
+                continue
+
+            # Normalize longitudes
+            bbox["lon_min"] = _norm_lon(bbox["lon_min"])
+            bbox["lon_max"] = _norm_lon(bbox["lon_max"])
+
+            # Buffer Point geometries (CRISM) by ~0.1 deg
+            if geom.get("type") == "Point":
+                lat_c = (bbox["lat_min"] + bbox["lat_max"]) / 2
+                buf_deg = 0.1
+                cos_lat = max(_math.cos(_math.radians(lat_c)), 0.3)
+                bbox["lat_min"] -= buf_deg
+                bbox["lat_max"] += buf_deg
+                bbox["lon_min"] -= buf_deg / cos_lat
+                bbox["lon_max"] += buf_deg / cos_lat
+
+            # Quick viewport pre-filter (latitude only for speed)
+            if bbox["lat_max"] < viewport_bbox["lat_min"] or bbox["lat_min"] > viewport_bbox["lat_max"]:
+                continue
+
+            centroid = _centroid_from_geometry(geom)
+            features.append({
+                "pid": pid,
+                "geom": geom,
+                "bbox": bbox,
+                "centroid": centroid,
+            })
+        return features
+
+    feats_a = _extract_features(index_a, inst_a)
+    feats_b = _extract_features(index_b, inst_b)
+
+    if not feats_a or not feats_b:
+        return []
+
+    pairs: List[Dict[str, Any]] = []
+    seen = set()
+
+    for fa in feats_a:
+        for fb in feats_b:
+            if not _geometries_overlap(fa["geom"], fa["bbox"], fb["geom"], fb["bbox"]):
+                continue
+
+            key = (fa["pid"], fb["pid"])
+            if key in seen:
+                continue
+            seen.add(key)
+
+            # Midpoint of the two centroids
+            ca = fa["centroid"] or {"lat": 0, "lon": 0}
+            cb = fb["centroid"] or {"lat": 0, "lon": 0}
+            mid_lat = (ca["lat"] + cb["lat"]) / 2
+            mid_lon = (ca["lon"] + cb["lon"]) / 2
+
+            dist_to_center = abs(mid_lat - vp_center_lat) + abs(mid_lon - vp_center_lon)
+            pairs.append({
+                "product_a": fa["pid"],
+                "product_b": fb["pid"],
+                "instrument_a": inst_a,
+                "instrument_b": inst_b,
+                "lat": round(mid_lat, 4),
+                "lon": round(mid_lon, 4),
+                "_dist": dist_to_center,
+            })
+
+    pairs.sort(key=lambda p: p["_dist"])
+    for p in pairs:
+        del p["_dist"]
+
+    return pairs[:limit]
+
+
+# =============================================================================
 # API Endpoints
 # =============================================================================
 
