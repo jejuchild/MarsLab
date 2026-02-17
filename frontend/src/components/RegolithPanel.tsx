@@ -419,6 +419,87 @@ export default function RegolithPanel({
 
                 {showAdvanced && (
                   <div className="space-y-3 pl-2 border-l border-slate-700/50">
+                    {/* Mode selection */}
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-2">
+                        Detection Mode
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setMode("default")}
+                          className={`flex-1 py-1.5 px-2 rounded text-[10px] font-medium transition-colors ${
+                            mode === "default"
+                              ? "bg-primary/30 border border-primary/50 text-primary"
+                              : "bg-slate-700/30 border border-slate-600/30 text-slate-400 hover:bg-slate-700/50"
+                          }`}
+                        >
+                          Default
+                        </button>
+                        <button
+                          onClick={() => setMode("shallow")}
+                          className={`flex-1 py-1.5 px-2 rounded text-[10px] font-medium transition-colors ${
+                            mode === "shallow"
+                              ? "bg-primary/30 border border-primary/50 text-primary"
+                              : "bg-slate-700/30 border border-slate-600/30 text-slate-400 hover:bg-slate-700/50"
+                          }`}
+                        >
+                          Shallow
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Epsilon uncertainty slider */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] text-slate-400">
+                          εr Uncertainty (±)
+                        </label>
+                        <span className="text-xs font-mono text-white">{epsilonUncertainty.toFixed(1)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.1}
+                        value={epsilonUncertainty}
+                        onChange={(e) => setEpsilonUncertainty(+e.target.value)}
+                        className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
+                      />
+                      <div className="flex justify-between text-[9px] text-slate-600 mt-0.5">
+                        <span>0 (nominal)</span>
+                        <span>2.0 (max)</span>
+                      </div>
+                    </div>
+
+                    {/* Clutter mode toggle */}
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-2">
+                        Clutter Masking
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setClutterMode("off")}
+                          className={`flex-1 py-1.5 px-2 rounded text-[10px] font-medium transition-colors ${
+                            clutterMode === "off"
+                              ? "bg-primary/30 border border-primary/50 text-primary"
+                              : "bg-slate-700/30 border border-slate-600/30 text-slate-400 hover:bg-slate-700/50"
+                          }`}
+                        >
+                          Off
+                        </button>
+                        <button
+                          onClick={() => setClutterMode("mask")}
+                          className={`flex-1 py-1.5 px-2 rounded text-[10px] font-medium transition-colors ${
+                            clutterMode === "mask"
+                              ? "bg-primary/30 border border-primary/50 text-primary"
+                              : "bg-slate-700/30 border border-slate-600/30 text-slate-400 hover:bg-slate-700/50"
+                          }`}
+                        >
+                          Mask
+                        </button>
+                      </div>
+                    </div>
+
                     <SliderParam
                       label="SNR Threshold"
                       value={snrThreshold}
@@ -449,7 +530,7 @@ export default function RegolithPanel({
                 {/* Re-run button */}
                 {paramsChanged && (
                   <button
-                    onClick={() => runAnalysis(epsilonR, snrThreshold, searchLo, searchHi)}
+                    onClick={() => runAnalysis(epsilonR, snrThreshold, searchLo, searchHi, mode, epsilonUncertainty, clutterMode)}
                     disabled={loading}
                     className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary/20 border border-primary/30 rounded-lg text-primary text-xs font-bold uppercase tracking-wider hover:bg-primary/30 transition-colors disabled:opacity-50"
                   >
