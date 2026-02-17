@@ -353,6 +353,9 @@ export class FootprintManager {
 
       const entityId = `${instrument}_FP_${productId}`;
 
+      // Skip duplicates (same product_id appearing twice in data)
+      if (ids.has(entityId) || this.viewer.entities.getById(entityId)) continue;
+
       // Pass ALL feature properties to the entity (for popup access)
       const entityProps = { ...feature.properties, instrument };
 
