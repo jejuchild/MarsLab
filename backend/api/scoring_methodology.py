@@ -142,49 +142,87 @@ def normalize_subsurface(
             f"SHARAD analyzed ({analyzed_count} track(s)), no reflectors detected."
         )
     else:
-        # We have detections -- resolve depth
-        depth_m: Optional[float] = None
-        if median_depth is not None:
-            try:
-                depth_m = float(median_depth)
-            except (TypeError, ValueError):
-                depth_m = None
+        # We have detections -- check if ISRU provides physics-based depth
+        isru_depth = None
+        isru_score = None
+        isru_tier = None
+        if isru_data and isru_data.get("depth_source") in ("physics_inversion", "terrace_dielectric"):
+            isru_depth = isru_data.get("depth_m")
+            isru_score = isru_data.get("accessibility_score", 0.0)
+            isru_tier = isru_data.get("isru_tier", "unknown")
 
-        if depth_m is None:
-            # Depth unknown -- give intermediate credit
-            base = 0.5 if n_detections >= 2 else 0.4
-            breakdown["depth_category"] = "depth_unknown"
+        if isru_depth is not None and isru_score is not None:
+            # ISRU-aware scoring: use physics-based depth and accessibility score
+            base = max(0.4, isru_score)  # Floor at 0.4 since reflectors were detected
+            breakdown["isru_tier"] = isru_tier
+            breakdown["isru_accessibility_score"] = isru_score
+            cat = isru_data.get("accessibility_category", "unknown")
+            breakdown["depth_category"] = f"isru_{cat}"
             breakdown["notes"].append(
-                f"Reflector(s) detected ({n_detections} track(s)), depth unknown."
+                f"Physics-based depth {isru_depth:.1f} m (εr from "
+                f"{isru_data['depth_source']}). ISRU tier: {isru_tier}, "
+                f"accessibility score: {isru_score:.2f}."
             )
-        elif depth_m > 80:
-            base = 0.4
-            breakdown["depth_category"] = "deep_>80m"
-            breakdown["notes"].append(
-                f"Reflectors detected at ~{depth_m:.0f} m depth -- too deep for "
-                "practical extraction without major drilling infrastructure."
-            )
-        elif depth_m > 30:
-            base = 0.6
-            breakdown["depth_category"] = "moderate_30-80m"
-            breakdown["notes"].append(
-                f"Reflectors at ~{depth_m:.0f} m depth -- moderate drilling required."
-            )
-        elif depth_m > 10:
-            base = 0.8 if n_detections >= 2 else 0.7
-            breakdown["depth_category"] = "shallow_10-30m"
-            breakdown["notes"].append(
-                f"Reflectors at ~{depth_m:.0f} m depth with {n_detections} track(s) "
-                "-- accessible with moderate excavation."
-            )
+            if isru_tier == "tier_1":
+                breakdown["notes"].append(
+                    "ISRU Tier 1: Ice within ≤10 m — accessible with standard "
+                    "drilling or trenching for near-term ISRU missions."
+                )
+            elif isru_tier == "tier_2":
+                breakdown["notes"].append(
+                    "ISRU Tier 2: Ice at 10-20 m — requires dedicated drilling "
+                    "infrastructure but feasible for advanced ISRU missions."
+                )
+            elif isru_tier == "tier_3":
+                breakdown["notes"].append(
+                    "ISRU Tier 3: Ice at 20-30 m — major infrastructure required, "
+                    "not viable for first-generation missions."
+                )
         else:
-            # <= 10 m
-            base = 1.0 if n_detections >= 2 else 0.85
-            breakdown["depth_category"] = "very_shallow_<10m"
-            breakdown["notes"].append(
-                f"Very shallow reflectors at ~{depth_m:.0f} m with {n_detections} "
-                "track(s) -- highly accessible."
-            )
+            # Fallback: resolve depth from depth_summary (may be None or from assumed εr)
+            depth_m: Optional[float] = None
+            if median_depth is not None:
+                try:
+                    depth_m = float(median_depth)
+                except (TypeError, ValueError):
+                    depth_m = None
+
+            if depth_m is None:
+                # Depth unknown -- give intermediate credit
+                base = 0.5 if n_detections >= 2 else 0.4
+                breakdown["depth_category"] = "depth_unknown"
+                breakdown["notes"].append(
+                    f"Reflector(s) detected ({n_detections} track(s)), depth unknown "
+                    "(no physics-based εr). ISRU accessibility cannot be assessed."
+                )
+            elif depth_m > 80:
+                base = 0.4
+                breakdown["depth_category"] = "deep_>80m"
+                breakdown["notes"].append(
+                    f"Reflectors detected at ~{depth_m:.0f} m depth -- too deep for "
+                    "practical extraction without major drilling infrastructure."
+                )
+            elif depth_m > 30:
+                base = 0.6
+                breakdown["depth_category"] = "moderate_30-80m"
+                breakdown["notes"].append(
+                    f"Reflectors at ~{depth_m:.0f} m depth -- moderate drilling required."
+                )
+            elif depth_m > 10:
+                base = 0.8 if n_detections >= 2 else 0.7
+                breakdown["depth_category"] = "shallow_10-30m"
+                breakdown["notes"].append(
+                    f"Reflectors at ~{depth_m:.0f} m depth with {n_detections} track(s) "
+                    "-- accessible with moderate excavation."
+                )
+            else:
+                # <= 10 m
+                base = 1.0 if n_detections >= 2 else 0.85
+                breakdown["depth_category"] = "very_shallow_<10m"
+                breakdown["notes"].append(
+                    f"Very shallow reflectors at ~{depth_m:.0f} m with {n_detections} "
+                    "track(s) -- highly accessible."
+                )
 
     breakdown["base_score"] = round(base, 4)
 
@@ -708,6 +746,7 @@ def compute_composite_score(
     climate_data: Dict[str, Any],
     science_distance_km: Optional[float] = None,
     weights: Optional[Dict[str, float]] = None,
+    isru_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Compute the full weighted composite score with all sub-scores.
 
@@ -734,6 +773,8 @@ def compute_composite_score(
         Optional distance to nearest science target for penalty.
     weights : dict or None
         Override default weights (keys ``w1``, ``w2``, ``w3``, ``w4``).
+    isru_data : dict or None
+        ``synthesis["isru_assessment"]`` for ISRU-aware depth scoring.
 
     Returns
     -------
@@ -750,6 +791,7 @@ def compute_composite_score(
     # Normalize sub-scores
     sub_score, sub_bd = normalize_subsurface(
         subsurface_data, dielectric_data, cross_instrument_data,
+        isru_data=isru_data,
     )
     ice_score, ice_bd = normalize_surface_ice(mineral_data, cnn_data)
     terrain_score, terrain_bd = normalize_terrain(engineering_data)
