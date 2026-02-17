@@ -1574,9 +1574,6 @@ export default function MainPage() {
       // Measurement Tools
       showMeasurementTools={showMeasurementTools}
       onToggleMeasurementTools={setShowMeasurementTools}
-      // Panel Intelligence
-      autoOpenEnabled={panelManager.autoOpenEnabled}
-      onAutoOpenChange={panelManager.setAutoOpenEnabled}
     />
   );
 

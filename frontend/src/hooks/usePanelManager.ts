@@ -29,10 +29,6 @@ export interface PanelManagerConfig {
 }
 
 export interface PanelManagerAPI {
-  /** Autonomy toggle — if false, only user_click opens panels */
-  autoOpenEnabled: boolean;
-  setAutoOpenEnabled: (v: boolean) => void;
-
   /** Core: ensure the right panel is visible */
   ensurePanelVisible: (reason?: PanelOpenReason) => void;
 
@@ -56,30 +52,8 @@ export interface PanelManagerAPI {
 
 // ── localStorage helpers ───────────────────────────────────────────
 
-const STORAGE_KEY = "marslab_panel_prefs";
 const COLLAPSE_COOLDOWN_MS = 5000;
 const DEBOUNCE_MS = 300;
-
-function loadPrefs(): { autoOpenEnabled: boolean } {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed.autoOpenEnabled === "boolean") return parsed;
-    }
-  } catch {
-    /* corrupt or unavailable */
-  }
-  return { autoOpenEnabled: true };
-}
-
-function savePrefs(prefs: { autoOpenEnabled: boolean }) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-  } catch {
-    /* storage full — silently fail */
-  }
-}
 
 // ── Hook ───────────────────────────────────────────────────────────
 
@@ -90,14 +64,6 @@ export default function usePanelManager(config: PanelManagerConfig): PanelManage
     isMobile,
     setMobilePanel,
   } = config;
-
-  // Autonomy toggle (persisted)
-  const [autoOpenEnabled, setAutoOpenEnabledState] = useState(() => loadPrefs().autoOpenEnabled);
-
-  const setAutoOpenEnabled = useCallback((v: boolean) => {
-    setAutoOpenEnabledState(v);
-    savePrefs({ autoOpenEnabled: v });
-  }, []);
 
   // Manual collapse timestamp
   const lastManualCollapseRef = useRef(0);
@@ -131,11 +97,6 @@ export default function usePanelManager(config: PanelManagerConfig): PanelManage
   // Core: ensurePanelVisible
   const ensurePanelVisible = useCallback(
     (reason: PanelOpenReason = "user_click") => {
-      // Non-user reasons respect autonomy toggle
-      if (reason !== "user_click" && reason !== "feature_select" && reason !== "search_result" && reason !== "keyboard_shortcut") {
-        if (!autoOpenEnabled) return;
-      }
-
       // Debounce rapid calls
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
@@ -163,7 +124,7 @@ export default function usePanelManager(config: PanelManagerConfig): PanelManage
         setAttentionPulseKey((k) => k + 1);
       }, DEBOUNCE_MS);
     },
-    [autoOpenEnabled, rightPanelCollapsed, isMobile, setRightPanelCollapsed, setMobilePanel],
+    [rightPanelCollapsed, isMobile, setRightPanelCollapsed, setMobilePanel],
   );
 
   // Cleanup debounce timer on unmount
@@ -174,8 +135,6 @@ export default function usePanelManager(config: PanelManagerConfig): PanelManage
   }, []);
 
   return {
-    autoOpenEnabled,
-    setAutoOpenEnabled,
     ensurePanelVisible,
     recordManualCollapse,
     attentionPulse,

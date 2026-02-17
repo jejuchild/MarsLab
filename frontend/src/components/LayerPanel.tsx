@@ -359,10 +359,6 @@ interface LayerPanelProps {
   showMeasurementTools?: boolean;
   onToggleMeasurementTools?: (v: boolean) => void;
 
-  // Panel Intelligence
-  autoOpenEnabled?: boolean;
-  onAutoOpenChange?: (v: boolean) => void;
-
   // Mobile mode
   isMobile?: boolean;
 }
@@ -652,8 +648,6 @@ export default function LayerPanel({
   overlapStats,
   showMeasurementTools = false,
   onToggleMeasurementTools,
-  autoOpenEnabled = true,
-  onAutoOpenChange,
   isMobile = false,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
@@ -895,26 +889,6 @@ export default function LayerPanel({
             <span className="material-symbols-outlined text-xs text-slate-400">grid_on</span>
             <span className={`text-[11px] font-medium ${showGrid ? "text-slate-300" : "text-[#92a4c9]"}`}>
               Coordinate Grid
-            </span>
-          </label>
-
-          {/* Auto-open panels toggle */}
-          <label
-            className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-              autoOpenEnabled
-                ? "bg-teal-500/20 border border-teal-400/50"
-                : "bg-[#1a2333] border border-[#232f48] hover:border-teal-400/30"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={autoOpenEnabled}
-              onChange={(e) => onAutoOpenChange?.(e.target.checked)}
-              className="rounded bg-[#0a0f18] border-[#232f48] text-teal-400 focus:ring-0 focus:ring-offset-0"
-            />
-            <span className="material-symbols-outlined text-xs text-teal-400">auto_fix_high</span>
-            <span className={`text-[11px] font-medium ${autoOpenEnabled ? "text-teal-300" : "text-[#92a4c9]"}`}>
-              Auto-open panels
             </span>
           </label>
 

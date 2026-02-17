@@ -3,11 +3,11 @@ Agentic AI Orchestrator.
 
 Core agent loop that:
 1. Takes a natural language mission objective
-2. Uses Llama (via Ollama) to generate an execution plan
+2. Uses Groq LLaMA to generate an execution plan (8b light, 70b heavy)
 3. Executes each task step-by-step
-4. Uses Llama to synthesize results into a narrative report
+4. Uses Groq LLaMA-70b to synthesize results into a narrative report
 
-Falls back to rule-based planning if Ollama is unavailable.
+Falls back to rule-based planning if Groq is unavailable.
 """
 
 import json
@@ -51,9 +51,15 @@ from .science_context import get_context_for_agent, get_region_context_by_name
 
 logger = logging.getLogger(__name__)
 
-# Ollama config
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.1:8b"
+# Groq config (replaces Ollama — fast cloud inference)
+from pathlib import Path as _Path
+from dotenv import load_dotenv as _load_dotenv
+_load_dotenv(_Path(__file__).parent.parent / ".env")
+
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL_LIGHT = "llama-3.1-8b-instant"       # ReAct loop, planning (fast)
+GROQ_MODEL_HEAVY = "llama-3.3-70b-versatile"     # Narrative synthesis (quality)
 
 
 # =============================================================================
@@ -376,7 +382,7 @@ async def cancel_session(session_id: str) -> bool:
 
 
 # =============================================================================
-# Ollama LLM Integration
+# Groq LLM Integration
 # =============================================================================
 
 HEARTBEAT_INTERVAL = 15.0  # seconds between SSE keepalive events
@@ -384,8 +390,7 @@ HEARTBEAT_INTERVAL = 15.0  # seconds between SSE keepalive events
 
 async def _drain_queue_with_heartbeat(queue: asyncio.Queue):
     """Drain an asyncio.Queue, yielding items as they arrive.
-    Sends heartbeat events every HEARTBEAT_INTERVAL seconds to keep SSE alive
-    when Ollama is slow (CPU-only, model loading, long prompts)."""
+    Sends heartbeat events every HEARTBEAT_INTERVAL seconds to keep SSE alive."""
     while True:
         try:
             item = await asyncio.wait_for(queue.get(), timeout=HEARTBEAT_INTERVAL)
@@ -397,91 +402,112 @@ async def _drain_queue_with_heartbeat(queue: asyncio.Queue):
         yield item
 
 
-async def _check_ollama() -> bool:
-    """Check if Ollama is running."""
+async def _check_groq() -> bool:
+    """Check if Groq API key is configured."""
+    return bool(GROQ_API_KEY)
+
+# Keep old name as alias so callers still work during transition
+_check_ollama = _check_groq
+
+
+async def _call_groq(
+    prompt: str,
+    system: str = "",
+    temperature: float = 0.3,
+    model: str = "",
+) -> str:
+    """Call Groq API (OpenAI-compatible) for text generation."""
+    if not GROQ_API_KEY:
+        return ""
+
+    use_model = model or GROQ_MODEL_LIGHT
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = {
+        "model": use_model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": 4096,
+    }
+
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=aiohttp.ClientTimeout(total=3)) as resp:
-                return resp.status == 200
-    except Exception:
-        return False
-
-
-async def _call_ollama(prompt: str, system: str = "", temperature: float = 0.3) -> str:
-    """Call Ollama API for text generation."""
-    try:
-        payload = {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "system": system,
-            "stream": False,
-            "keep_alive": -1,
-            "options": {
-                "temperature": temperature,
-                "num_predict": 2048,
-                "num_ctx": 16384,
-            },
-        }
-
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{OLLAMA_BASE_URL}/api/generate",
+                GROQ_BASE_URL,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=300),
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                timeout=aiohttp.ClientTimeout(total=120),
             ) as resp:
                 if resp.status != 200:
                     text = await resp.text()
-                    logger.error(f"Ollama error {resp.status}: {text}")
+                    logger.error(f"Groq error {resp.status}: {text[:200]}")
                     return ""
                 data = await resp.json()
-                return data.get("response", "")
-
+                return data.get("choices", [{}])[0].get("message", {}).get("content", "")
     except Exception as e:
-        logger.error(f"Ollama call failed: {e}")
+        logger.error(f"Groq call failed: {e}")
         return ""
 
 
-async def _call_ollama_streaming(
+async def _call_groq_streaming(
     prompt: str,
     system: str = "",
     temperature: float = 0.3,
     on_chunk: Optional[Callable[[str], Awaitable[None]]] = None,
+    model: str = "",
 ) -> str:
-    """Call Ollama with stream=true, yielding text chunks via on_chunk callback.
+    """Call Groq with streaming, yielding text chunks via on_chunk callback.
     Returns the full accumulated response text."""
-    try:
-        payload = {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "system": system,
-            "stream": True,
-            "keep_alive": -1,
-            "options": {
-                "temperature": temperature,
-                "num_predict": 2048,
-                "num_ctx": 16384,
-            },
-        }
+    if not GROQ_API_KEY:
+        return ""
 
-        full_text = ""
+    use_model = model or GROQ_MODEL_LIGHT
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = {
+        "model": use_model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": 4096,
+        "stream": True,
+    }
+
+    full_text = ""
+    try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{OLLAMA_BASE_URL}/api/generate",
+                GROQ_BASE_URL,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=300),
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                timeout=aiohttp.ClientTimeout(total=120),
             ) as resp:
                 if resp.status != 200:
                     text = await resp.text()
-                    logger.error(f"Ollama streaming error {resp.status}: {text}")
+                    logger.error(f"Groq streaming error {resp.status}: {text[:200]}")
                     return ""
 
                 async for line in resp.content:
                     line_str = line.decode("utf-8").strip()
-                    if not line_str:
+                    if not line_str or line_str == "data: [DONE]":
                         continue
+                    if line_str.startswith("data: "):
+                        line_str = line_str[6:]
                     try:
                         chunk_data = json.loads(line_str)
-                        token = chunk_data.get("response", "")
+                        delta = chunk_data.get("choices", [{}])[0].get("delta", {})
+                        token = delta.get("content", "")
                         if token:
                             full_text += token
                             if on_chunk:
@@ -492,7 +518,7 @@ async def _call_ollama_streaming(
         return full_text
 
     except Exception as e:
-        logger.error(f"Ollama streaming call failed: {e}")
+        logger.error(f"Groq streaming call failed: {e}")
         return ""
 
 
@@ -1467,9 +1493,9 @@ SHARAD for subsurface ice, CRISM for mineral signatures), and a final synthesis 
 Return ONLY the JSON object, no other text."""
 
     if on_chunk:
-        response = await _call_ollama_streaming(prompt, PLAN_SYSTEM_PROMPT, on_chunk=on_chunk)
+        response = await _call_groq_streaming(prompt, PLAN_SYSTEM_PROMPT, on_chunk=on_chunk, model=GROQ_MODEL_LIGHT)
     else:
-        response = await _call_ollama(prompt, PLAN_SYSTEM_PROMPT)
+        response = await _call_groq(prompt, PLAN_SYSTEM_PROMPT, model=GROQ_MODEL_LIGHT)
 
     # Parse JSON from response
     try:
@@ -1803,9 +1829,9 @@ Slope does NOT drive site selection; it is a final feasibility filter.
 State a concrete Primary Landing Site with coordinates and trade-off reasoning."""
 
     if on_chunk:
-        response = await _call_ollama_streaming(prompt, NARRATIVE_SYSTEM_PROMPT, temperature=0.5, on_chunk=on_chunk)
+        response = await _call_groq_streaming(prompt, NARRATIVE_SYSTEM_PROMPT, temperature=0.5, on_chunk=on_chunk, model=GROQ_MODEL_HEAVY)
     else:
-        response = await _call_ollama(prompt, NARRATIVE_SYSTEM_PROMPT, temperature=0.5)
+        response = await _call_groq(prompt, NARRATIVE_SYSTEM_PROMPT, temperature=0.5, model=GROQ_MODEL_HEAVY)
 
     if not response:
         return _generate_narrative_fallback(session)
@@ -2303,7 +2329,7 @@ async def run_agent(
     """
     Main agent entry point. Yields SSE events.
 
-    Uses ReAct (Reason+Act) loop when Ollama is available,
+    Uses ReAct (Reason+Act) loop when Groq is available,
     falls back to rule-based pipeline otherwise.
     """
     # Session setup
@@ -2315,18 +2341,18 @@ async def run_agent(
         session = AgentSession(session_id=session_id, objective=objective)
         _sessions[session_id] = session
 
-    # Check Ollama availability
-    ollama_available = await _check_ollama()
+    # Check Groq availability
+    groq_available = await _check_groq()
 
-    if not ollama_available:
+    if not groq_available:
         # Fallback to rule-based pipeline (LLM unavailable)
-        logger.info("Ollama unavailable — falling back to rule-based pipeline")
+        logger.info("Groq unavailable — falling back to rule-based pipeline")
         async for event in _run_agent_rules(objective, auto_download, _session=session):
             yield event
         return
 
     # ── ReAct Agent Loop ─────────────────────────────
-    logger.info("Starting ReAct agent loop with Ollama/Llama")
+    logger.info("Starting ReAct agent loop with Groq/Llama")
     yield {"event": "session_start", "data": {
         "session_id": session_id, "objective": objective, "mode": "react",
     }}
@@ -2381,8 +2407,8 @@ async def run_agent(
 
             async def _do_think():
                 nonlocal full_response
-                full_response = await _call_ollama_streaming(
-                    prompt, system_prompt, on_chunk=_emit_chunk
+                full_response = await _call_groq_streaming(
+                    prompt, system_prompt, on_chunk=_emit_chunk, model=GROQ_MODEL_LIGHT
                 )
                 await reasoning_queue.put(None)  # sentinel
 
@@ -2765,7 +2791,7 @@ async def _run_agent_rules(
     _session: Optional[AgentSession] = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
-    Rule-based agent pipeline (fallback when Ollama is unavailable).
+    Rule-based agent pipeline (fallback when Groq is unavailable).
 
     Plans all steps upfront, executes sequentially, synthesizes at the end.
     """
@@ -2812,10 +2838,10 @@ async def _run_agent_rules(
 
         # ── Phase 1: Generate Plan ──────────────────────
         session.status = "planning"
-        ollama_available = await _check_ollama()
+        groq_available = await _check_groq()
 
-        if ollama_available:
-            logger.info("Using Llama for plan generation")
+        if groq_available:
+            logger.info("Using Groq/Llama-8b for plan generation")
             yield {"event": "reasoning_start", "data": {"phase": "planning"}}
 
             # Run plan generation in background task so we can drain the queue
@@ -2836,7 +2862,7 @@ async def _run_agent_rules(
 
             yield {"event": "reasoning_end", "data": {"phase": "planning"}}
         else:
-            logger.info("Ollama unavailable, using rule-based planning")
+            logger.info("Groq unavailable, using rule-based planning")
             plan_data = {}
 
         # Fallback to rules if LLM plan is empty/invalid
@@ -2946,7 +2972,7 @@ async def _run_agent_rules(
                 "region": session.region_name,
                 "instruments": instruments,
                 "steps": [s.to_dict() for s in session.steps],
-                "planned_by": "llama" if ollama_available and plan_data else "rules",
+                "planned_by": "llama" if groq_available and plan_data else "rules",
             },
         }
 
@@ -3158,7 +3184,7 @@ async def _run_agent_rules(
         # ── Phase 3: Generate Narrative ────────────────
         session.status = "synthesizing"
 
-        if ollama_available:
+        if groq_available:
             yield {"event": "reasoning_start", "data": {"phase": "narrative"}}
 
             async def _do_narrative():
