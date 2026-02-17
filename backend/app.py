@@ -493,6 +493,9 @@ app.include_router(workflow_router)  # /api/workflow/* — Workflow Research Ass
 from api.marvis_chat import router as marvis_chat_router
 app.include_router(marvis_chat_router)  # /api/marvis/chat — MARVIS lightweight chat
 
+from api.regolith_router import router as regolith_router
+app.include_router(regolith_router)  # /api/regolith/* — Regolith Thickness Estimator
+
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(product_id: str):
     """

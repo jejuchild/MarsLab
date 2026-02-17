@@ -58,6 +58,7 @@ const SpaceGame = lazy(() => import("../components/SpaceGame"));
 const RegionStatsPanel = lazy(() => import("../components/RegionStatsPanel"));
 const CraterDetectPanel = lazy(() => import("../components/CraterDetectPanel"));
 const TemporalComparison = lazy(() => import("../components/TemporalComparison"));
+const RegolithPanel = lazy(() => import("../components/RegolithPanel"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -221,7 +222,7 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Guided Workflow: user-selected location
@@ -381,6 +382,9 @@ export default function MainPage() {
   const [sharadHiresProductId, setSharadHiresProductId] = useState<string | null>(null);
   // Pin showing clicked radargram location on the map track
   const [sharadTracePin, setSharadTracePin] = useState<{ lat: number; lon: number } | null>(null);
+
+  // Regolith Thickness Estimator — product ID for analysis
+  const [regolithProductId, setRegolithProductId] = useState<string | null>(null);
 
   // Custom user-uploaded datasets
   const [showCustomData, setShowCustomData] = useState(false);
@@ -748,6 +752,14 @@ export default function MainPage() {
   const handleSharadHiresClick = useCallback((productId: string) => {
     setSharadHiresProductId(productId);
     setSelected(null); // Close regular Inspector
+  }, []);
+
+  // Handle opening Regolith Thickness analysis from SharadHiresInspector
+  const handleOpenRegolith = useCallback((productId: string) => {
+    setSharadHiresProductId(null);
+    setSharadTracePin(null);
+    setRegolithProductId(productId);
+    setAnalysisMode("regolith");
   }, []);
 
   // Fly to lat/lon coordinates (for search results not on map)
@@ -1212,6 +1224,9 @@ export default function MainPage() {
     if (mode !== "agentic") {
       setEpsilonTarget(null);
     }
+    if (mode !== "regolith") {
+      setRegolithProductId(null);
+    }
   }, []);
 
   // Handle "Run ε Inversion" from CraterDetectPanel → opens AgenticPanel with pre-filled objective
@@ -1572,6 +1587,13 @@ export default function MainPage() {
         initialObjective={epsilonTarget ? `Run terrain εr inversion for terraced crater at (${epsilonTarget.lat.toFixed(3)}, ${epsilonTarget.lon.toFixed(3)}), diameter ${epsilonTarget.diameter_km?.toFixed(1) ?? "?"} km, terrace depth ${epsilonTarget.terrace_depth_m?.toFixed(0) ?? "?"} m. Search for SHARAD and HiRISE DTM data, then compute dielectric constant.` : undefined}
         onPanelAttention={handleAgenticPanelAttention}
       />
+    ) : regolithProductId && analysisMode === "regolith" ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading regolith analysis...</div>}>
+        <RegolithPanel
+          productId={regolithProductId}
+          onClose={() => { setRegolithProductId(null); setAnalysisMode(null); }}
+        />
+      </Suspense>
     ) : sharadHiresProductId ? (
       <SharadHiresInspector
         productId={sharadHiresProductId}
@@ -1579,6 +1601,7 @@ export default function MainPage() {
         fieldNotes={fieldNotes}
         onOpenFieldNote={(pid, lat, lon) => setShowFieldNoteModal({ productId: pid, instrument: "SHARAD_HIGHRES", lat, lon })}
         onLocatePoint={(lat, lon) => setSharadTracePin({ lat, lon })}
+        onOpenRegolith={handleOpenRegolith}
       />
     ) : selected ? (
       <Inspector
