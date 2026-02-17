@@ -1,7 +1,7 @@
 /**
  * Subsurface3DViewer - 3D visualization of SHARAD subsurface interface
  *
- * Displays MOLA terrain as a 3D mesh surface (same as Slope3DViewer)
+ * Displays MOLA terrain as a 3D mesh surface (same as SlopeAnalysis3DTab)
  * with the subsurface boundary as a 1D line following the track path at depth.
  */
 
@@ -73,7 +73,7 @@ async function fetchDEMPatch(
 }
 
 // =============================================================================
-// Color Utilities (same as Slope3DViewer)
+// Color Utilities (same as SlopeAnalysis3DTab)
 // =============================================================================
 
 function elevationToColor(
@@ -99,7 +99,7 @@ function elevationToColor(
 }
 
 // =============================================================================
-// Terrain Mesh (same approach as Slope3DViewer)
+// Terrain Mesh (same approach as SlopeAnalysis3DTab)
 // =============================================================================
 
 function TerrainMesh({

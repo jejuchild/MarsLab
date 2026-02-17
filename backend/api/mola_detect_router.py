@@ -1,8 +1,9 @@
 """
-MOLA Landform Detection Router — SSE streaming endpoint.
+MOLA Landform Detection Router — SSE streaming + pre-computed cache.
 
-POST /api/mola-detect/scan    — Run detection pipeline, stream SSE events
-GET  /api/mola-detect/status  — Check if DEM is available
+POST /api/mola-detect/scan      — Run detection pipeline, stream SSE events
+GET  /api/mola-detect/status    — Check if DEM is available
+GET  /api/mola-detect/features  — Query pre-computed landform cache by bbox
 
 Performance: DEM extracted once, derivatives pre-computed, detectors run in
 parallel via asyncio.gather + to_thread.
@@ -13,8 +14,10 @@ import logging
 import asyncio
 import time
 import os
+from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -235,8 +238,106 @@ async def check_status():
         "available": available,
         "max_radius_km": 500,
         "resolution_m": 200,
+        "precomputed": _precomputed_cache is not None,
+        "precomputed_count": len(_precomputed_cache) if _precomputed_cache else 0,
         "feature_types": [
             "crater", "terraced_crater", "volcanic", "graben",
             "channel", "wrinkle_ridge", "lda",
         ],
+    })
+
+
+# ---------------------------------------------------------------------------
+# Pre-computed landform cache
+# ---------------------------------------------------------------------------
+
+_CACHE_PATH = Path(__file__).resolve().parent.parent / "cache" / "landforms_precomputed.json"
+_precomputed_cache: Optional[list[dict]] = None
+
+
+def load_precomputed_cache():
+    """Load the pre-computed landforms cache into memory. Called at startup."""
+    global _precomputed_cache
+    if not _CACHE_PATH.exists():
+        logger.info("No precomputed landform cache at %s", _CACHE_PATH)
+        _precomputed_cache = None
+        return
+    try:
+        with open(_CACHE_PATH) as f:
+            data = json.load(f)
+        _precomputed_cache = data.get("features", [])
+        logger.info(
+            "Loaded %d precomputed landforms (generated %s)",
+            len(_precomputed_cache),
+            data.get("generated_at", "unknown"),
+        )
+    except Exception as e:
+        logger.error("Failed to load precomputed landforms: %s", e)
+        _precomputed_cache = None
+
+
+# Auto-load on module import
+load_precomputed_cache()
+
+
+@router.get("/features")
+async def get_precomputed_features(
+    west: float = Query(..., ge=-180, le=360, description="West longitude"),
+    south: float = Query(..., ge=-90, le=90, description="South latitude"),
+    east: float = Query(..., ge=-180, le=360, description="East longitude"),
+    north: float = Query(..., ge=-90, le=90, description="North latitude"),
+    types: Optional[str] = Query(None, description="Comma-separated feature types to include"),
+    min_confidence: float = Query(0.0, ge=0, le=1, description="Minimum confidence threshold"),
+):
+    """
+    Query pre-computed landform features within a bounding box.
+
+    Returns all features whose centroid falls within [west, south, east, north].
+    Supports optional type filtering and confidence threshold.
+    """
+    if _precomputed_cache is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "No precomputed landform cache available. Run precompute_landforms.py first."},
+        )
+
+    # Parse type filter
+    type_filter = None
+    if types:
+        type_filter = set(t.strip() for t in types.split(","))
+
+    # Handle antimeridian wrapping: if west > east, the bbox wraps around
+    wraps = west > east
+
+    results = []
+    for f in _precomputed_cache:
+        lat = f["lat"]
+        lon = f["lon"]
+
+        # Latitude check
+        if lat < south or lat > north:
+            continue
+
+        # Longitude check (handle wrap-around)
+        if wraps:
+            if lon < west and lon > east:
+                continue
+        else:
+            if lon < west or lon > east:
+                continue
+
+        # Type filter
+        if type_filter and f["type"] not in type_filter:
+            continue
+
+        # Confidence filter
+        if f.get("confidence", 0) < min_confidence:
+            continue
+
+        results.append(f)
+
+    return JSONResponse(content={
+        "count": len(results),
+        "bbox": {"west": west, "south": south, "east": east, "north": north},
+        "features": results,
     })

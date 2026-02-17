@@ -287,14 +287,6 @@ const ACTIONS: CommandAction[] = [
     action: { type: "set_analysis", mode: "ai_analysis" },
   },
   {
-    id: "analysis-3d",
-    label: "Open Slope 3D Viewer",
-    category: "analysis",
-    icon: "view_in_ar",
-    keywords: ["3d", "slope", "viewer", "terrain", "three"],
-    action: { type: "set_analysis", mode: "slope3d" },
-  },
-  {
     id: "analysis-line",
     label: "Draw Line Profile",
     category: "analysis",

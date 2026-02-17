@@ -42,6 +42,13 @@ type ScanPhase =
   | "complete"
   | "error";
 
+type ViewBounds = {
+  minLat: number;
+  maxLat: number;
+  westLon: number;
+  eastLon: number;
+} | null;
+
 const FEATURE_COLORS: Record<string, string> = {
   crater: "#fb923c",
   terraced_crater: "#f43f5e",
@@ -77,6 +84,7 @@ const FEATURE_LABELS: Record<string, string> = {
  * =======================================================*/
 interface CraterDetectPanelProps {
   scanCenter?: { lat: number; lon: number } | null;
+  viewBounds?: ViewBounds;
   onClose: () => void;
   onFlyTo?: (lat: number, lon: number) => void;
   onSearchHiRISE?: (lat: number, lon: number) => void;
@@ -90,6 +98,7 @@ interface CraterDetectPanelProps {
  * =======================================================*/
 export default function CraterDetectPanel({
   scanCenter,
+  viewBounds,
   onClose,
   onFlyTo,
   onSearchHiRISE,
@@ -97,6 +106,9 @@ export default function CraterDetectPanel({
   onFeaturesChanged,
   onRunEpsilonInversion,
 }: CraterDetectPanelProps) {
+  // Data mode: "precomputed" (auto-loaded from cache) or "scan" (manual SSE scan)
+  const [mode, setMode] = useState<"precomputed" | "scan">("precomputed");
+
   // Scan config
   const [radiusKm, setRadiusKm] = useState(100);
   const [detectCraters, setDetectCraters] = useState(true);
@@ -104,8 +116,8 @@ export default function CraterDetectPanel({
   const [detectChannels, setDetectChannels] = useState(true);
   const [detectRidges, setDetectRidges] = useState(true);
 
-  // Scan state
-  const [features, setFeatures] = useState<DetectedFeature[]>([]);
+  // Scan state (for manual scan mode)
+  const [scanFeatures, setScanFeatures] = useState<DetectedFeature[]>([]);
   const [phase, setPhase] = useState<ScanPhase>("idle");
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
@@ -113,9 +125,60 @@ export default function CraterDetectPanel({
   const [elapsed, setElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Precomputed features state
+  const [precomputedFeatures, setPrecomputedFeatures] = useState<DetectedFeature[]>([]);
+  const [precomputedLoading, setPrecomputedLoading] = useState(false);
+  const [precomputedAvailable, setPrecomputedAvailable] = useState<boolean | null>(null);
+  const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Filters
   const [filterType, setFilterType] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"confidence" | "size" | "type">("confidence");
+
+  // Active features based on mode
+  const features = mode === "precomputed" ? precomputedFeatures : scanFeatures;
+
+  // Check if precomputed cache is available on mount
+  useEffect(() => {
+    fetch("/api/mola-detect/status")
+      .then((r) => r.json())
+      .then((d) => {
+        setPrecomputedAvailable(!!d.precomputed);
+        if (!d.precomputed) setMode("scan");
+      })
+      .catch(() => {
+        setPrecomputedAvailable(false);
+        setMode("scan");
+      });
+  }, []);
+
+  // Auto-fetch precomputed features when viewBounds change (debounced)
+  useEffect(() => {
+    if (mode !== "precomputed" || !viewBounds || precomputedAvailable === false) return;
+
+    if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current);
+
+    fetchTimerRef.current = setTimeout(() => {
+      setPrecomputedLoading(true);
+      const params = new URLSearchParams({
+        west: String(viewBounds.westLon),
+        south: String(viewBounds.minLat),
+        east: String(viewBounds.eastLon),
+        north: String(viewBounds.maxLat),
+      });
+      fetch(`/api/mola-detect/features?${params}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.features) setPrecomputedFeatures(d.features as DetectedFeature[]);
+        })
+        .catch(() => {})
+        .finally(() => setPrecomputedLoading(false));
+    }, 300);
+
+    return () => {
+      if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current);
+    };
+  }, [mode, viewBounds, precomputedAvailable]);
 
   // Notify parent of feature changes
   useEffect(() => {
@@ -130,8 +193,9 @@ export default function CraterDetectPanel({
     const controller = new AbortController();
     abortRef.current = controller;
 
+    setMode("scan");
     setPhase("starting");
-    setFeatures([]);
+    setScanFeatures([]);
     setError(null);
     setProgress(0);
     setStatusMessage("Connecting...");
@@ -195,7 +259,7 @@ export default function CraterDetectPanel({
       if (typeof data.progress === "number") setProgress(data.progress);
       if (typeof data.message === "string") setStatusMessage(data.message);
     } else if (event === "feature") {
-      setFeatures((prev) => [...prev, data as unknown as DetectedFeature]);
+      setScanFeatures((prev) => [...prev, data as unknown as DetectedFeature]);
     } else if (event === "complete") {
       setPhase("complete");
       setProgress(1);
@@ -214,7 +278,8 @@ export default function CraterDetectPanel({
   }, []);
 
   const clearResults = useCallback(() => {
-    setFeatures([]);
+    setScanFeatures([]);
+    setPrecomputedFeatures([]);
     setPhase("idle");
     setProgress(0);
     setStatusMessage("");
@@ -265,106 +330,159 @@ export default function CraterDetectPanel({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3 text-[11px]">
-        {/* Scan Config */}
-        <div className="space-y-2">
-          <div className="text-[10px] font-semibold text-[#6b7c9c] uppercase tracking-wider">
-            Scan Region
-          </div>
-
-          {/* Center coordinates */}
-          <div className="flex gap-2">
-            <div className="flex-1 bg-[#1a2333] rounded px-2 py-1.5 border border-[#232f48]">
-              <span className="text-[9px] text-[#6b7c9c]">Lat</span>
-              <div className="text-[11px] font-mono">
-                {scanCenter ? scanCenter.lat.toFixed(3) + "°" : "Click map..."}
-              </div>
-            </div>
-            <div className="flex-1 bg-[#1a2333] rounded px-2 py-1.5 border border-[#232f48]">
-              <span className="text-[9px] text-[#6b7c9c]">Lon</span>
-              <div className="text-[11px] font-mono">
-                {scanCenter ? scanCenter.lon.toFixed(3) + "°" : "—"}
-              </div>
-            </div>
-          </div>
-
-          {/* Radius slider */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-[10px] text-[#6b7c9c]">
-              <span>Scan Radius</span>
-              <span className="text-[#c8d4e8] font-mono">{radiusKm} km</span>
-            </div>
-            <input
-              type="range"
-              min={10}
-              max={500}
-              step={10}
-              value={radiusKm}
-              onChange={(e) => setRadiusKm(Number(e.target.value))}
-              className="w-full h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer accent-rose-500"
-              disabled={isScanning}
-            />
-            <div className="flex justify-between text-[9px] text-[#4a5568]">
-              <span>10 km</span>
-              <span>500 km</span>
-            </div>
-          </div>
-
-          {/* Feature type toggles */}
-          <div className="space-y-1">
-            <div className="text-[10px] text-[#6b7c9c]">Detect</div>
-            <div className="grid grid-cols-2 gap-1">
-              {[
-                { label: "Craters", state: detectCraters, set: setDetectCraters, color: "#fb923c" },
-                { label: "LDAs", state: detectLdas, set: setDetectLdas, color: "#22d3ee" },
-                { label: "Channels", state: detectChannels, set: setDetectChannels, color: "#3b82f6" },
-                { label: "Ridges", state: detectRidges, set: setDetectRidges, color: "#eab308" },
-              ].map((t) => (
-                <label
-                  key={t.label}
-                  className="flex items-center gap-1.5 cursor-pointer select-none"
-                >
-                  <input
-                    type="checkbox"
-                    checked={t.state}
-                    onChange={() => t.set(!t.state)}
-                    disabled={isScanning}
-                    className="rounded border-[#232f48] bg-[#1a2333] text-rose-500 focus:ring-rose-500/20 w-3 h-3"
-                  />
-                  <span className="text-[10px]" style={{ color: t.color }}>
-                    {t.label}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Scan button */}
-          {isScanning ? (
+        {/* Mode toggle */}
+        {precomputedAvailable && (
+          <div className="flex rounded border border-[#232f48] overflow-hidden">
             <button
-              onClick={stopScan}
-              className="w-full py-1.5 rounded text-[11px] font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors"
-            >
-              <span className="material-symbols-outlined text-xs mr-1 align-middle">stop</span>
-              Stop Scan
-            </button>
-          ) : (
-            <button
-              onClick={startScan}
-              disabled={!scanCenter}
-              className={`w-full py-1.5 rounded text-[11px] font-medium transition-colors ${
-                scanCenter
-                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30"
-                  : "bg-[#1a2333] text-[#4a5568] border border-[#232f48] cursor-not-allowed"
+              onClick={() => setMode("precomputed")}
+              className={`flex-1 py-1.5 text-[10px] font-medium transition-colors ${
+                mode === "precomputed"
+                  ? "bg-rose-500/20 text-rose-400 border-r border-rose-500/30"
+                  : "bg-[#1a2333] text-[#6b7c9c] border-r border-[#232f48] hover:text-[#c8d4e8]"
               }`}
             >
-              <span className="material-symbols-outlined text-xs mr-1 align-middle">radar</span>
-              {scanCenter ? "Scan Region" : "Click map to set center"}
+              <span className="material-symbols-outlined text-xs mr-0.5 align-middle">database</span>
+              Viewport (cached)
             </button>
-          )}
-        </div>
+            <button
+              onClick={() => setMode("scan")}
+              className={`flex-1 py-1.5 text-[10px] font-medium transition-colors ${
+                mode === "scan"
+                  ? "bg-rose-500/20 text-rose-400"
+                  : "bg-[#1a2333] text-[#6b7c9c] hover:text-[#c8d4e8]"
+              }`}
+            >
+              <span className="material-symbols-outlined text-xs mr-0.5 align-middle">radar</span>
+              Manual Scan
+            </button>
+          </div>
+        )}
 
-        {/* Progress */}
-        {isScanning && (
+        {/* Precomputed mode info */}
+        {mode === "precomputed" && (
+          <div className="space-y-2">
+            <div className="bg-[#1a2333] rounded p-2 border border-[#232f48]">
+              <div className="flex items-center gap-1.5">
+                {precomputedLoading ? (
+                  <div className="animate-spin w-3 h-3 border-2 border-rose-500/30 border-t-rose-500 rounded-full" />
+                ) : (
+                  <span className="material-symbols-outlined text-xs text-emerald-400">check_circle</span>
+                )}
+                <span className="text-[10px] text-[#c8d4e8]">
+                  {precomputedLoading
+                    ? "Loading features for viewport..."
+                    : `${precomputedFeatures.length} landforms in current viewport`}
+                </span>
+              </div>
+              <p className="text-[9px] text-[#4a5568] mt-1">
+                Pre-computed features auto-update as you pan/zoom the map.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Scan Config */}
+        {mode === "scan" && (
+          <div className="space-y-2">
+            <div className="text-[10px] font-semibold text-[#6b7c9c] uppercase tracking-wider">
+              Scan Region
+            </div>
+
+            {/* Center coordinates */}
+            <div className="flex gap-2">
+              <div className="flex-1 bg-[#1a2333] rounded px-2 py-1.5 border border-[#232f48]">
+                <span className="text-[9px] text-[#6b7c9c]">Lat</span>
+                <div className="text-[11px] font-mono">
+                  {scanCenter ? scanCenter.lat.toFixed(3) + "°" : "Click map..."}
+                </div>
+              </div>
+              <div className="flex-1 bg-[#1a2333] rounded px-2 py-1.5 border border-[#232f48]">
+                <span className="text-[9px] text-[#6b7c9c]">Lon</span>
+                <div className="text-[11px] font-mono">
+                  {scanCenter ? scanCenter.lon.toFixed(3) + "°" : "\u2014"}
+                </div>
+              </div>
+            </div>
+
+            {/* Radius slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[10px] text-[#6b7c9c]">
+                <span>Scan Radius</span>
+                <span className="text-[#c8d4e8] font-mono">{radiusKm} km</span>
+              </div>
+              <input
+                type="range"
+                min={10}
+                max={500}
+                step={10}
+                value={radiusKm}
+                onChange={(e) => setRadiusKm(Number(e.target.value))}
+                className="w-full h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer accent-rose-500"
+                disabled={isScanning}
+              />
+              <div className="flex justify-between text-[9px] text-[#4a5568]">
+                <span>10 km</span>
+                <span>500 km</span>
+              </div>
+            </div>
+
+            {/* Feature type toggles */}
+            <div className="space-y-1">
+              <div className="text-[10px] text-[#6b7c9c]">Detect</div>
+              <div className="grid grid-cols-2 gap-1">
+                {[
+                  { label: "Craters", state: detectCraters, set: setDetectCraters, color: "#fb923c" },
+                  { label: "LDAs", state: detectLdas, set: setDetectLdas, color: "#22d3ee" },
+                  { label: "Channels", state: detectChannels, set: setDetectChannels, color: "#3b82f6" },
+                  { label: "Ridges", state: detectRidges, set: setDetectRidges, color: "#eab308" },
+                ].map((t) => (
+                  <label
+                    key={t.label}
+                    className="flex items-center gap-1.5 cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={t.state}
+                      onChange={() => t.set(!t.state)}
+                      disabled={isScanning}
+                      className="rounded border-[#232f48] bg-[#1a2333] text-rose-500 focus:ring-rose-500/20 w-3 h-3"
+                    />
+                    <span className="text-[10px]" style={{ color: t.color }}>
+                      {t.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Scan button */}
+            {isScanning ? (
+              <button
+                onClick={stopScan}
+                className="w-full py-1.5 rounded text-[11px] font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+              >
+                <span className="material-symbols-outlined text-xs mr-1 align-middle">stop</span>
+                Stop Scan
+              </button>
+            ) : (
+              <button
+                onClick={startScan}
+                disabled={!scanCenter}
+                className={`w-full py-1.5 rounded text-[11px] font-medium transition-colors ${
+                  scanCenter
+                    ? "bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30"
+                    : "bg-[#1a2333] text-[#4a5568] border border-[#232f48] cursor-not-allowed"
+                }`}
+              >
+                <span className="material-symbols-outlined text-xs mr-1 align-middle">radar</span>
+                {scanCenter ? "Scan Region" : "Click map to set center"}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Progress (scan mode only) */}
+        {mode === "scan" && isScanning && (
           <div className="space-y-1.5 bg-[#1a2333] rounded p-2 border border-[#232f48]">
             <div className="flex items-center gap-2">
               <div className="animate-spin w-3 h-3 border-2 border-rose-500/30 border-t-rose-500 rounded-full" />
@@ -376,9 +494,9 @@ export default function CraterDetectPanel({
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
-            {features.length > 0 && (
+            {scanFeatures.length > 0 && (
               <div className="text-[9px] text-[#6b7c9c]">
-                {features.length} features found so far
+                {scanFeatures.length} features found so far
               </div>
             )}
           </div>
@@ -482,17 +600,30 @@ export default function CraterDetectPanel({
         )}
 
         {/* Empty state */}
-        {phase === "idle" && features.length === 0 && (
+        {features.length === 0 && !precomputedLoading && (mode === "scan" ? phase === "idle" : true) && (
           <div className="text-center py-6 text-[#4a5568] space-y-2">
             <span className="material-symbols-outlined text-3xl">radar</span>
-            <p className="text-[11px]">
-              Click on the map to set scan center, then click "Scan Region" to
-              detect landforms.
-            </p>
-            <p className="text-[9px]">
-              Detects craters, terraced craters, volcanic constructs, graben,
-              channels, wrinkle ridges, and LDAs from MOLA DEM (200m/px).
-            </p>
+            {mode === "precomputed" ? (
+              <>
+                <p className="text-[11px]">
+                  No landforms found in the current viewport.
+                </p>
+                <p className="text-[9px]">
+                  Pan or zoom the map to explore detected landforms, or switch to Manual Scan for custom parameters.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-[11px]">
+                  Click on the map to set scan center, then click "Scan Region" to
+                  detect landforms.
+                </p>
+                <p className="text-[9px]">
+                  Detects craters, terraced craters, volcanic constructs, graben,
+                  channels, wrinkle ridges, and LDAs from MOLA DEM (200m/px).
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>

@@ -138,7 +138,7 @@ type MapViewProps = {
     opacity: number;
   }>;
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  analysisMode?: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
   // Active HiRISE DTM product for hover elevation probing
   activeDTMProductId?: string | null;
   linePoints?: Array<{ lat: number; lon: number }>;

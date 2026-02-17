@@ -498,7 +498,7 @@ export default function GuidedWorkflows({
       }
 
       case "run_subsurface_analysis":
-        onAction({ type: "set_analysis_mode", mode: "slope3d" });
+        onAction({ type: "set_analysis_mode", mode: "slope" });
         break;
 
       case "show_results":

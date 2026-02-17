@@ -322,8 +322,8 @@ interface LayerPanelProps {
   onCustomDatasetToggle?: (id: string, visible: boolean) => void;
 
   // Analysis mode
-  analysisMode?: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
-  onAnalysisModeChange?: (mode: "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null) => void;
+  analysisMode?: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  onAnalysisModeChange?: (mode: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null) => void;
 
   // Fly-To navigation
   onFlyToCoords?: (lat: number, lon: number) => void;
@@ -1066,27 +1066,6 @@ export default function LayerPanel({
               </div>
               {analysisMode === "slope" && (
                 <span className="text-[8px] px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 font-bold uppercase">
-                  ON
-                </span>
-              )}
-            </button>
-
-            {/* Slope 3D Analysis */}
-            <button
-              onClick={() => onAnalysisModeChange?.(analysisMode === "slope3d" ? null : "slope3d")}
-              className={`flex items-center gap-2 w-full p-2 rounded transition-colors text-left ${
-                analysisMode === "slope3d"
-                  ? "bg-purple-500/20 border border-purple-500/50 text-purple-400"
-                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:border-purple-500/30"
-              }`}
-            >
-              <span className="material-symbols-outlined text-sm">landscape</span>
-              <div className="flex-1">
-                <span className="text-[11px] font-medium">Slope 3D Analysis</span>
-                <p className="text-[9px] text-[#6b7c9c]">View local 3D terrain</p>
-              </div>
-              {analysisMode === "slope3d" && (
-                <span className="text-[8px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 font-bold uppercase">
                   ON
                 </span>
               )}

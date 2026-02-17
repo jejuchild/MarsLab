@@ -50,7 +50,6 @@ const AgenticPanel = memo(AgenticPanelRaw);
 const GuidedWorkflows = memo(GuidedWorkflowsRaw);
 
 // Lazy-loaded heavy components (Three.js / Recharts)
-const Slope3DViewer = lazy(() => import("../components/Slope3DViewer"));
 const HiRiseDTM3DViewer = lazy(() => import("../components/HiRiseDTM3DViewer"));
 const LineProfile = lazy(() => import("../components/LineProfile"));
 const ReportPanel = lazy(() => import("../components/ReportPanel"));
@@ -221,15 +220,12 @@ export default function MainPage() {
   // Terrain click point for slope analysis (when clicking empty terrain)
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
-  // Analysis mode: mutually exclusive slope / slope3d / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "slope3d" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / ai_analysis / agentic
+  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Guided Workflow: user-selected location
   const [guidedLocation, setGuidedLocation] = useState<{ lat: number; lon: number } | null>(null);
-
-  // Slope 3D analysis point (separate from regular slope terrainPoint)
-  const [slope3DPoint, setSlope3DPoint] = useState<TerrainPoint | null>(null);
 
   // HiRISE DTM 3D analysis point (requires product_id + lat/lon)
   const [hiRiseDTM3DPoint, setHiRiseDTM3DPoint] = useState<HiRiseDTMPoint | null>(null);
@@ -1023,7 +1019,6 @@ export default function MainPage() {
 
     // 4. Clear other analysis state
     setTerrainPoint(null);
-    setSlope3DPoint(null);
     setHiRiseDTM3DPoint(null);
   }, []);
 
@@ -1152,11 +1147,6 @@ export default function MainPage() {
       setSelected(null);
       setTerrainPoint({ lat, lon });
     }
-    if (analysisMode === "slope3d") {
-      // Slope 3D analysis mode: show 3D terrain viewer on terrain click
-      setSelected(null);
-      setSlope3DPoint({ lat, lon });
-    }
     if (analysisMode === "ai_analysis") {
       // AI Analysis mode: set pin and open panel
       setSelected(null);
@@ -1197,9 +1187,6 @@ export default function MainPage() {
     }
     if (mode !== "slope") {
       setTerrainPoint(null);
-    }
-    if (mode !== "slope3d") {
-      setSlope3DPoint(null);
     }
     if (mode !== "hirise_dtm_3d") {
       setHiRiseDTM3DPoint(null);
@@ -1630,13 +1617,6 @@ export default function MainPage() {
         point={terrainPoint}
         onClose={() => setTerrainPoint(null)}
       />
-    ) : slope3DPoint ? (
-      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
-        <Slope3DViewer
-          point={slope3DPoint}
-          onClose={() => setSlope3DPoint(null)}
-        />
-      </Suspense>
     ) : hiRiseDTM3DPoint ? (
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
         <HiRiseDTM3DViewer
@@ -1679,6 +1659,7 @@ export default function MainPage() {
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading landform detector...</div>}>
         <CraterDetectPanel
           scanCenter={craterDetectCenter}
+          viewBounds={viewBounds}
           onClose={() => { setAnalysisMode(null); setCraterDetectCenter(null); setCraterDetectFeatures([]); }}
           onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
           onSearchHiRISE={(lat, lon) => {

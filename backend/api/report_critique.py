@@ -106,8 +106,8 @@ async def _run_critique(
     """
     # Try Ollama/Llama first
     try:
-        from .agent_orchestrator import _check_ollama
-        ollama_ok = await _check_ollama()
+        from .agent_orchestrator import _check_groq
+        ollama_ok = await _check_groq()
         if ollama_ok:
             result = await _critique_with_ollama(report_md, evidence_pack)
             if result is not None:

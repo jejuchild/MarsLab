@@ -22,9 +22,9 @@ import aiohttp
 from .agent_orchestrator import (
     AgentStep,
     StepStatus,
-    _call_ollama,
-    _call_ollama_streaming,
-    _check_ollama,
+    _call_groq,
+    _call_groq_streaming,
+    _check_groq,
 )
 from .agent_tasks import (
     RegionBBox,
@@ -1646,11 +1646,11 @@ Rankings (best to worst):
     prompt += "\nWrite a 2-3 paragraph executive summary. Reference the composite scoring model, evidence strength classifications, and key differentiators between regions."
 
     if on_chunk:
-        response = await _call_ollama_streaming(
+        response = await _call_groq_streaming(
             prompt, EXECUTIVE_SYSTEM_PROMPT, temperature=0.4, on_chunk=on_chunk
         )
     else:
-        response = await _call_ollama(
+        response = await _call_groq(
             prompt, EXECUTIVE_SYSTEM_PROMPT, temperature=0.4
         )
 
@@ -1834,7 +1834,7 @@ async def run_report(
                 {"event": "reasoning_chunk", "data": {"text": text}}
             )
 
-        ollama_available = await _check_ollama()
+        ollama_available = await _check_groq()
 
         if ollama_available:
             yield {"event": "reasoning_start", "data": {"phase": "executive_summary"}}
