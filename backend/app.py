@@ -496,6 +496,9 @@ app.include_router(marvis_chat_router)  # /api/marvis/chat — MARVIS lightweigh
 from api.regolith_router import router as regolith_router
 app.include_router(regolith_router)  # /api/regolith/* — Regolith Thickness Estimator
 
+from api.epsilon_router import router as epsilon_router
+app.include_router(epsilon_router)  # /api/epsilon/* — εr Inversion (near-crater, hyperbola)
+
 from api.stratigraphy_router import router as stratigraphy_router
 app.include_router(stratigraphy_router)  # /api/stratigraphy/* — Crater Stratigraphy
 

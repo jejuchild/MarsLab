@@ -29,6 +29,9 @@ from analysis.shared.constants import SPEED_OF_LIGHT, SHARAD_SAMPLE_INTERVAL_US
 from analysis.shared.coordinates import lon_to_180, centric_to_graphic, cumulative_distance_m
 from analysis.shared.dem_sampling import sample_dem_along_track
 from analysis.shared.overlay import interpolate_colormap, CMAP_THICKNESS
+from analysis.shared.sharad_clutter import find_clutter_pair
+from analysis.shared.clutter_alignment import ClutterAligner
+from analysis.shared.clutter_mask import compute_clutter_mask
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +165,22 @@ class RegolithThicknessEstimator(AnalysisModule):
 
         logger.debug("RTE: loaded %d traces, %d bins", total_rows, power.shape[1])
 
+        # ── PHASE 6.1: Array truncation (geometry index mismatch fix) ──
+        # Handle case where arrays have different lengths (e.g., R_3908602)
+        n_traces_min = min(len(lats_centric), len(lons_180), len(surface), power.shape[0])
+        if n_traces_min < total_rows:
+            logger.warning(
+                "RTE: Array size mismatch detected; truncating to %d traces "
+                "(lat: %d, lon: %d, surface: %d, power: %d)",
+                n_traces_min, len(lats_centric), len(lons_180), len(surface), power.shape[0]
+            )
+            lats_centric = lats_centric[:n_traces_min]
+            lons_180 = lons_180[:n_traces_min]
+            lats_graphic = centric_to_graphic(lats_centric)
+            surface = surface[:n_traces_min]
+            power = power[:n_traces_min]
+            total_rows = n_traces_min
+
         # ── Step 2: Sample DEM along track ──────────────────────────
         dem_source, surface_elevs = sample_dem_along_track(
             lats_centric, lons_180, dtm_product_id,
@@ -170,6 +189,38 @@ class RegolithThicknessEstimator(AnalysisModule):
         # ── Step 3: Along-track distance ────────────────────────────
         distances_m = cumulative_distance_m(lats_centric, lons_180)
         distances_km = distances_m / 1000.0
+
+        # ── PHASE 2: Clutter loading and alignment ──────────────────
+        clutter_available = False
+        clutter_power_aligned = None
+        clutter_flagged_arr = np.zeros(total_rows, dtype=bool)
+        clutter_snr_arr = np.full(total_rows, np.nan, dtype=np.float32)
+
+        if clutter_mode != "off":
+            clutter_pair = find_clutter_pair(product_id)
+            if clutter_pair:
+                img_path, xml_path = clutter_pair
+                try:
+                    # Load cluttergram binary data
+                    clutter_data = np.fromfile(img_path, dtype=np.float32)
+                    # Reshape assuming (n_ranges, n_traces) — may need calibration
+                    # Typical SHARAD: 1024 or 2048 range bins
+                    n_clutter_traces_guess = clutter_data.size // 667  # Assume 667 range bins like RDR
+                    if n_clutter_traces_guess > 0:
+                        clutter_power = clutter_data.reshape(667, -1).astype(np.float32)
+                        logger.info(f"Loaded cluttergram: shape={clutter_power.shape}")
+
+                        # Align clutter to RDR using surface as anchor
+                        aligner = ClutterAligner(clutter_power, surface, total_rows)
+                        clutter_power_aligned = aligner.align_full()
+                        clutter_available = True
+                        logger.info("Clutter alignment complete")
+                    else:
+                        logger.warning("Cluttergram size mismatch; skipping clutter")
+                except Exception as e:
+                    logger.warning(f"Failed to load cluttergram: {e}")
+            else:
+                logger.debug(f"No cluttergram found for {product_id}")
 
         # ── Step 4: Vectorized near-surface reflector detection ─────
         n_traces = total_rows
@@ -287,6 +338,21 @@ class RegolithThicknessEstimator(AnalysisModule):
             c_dem = dem_bonus * 0.10
             confidence[i] = min(c_snr + c_coh + c_con + c_dem, 1.0)
 
+        # ── PHASE 2: Clutter masking and confidence penalty ──────────
+        if clutter_available and clutter_power_aligned is not None:
+            clutter_flagged_arr, clutter_snr_arr = compute_clutter_mask(
+                clutter_power_aligned,
+                delta_bins_arr,
+                search_lo,
+                snr_threshold=clutter_snr_threshold,
+                bin_tolerance=clutter_bin_tolerance,
+            )
+            # Apply confidence penalty to clutter-flagged traces
+            for i in range(n_traces):
+                if clutter_flagged_arr[i] and detected[i]:
+                    confidence[i] *= 0.35  # Multiplicative penalty
+                    logger.debug(f"Trace {i}: clutter penalty applied ({confidence[i]:.3f})")
+
         # ── Step 8: Build profile ───────────────────────────────────
         profile: List[RegolithSample] = []
         for i in range(n_traces):
@@ -308,10 +374,10 @@ class RegolithThicknessEstimator(AnalysisModule):
                 confidence=round(float(confidence[i]), 3),
                 # PHASE 1: surface ringing rejection
                 ringing_rejected=bool(ringing_rejected[i]),
-                # PHASE 2: clutter fields (initialized, will be updated in phase 2)
-                clutter_available=False,
-                clutter_flagged=False,
-                clutter_snr=None,
+                # PHASE 2: clutter fields
+                clutter_available=clutter_available,
+                clutter_flagged=bool(clutter_flagged_arr[i]) if clutter_available else False,
+                clutter_snr=round(float(clutter_snr_arr[i]), 2) if clutter_available and not np.isnan(clutter_snr_arr[i]) else None,
                 # PHASE 1: mode parameter
                 mode=mode,
             )
@@ -329,6 +395,15 @@ class RegolithThicknessEstimator(AnalysisModule):
 
         # PHASE 1: Calculate ring rejection rate
         ring_reject_rate = float(ringing_rejected.sum()) / max(len(valid_indices), 1) if len(valid_indices) > 0 else 0.0
+
+        # PHASE 2: Calculate clutter statistics
+        clutter_flag_rate = 0.0
+        clutter_trace_mismatch = 0
+        if clutter_available:
+            clutter_flag_rate = float(clutter_flagged_arr.sum()) / max(n_valid, 1) if n_valid > 0 else 0.0
+
+        # PHASE 6.1: Calculate truncated trace count
+        truncated_traces_count = max(0, len(geom["lat"]) - total_rows) if "lat" in geom else 0
 
         summary = RegolithSummary(
             product_id=product_id,
@@ -348,6 +423,12 @@ class RegolithThicknessEstimator(AnalysisModule):
             # PHASE 1: shallow mode fields
             shallow_mode_enabled=(mode == "shallow"),
             ring_reject_rate=round(ring_reject_rate, 4),
+            # PHASE 2: clutter fields
+            clutter_available=clutter_available,
+            clutter_flag_rate=round(clutter_flag_rate, 4),
+            clutter_trace_mismatch=clutter_trace_mismatch,
+            # PHASE 6.1: truncated traces count
+            truncated_traces_count=truncated_traces_count,
             # PHASE 3: epsilon_uncertainty
             epsilon_uncertainty=epsilon_uncertainty,
         )
