@@ -149,6 +149,19 @@ def run_spectral_analysis(
         wavelengths, class_counts, n_valid, ice_frac
     )
 
+    # ── Physics score and interpretation label (Phase 0.3) ──
+    mean_bd1500 = float(np.mean(ice_bd1500s)) if ice_bd1500s else 0.0
+    mean_bd1900 = float(np.mean(ice_bd1900s)) if ice_bd1900s else 0.0
+    mean_bd2200 = float(np.mean(ice_bd2200s)) if ice_bd2200s else 0.0
+
+    physics_score, interpretation_label = _compute_physics_score(
+        bd1500=mean_bd1500,
+        bd1900=mean_bd1900,
+        bd2200=mean_bd2200,
+        water_ice_fraction=ice_frac,
+        sam_confidence=ice_mean_conf,
+    )
+
     return CrismSpectralResult(
         obs_id=obs_id,
         rows=rows,
@@ -162,15 +175,64 @@ def run_spectral_analysis(
         water_ice_fraction=round(ice_frac, 4),
         water_ice_pixels=ice_pixels,
         water_ice_mean_confidence=round(ice_mean_conf, 4),
-        mean_BD1500=round(float(np.mean(ice_bd1500s)), 4) if ice_bd1500s else None,
-        mean_BD1900=round(float(np.mean(ice_bd1900s)), 4) if ice_bd1900s else None,
+        mean_BD1500=round(mean_bd1500, 4) if ice_bd1500s else None,
+        mean_BD1900=round(mean_bd1900, 4) if ice_bd1900s else None,
         mean_BD2100=round(float(np.mean(ice_bd2100s)), 4) if ice_bd2100s else None,
-        mean_BD2200=round(float(np.mean(ice_bd2200s)), 4) if ice_bd2200s else None,
+        mean_BD2200=round(mean_bd2200, 4) if ice_bd2200s else None,
         mean_sam_confidence=round(float(np.mean(all_confidences)), 4) if all_confidences else 0.0,
         atmospheric_uncertainty_notes=atm_notes,
+        physics_score=round(physics_score, 4),
+        interpretation_label=interpretation_label,
         success=True,
         elapsed_seconds=round(elapsed, 2),
     )
+
+
+def _compute_physics_score(
+    bd1500: float,
+    bd1900: float,
+    bd2200: float,
+    water_ice_fraction: float,
+    sam_confidence: float,
+) -> tuple:
+    """
+    Compute a physics-based score (0-1) and interpretation label for CRISM observation.
+
+    Weights:
+        0.30 - BD1500 (1.5 µm H2O ice absorption — strongest diagnostic)
+        0.30 - BD1900 (1.9 µm H2O absorption)
+        0.20 - water_ice_fraction (SAM classification ice fraction)
+        0.20 - SAM confidence (classification quality)
+
+    Returns:
+        (physics_score, interpretation_label)
+    """
+    # Normalize each component to 0-1
+    bd1500_norm = min(1.0, bd1500 / 0.10) if bd1500 > 0 else 0.0
+    bd1900_norm = min(1.0, bd1900 / 0.08) if bd1900 > 0 else 0.0
+    ice_frac_norm = min(1.0, water_ice_fraction / 0.05) if water_ice_fraction > 0 else 0.0
+    conf_norm = sam_confidence  # already 0-1
+
+    score = (
+        0.30 * bd1500_norm
+        + 0.30 * bd1900_norm
+        + 0.20 * ice_frac_norm
+        + 0.20 * conf_norm
+    )
+
+    # Interpretation label
+    if water_ice_fraction > 0.50:
+        label = "Ambiguous/atmospheric contamination risk"
+    elif bd1500 > 0.05 and water_ice_fraction > 0.02:
+        label = "Likely H2O ice"
+    elif bd1900 > 0.05 and bd2200 > 0.03:
+        label = "Likely hydrated minerals"
+    elif bd1500 > 0.02 or bd1900 > 0.03:
+        label = "Weak hydration signal"
+    else:
+        label = "No significant ice/hydration signature"
+
+    return score, label
 
 
 def _assess_atmospheric_uncertainty(

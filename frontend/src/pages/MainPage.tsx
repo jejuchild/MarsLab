@@ -59,6 +59,7 @@ const RegionStatsPanel = lazy(() => import("../components/RegionStatsPanel"));
 const CraterDetectPanel = lazy(() => import("../components/CraterDetectPanel"));
 const TemporalComparison = lazy(() => import("../components/TemporalComparison"));
 const RegolithPanel = lazy(() => import("../components/RegolithPanel"));
+const StratigraphyPanel = lazy(() => import("../components/StratigraphyPanel"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -222,7 +223,7 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | null;
+  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Guided Workflow: user-selected location
@@ -1267,7 +1268,7 @@ export default function MainPage() {
       setCraterDetectCenter(null);
       setCraterDetectFeatures([]);
     }
-    if (mode !== "agentic") {
+    if (mode !== "agentic" && mode !== "stratigraphy") {
       setEpsilonTarget(null);
     }
     if (mode !== "regolith") {
@@ -1275,10 +1276,10 @@ export default function MainPage() {
     }
   }, []);
 
-  // Handle "Run ε Inversion" from CraterDetectPanel → opens AgenticPanel with pre-filled objective
+  // Handle "Run ε Inversion" from CraterDetectPanel → opens StratigraphyPanel
   const handleRunEpsilon = useCallback((feature: DetectedFeature) => {
     setEpsilonTarget(feature);
-    setAnalysisMode("agentic");
+    setAnalysisMode("stratigraphy");
   }, []);
 
   // Guided Workflow action handler
@@ -1638,6 +1639,13 @@ export default function MainPage() {
         <RegolithPanel
           productId={regolithProductId}
           onClose={() => { setRegolithProductId(null); setAnalysisMode(null); }}
+        />
+      </Suspense>
+    ) : epsilonTarget && analysisMode === "stratigraphy" ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading stratigraphy analysis...</div>}>
+        <StratigraphyPanel
+          craterFeature={epsilonTarget}
+          onClose={() => { setEpsilonTarget(null); setAnalysisMode(null); }}
         />
       </Suspense>
     ) : sharadHiresProductId ? (

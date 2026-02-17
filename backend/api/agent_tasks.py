@@ -560,10 +560,11 @@ def slope_analysis(
 # Task: Subsurface Analysis (SHARAD — real radargram analysis)
 # =============================================================================
 
-# Physics constants for SHARAD depth conversion
+# Physics constants for SHARAD radar observables
 _SPEED_OF_LIGHT = 299_792_458.0          # m/s
 _SHARAD_DT_US   = 3.0 / 80.0             # 0.0375 µs per range-bin (1/26.67 MHz ADC)
-_ICE_EPSILON    = 3.15                    # pure water-ice εr
+# NOTE: _ICE_EPSILON removed — depth in meters is NEVER computed from assumed εr.
+#       Only delta_bins and twt_us are reported. Depth requires physics-based εr.
 
 def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
     """
@@ -573,7 +574,7 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
       1. Load RDR binary (power array + geometry)
       2. Auto-pick surface return
       3. Scan for subsurface reflectors below surface
-      4. Estimate ice-table depth using εr = 3.15 (water-ice)
+      4. Report delta_bins and TWT — depth_m is NOT computed without εr
 
     Falls back to coverage count for products not downloaded.
     """
@@ -598,6 +599,10 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
     # ── Real analysis for downloaded hi-res products ──
     analyzed_tracks: List[Dict[str, Any]] = []
     subsurface_detections = 0
+    # Cluttergram validation stats (Phase 0.4)
+    clutter_checks_total = 0
+    clutter_rejected_count = 0
+    clutter_unavailable_count = 0
 
     try:
         from .sharad_highres_router import (
@@ -606,6 +611,16 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
         )
     except ImportError:
         SHARAD_HR_DIR = None
+
+    # Import cluttergram assessment
+    _assess_clutter = None
+    try:
+        from analysis.sharad_inversion.clutter_filter import assess_clutter as _assess_clutter
+    except ImportError:
+        try:
+            from backend.analysis.sharad_inversion.clutter_filter import assess_clutter as _assess_clutter
+        except ImportError:
+            logger.warning("Cluttergram filter not available — picks will not be clutter-validated")
 
     for p in sharad_highres:
         pid = p["product_id"]
@@ -670,46 +685,33 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
                 if snr >= 4.0:  # subsurface reflector threshold (strict to reduce false positives)
                     sub_detect_count += 1
                     delta_bins = (search_lo + peak_idx) - s_bin
+                    twt_us = float(delta_bins * _SHARAD_DT_US)
 
-                    # Three dielectric scenarios for depth estimation
-                    DIELECTRIC_SCENARIOS = [
-                        {"epsilon_r": 2.8, "label": "porous_ice", "description": "Porous ice/regolith mix"},
-                        {"epsilon_r": 3.15, "label": "pure_ice", "description": "Pure water ice"},
-                        {"epsilon_r": 4.0, "label": "basaltic", "description": "Basaltic contrast interface"},
-                    ]
-                    depths_multi = {}
-                    for scenario in DIELECTRIC_SCENARIOS:
-                        eps_r = scenario["epsilon_r"]
-                        d_m = (_SPEED_OF_LIGHT * delta_bins * _SHARAD_DT_US * 1e-6) / (2.0 * np.sqrt(eps_r))
-                        depths_multi[scenario["label"]] = round(float(d_m), 1)
-
-                    # Keep pure_ice as the backward-compat default depth
-                    depth_m = depths_multi["pure_ice"]
-                    depth_estimates.append(float(depth_m))
+                    # Record raw observables only — NO depth from assumed εr
+                    depth_estimates.append(float(delta_bins))  # used for coherence filter on bins
                     subsurface_picks.append({
                         "trace_idx": int(idx),
                         "bin_idx": search_lo + peak_idx,
                         "delta_bins": delta_bins,
+                        "twt_us": round(twt_us, 4),
                         "snr": round(float(snr), 2),
-                        "depths": depths_multi,
-                        # backward compat
-                        "depth_m": round(float(depth_m), 1),
-                        "epsilon_r_source": "assumed",
+                        "depth_m": None,  # NOT computed without physics-based εr
+                        "epsilon_r_source": "not_estimated",
                     })
 
-            # Coherence filter: real subsurface interfaces have consistent depth
-            # Discard if depth varies too wildly (noise, not a real horizontal interface)
+            # Coherence filter: real subsurface interfaces have consistent delta_bins
+            # Discard if bins vary too wildly (noise, not a real horizontal interface)
             if len(depth_estimates) >= 3:
-                depth_arr = np.array(depth_estimates)
-                depth_std = float(np.std(depth_arr))
-                depth_median = float(np.median(depth_arr))
-                # Keep only picks within 2 std of median depth (remove outliers)
-                if depth_std > 0 and depth_median > 0:
-                    mask = np.abs(depth_arr - depth_median) <= 2.0 * depth_std
-                    depth_estimates = depth_arr[mask].tolist()
+                bins_arr = np.array(depth_estimates)  # these are delta_bins values
+                bins_std = float(np.std(bins_arr))
+                bins_median = float(np.median(bins_arr))
+                # Keep only picks within 2 std of median (remove outliers)
+                if bins_std > 0 and bins_median > 0:
+                    mask = np.abs(bins_arr - bins_median) <= 2.0 * bins_std
+                    depth_estimates = bins_arr[mask].tolist()
                     subsurface_picks = [p for p, m in zip(subsurface_picks, mask) if m]
                     sub_detect_count = len(subsurface_picks)
-                # If remaining depths still too scattered (CV > 30%), likely noise
+                # If remaining bins still too scattered (CV > 30%), likely noise
                 if len(depth_estimates) >= 3:
                     final_std = float(np.std(depth_estimates))
                     final_mean = float(np.mean(depth_estimates))
@@ -717,6 +719,56 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
                         depth_estimates = []
                         subsurface_picks = []
                         sub_detect_count = 0
+
+            # ── Cluttergram gate (Phase 0.4) ──
+            # Validate each remaining pick against cluttergram simulation
+            if _assess_clutter is not None and subsurface_picks:
+                validated_picks = []
+                validated_bins = []
+                track_clutter_rejected = 0
+                for pick in subsurface_picks:
+                    clutter_checks_total += 1
+                    try:
+                        ca = _assess_clutter(
+                            pid,
+                            pick["trace_idx"],
+                            pick["bin_idx"],
+                            int(surface[pick["trace_idx"]]),
+                        )
+                        pick["clutter_assessment"] = {
+                            "available": ca.cluttergram_available,
+                            "score": ca.clutter_likelihood_score,
+                            "rejected": ca.rejected,
+                            "notes": ca.notes,
+                        }
+                        if not ca.cluttergram_available:
+                            clutter_unavailable_count += 1
+                            validated_picks.append(pick)
+                            validated_bins.append(pick["delta_bins"])
+                        elif ca.rejected:
+                            clutter_rejected_count += 1
+                            track_clutter_rejected += 1
+                            logger.debug(
+                                f"  Clutter-rejected pick trace={pick['trace_idx']} "
+                                f"bin={pick['bin_idx']} score={ca.clutter_likelihood_score:.2f}"
+                            )
+                        else:
+                            validated_picks.append(pick)
+                            validated_bins.append(pick["delta_bins"])
+                    except Exception as ce:
+                        logger.warning(f"Clutter check failed for pick: {ce}")
+                        pick["clutter_assessment"] = {
+                            "available": False, "score": 0.0,
+                            "rejected": False, "notes": f"Error: {ce}",
+                        }
+                        clutter_unavailable_count += 1
+                        validated_picks.append(pick)
+                        validated_bins.append(pick["delta_bins"])
+
+                subsurface_picks = validated_picks
+                depth_estimates = validated_bins
+                sub_detect_count = len(subsurface_picks)
+                track_info["clutter_rejected_count"] = track_clutter_rejected
 
             detection_pct = round(sub_detect_count / len(sampled) * 100, 1) if sampled.size > 0 else 0
 
@@ -728,13 +780,18 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
             track_info["lat_range"] = [round(float(geom["lat"].min()), 3), round(float(geom["lat"].max()), 3)]
             track_info["lon_range"] = [round(float(lons180.min()), 3), round(float(lons180.max()), 3)]
 
-            if depth_estimates:
-                track_info["estimated_depth_m"] = {
-                    "min": round(min(depth_estimates), 1),
-                    "max": round(max(depth_estimates), 1),
-                    "median": round(float(np.median(depth_estimates)), 1),
-                    "epsilon_r": _ICE_EPSILON,
-                    "epsilon_r_source": "assumed",
+            if depth_estimates and subsurface_picks:
+                bins_vals = [p["delta_bins"] for p in subsurface_picks]
+                twt_vals = [p["twt_us"] for p in subsurface_picks]
+                track_info["reflector_stats"] = {
+                    "min_delta_bins": int(min(bins_vals)),
+                    "max_delta_bins": int(max(bins_vals)),
+                    "median_delta_bins": int(round(float(np.median(bins_vals)))),
+                    "min_twt_us": round(min(twt_vals), 4),
+                    "max_twt_us": round(max(twt_vals), 4),
+                    "median_twt_us": round(float(np.median(twt_vals)), 4),
+                    "depth_m": None,
+                    "depth_note": "Depth in meters requires physics-based εr estimation.",
                 }
                 subsurface_detections += 1
             if subsurface_picks:
@@ -780,82 +837,62 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
             total_track_km += track_km
     reflector_density = round(n_with_subsurface / total_track_km, 3) if total_track_km > 0 else 0
 
-    # ── Multi-scenario depth summary ──
-    DIELECTRIC_SCENARIOS_SUMMARY = [
-        {"epsilon_r": 2.8, "label": "porous_ice", "description": "Porous ice/regolith mix"},
-        {"epsilon_r": 3.15, "label": "pure_ice", "description": "Pure water ice"},
-        {"epsilon_r": 4.0, "label": "basaltic", "description": "Basaltic contrast interface"},
-    ]
-
-    # Collect per-scenario depths from all picks across all tracks
-    all_depths_by_scenario: Dict[str, List[float]] = {"porous_ice": [], "pure_ice": [], "basaltic": []}
+    # ── Reflector summary (TWT / delta_bins only — NO assumed εr depth) ──
+    all_delta_bins = []
+    all_twt_us = []
     for t in analyzed_tracks:
         for pick in t.get("subsurface_picks", []):
-            depths_dict = pick.get("depths", {})
-            for label in all_depths_by_scenario:
-                val = depths_dict.get(label)
-                if val is not None:
-                    all_depths_by_scenario[label].append(float(val))
+            all_delta_bins.append(pick["delta_bins"])
+            all_twt_us.append(pick["twt_us"])
 
-    # Also collect backward-compat median depths per track
-    all_depths = []
-    for t in analyzed_tracks:
-        if "estimated_depth_m" in t:
-            all_depths.append(t["estimated_depth_m"]["median"])
-
-    depth_summary = None
-    if all_depths_by_scenario["pure_ice"]:
-        depth_ranges = {}
-        for scenario in DIELECTRIC_SCENARIOS_SUMMARY:
-            label = scenario["label"]
-            vals = all_depths_by_scenario.get(label, [])
-            if vals:
-                depth_ranges[label] = {
-                    "min": round(min(vals), 1),
-                    "max": round(max(vals), 1),
-                    "median": round(float(np.median(vals)), 1),
-                    "epsilon_r": scenario["epsilon_r"],
-                }
-        pure_vals = all_depths_by_scenario["pure_ice"]
-        depth_summary = {
-            "dielectric_scenarios": DIELECTRIC_SCENARIOS_SUMMARY,
-            "depth_ranges": depth_ranges,
-            "n_tracks": len(all_depths) if all_depths else len(pure_vals),
-            # Backward-compat fields (using pure_ice scenario)
-            "min_depth_m": round(min(pure_vals), 1),
-            "max_depth_m": round(max(pure_vals), 1),
-            "median_depth_m": round(float(np.median(pure_vals)), 1),
-            "epsilon_r_assumed": _ICE_EPSILON,
-            "epsilon_r_source": "assumed",
-            "physics_warning": (
-                "Depth computed from assumed εr=3.15 (water-ice). "
-                "This is NOT an independent physical measurement. "
-                "Physics-based dielectric inversion required for validated depth."
-            ),
-        }
-    elif all_depths:
-        # Fallback: no multi-scenario picks but old-style depths exist
-        depth_summary = {
-            "min_depth_m": round(min(all_depths), 1),
-            "max_depth_m": round(max(all_depths), 1),
-            "median_depth_m": round(float(np.median(all_depths)), 1),
-            "n_tracks": len(all_depths),
-            "epsilon_r_assumed": _ICE_EPSILON,
-            "epsilon_r_source": "assumed",
-            "physics_warning": (
-                "Depth computed from assumed εr=3.15 (water-ice). "
-                "This is NOT an independent physical measurement. "
-                "Physics-based dielectric inversion required for validated depth."
+    reflector_summary = None
+    if all_delta_bins:
+        reflector_summary = {
+            "n_tracks_with_reflectors": n_with_subsurface,
+            "total_picks": len(all_delta_bins),
+            "median_delta_bins": int(round(float(np.median(all_delta_bins)))),
+            "min_delta_bins": int(min(all_delta_bins)),
+            "max_delta_bins": int(max(all_delta_bins)),
+            "median_twt_us": round(float(np.median(all_twt_us)), 4),
+            "min_twt_us": round(float(min(all_twt_us)), 4),
+            "max_twt_us": round(float(max(all_twt_us)), 4),
+            "depth_m": None,
+            "epsilon_r_source": "not_estimated",
+            "depth_note": (
+                "Depth in meters is NOT computed without εr estimation. "
+                "Report uses two-way travel time (TWT) and delta_bins as "
+                "the primary radar observables. Physics-based εr inversion "
+                "(Phase 2/3) is required to convert to depth."
             ),
         }
 
-    # ── Clutter rejection methodology note ──
+    # Backward-compat: depth_summary points to reflector_summary
+    depth_summary = reflector_summary
+
+    # ── Clutter validation summary ──
+    clutter_validation = {
+        "checks_total": clutter_checks_total,
+        "rejected_count": clutter_rejected_count,
+        "unavailable_count": clutter_unavailable_count,
+        "validated_count": clutter_checks_total - clutter_rejected_count - clutter_unavailable_count,
+        "methodology": (
+            "Each subsurface reflector pick is cross-checked against the aligned "
+            "cluttergram (surface return simulation). Picks with clutter_likelihood_score > 0.7 "
+            "are rejected as likely surface clutter. Picks without available cluttergrams "
+            "are retained but flagged."
+        ),
+    }
+
+    # ── Clutter rejection methodology note (legacy + enhanced) ──
     clutter_rejection = (
         "Subsurface reflectors are identified by SNR >= 4.0 threshold relative to "
         "local noise floor (median power in search window). Coherence filtering "
         "removes detections with coefficient of variation > 30% across sampled traces "
         "to reject off-nadir surface clutter. Remaining outliers beyond 2 sigma of median "
-        "depth are removed."
+        "delta_bins are removed. "
+        f"Cluttergram cross-check: {clutter_checks_total} picks checked, "
+        f"{clutter_rejected_count} rejected as likely clutter, "
+        f"{clutter_unavailable_count} without cluttergram data."
     )
 
     summary_parts = [f"SHARAD: {coverage} ({total} tracks)"]
@@ -863,10 +900,12 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
         summary_parts.append(f"{n_analyzed} analyzed")
     if n_with_subsurface > 0:
         summary_parts.append(f"{n_with_subsurface} with subsurface reflectors")
-    if depth_summary:
+    if clutter_rejected_count > 0:
+        summary_parts.append(f"{clutter_rejected_count} clutter-rejected")
+    if reflector_summary:
         summary_parts.append(
-            f"depth {depth_summary['min_depth_m']}-{depth_summary['max_depth_m']}m "
-            f"(εr={_ICE_EPSILON})"
+            f"TWT {reflector_summary['min_twt_us']}-{reflector_summary['max_twt_us']} µs "
+            f"(depth requires εr estimation)"
         )
 
     return TaskResult(
@@ -879,14 +918,176 @@ def subsurface_scan(products: List[Dict[str, Any]]) -> TaskResult:
             "coverage": coverage,
             "analyzed_count": n_analyzed,
             "subsurface_detections": n_with_subsurface,
-            "depth_summary": depth_summary,
+            "reflector_summary": reflector_summary,
+            "depth_summary": depth_summary,  # backward-compat alias
             "tracks": analyzed_tracks,
             "snr_distribution": snr_distribution,
             "clutter_rejection": clutter_rejection,
+            "clutter_validation": clutter_validation,
             "reflector_density_per_km": reflector_density,
         },
         summary=", ".join(summary_parts),
     )
+
+
+# =============================================================================
+# Cross-Instrument Targeting (Phase 0.2)
+# =============================================================================
+
+def select_targeted_products(
+    crism_results: Optional[Dict[str, Any]],
+    all_products: List[Dict[str, Any]],
+    buffer_km: float = 50.0,
+    max_targets: int = 10,
+    fallback_buffer_km: float = 100.0,
+) -> Dict[str, Any]:
+    """
+    Select SHARAD/HiRISE/CTX products by cross-instrument targeting against CRISM ice candidates.
+
+    Strategy:
+    1. Rank CRISM observations by physics_score (or ice_score as fallback)
+    2. Take top-N candidates
+    3. Find SHARAD_HIGHRES tracks intersecting within buffer_km of each candidate
+    4. Also find HiRISE, CTX, HiRISE_DTM within buffer
+    5. If not enough CRISM targets, fall back to region-wide sampling
+
+    Returns:
+        Dict with 'targeted_products', 'targeting_rationale', 'targets_used'
+    """
+    import math
+
+    def _haversine_km(lat1, lon1, lat2, lon2):
+        R = 3389.5  # Mars radius km
+        dlat = math.radians(lat2 - lat1)
+        dlon = math.radians(lon2 - lon1)
+        a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+        return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    # Gather CRISM ice candidates
+    crism_candidates = []
+    if crism_results:
+        # From CRISM spectral physics (Phase 0.3)
+        spectral_obs = crism_results.get("observations", [])
+        for obs in spectral_obs:
+            if obs.get("lat") is not None and obs.get("lon") is not None:
+                crism_candidates.append({
+                    "obs_id": obs.get("obs_id"),
+                    "lat": obs["lat"],
+                    "lon": obs["lon"],
+                    "score": obs.get("physics_score", 0) or obs.get("ice_score", 0) or 0,
+                    "label": obs.get("interpretation_label", "Unknown"),
+                    "source": "crism_spectral",
+                })
+
+        # From CRISM mineral analysis (ice_score)
+        top_ice = crism_results.get("top_ice_candidates", [])
+        seen_ids = {c["obs_id"] for c in crism_candidates}
+        for c in top_ice:
+            if c.get("obs_id") not in seen_ids and c.get("lat") is not None:
+                crism_candidates.append({
+                    "obs_id": c.get("obs_id"),
+                    "lat": c["lat"],
+                    "lon": c["lon"],
+                    "score": c.get("ice_score", 0) or c.get("ice_percent", 0) / 100.0,
+                    "label": "CRISM ice candidate",
+                    "source": "mineral_analysis",
+                })
+
+    # Sort by score descending, take top N
+    crism_candidates.sort(key=lambda c: c["score"], reverse=True)
+    targets = crism_candidates[:max_targets]
+
+    if not targets:
+        return {
+            "targeted_products": [],
+            "targeting_rationale": "No CRISM ice candidates available — fallback to spatial sampling",
+            "targets_used": [],
+            "method": "spatial_fallback",
+        }
+
+    # Find intersecting products for each target
+    sharad_products = [p for p in all_products if p.get("instrument") in ("SHARAD", "SHARAD_HIGHRES")]
+    other_products = [p for p in all_products if p.get("instrument") in ("HIRISE", "HIRISE_DTM", "CTX")]
+
+    targeted = []
+    targeted_ids = set()
+    rationale_log = []
+
+    for target in targets:
+        target_lat = target["lat"]
+        target_lon = target["lon"]
+
+        # Find SHARAD products within buffer
+        for sp in sharad_products:
+            if sp["product_id"] in targeted_ids:
+                continue
+            sp_lat = sp.get("lat")
+            sp_lon = sp.get("lon")
+            if sp_lat is None or sp_lon is None:
+                continue
+            dist = _haversine_km(target_lat, target_lon, sp_lat, sp_lon)
+            if dist <= buffer_km:
+                sp_copy = dict(sp)
+                sp_copy["targeting_reason"] = (
+                    f"Intersects CRISM candidate {target['obs_id']} "
+                    f"(score={target['score']:.3f}, label={target['label']}) "
+                    f"at {dist:.0f} km"
+                )
+                sp_copy["targeting_distance_km"] = round(dist, 1)
+                sp_copy["targeting_crism_obs_id"] = target["obs_id"]
+                targeted.append(sp_copy)
+                targeted_ids.add(sp["product_id"])
+            elif dist <= fallback_buffer_km and len(targeted) < 5:
+                # Fallback to wider buffer if not enough products found
+                sp_copy = dict(sp)
+                sp_copy["targeting_reason"] = (
+                    f"Within fallback buffer of CRISM candidate {target['obs_id']} "
+                    f"(score={target['score']:.3f}) at {dist:.0f} km"
+                )
+                sp_copy["targeting_distance_km"] = round(dist, 1)
+                sp_copy["targeting_crism_obs_id"] = target["obs_id"]
+                targeted.append(sp_copy)
+                targeted_ids.add(sp["product_id"])
+
+        # Find other instruments within buffer (for context)
+        for op in other_products:
+            if op["product_id"] in targeted_ids:
+                continue
+            op_lat = op.get("lat")
+            op_lon = op.get("lon")
+            if op_lat is None or op_lon is None:
+                continue
+            dist = _haversine_km(target_lat, target_lon, op_lat, op_lon)
+            if dist <= buffer_km:
+                op_copy = dict(op)
+                op_copy["targeting_reason"] = (
+                    f"Near CRISM candidate {target['obs_id']} at {dist:.0f} km"
+                )
+                op_copy["targeting_distance_km"] = round(dist, 1)
+                targeted.append(op_copy)
+                targeted_ids.add(op["product_id"])
+
+        rationale_log.append(
+            f"Target: {target['obs_id']} ({target['source']}, score={target['score']:.3f}, "
+            f"label={target['label']}), lat={target_lat:.3f}, lon={target_lon:.3f}"
+        )
+
+    method = "cross_instrument_targeting"
+    if not targeted:
+        method = "no_intersections_found"
+
+    return {
+        "targeted_products": targeted,
+        "targeting_rationale": (
+            f"Cross-instrument targeting: {len(targets)} CRISM ice candidates used to select "
+            f"{len(targeted)} intersecting products (buffer={buffer_km} km). "
+            + (" ".join(rationale_log[:3]))
+        ),
+        "targets_used": targets,
+        "method": method,
+        "n_sharad_targeted": sum(1 for p in targeted if p.get("instrument") in ("SHARAD", "SHARAD_HIGHRES")),
+        "n_other_targeted": sum(1 for p in targeted if p.get("instrument") not in ("SHARAD", "SHARAD_HIGHRES")),
+    }
 
 
 # =============================================================================
@@ -1330,7 +1531,7 @@ def dielectric_analysis(
     tracks = subsurface_result.data.get("tracks", [])
     tracks_with_reflectors = [
         t for t in tracks
-        if t.get("subsurface_detected") and t.get("estimated_depth_m")
+        if t.get("subsurface_detected") and t.get("reflector_stats")
     ]
 
     if not tracks_with_reflectors:
@@ -1367,10 +1568,10 @@ def dielectric_analysis(
     for track in tracks_with_reflectors:
         track_lat = track.get("lat")
         track_lon = track.get("lon")
-        depth_info = track.get("estimated_depth_m", {})
-        median_depth = depth_info.get("median")
+        ref_stats = track.get("reflector_stats", {})
+        median_twt_us = ref_stats.get("median_twt_us")
 
-        if track_lat is None or track_lon is None or median_depth is None:
+        if track_lat is None or track_lon is None or median_twt_us is None:
             continue
 
         # Find nearest DTM product
@@ -1406,10 +1607,8 @@ def dielectric_analysis(
             if terrain_relief < 50:  # Need significant relief for meaningful εr
                 continue
 
-            # Back-compute raw SHARAD two-way travel time from assumed-εr depth
-            # depth_m = v_ice * dt_s / 2  where v_ice = c / sqrt(εr_assumed)
-            # => dt_s = 2 * depth_m * sqrt(εr_assumed) / c
-            dt_s = 2.0 * median_depth * math.sqrt(_ICE_EPSILON) / _SPEED_OF_LIGHT
+            # Use raw SHARAD TWT directly (no assumed εr back-computation)
+            dt_s = median_twt_us * 1e-6  # convert µs → s
 
             # Compute εr = (c * dt_s / (2 * geometric_depth))²
             epsilon_r = (_SPEED_OF_LIGHT * dt_s / (2.0 * terrain_relief)) ** 2
@@ -1523,7 +1722,7 @@ def terrace_dielectric_analysis(
     tracks = subsurface_result.data.get("tracks", [])
     tracks_with_reflectors = [
         t for t in tracks
-        if t.get("subsurface_detected") and t.get("estimated_depth_m")
+        if t.get("subsurface_detected") and (t.get("reflector_stats") or t.get("subsurface_picks"))
     ]
 
     if not tracks_with_reflectors:
@@ -2150,14 +2349,7 @@ def targeted_subsurface_at_ice(
             if reflector_detected:
                 reflectors_at_ice += 1
 
-            # Compute assumed depth (clearly labeled)
-            depth_assumed = None
-            if pick_result.median_twt_us > 0:
-                _ICE_EPSILON = 3.15
-                _C = 299_792_458.0
-                v_ice = _C / math.sqrt(_ICE_EPSILON)
-                depth_assumed = round(v_ice * pick_result.median_twt_us * 1e-6 / 2, 1)
-
+            # Report TWT only — no depth from assumed εr
             pick_entry = {
                 "ice_source": ice_loc["source"],
                 "ice_lat": ice_lat,
@@ -2170,8 +2362,8 @@ def targeted_subsurface_at_ice(
                 "n_picks": len(pick_result.picks),
                 "median_snr": round(max((p.snr for p in pick_result.picks), default=0), 1),
                 "twt_us": round(pick_result.median_twt_us, 4) if pick_result.median_twt_us else None,
-                "depth_m_assumed": depth_assumed,
-                "epsilon_r_note": "Depth uses assumed εr=3.15 (not measured)",
+                "depth_m": None,  # NOT computed without physics-based εr
+                "depth_note": "Depth requires εr estimation (not assumed)",
             }
             if pick_result.error:
                 pick_entry["error"] = pick_result.error
@@ -2276,13 +2468,15 @@ def crism_spectral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
                 "class_counts": result.class_counts,
                 "class_fractions": result.class_fractions,
                 "water_ice_fraction": result.water_ice_fraction,
-                "water_ice_pixel_count": result.water_ice_pixel_count,
+                "water_ice_pixel_count": result.water_ice_pixels,
                 "mean_band_params": {
-                    "BD1500": result.mean_band_params.BD1500,
-                    "BD1900": result.mean_band_params.BD1900,
-                    "BD2100": result.mean_band_params.BD2100,
-                    "BD2200": result.mean_band_params.BD2200,
+                    "BD1500": result.mean_BD1500,
+                    "BD1900": result.mean_BD1900,
+                    "BD2100": result.mean_BD2100,
+                    "BD2200": result.mean_BD2200,
                 },
+                "physics_score": result.physics_score,
+                "interpretation_label": result.interpretation_label,
                 "atmospheric_uncertainty_notes": result.atmospheric_uncertainty_notes,
             }
             analyzed.append(obs_data)
@@ -2290,12 +2484,12 @@ def crism_spectral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
             # Aggregate
             for cls, count in result.class_counts.items():
                 aggregate_class_counts[cls] = aggregate_class_counts.get(cls, 0) + count
-            total_water_ice_pixels += result.water_ice_pixel_count
+            total_water_ice_pixels += result.water_ice_pixels
             total_pixels_analyzed += sum(result.class_counts.values())
-            if result.mean_band_params.BD1500 is not None:
-                all_bd1500.append(result.mean_band_params.BD1500)
-            if result.mean_band_params.BD1900 is not None:
-                all_bd1900.append(result.mean_band_params.BD1900)
+            if result.mean_BD1500 is not None:
+                all_bd1500.append(result.mean_BD1500)
+            if result.mean_BD1900 is not None:
+                all_bd1900.append(result.mean_BD1900)
 
         except Exception as e:
             logger.warning(f"CRISM spectral analysis failed for {obs_id}: {e}")
@@ -2329,6 +2523,21 @@ def crism_spectral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
     mean_bd1500 = round(float(np.mean(all_bd1500)), 4) if all_bd1500 else None
     mean_bd1900 = round(float(np.mean(all_bd1900)), 4) if all_bd1900 else None
 
+    # Physics score aggregation (Phase 0.3)
+    all_physics_scores = [o["physics_score"] for o in analyzed if o.get("physics_score")]
+    mean_physics_score = round(float(np.mean(all_physics_scores)), 4) if all_physics_scores else 0.0
+    max_physics_score = round(float(max(all_physics_scores)), 4) if all_physics_scores else 0.0
+
+    # Top physics-scored observations (for targeting)
+    scored_obs = sorted(analyzed, key=lambda o: o.get("physics_score", 0), reverse=True)
+    top_physics_candidates = scored_obs[:10]
+
+    # Interpretation distribution
+    interp_counts: Dict[str, int] = {}
+    for o in analyzed:
+        label = o.get("interpretation_label", "Unknown")
+        interp_counts[label] = interp_counts.get(label, 0) + 1
+
     data = {
         "observations_analyzed": len(analyzed),
         "total_pixels_analyzed": total_pixels_analyzed,
@@ -2341,11 +2550,17 @@ def crism_spectral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
             "BD1500": mean_bd1500,
             "BD1900": mean_bd1900,
         },
+        # Phase 0.3: Physics scoring
+        "mean_physics_score": mean_physics_score,
+        "max_physics_score": max_physics_score,
+        "top_physics_candidates": top_physics_candidates,
+        "interpretation_distribution": interp_counts,
         "methodology": (
             "Continuum removal (convex hull) → band parameter extraction (BD1500, BD1900, BD2100, BD2200) "
             "→ Spectral Angle Mapper classification against synthetic USGS endmembers "
             "(water ice, gypsum, polyhydrated sulfate, basalt). "
-            "Band strengths cross-validate SAM mineral ID."
+            "Band strengths cross-validate SAM mineral ID. "
+            "Physics score (0-1) combines BD1500, BD1900, ice fraction, and SAM confidence."
         ),
     }
 
@@ -2354,6 +2569,8 @@ def crism_spectral_analysis(products: List[Dict[str, Any]]) -> TaskResult:
         summary_parts.append(f"water ice {water_ice_overall_fraction:.1%} of pixels")
     if mean_bd1500 is not None:
         summary_parts.append(f"mean BD1500={mean_bd1500:.3f}")
+    if max_physics_score > 0:
+        summary_parts.append(f"max physics_score={max_physics_score:.3f}")
 
     return TaskResult(
         task_type="crism_spectral",
@@ -2439,11 +2656,12 @@ def synthesize_results(
             "total_tracks": sub.get("total_tracks", 0),
             "analyzed_count": sub.get("analyzed_count", 0),
             "subsurface_detections": sub.get("subsurface_detections", 0),
-            "depth_summary": depth,
+            "reflector_summary": sub.get("reflector_summary"),
+            "depth_summary": depth,  # backward-compat alias for reflector_summary
             "snr_distribution": sub.get("snr_distribution"),
             "clutter_rejection": sub.get("clutter_rejection"),
             "reflector_density_per_km": sub.get("reflector_density_per_km"),
-            "epsilon_r_source": depth.get("epsilon_r_source", "assumed") if depth else "no_data",
+            "epsilon_r_source": depth.get("epsilon_r_source", "not_estimated") if depth else "no_data",
         }
 
     # CRISM mineral analysis (now with spatial data)
@@ -2882,9 +3100,9 @@ def recommend_site(all_results: Dict[str, TaskResult]) -> TaskResult:
                         nearest_sharad = t
             if nearest_sharad and min_dist < 100:
                 score += 25
-                depth_info = nearest_sharad.get("estimated_depth_m", {})
-                depth_str = f"~{depth_info.get('median', '?')}m deep" if depth_info else ""
-                reasons.append(f"SHARAD subsurface reflector {min_dist:.0f} km away {depth_str}")
+                ref_stats = nearest_sharad.get("reflector_stats", {})
+                twt_str = f"TWT={ref_stats.get('median_twt_us', '?')} µs" if ref_stats else ""
+                reasons.append(f"SHARAD subsurface reflector {min_dist:.0f} km away {twt_str}")
             elif nearest_sharad and min_dist < 300:
                 score += 12
                 reasons.append(f"SHARAD subsurface detection {min_dist:.0f} km away")
@@ -3012,12 +3230,15 @@ def _compute_cross_instrument(all_results: Dict[str, 'TaskResult']) -> Dict[str,
         for t in all_results["subsurface"].data.get("tracks", []):
             if t.get("subsurface_detected") and t.get("lat") is not None:
                 sharad_detections.append(t)
+                ref_stats = t.get("reflector_stats", {})
                 cross["direct_ice_evidence"].append({
                     "type": "SHARAD_reflector",
                     "product_id": t["product_id"],
                     "lat": t["lat"],
                     "lon": t["lon"],
-                    "depth_m": t.get("estimated_depth_m", {}).get("median"),
+                    "twt_us": ref_stats.get("median_twt_us"),
+                    "delta_bins": ref_stats.get("median_delta_bins"),
+                    "depth_m": None,  # requires physics εr
                 })
 
     # CRISM spectral ice data
@@ -3416,7 +3637,11 @@ def terrain_epsilon_inversion(
         data={
             "tracks": [{
                 "subsurface_detected": True,
-                "estimated_depth_m": terrace_depth_m,
+                "reflector_stats": {
+                    "median_twt_us": None,  # will be filled by terrace pipeline
+                    "median_delta_bins": None,
+                    "depth_m": None,
+                },
                 "product_id": sp["product_id"],
             } for sp in sharad_nearby[:3]],
         },

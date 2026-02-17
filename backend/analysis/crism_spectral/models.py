@@ -61,6 +61,10 @@ class CrismSpectralResult(BaseModel):
     mean_sam_confidence: float = 0.0
     atmospheric_uncertainty_notes: str = ""
 
+    # Physics score and interpretation (Phase 0.3)
+    physics_score: float = 0.0  # 0-1, weighted combination of band depths + SAM
+    interpretation_label: str = "Unanalyzed"  # "Likely H2O ice", "Likely hydrated minerals", "Ambiguous/atmospheric contamination risk"
+
     success: bool = False
     error: Optional[str] = None
     elapsed_seconds: float = 0.0

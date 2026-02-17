@@ -714,11 +714,13 @@ async def _tool_subsurface(session: "AgentSession", params: dict):
     analyzed = sub.get("analyzed_count", 0)
     detections = sub.get("subsurface_detections", 0)
     if detections > 0:
-        depth = sub.get("depth_summary", {})
+        ref = sub.get("reflector_summary") or sub.get("depth_summary") or {}
+        twt_min = ref.get("min_twt_us", "?")
+        twt_max = ref.get("max_twt_us", "?")
         return result, (
             f"Analyzed {analyzed} SHARAD tracks. Found {detections} subsurface reflector(s). "
-            f"Estimated ice depth: {depth.get('min_depth_m', '?')}-{depth.get('max_depth_m', '?')} m "
-            f"(median {depth.get('median_depth_m', '?')} m, assuming er={depth.get('epsilon_r_assumed', 3.15)})."
+            f"TWT range: {twt_min}-{twt_max} µs "
+            f"(depth requires εr estimation)."
         )
     return result, f"Analyzed {analyzed} SHARAD tracks. No subsurface reflectors detected (SNR below threshold)."
 
@@ -1919,24 +1921,15 @@ def _generate_narrative_fallback(session: AgentSession) -> str:
                 f"**{n_detect} subsurface reflector detection(s)**, providing direct "
                 f"evidence of a dielectric interface beneath the surface."
             )
-            if depth:
-                try:
-                    med_d = float(depth.get('median_depth_m', 50))
-                except (TypeError, ValueError):
-                    med_d = 50.0
-                if med_d <= 10:
-                    depth_qual = "This is **shallow ice** — potentially accessible for in-situ resource extraction without deep drilling."
-                elif med_d <= 30:
-                    depth_qual = "This is a moderate depth — drilling infrastructure would be required for extraction."
-                elif med_d <= 80:
-                    depth_qual = "This depth is significant and would require substantial drilling capability."
-                else:
-                    depth_qual = "This depth is **too deep for practical ice extraction** and reduces the site's utility for ISRU."
+            ref = sub.get("reflector_summary") or depth or {}
+            twt_med = ref.get("median_twt_us")
+            if twt_med is not None:
                 parts.append(
-                    f"Assuming a water-ice dielectric constant (εr = {depth.get('epsilon_r_assumed', 3.15)}), "
-                    f"the estimated ice-table depth ranges from **{depth['min_depth_m']} to "
-                    f"{depth['max_depth_m']} m** (median {depth['median_depth_m']} m). "
-                    f"{depth_qual}"
+                    f"Reflector two-way travel time: **{ref.get('min_twt_us', '?')}–"
+                    f"{ref.get('max_twt_us', '?')} µs** "
+                    f"(median {twt_med} µs, {ref.get('median_delta_bins', '?')} range bins). "
+                    f"Depth in meters is **not computed** without εr estimation "
+                    f"(physics-based dielectric inversion required)."
                 )
         elif n_analyzed > 0:
             parts.append(
@@ -2148,40 +2141,43 @@ def _generate_narrative_fallback(session: AgentSession) -> str:
 
     # ── Engineering Implications ──
     parts.append("### Engineering Implications")
-    depth_summary = synthesis.get("subsurface_coverage", {}).get(
-        "depth_summary", {}
-    )
-    median_depth = depth_summary.get("median_depth_m") if depth_summary else None
+    ref_summary = synthesis.get("subsurface_coverage", {}).get("reflector_summary") or \
+                  synthesis.get("subsurface_coverage", {}).get("depth_summary") or {}
     inv_completed = synthesis.get("sharad_physics_inversion", {}).get(
         "inversions_completed", 0
     )
 
-    if median_depth is not None:
-        try:
-            md = float(median_depth)
-        except (TypeError, ValueError):
-            md = None
-        if md is not None:
-            if md <= 5:
-                parts.append(
-                    f"Estimated ice depth ~{md:.0f}m: accessible via "
-                    "trenching or shallow excavation."
-                )
-            elif md <= 20:
-                parts.append(
-                    f"Estimated ice depth ~{md:.0f}m: requires mechanical "
-                    "drilling capability."
-                )
-            elif md <= 50:
-                parts.append(
-                    f"Estimated ice depth ~{md:.0f}m: significant drilling "
-                    "infrastructure needed."
-                )
-            else:
-                parts.append(
-                    f"Estimated ice depth ~{md:.0f}m: impractical for "
-                    "near-term ISRU missions."
-                )
+    # Only report depth if physics εr is available (from inversion pipeline)
+    physics_eps = synthesis.get("sharad_physics_inversion", {}).get("best_epsilon_r")
+    if physics_eps is not None and ref_summary.get("median_twt_us"):
+        import math
+        v = 299_792_458.0 / math.sqrt(float(physics_eps))
+        md = v * float(ref_summary["median_twt_us"]) * 1e-6 / 2.0
+        if md <= 5:
+            parts.append(
+                f"Estimated ice depth ~{md:.0f}m (εr={physics_eps:.2f}): accessible via "
+                "trenching or shallow excavation."
+            )
+        elif md <= 20:
+            parts.append(
+                f"Estimated ice depth ~{md:.0f}m (εr={physics_eps:.2f}): requires mechanical "
+                "drilling capability."
+            )
+        elif md <= 50:
+            parts.append(
+                f"Estimated ice depth ~{md:.0f}m (εr={physics_eps:.2f}): significant drilling "
+                "infrastructure needed."
+            )
+        else:
+            parts.append(
+                f"Estimated ice depth ~{md:.0f}m (εr={physics_eps:.2f}): impractical for "
+                "near-term ISRU missions."
+            )
+    elif ref_summary.get("median_twt_us"):
+        parts.append(
+            f"Subsurface reflectors detected (TWT={ref_summary['median_twt_us']} µs), "
+            f"but depth in meters cannot be determined without εr estimation."
+        )
 
     safety = synthesis.get("engineering_feasibility", {}).get(
         "safety", "UNKNOWN"
@@ -3013,8 +3009,49 @@ async def _run_agent_rules(
                         check_result = session.all_results.get("check_local")
                         missing = check_result.data.get("missing", []) if check_result else []
 
-                        # Smart download selection: cap at 30, sparse vs dense
-                        to_download, dl_strategy = _select_downloads(missing, session.bbox)
+                        # ── Cross-instrument targeting (Phase 0.2) ──
+                        # If CRISM mineral results exist, use them to target SHARAD downloads
+                        from .agent_tasks import select_targeted_products
+                        mineral_result = session.all_results.get("mineral")
+                        crism_spectral_result = session.all_results.get("crism_spectral")
+                        crism_data = {}
+                        if mineral_result and mineral_result.success:
+                            crism_data["top_ice_candidates"] = mineral_result.data.get("top_ice_candidates", [])
+                        if crism_spectral_result and crism_spectral_result.success:
+                            crism_data["observations"] = crism_spectral_result.data.get("observations", [])
+
+                        targeting_result = None
+                        if crism_data:
+                            targeting_result = select_targeted_products(
+                                crism_data, missing, buffer_km=50.0, max_targets=10,
+                            )
+                            if targeting_result.get("method") == "cross_instrument_targeting" and targeting_result["targeted_products"]:
+                                targeted_ids = {p["product_id"] for p in targeting_result["targeted_products"]}
+                                # Prioritize targeted products, then fill with spatial sampling
+                                targeted_missing = [p for p in missing if p["product_id"] in targeted_ids]
+                                non_targeted_missing = [p for p in missing if p["product_id"] not in targeted_ids]
+                                remaining_budget = 30 - len(targeted_missing)
+                                if remaining_budget > 0 and non_targeted_missing:
+                                    extra, _ = _select_downloads(non_targeted_missing, session.bbox, max_per_instrument=remaining_budget)
+                                    to_download = targeted_missing + extra
+                                else:
+                                    to_download = targeted_missing[:30]
+                                dl_strategy = "cross_instrument_targeted"
+                                session.all_results["cross_instrument_targeting"] = TaskResult(
+                                    task_type="cross_instrument_targeting",
+                                    success=True,
+                                    data=targeting_result,
+                                    summary=targeting_result.get("targeting_rationale", ""),
+                                )
+                                logger.info(
+                                    f"Cross-instrument targeting: {len(targeted_missing)} targeted, "
+                                    f"{len(to_download) - len(targeted_missing)} spatial fill"
+                                )
+                            else:
+                                to_download, dl_strategy = _select_downloads(missing, session.bbox)
+                        else:
+                            # Smart download selection: cap at 30, sparse vs dense
+                            to_download, dl_strategy = _select_downloads(missing, session.bbox)
                         if len(missing) > len(to_download):
                             step.description = (
                                 f"Download {len(to_download)}/{len(missing)} "
