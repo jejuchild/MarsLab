@@ -91,6 +91,7 @@ interface CraterDetectPanelProps {
   onSearchSHARAD?: (lat: number, lon: number) => void;
   onFeaturesChanged?: (features: DetectedFeature[]) => void;
   onRunEpsilonInversion?: (feature: DetectedFeature) => void;
+  onOpenStratColumn?: (feature: DetectedFeature) => void;
 }
 
 /* =========================================================
@@ -105,6 +106,7 @@ export default function CraterDetectPanel({
   onSearchSHARAD,
   onFeaturesChanged,
   onRunEpsilonInversion,
+  onOpenStratColumn,
 }: CraterDetectPanelProps) {
   // Data mode: "precomputed" (auto-loaded from cache) or "scan" (manual SSE scan)
   const [mode, setMode] = useState<"precomputed" | "scan">("precomputed");
@@ -593,6 +595,7 @@ export default function CraterDetectPanel({
                   onSearchHiRISE={onSearchHiRISE}
                   onSearchSHARAD={onSearchSHARAD}
                   onRunEpsilonInversion={onRunEpsilonInversion}
+                  onOpenStratColumn={onOpenStratColumn}
                 />
               ))}
             </div>
@@ -640,12 +643,14 @@ function FeatureRow({
   onSearchHiRISE,
   onSearchSHARAD,
   onRunEpsilonInversion,
+  onOpenStratColumn,
 }: {
   feature: DetectedFeature;
   onFlyTo?: (lat: number, lon: number) => void;
   onSearchHiRISE?: (lat: number, lon: number) => void;
   onSearchSHARAD?: (lat: number, lon: number) => void;
   onRunEpsilonInversion?: (feature: DetectedFeature) => void;
+  onOpenStratColumn?: (feature: DetectedFeature) => void;
 }) {
   const color = FEATURE_COLORS[f.type] || "#6b7c9c";
   const [expanded, setExpanded] = useState(false);
@@ -811,6 +816,21 @@ function FeatureRow({
                   science
                 </span>
                 Run ε Inversion
+              </button>
+            )}
+            {(f.type === "crater" || f.type === "terraced_crater") && f.diameter_km != null && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenStratColumn?.(f);
+                }}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400 hover:text-emerald-300 hover:border-emerald-500/50 hover:bg-emerald-500/20 transition-colors"
+                title="Build composite stratigraphic column from HiRISE + CRISM + SHARAD"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>
+                  view_column
+                </span>
+                Strat Column
               </button>
             )}
           </div>

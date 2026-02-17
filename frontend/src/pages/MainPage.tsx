@@ -62,6 +62,7 @@ const RegolithPanel = lazy(() => import("../components/RegolithPanel"));
 const StratigraphyPanel = lazy(() => import("../components/StratigraphyPanel"));
 const AttenuationPanel = lazy(() => import("../components/AttenuationPanel"));
 const MineralSequencePanel = lazy(() => import("../components/MineralSequencePanel"));
+const StratColumnPanel = lazy(() => import("../components/StratColumnPanel"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -225,7 +226,7 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | null;
+  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Guided Workflow: user-selected location
@@ -427,6 +428,7 @@ export default function MainPage() {
   const [craterDetectCenter, setCraterDetectCenter] = useState<{lat: number; lon: number} | null>(null);
   const [craterDetectFeatures, setCraterDetectFeatures] = useState<DetectedFeature[]>([]);
   const [epsilonTarget, setEpsilonTarget] = useState<DetectedFeature | null>(null);
+  const [stratColumnTarget, setStratColumnTarget] = useState<DetectedFeature | null>(null);
 
   // Temporal Change Detection modal
   const [showTemporalComparison, setShowTemporalComparison] = useState<{lat: number; lon: number; instrument?: string} | null>(null);
@@ -1266,12 +1268,21 @@ export default function MainPage() {
     if (mode !== "mineral_sequence") {
       setMineralSequenceObsId(null);
     }
+    if (mode !== "strat_column") {
+      setStratColumnTarget(null);
+    }
   }, []);
 
   // Handle "Run ε Inversion" from CraterDetectPanel → opens StratigraphyPanel
   const handleRunEpsilon = useCallback((feature: DetectedFeature) => {
     setEpsilonTarget(feature);
     setAnalysisMode("stratigraphy");
+  }, []);
+
+  // Handle "Strat Column" from CraterDetectPanel → opens StratColumnPanel
+  const handleOpenStratColumn = useCallback((feature: DetectedFeature) => {
+    setStratColumnTarget(feature);
+    setAnalysisMode("strat_column");
   }, []);
 
   // Guided Workflow action handler
@@ -1654,6 +1665,13 @@ export default function MainPage() {
           onClose={() => { setMineralSequenceObsId(null); setAnalysisMode(null); }}
         />
       </Suspense>
+    ) : stratColumnTarget && analysisMode === "strat_column" ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading stratigraphic column...</div>}>
+        <StratColumnPanel
+          craterFeature={stratColumnTarget}
+          onClose={() => { setStratColumnTarget(null); setAnalysisMode(null); }}
+        />
+      </Suspense>
     ) : sharadHiresProductId ? (
       <SharadHiresInspector
         productId={sharadHiresProductId}
@@ -1755,6 +1773,7 @@ export default function MainPage() {
           }}
           onFeaturesChanged={setCraterDetectFeatures}
           onRunEpsilonInversion={handleRunEpsilon}
+          onOpenStratColumn={handleOpenStratColumn}
         />
       </Suspense>
     ) : (
