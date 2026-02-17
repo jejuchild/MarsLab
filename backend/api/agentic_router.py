@@ -1444,6 +1444,57 @@ def generate_report_from_evidence_pack(
             lines.append(explanation)
             lines.append("")
 
+    # Phase 4: Ice Stability
+    ice_stab = clim.get("ice_stability", {})
+    if ice_stab.get("sublimation_regime"):
+        lines.append("### Ice Thermodynamic Stability")
+        lines.append("")
+        lines.append("| Parameter | Value |")
+        lines.append("|-----------|-------|")
+        lines.append(f"| Annual Mean Ground Temperature | {ice_stab.get('annual_mean_temp_k', 'N/A')} K |")
+        lines.append(f"| Sublimation Regime | **{ice_stab.get('sublimation_regime', 'N/A')}** |")
+        lines.append(f"| Stability Margin | {ice_stab.get('stability_margin', 'N/A')}x |")
+        depth = ice_stab.get("estimated_ice_table_depth_m")
+        if depth is not None:
+            lines.append(f"| Estimated Ice Table Depth | {depth} m |")
+        lines.append("")
+
+    # Phase 4: Seasonal Operation Window
+    sow = clim.get("seasonal_operation_window", {})
+    if sow.get("n_safe_bins") is not None:
+        n_safe = sow["n_safe_bins"]
+        total = sow.get("total_bins", 12)
+        frac = sow.get("operational_fraction", 0)
+        lines.append("### Seasonal Operation Window")
+        lines.append("")
+        lines.append(f"**{n_safe}/{total} seasons safe** ({frac:.0%} of Mars year)")
+        lines.append("")
+        constraints = sow.get("constraints", [])
+        if constraints:
+            lines.append(f"Limiting factors: {', '.join(constraints)}")
+            lines.append("")
+        lines.append(f"Best season: Ls {sow.get('best_season_ls', '?')}° "
+                      f"(score {sow.get('best_season_score', 'N/A')})")
+        lines.append("")
+
+    # Phase 4: Climate-Ice Compatibility
+    compat = ep.get("climate_ice_compatibility", {})
+    if compat.get("assessed"):
+        lines.append("### Climate-Ice Compatibility")
+        lines.append("")
+        lines.append(f"**Overall:** {compat.get('overall_compatibility', 'unknown').replace('_', ' ').title()} "
+                      f"(score {compat.get('compatibility_score', 0):.2f})")
+        lines.append("")
+        ti_eps = compat.get("ti_epsilon_correlation", {})
+        if ti_eps.get("correlation") and ti_eps["correlation"] != "unavailable":
+            lines.append(f"**TI-εr Correlation:** {ti_eps.get('interpretation', '')}")
+            lines.append("")
+        notes = compat.get("notes", [])
+        if notes:
+            for note in notes:
+                lines.append(f"- {note}")
+            lines.append("")
+
     # ══════════════════════════════════════════════════════════════════
     # 7. ASSESSMENT SCORE + LANDING SITE
     # ══════════════════════════════════════════════════════════════════
@@ -2329,6 +2380,50 @@ def _build_report_markdown(session: AgentSession) -> str:
         explanation = ti.get("ti_explanation", "")
         if explanation:
             lines.append(explanation)
+            lines.append("")
+
+    # Phase 4: Ice Stability (legacy report)
+    ice_stab = clim.get("ice_stability", {}) if clim else {}
+    if ice_stab.get("sublimation_regime"):
+        lines.append("### Ice Thermodynamic Stability")
+        lines.append("")
+        regime = ice_stab.get("sublimation_regime", "unknown")
+        margin = ice_stab.get("stability_margin", 0)
+        mean_t = ice_stab.get("annual_mean_temp_k", 0)
+        depth = ice_stab.get("estimated_ice_table_depth_m")
+        lines.append(f"Regime: **{regime}** (stability margin {margin:.1f}x, "
+                      f"annual mean T = {mean_t:.0f} K)")
+        if depth is not None:
+            lines.append(f"Estimated ice table depth: **{depth} m**")
+        lines.append("")
+
+    # Phase 4: Seasonal Operation Window (legacy report)
+    sow = clim.get("seasonal_operation_window", {}) if clim else {}
+    if sow.get("n_safe_bins") is not None:
+        n_safe = sow["n_safe_bins"]
+        total = sow.get("total_bins", 12)
+        frac = sow.get("operational_fraction", 0)
+        lines.append(f"### Seasonal Operations: {n_safe}/{total} seasons safe ({frac:.0%})")
+        lines.append("")
+        constraints = sow.get("constraints", [])
+        if constraints:
+            lines.append(f"Constraints: {', '.join(constraints)}")
+            lines.append("")
+
+    # Phase 4: Climate-Ice Compatibility (legacy report)
+    compat = synthesis.get("climate_ice_compatibility", {})
+    if compat.get("assessed"):
+        verdict = compat.get("overall_compatibility", "unknown").replace("_", " ").title()
+        cscore = compat.get("compatibility_score", 0)
+        lines.append(f"### Climate-Ice Compatibility: {verdict} ({cscore:.2f})")
+        lines.append("")
+        ti_eps = compat.get("ti_epsilon_correlation", {})
+        if ti_eps.get("interpretation"):
+            lines.append(f"TI-εr: {ti_eps['interpretation']}")
+            lines.append("")
+        for note in compat.get("notes", []):
+            lines.append(f"- {note}")
+        if compat.get("notes"):
             lines.append("")
 
     # ── 7b. Physics Assessment Summary (MANDATORY) ──

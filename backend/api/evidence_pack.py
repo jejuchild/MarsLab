@@ -261,6 +261,9 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
         "climate_score": clim_raw.get("climate_score", 0),
         "climate_summary": clim_raw.get("climate_summary", ""),
         "annual_stats": clim_raw.get("annual_stats", {}),
+        # Phase 4: Ice stability and seasonal operations
+        "ice_stability": clim_raw.get("ice_stability", {}),
+        "seasonal_operation_window": clim_raw.get("seasonal_operation_window", {}),
     }
 
     # ── Thermal Inertia ──
@@ -272,6 +275,16 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
         "classification": ti_raw.get("classification", ""),
         "distribution_pct": ti_raw.get("distribution_pct", {}),
         "ti_explanation": ti_raw.get("ti_explanation", ""),
+    }
+
+    # ── Climate-Ice Compatibility (Phase 4) ──
+    compat_raw = synthesis.get("climate_ice_compatibility", {})
+    climate_ice_compatibility = {
+        "assessed": compat_raw.get("assessed", False),
+        "overall_compatibility": compat_raw.get("overall_compatibility", "unknown"),
+        "compatibility_score": compat_raw.get("compatibility_score", 0.0),
+        "ti_epsilon_correlation": compat_raw.get("ti_epsilon_correlation", {}),
+        "notes": compat_raw.get("notes", []),
     }
 
     # ── Scoring ──
@@ -312,6 +325,7 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
         "isru": isru,
         "climate": climate,
         "thermal_inertia": thermal_inertia,
+        "climate_ice_compatibility": climate_ice_compatibility,
         "scoring": scoring,
         "landing_site": landing_site,
         "instruments_searched": synthesis.get("instruments_searched", []),

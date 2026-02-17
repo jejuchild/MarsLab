@@ -3352,6 +3352,7 @@ def synthesize_results(
         climate_data=synthesis.get("climate", {}),
         science_distance_km=science_distance,
         isru_data=synthesis.get("isru_assessment"),
+        thermal_inertia_data=synthesis.get("thermal_inertia"),
     )
 
     evidence_strength = classify_evidence_strength(
