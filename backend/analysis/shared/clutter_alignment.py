@@ -74,13 +74,18 @@ class ClutterAligner:
         offsets = np.round(clutter_peaks_smooth - rdr_surface_median).astype(np.int32)
 
         # Validate: ensure window [offset, offset+667] fits in clutter array
-        valid_offsets = (offsets > 0) & (offsets + 667 <= self.clutter_n_ranges)
+        valid_offsets = (offsets >= 0) & (offsets + 667 <= self.clutter_n_ranges)
         invalid_count = (~valid_offsets).sum()
 
         if invalid_count > 0:
             # Use global median offset as fallback
-            median_offset = np.median(offsets[valid_offsets])
-            offsets[~valid_offsets] = int(median_offset)
+            valid_subset = offsets[valid_offsets]
+            if valid_subset.size > 0:
+                median_offset = int(np.median(valid_subset))
+            else:
+                median_offset = 0
+                logger.warning("ClutterAligner: no valid offsets found; using 0")
+            offsets[~valid_offsets] = median_offset
             logger.debug(
                 f"ClutterAligner: {invalid_count} traces had invalid offsets; "
                 f"using median={median_offset}"

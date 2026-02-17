@@ -67,9 +67,9 @@ async def thickness_profile(
     search_hi: int = Query(150, ge=10, le=500, description="Search end (bins below surface)"),
     dtm_product_id: str = Query("", description="Optional HiRISE DTM product ID"),
     # PHASE 1: shallow-mode parameter
-    mode: str = Query("default", regex="^(default|shallow)$", description="Detection mode (default or shallow)"),
+    mode: str = Query("default", pattern="^(default|shallow)$", description="Detection mode (default or shallow)"),
     # PHASE 2: clutter integration parameters
-    clutter_mode: str = Query("off", regex="^(off|mask)$", description="Clutter masking mode"),
+    clutter_mode: str = Query("off", pattern="^(off|mask)$", description="Clutter masking mode"),
     clutter_snr_threshold: float = Query(3.0, ge=1.0, le=10.0, description="Clutter SNR threshold"),
     clutter_bin_tolerance: int = Query(3, ge=0, le=10, description="Clutter bin tolerance"),
     # PHASE 3: epsilon_uncertainty parameter
@@ -121,9 +121,9 @@ async def export_csv(
     search_hi: int = Query(150, ge=10, le=500),
     dtm_product_id: str = Query("", description="Optional HiRISE DTM product ID"),
     # PHASE 1: shallow-mode parameter
-    mode: str = Query("default", regex="^(default|shallow)$"),
+    mode: str = Query("default", pattern="^(default|shallow)$"),
     # PHASE 2: clutter integration parameters
-    clutter_mode: str = Query("off", regex="^(off|mask)$"),
+    clutter_mode: str = Query("off", pattern="^(off|mask)$"),
     clutter_snr_threshold: float = Query(3.0, ge=1.0, le=10.0),
     clutter_bin_tolerance: int = Query(3, ge=0, le=10),
     # PHASE 3: epsilon_uncertainty parameter

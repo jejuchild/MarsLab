@@ -36,7 +36,8 @@ class TestClutterAligner:
     def test_align_vertical_basic(self):
         """Align clutter surface to RDR surface."""
         # Synthetic clutter: surface at bin 50, RDR surface at bin 40
-        clutter_power = np.zeros((100, 10), dtype=np.float32)
+        # Array must be tall enough for 667-bin extraction window: offset(10)+667=677
+        clutter_power = np.zeros((700, 10), dtype=np.float32)
         clutter_power[50, :] = 1.0  # Surface peak at bin 50
 
         rdr_surface_bins = np.full(10, 40, dtype=np.int32)

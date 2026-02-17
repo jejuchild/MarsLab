@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceArea,
 } from "recharts";
 import {
   fetchRegolithProfile,
@@ -154,6 +155,25 @@ export default function RegolithPanel({
         clutter_flagged: s.clutter_flagged ?? false,
         clutter_snr: s.clutter_snr,
       })) ?? [];
+
+  // Identify contiguous clutter-flagged ranges for overlay visualization
+  const clutterRanges: { start: number; end: number }[] = [];
+  if (clutterMode === "mask") {
+    let inRange = false;
+    let rangeStart = 0;
+    for (let i = 0; i < chartData.length; i++) {
+      if (chartData[i].clutter_flagged && !inRange) {
+        rangeStart = chartData[i].km;
+        inRange = true;
+      } else if (!chartData[i].clutter_flagged && inRange) {
+        clutterRanges.push({ start: rangeStart, end: chartData[i - 1].km });
+        inRange = false;
+      }
+    }
+    if (inRange && chartData.length > 0) {
+      clutterRanges.push({ start: rangeStart, end: chartData[chartData.length - 1].km });
+    }
+  }
 
   const summary = result?.summary;
 
@@ -331,17 +351,6 @@ export default function RegolithPanel({
                           fontSize: 11,
                           borderRadius: 6,
                         }}
-                        labelFormatter={(v) => `${v} km`}
-                        formatter={(value: any, name: string) => {
-                          if (name === "thickness")
-                            return [`${value?.toFixed(1)} m`, "Thickness"];
-                          if (name === "thickness_low")
-                            return [`${value?.toFixed(1)} m`, "Thickness (Low)"];
-                          if (name === "thickness_high")
-                            return [`${value?.toFixed(1)} m`, "Thickness (High)"];
-                          if (name === "confidence") return [`${value}%`, "Confidence"];
-                          return [value, name];
-                        }}
                         content={({ active, payload }: any) => {
                           if (active && payload && payload.length > 0) {
                             const data = payload[0].payload;
@@ -410,6 +419,19 @@ export default function RegolithPanel({
                         isAnimationActive={false}
                         dot={false}
                       />
+                      {clutterRanges.map((r, i) => (
+                        <ReferenceArea
+                          key={`clutter-${i}`}
+                          yAxisId="thick"
+                          x1={r.start}
+                          x2={r.end}
+                          fill="#f59e42"
+                          fillOpacity={0.08}
+                          stroke="#f59e42"
+                          strokeOpacity={0.2}
+                          strokeDasharray="3 3"
+                        />
+                      ))}
                       <defs>
                         <linearGradient id="thickGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#4f9cf7" stopOpacity={0.3} />
@@ -426,7 +448,7 @@ export default function RegolithPanel({
                       </defs>
                     </ComposedChart>
                   </ResponsiveContainer>
-                  <div className="flex items-center justify-center gap-4 text-[9px] text-slate-500 mt-1">
+                  <div className="flex items-center justify-center gap-4 text-[9px] text-slate-500 mt-1 flex-wrap">
                     <span className="flex items-center gap-1">
                       <span className="w-3 h-0.5 bg-[#4f9cf7] rounded" />
                       Thickness (m)
@@ -435,6 +457,12 @@ export default function RegolithPanel({
                       <span className="w-3 h-0.5 bg-[#f59e42] rounded border-dashed" />
                       Confidence (%)
                     </span>
+                    {clutterRanges.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <span className="w-3 h-2 bg-[#f59e42]/20 border border-dashed border-[#f59e42]/40 rounded-sm" />
+                        Clutter
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -618,6 +646,11 @@ export default function RegolithPanel({
                 snrThreshold,
                 searchLo,
                 searchHi,
+                {
+                  mode,
+                  epsilon_uncertainty: epsilonUncertainty,
+                  clutter_mode: clutterMode,
+                },
               );
               window.open(url, "_blank");
             }}

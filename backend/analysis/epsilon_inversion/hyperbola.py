@@ -107,8 +107,8 @@ class HyperbolaFitter:
                 peak_idx = np.argmax(window[i, :])
                 peak_power = window[i, peak_idx]
 
-                # Skip very weak peaks
-                if peak_power < 0.1 * np.max(window[i, :]):
+                # Skip very weak peaks (compare against window-wide max)
+                if peak_power < 0.1 * np.max(window):
                     continue
 
                 picks_x.append(i - window_traces // 2)
@@ -131,7 +131,7 @@ class HyperbolaFitter:
             picks_confidence = np.array(picks_confidence, dtype=np.float64)
 
             # Convert trace offset to distance (assumption: ~300m per trace)
-            x_km = picks_x * 0.3 / 1000.0  # 300m/trace → km
+            x_km = picks_x * 300.0 / 1000.0  # 300m/trace → km
 
             # Convert bin indices to time (microseconds)
             t_us = picks_t_bins * SHARAD_SAMPLE_INTERVAL_US
@@ -171,7 +171,7 @@ class HyperbolaFitter:
                 )
 
             # Outlier rejection: remove picks with large residuals
-            std_residuals = np.std(residuals)
+            std_residuals = max(np.std(residuals), 1e-12)
             inlier_mask = np.abs(residuals) < 2.0 * std_residuals
             n_inliers = inlier_mask.sum()
             inlier_ratio = n_inliers / len(picks_x)

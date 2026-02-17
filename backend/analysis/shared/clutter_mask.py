@@ -23,7 +23,7 @@ def compute_clutter_mask(
 
     Args:
         aligned_clutter: (667, n_traces) float32 aligned clutter power array
-        detected_peaks: (n_traces,) int32 delta_bins from search_lo, or -1 if not detected
+        detected_peaks: (n_traces,) int32 delta_bins (= search_lo + peak_idx), 0 if not detected
         search_lo: Offset of search band start from surface (in bins)
         snr_threshold: Clutter SNR threshold for flagging (default 3.0)
         bin_tolerance: Max bin distance to flag as conflict (default 3)
@@ -41,8 +41,8 @@ def compute_clutter_mask(
     clutter_band_end = min(search_lo + 120, aligned_clutter.shape[0])
 
     for i in range(n_traces):
-        # Skip undetected traces
-        if detected_peaks[i] < 0:
+        # Skip undetected traces (pipeline stores 0 for undetected)
+        if detected_peaks[i] <= 0:
             clutter_flagged[i] = False
             continue
 
@@ -64,11 +64,14 @@ def compute_clutter_mask(
 
         # Check: clutter SNR high AND bin proximity to detected peak
         if clutter_snr >= snr_threshold:
-            detected_bin = detected_peaks[i]
+            # detected_peaks[i] = search_lo + peak_idx (offset from surface)
+            # clutter_peak_idx is offset from search_lo within clutter band
+            # Normalize to same reference frame before comparing
+            detected_bin_from_search_lo = detected_peaks[i] - search_lo
             clutter_detected_bin = clutter_peak_idx
 
-            # Bin distance (relative to search window)
-            bin_distance = abs(clutter_detected_bin - detected_bin)
+            # Bin distance in search-band coordinates
+            bin_distance = abs(clutter_detected_bin - detected_bin_from_search_lo)
 
             if bin_distance <= bin_tolerance:
                 clutter_flagged[i] = True
