@@ -3209,6 +3209,8 @@ def synthesize_results(
             "climate_summary": clim.get("climate_summary", ""),
             "annual_stats": clim.get("annual_stats", {}),
             "elevation_m": clim.get("elevation_m", 0),
+            "ice_stability": clim.get("ice_stability", {}),
+            "seasonal_operation_window": clim.get("seasonal_operation_window", {}),
         }
 
     # Thermal inertia analysis (TES)
@@ -3222,6 +3224,16 @@ def synthesize_results(
             "classification": ti.get("classification", ""),
             "distribution_pct": ti.get("distribution_pct", {}),
         }
+
+    # Phase 4: Climate-Ice Compatibility Assessment
+    synthesis["climate_ice_compatibility"] = _assess_climate_ice_compatibility(
+        climate=synthesis.get("climate", {}),
+        thermal_inertia=synthesis.get("thermal_inertia", {}),
+        dielectric=synthesis.get("dielectric_analysis", {}),
+        terrace_diel=synthesis.get("terrace_dielectric", {}),
+        cross_val=synthesis.get("epsilon_cross_validation", {}),
+        mineral=synthesis.get("mineral_signatures", {}),
+    )
 
     # Site recommendation (if available)
     if "recommend" in all_results and all_results["recommend"].success:
@@ -3633,6 +3645,203 @@ def recommend_site(all_results: Dict[str, TaskResult]) -> TaskResult:
         },
         summary=summary,
     )
+
+
+# =============================================================================
+# Phase 4: Climate-Ice Compatibility Assessment
+# =============================================================================
+
+def _assess_climate_ice_compatibility(
+    climate: Dict[str, Any],
+    thermal_inertia: Dict[str, Any],
+    dielectric: Dict[str, Any],
+    terrace_diel: Dict[str, Any],
+    cross_val: Dict[str, Any],
+    mineral: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Cross-correlate climate/TI data with ice evidence to assess compatibility.
+
+    Combines:
+      1. Ice thermodynamic stability (from climate model)
+      2. TI-εr correlation (high TI + low εr = ice-cemented regolith)
+      3. Seasonal operation window
+      4. Overall climate-ice compatibility verdict
+
+    Returns a dict with all cross-correlation results.
+    """
+    result: Dict[str, Any] = {
+        "assessed": False,
+        "ice_stability": {},
+        "ti_epsilon_correlation": {},
+        "seasonal_window": {},
+        "overall_compatibility": "unknown",
+        "compatibility_score": 0.0,
+        "notes": [],
+    }
+
+    ice_stability = climate.get("ice_stability", {})
+    seasonal_window = climate.get("seasonal_operation_window", {})
+
+    if not climate and not thermal_inertia:
+        result["notes"].append("No climate or thermal inertia data available.")
+        return result
+
+    result["assessed"] = True
+
+    # ── 1. Ice Stability ──
+    if ice_stability:
+        result["ice_stability"] = ice_stability
+        regime = ice_stability.get("sublimation_regime", "unknown")
+        if regime == "stable":
+            result["notes"].append(
+                f"Ice thermodynamically stable (margin={ice_stability.get('stability_margin', 0):.1f}x). "
+                f"Ice table estimated at {ice_stability.get('estimated_ice_table_depth_m', '?')} m depth."
+            )
+        elif regime == "marginal":
+            result["notes"].append(
+                f"Ice marginally stable (margin={ice_stability.get('stability_margin', 0):.2f}x). "
+                "Ice may persist at depth but subject to slow sublimation."
+            )
+        else:
+            result["notes"].append(
+                "Ice thermodynamically unstable at this location. "
+                "Any detected ice signals may be transient or require protected burial."
+            )
+
+    # ── 2. TI-εr Cross-Correlation ──
+    ti_median = thermal_inertia.get("ti_median")
+
+    # Get best available εr
+    consensus_eps = cross_val.get("consensus_epsilon_r")
+    terrace_eps = (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r")
+    physics_eps = dielectric.get("best_epsilon_r") or dielectric.get("median_epsilon_r")
+    best_eps = consensus_eps or physics_eps or terrace_eps
+
+    ti_eps_corr: Dict[str, Any] = {
+        "ti_median": ti_median,
+        "epsilon_r": best_eps,
+        "correlation": "unavailable",
+        "interpretation": "",
+    }
+
+    if ti_median is not None and best_eps is not None:
+        # Classification matrix:
+        # High TI (>300) + Low εr (<5) = strongly corroborated ice
+        # High TI (>300) + High εr (>5) = consolidated rock, not ice
+        # Low TI (<150) + Low εr (<5) = possible ice under dust, uncertain
+        # Low TI (<150) + High εr (>5) = dust over rock, no ice
+        if ti_median >= 300 and best_eps < 5.0:
+            ti_eps_corr["correlation"] = "strongly_corroborated"
+            ti_eps_corr["interpretation"] = (
+                f"High TI ({ti_median:.0f}) + ice-range εr ({best_eps:.1f}) = "
+                "ice-cemented regolith strongly corroborated"
+            )
+        elif ti_median >= 300 and best_eps >= 5.0:
+            ti_eps_corr["correlation"] = "consolidated_rock"
+            ti_eps_corr["interpretation"] = (
+                f"High TI ({ti_median:.0f}) but high εr ({best_eps:.1f}) suggests "
+                "consolidated rock rather than ice"
+            )
+        elif ti_median >= 150 and best_eps < 5.0:
+            ti_eps_corr["correlation"] = "moderate_support"
+            ti_eps_corr["interpretation"] = (
+                f"Moderate TI ({ti_median:.0f}) + ice-range εr ({best_eps:.1f}) = "
+                "possible ice beneath mixed surface"
+            )
+        elif ti_median < 150 and best_eps < 5.0:
+            ti_eps_corr["correlation"] = "uncertain_dust_covered"
+            ti_eps_corr["interpretation"] = (
+                f"Low TI ({ti_median:.0f}) + ice-range εr ({best_eps:.1f}) = "
+                "possible buried ice under dust veneer, uncertain"
+            )
+        else:
+            ti_eps_corr["correlation"] = "no_ice_indication"
+            ti_eps_corr["interpretation"] = (
+                f"Low TI ({ti_median:.0f}) + high εr ({best_eps:.1f}) = "
+                "dusty surface over rock, no ice indication"
+            )
+        result["notes"].append(ti_eps_corr["interpretation"])
+    elif ti_median is not None:
+        ti_eps_corr["interpretation"] = f"TI={ti_median:.0f} available but no εr estimate for cross-correlation"
+
+    result["ti_epsilon_correlation"] = ti_eps_corr
+
+    # ── 3. Seasonal Operation Window ──
+    if seasonal_window:
+        result["seasonal_window"] = seasonal_window
+        n_safe = seasonal_window.get("n_safe_bins", 0)
+        total = seasonal_window.get("total_bins", 12)
+        frac = seasonal_window.get("operational_fraction", 0)
+        constraints = seasonal_window.get("constraints", [])
+
+        if frac >= 0.75:
+            result["notes"].append(
+                f"Favorable operational window: {n_safe}/{total} seasons safe ({frac:.0%})."
+            )
+        elif frac >= 0.5:
+            result["notes"].append(
+                f"Moderate operational window: {n_safe}/{total} seasons safe ({frac:.0%}). "
+                f"Constraints: {', '.join(constraints)}."
+            )
+        else:
+            result["notes"].append(
+                f"Limited operational window: {n_safe}/{total} seasons safe ({frac:.0%}). "
+                f"Constraints: {', '.join(constraints)}."
+            )
+
+    # ── 4. Has Ice Evidence? ──
+    has_ice_signal = False
+    # CRISM ice detections
+    if mineral.get("ice_pixel_count", 0) > 0 or mineral.get("high_ice_count", 0) > 0:
+        has_ice_signal = True
+    # Dielectric suggests ice
+    if best_eps is not None and best_eps < 5.0:
+        has_ice_signal = True
+
+    # ── 5. Overall Compatibility Verdict ──
+    compat_score = 0.0
+    regime = ice_stability.get("sublimation_regime", "unknown")
+
+    # Ice stability component (0-0.4)
+    if regime == "stable":
+        compat_score += 0.4
+    elif regime == "marginal":
+        compat_score += 0.2
+
+    # TI-εr correlation component (0-0.3)
+    corr = ti_eps_corr.get("correlation", "unavailable")
+    if corr == "strongly_corroborated":
+        compat_score += 0.3
+    elif corr == "moderate_support":
+        compat_score += 0.2
+    elif corr == "uncertain_dust_covered":
+        compat_score += 0.1
+    elif corr == "consolidated_rock":
+        compat_score += 0.05
+
+    # Seasonal window component (0-0.2)
+    if seasonal_window:
+        compat_score += 0.2 * seasonal_window.get("operational_fraction", 0)
+
+    # Ice evidence presence (0-0.1)
+    if has_ice_signal:
+        compat_score += 0.1
+
+    compat_score = round(min(1.0, compat_score), 3)
+    result["compatibility_score"] = compat_score
+
+    # Verdict
+    if compat_score >= 0.7:
+        result["overall_compatibility"] = "highly_compatible"
+    elif compat_score >= 0.4:
+        result["overall_compatibility"] = "moderately_compatible"
+    elif compat_score >= 0.2:
+        result["overall_compatibility"] = "weakly_compatible"
+    else:
+        result["overall_compatibility"] = "incompatible"
+
+    return result
 
 
 # =============================================================================

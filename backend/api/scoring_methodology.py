@@ -556,6 +556,8 @@ def normalize_terrain(
 
 def normalize_climate(
     climate_data: Dict[str, Any],
+    thermal_inertia_data: Optional[Dict[str, Any]] = None,
+    has_ice_signal: bool = False,
 ) -> Tuple[float, Dict[str, Any]]:
     """Normalize climate suitability to 0-1.
 
@@ -566,6 +568,11 @@ def normalize_climate(
       Wind         (weight 0.20):  1.0 if mean<7 m/s, 0.5 if <10, else 0.0
       Frost        (weight 0.25):  1.0 if frost_prob<0.05, 0.5 if <0.3, else 0.0
 
+    Phase 4: TI modifier applied after base score:
+      TI >= 300 + ice signal → +0.10 bonus (ice-cemented corroboration)
+      TI >= 300 (no ice)     → +0.05 bonus (consolidated surface)
+      TI < 150 + ice signal  → -0.05 penalty (dust cover weakens ice confidence)
+
     Fallback: If ``annual_stats`` is absent, scale the legacy ``climate_score``
     (0-10 integer) to [0, 1].
 
@@ -573,6 +580,10 @@ def normalize_climate(
     ----------
     climate_data : dict
         ``synthesis["climate"]`` from ``synthesize_results``.
+    thermal_inertia_data : dict or None
+        ``synthesis["thermal_inertia"]`` for TI modifier.
+    has_ice_signal : bool
+        Whether CRISM/SHARAD detected ice evidence.
 
     Returns
     -------
@@ -584,6 +595,7 @@ def normalize_climate(
         "dust_component": 0.0,
         "wind_component": 0.0,
         "frost_component": 0.0,
+        "ti_modifier": 0.0,
         "method": "annual_stats",
         "notes": [],
     }
@@ -680,6 +692,29 @@ def normalize_climate(
             f"Used legacy climate_score={legacy} (scaled to {score:.2f})."
         )
 
+    # Phase 4: Thermal Inertia modifier
+    ti_modifier = 0.0
+    if thermal_inertia_data:
+        ti_median = thermal_inertia_data.get("ti_median")
+        if ti_median is not None:
+            if ti_median >= 300 and has_ice_signal:
+                ti_modifier = 0.10
+                breakdown["notes"].append(
+                    f"TI modifier +0.10: High TI ({ti_median:.0f}) + ice signal = ice-cemented corroboration"
+                )
+            elif ti_median >= 300:
+                ti_modifier = 0.05
+                breakdown["notes"].append(
+                    f"TI modifier +0.05: High TI ({ti_median:.0f}) = consolidated surface"
+                )
+            elif ti_median < 150 and has_ice_signal:
+                ti_modifier = -0.05
+                breakdown["notes"].append(
+                    f"TI modifier -0.05: Low TI ({ti_median:.0f}) + ice signal = dust cover weakens confidence"
+                )
+    breakdown["ti_modifier"] = round(ti_modifier, 4)
+    score = _clamp(score + ti_modifier)
+
     return round(score, 4), breakdown
 
 
@@ -747,6 +782,7 @@ def compute_composite_score(
     science_distance_km: Optional[float] = None,
     weights: Optional[Dict[str, float]] = None,
     isru_data: Optional[Dict[str, Any]] = None,
+    thermal_inertia_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Compute the full weighted composite score with all sub-scores.
 
@@ -775,6 +811,8 @@ def compute_composite_score(
         Override default weights (keys ``w1``, ``w2``, ``w3``, ``w4``).
     isru_data : dict or None
         ``synthesis["isru_assessment"]`` for ISRU-aware depth scoring.
+    thermal_inertia_data : dict or None
+        ``synthesis["thermal_inertia"]`` for TI modifier in climate scoring.
 
     Returns
     -------
@@ -795,7 +833,17 @@ def compute_composite_score(
     )
     ice_score, ice_bd = normalize_surface_ice(mineral_data, cnn_data)
     terrain_score, terrain_bd = normalize_terrain(engineering_data)
-    climate_score, climate_bd = normalize_climate(climate_data)
+    # Phase 4: Determine ice signal for TI modifier
+    has_ice_signal = (
+        mineral_data.get("ice_pixel_count", 0) > 0
+        or mineral_data.get("high_ice_count", 0) > 0
+        or cnn_data.get("water_ice_count", 0) > 0
+    )
+    climate_score, climate_bd = normalize_climate(
+        climate_data,
+        thermal_inertia_data=thermal_inertia_data,
+        has_ice_signal=has_ice_signal,
+    )
 
     # Weighted composite
     composite = (

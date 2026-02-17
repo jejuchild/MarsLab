@@ -446,6 +446,216 @@ def analyze_climate(lat: float, lon: float) -> ClimateResult:
     )
 
 
+# ---------------------------------------------------------------------------
+# Ice Stability Analysis (Phase 4)
+# ---------------------------------------------------------------------------
+
+# Clausius-Clapeyron constants for water ice sublimation
+# Ref: Murphy & Koop (2005), Buck (1981)
+_H2O_SUBLIMATION_HEAT_J = 51_058.0  # J/mol latent heat of sublimation
+_R_GAS = 8.314  # J/(mol·K) universal gas constant
+_TRIPLE_POINT_T_K = 273.16  # Water triple point temperature
+_TRIPLE_POINT_P_PA = 611.657  # Water triple point pressure
+
+
+def _water_vapor_pressure_pa(temp_k: float) -> float:
+    """
+    Water vapor saturation pressure over ice via Clausius-Clapeyron.
+
+    P(T) = P_triple * exp(-ΔH_sub/R * (1/T - 1/T_triple))
+
+    Valid for T < 273.16 K (ice phase).
+    """
+    if temp_k <= 0:
+        return 0.0
+    return _TRIPLE_POINT_P_PA * math.exp(
+        -_H2O_SUBLIMATION_HEAT_J / _R_GAS * (1.0 / temp_k - 1.0 / _TRIPLE_POINT_T_K)
+    )
+
+
+def compute_ice_stability(
+    lat_deg: float,
+    lon: float = 0.0,
+    elevation_m: float = 0.0,
+) -> dict:
+    """
+    Determine whether near-surface water ice is thermodynamically stable.
+
+    Uses annual mean ground temperature to compute equilibrium vapor
+    pressure vs. ambient atmospheric water vapor partial pressure.
+
+    On Mars, atmospheric H2O column ~10 pr-µm → surface mixing ratio
+    yields partial pressure ~0.01-0.1 Pa. Ice is stable where the
+    equilibrium vapor pressure at ground temperature is below this.
+
+    Returns dict with:
+        ice_table_stable (bool): Whether ice can persist at shallow depth
+        annual_mean_temp_k (float): Mean annual ground temperature
+        equilibrium_vapor_pressure_pa (float): H2O vapor pressure at mean T
+        atmospheric_h2o_pa (float): Estimated atmospheric water vapor pressure
+        stability_margin (float): ratio atm_h2o / equil_vp (>1 = stable)
+        estimated_ice_table_depth_m (float or None): Estimated depth to ice table
+        sublimation_regime (str): "stable", "marginal", "sublimating"
+    """
+    # Compute annual mean ground temperature (average across 12 Ls bins)
+    temps = []
+    for ls in _LS_BINS:
+        t = surface_temperature_k(lat_deg, ls, elevation_m)
+        temps.append(t["mean_k"])
+
+    annual_mean_t = sum(temps) / len(temps)
+    annual_min_t = min(temps)
+
+    # Equilibrium vapor pressure at annual mean temperature
+    equil_vp = _water_vapor_pressure_pa(annual_mean_t)
+
+    # Atmospheric H2O partial pressure
+    # Mars atmospheric H2O: ~10 precipitable microns at equator, ~30 at poles
+    # At ~636 Pa surface pressure, mixing ratio ~1.5e-4
+    # Partial pressure: ~0.01-0.1 Pa, latitude dependent
+    atm_pressure = surface_pressure_pa(elevation_m)
+    # Higher water vapor at mid-latitudes (seasonal sublimation from caps)
+    abs_lat = abs(lat_deg)
+    if abs_lat > 60:
+        mixing_ratio = 3e-4  # Polar: higher near caps
+    elif abs_lat > 30:
+        mixing_ratio = 1.5e-4  # Mid-latitude
+    else:
+        mixing_ratio = 0.5e-4  # Equatorial: drier
+    atm_h2o_pa = atm_pressure * mixing_ratio
+
+    # Stability: ice is stable if equilibrium VP <= atmospheric H2O PP
+    # A stability margin > 1 means ice can persist
+    if equil_vp > 0:
+        stability_margin = atm_h2o_pa / equil_vp
+    else:
+        stability_margin = float("inf")
+
+    ice_stable = stability_margin >= 1.0
+
+    # Sublimation regime classification
+    if stability_margin >= 2.0:
+        regime = "stable"
+    elif stability_margin >= 0.5:
+        regime = "marginal"
+    else:
+        regime = "sublimating"
+
+    # Estimated ice table depth (Schorghofer 2005 approximation)
+    # Depth increases toward equator as surface gets warmer
+    # At polar latitudes: ~0 cm (surface ice), mid-lats: ~5-100 cm
+    if ice_stable:
+        if abs_lat > 60:
+            ice_table_depth = 0.0  # Surface or very shallow
+        elif abs_lat > 45:
+            ice_table_depth = 0.05 + (60 - abs_lat) * 0.02  # 5-35 cm
+        elif abs_lat > 30:
+            ice_table_depth = 0.35 + (45 - abs_lat) * 0.1  # 0.35-1.85 m
+        else:
+            ice_table_depth = 2.0 + (30 - abs_lat) * 0.3  # 2-11 m
+    elif regime == "marginal":
+        # Marginally stable: ice may persist at greater depth
+        ice_table_depth = 5.0 + (1.0 / max(stability_margin, 0.01)) * 2.0
+    else:
+        ice_table_depth = None  # Ice not expected to persist
+
+    return {
+        "ice_table_stable": ice_stable,
+        "annual_mean_temp_k": round(annual_mean_t, 1),
+        "annual_min_temp_k": round(annual_min_t, 1),
+        "equilibrium_vapor_pressure_pa": round(equil_vp, 6),
+        "atmospheric_h2o_pa": round(atm_h2o_pa, 6),
+        "stability_margin": round(stability_margin, 3),
+        "estimated_ice_table_depth_m": round(ice_table_depth, 2) if ice_table_depth is not None else None,
+        "sublimation_regime": regime,
+    }
+
+
+def compute_seasonal_operation_window(
+    lat_deg: float,
+    lon: float = 0.0,
+    elevation_m: float = 0.0,
+) -> dict:
+    """
+    Determine which Ls bins are safe for surface operations.
+
+    A bin is "safe" if:
+      - No seasonal CO2 frost (frost_probability < 0.3)
+      - Low dust risk (tau_peak < 2.0)
+      - Acceptable wind (gust < 20 m/s)
+      - Temperature above operational minimum (> 160 K mean)
+
+    Returns dict with:
+        safe_bins: list of Ls values that are safe
+        n_safe_bins: count (out of 12)
+        operational_fraction: fraction of Mars year safe for operations
+        best_season_ls: Ls bin with best combined conditions
+        worst_season_ls: Ls bin with worst conditions
+        constraints: list of limiting factors
+    """
+    safe_bins = []
+    bin_scores = []
+    constraints = set()
+
+    for i, ls in enumerate(_LS_BINS):
+        t = surface_temperature_k(lat_deg, ls, elevation_m)
+        d = dust_opacity(lat_deg, ls)
+        w = wind_speed(lat_deg, ls)
+        f = co2_frost_probability(lat_deg, ls, elevation_m)
+
+        is_safe = True
+        bin_score = 0.0
+
+        # Frost check
+        if f["frost_probability"] >= 0.3:
+            is_safe = False
+            constraints.add("CO2_frost")
+        else:
+            bin_score += 0.25 * (1.0 - f["frost_probability"])
+
+        # Dust check
+        if d["tau_peak"] >= 2.0:
+            is_safe = False
+            constraints.add("dust_storms")
+        else:
+            bin_score += 0.25 * max(0, 1.0 - d["tau_peak"] / 2.0)
+
+        # Wind check
+        if w["gust_ms"] >= 20:
+            is_safe = False
+            constraints.add("high_wind")
+        else:
+            bin_score += 0.25 * max(0, 1.0 - w["gust_ms"] / 20.0)
+
+        # Temperature check
+        if t["mean_k"] <= 160:
+            is_safe = False
+            constraints.add("extreme_cold")
+        else:
+            bin_score += 0.25 * min(1.0, (t["mean_k"] - 160) / 55.0)
+
+        if is_safe:
+            safe_bins.append(ls)
+        bin_scores.append((ls, round(bin_score, 3)))
+
+    n_safe = len(safe_bins)
+    best = max(bin_scores, key=lambda x: x[1])
+    worst = min(bin_scores, key=lambda x: x[1])
+
+    return {
+        "safe_bins": safe_bins,
+        "n_safe_bins": n_safe,
+        "total_bins": len(_LS_BINS),
+        "operational_fraction": round(n_safe / len(_LS_BINS), 2),
+        "best_season_ls": best[0],
+        "best_season_score": best[1],
+        "worst_season_ls": worst[0],
+        "worst_season_score": worst[1],
+        "constraints": sorted(constraints),
+        "bin_scores": bin_scores,
+    }
+
+
 def climate_analysis_for_region(
     min_lat: float, max_lat: float, min_lon: float, max_lon: float,
 ) -> dict:
@@ -492,6 +702,10 @@ def climate_analysis_for_region(
     # Use center point as primary
     center = results[0]
 
+    # Phase 4: Ice stability and seasonal operation window
+    ice_stability = compute_ice_stability(center_lat, center_lon, center.elevation_m)
+    seasonal_window = compute_seasonal_operation_window(center_lat, center_lon, center.elevation_m)
+
     return {
         "success": True,
         "center_lat": center_lat,
@@ -509,4 +723,6 @@ def climate_analysis_for_region(
             "min": round(min(subscores), 4),
             "max": round(max(subscores), 4),
         },
+        "ice_stability": ice_stability,
+        "seasonal_operation_window": seasonal_window,
     }
