@@ -56,8 +56,8 @@ DEFAULT_MIN_DEPTH_M = 100.0
 def generate_tile_grid(
     lat_step_deg: float = 2.5,
     lon_step_deg: float = 3.0,
-    lat_min: float = -88.0,
-    lat_max: float = 88.0,
+    lat_min: float = -75.0,
+    lat_max: float = 75.0,
 ) -> list[tuple[float, float]]:
     """
     Generate a latitude-adaptive tile grid covering Mars.
@@ -65,14 +65,17 @@ def generate_tile_grid(
     At higher latitudes, longitude steps are widened proportionally
     to 1/cos(lat) to maintain roughly equal tile areas.
 
+    Latitude range capped at ±75° to avoid oversized DEM windows
+    at the poles (where equirectangular projection inflates pixel counts).
+
     Returns list of (lat, lon) center coordinates.
     """
     tiles = []
     lat = lat_min
     while lat <= lat_max:
         # Adjust longitude step for latitude convergence
-        cos_lat = max(math.cos(math.radians(lat)), 0.15)  # clamp for near-poles
-        effective_lon_step = min(lon_step_deg / cos_lat, 60.0)  # cap at 60°
+        cos_lat = max(math.cos(math.radians(lat)), 0.25)
+        effective_lon_step = min(lon_step_deg / cos_lat, 30.0)
 
         lon = -180.0
         while lon < 180.0:
