@@ -1,0 +1,57 @@
+{
+  "candidate_id": "Arcadia Planitia",
+  "lat": 49.019999999999996,
+  "lon": 8.14500000000001,
+  "ice_probability": 0.366,
+  "confidence": 0.683,
+  "evidence": {
+    "E1_hyperbola": {
+      "score": 0.193,
+      "epsr": 1.673,
+      "ci": [
+        1.673,
+        1.673
+      ],
+      "flags": [
+        "CLUTTER_RISK_HIGH"
+      ],
+      "notes": "Auto-fit \u03b5r=1.67, SNR=281.8"
+    },
+    "E2_reflector": {
+      "score": 0.7,
+      "snr_stats": {
+        "best_snr": 350.91,
+        "best_continuity": 1.0
+      },
+      "continuity": 1.0,
+      "notes": "Found 179 reflector segment(s) in 5 tracks. Best SNR=350.9, best continuity=100%, nearest=3337 km from candidate. Strong coherent subsurface reflector detected \u2014 evidence supports subsurface interface."
+    },
+    "E3_terrain": {
+      "score": 0.985,
+      "slope_stats": {
+        "mean_slope_deg": 0.25,
+        "p95_slope_deg": 0.45
+      },
+      "roughness_proxy": 0.117,
+      "notes": "Terrain from MOLA/HRSC DEM: mean slope=0.2\u00b0, P95=0.5\u00b0, roughness \u03c3=0.12\u00b0. Smooth, low-slope terrain \u2014 consistent with mantled icy plains."
+    },
+    "E4_crism": {
+      "score": 0.0,
+      "ice_score": 0.0,
+      "hyd_score": 0.0,
+      "distance_km": 0.0,
+      "notes": "No CRISM products found within 200.0 km"
+    }
+  },
+  "consistency": {
+    "agreement_score": 0.05,
+    "conflicts": [
+      "E2 strong (0.70) but E4 weak (0.00) \u2014 inconsistent"
+    ]
+  },
+  "artifacts": {
+    "json_path": "",
+    "optional_png_paths": []
+  },
+  "_saved_at": "2026-02-17T02:24:16.565812"
+}

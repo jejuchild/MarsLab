@@ -188,7 +188,8 @@
       "Bash(cat:*)",
       "Bash(do echo -n \"$obs: \")",
       "Bash(conda info:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "WebFetch(domain:console.groq.com)"
     ]
   }
 }

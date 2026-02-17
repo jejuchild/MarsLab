@@ -1,0 +1,655 @@
+{
+  "version": "2.0",
+  "session_id": "ce1d2551",
+  "objective": " Search for shallow ice deposits and build a rover track in Arcadia Planitia by cross-instrument analysis, crism, crism trr, hirise dtm, hirise, ctx, sharad high-res, slope, etc\n",
+  "generated_at": "2026-02-17T02:36:58.605293+00:00",
+  "region": {
+    "name": "Arcadia Planitia",
+    "bbox": {
+      "min_lat": 33.87,
+      "max_lat": 64.17,
+      "min_lon": 165.86,
+      "max_lon": -149.57
+    },
+    "center_lat": 49.02,
+    "center_lon": 8.145,
+    "science_context": "Region: Arcadia Planitia\nDescription: Northern lowland plain between 38-60\u00b0N with extensive evidence for near-surface ice deposits. The region shows polygonal terrain and periglacial landforms indicative of ground ice. SHARAD radar has detected widespread subsurface reflectors consistent with an ice table at shallow depths.\nIce confidence: high\nKnown minerals: water ice, dust mantle, basaltic regolith\nKey findings:\n  - SHARAD detected subsurface ice deposits extending to depths of 20-40m (Bramson et al. 2015)\n  - Fresh impact craters expose clean water ice at depths of 1-10m (Dundas et al. 2014)\n  - Polygonal terrain widespread, suggesting thermal contraction of ice-rich regolith (Levy et al. 2009)\n  - Hydrogen abundance from neutron spectroscopy indicates >40% ice by volume in upper meter (Feldman et al. 2004)\nLanding suitability: Strong candidate for ISRU missions due to accessible shallow ice, flat terrain, and low elevation, though latitude (~47\u00b0N) limits solar power availability.\nReferences: Bramson+2015, Dundas+2014, Dundas+2018, Levy+2009, Feldman+2004"
+  },
+  "sharad": {
+    "coverage": "EXCELLENT",
+    "total_tracks": 92,
+    "analyzed_count": 92,
+    "subsurface_detections": 21,
+    "depth_summary": {
+      "dielectric_scenarios": [
+        {
+          "epsilon_r": 2.8,
+          "label": "porous_ice",
+          "description": "Porous ice/regolith mix"
+        },
+        {
+          "epsilon_r": 3.15,
+          "label": "pure_ice",
+          "description": "Pure water ice"
+        },
+        {
+          "epsilon_r": 4.0,
+          "label": "basaltic",
+          "description": "Basaltic contrast interface"
+        }
+      ],
+      "depth_ranges": {
+        "porous_ice": {
+          "min": 67.2,
+          "max": 157.9,
+          "median": 84.0,
+          "epsilon_r": 2.8
+        },
+        "pure_ice": {
+          "min": 63.3,
+          "max": 148.9,
+          "median": 79.2,
+          "epsilon_r": 3.15
+        },
+        "basaltic": {
+          "min": 56.2,
+          "max": 132.1,
+          "median": 70.3,
+          "epsilon_r": 4.0
+        }
+      },
+      "n_tracks": 21,
+      "min_depth_m": 63.3,
+      "max_depth_m": 148.9,
+      "median_depth_m": 79.2,
+      "epsilon_r_assumed": 3.15,
+      "epsilon_r_source": "assumed",
+      "physics_warning": "Depth computed from assumed \u03b5r=3.15 (water-ice). This is NOT an independent physical measurement. Physics-based dielectric inversion required for validated depth."
+    },
+    "snr_distribution": {
+      "mean": 16.34,
+      "median": 12.39,
+      "std": 13.87,
+      "min": 4.7,
+      "max": 133.19,
+      "histogram": [
+        7,
+        28,
+        28,
+        65,
+        28,
+        39
+      ]
+    },
+    "clutter_rejection": "Subsurface reflectors are identified by SNR >= 4.0 threshold relative to local noise floor (median power in search window). Coherence filtering removes detections with coefficient of variation > 30% across sampled traces to reject off-nadir surface clutter. Remaining outliers beyond 2 sigma of median depth are removed.",
+    "reflector_density_per_km": 0.0,
+    "epsilon_r_source": "assumed"
+  },
+  "dielectric": {
+    "method_hierarchy": [
+      {
+        "method": "physics_inversion",
+        "status": "attempted_failed",
+        "reason": "unknown"
+      },
+      {
+        "method": "terraced_crater",
+        "status": "attempted_failed",
+        "reason": "no_reliable_estimates"
+      }
+    ],
+    "best_method": "none",
+    "epsilon_r": null,
+    "epsilon_r_ci": null,
+    "epsilon_r_gaussian": null,
+    "sensitivity_table": null,
+    "reflector_confidence": 0,
+    "interpretation": "",
+    "is_fallback": true,
+    "physics_attempted": true,
+    "assumptions": [],
+    "derivation_log": [],
+    "terrace_estimates": [],
+    "terrace_median_epsilon_r": null,
+    "terrace_estimates_count": 0,
+    "physics_inversions_completed": 0,
+    "physics_methodology": ""
+  },
+  "crism": {
+    "crism_count": 218,
+    "high_ice_count": 45,
+    "high_hyd_count": 125,
+    "top_ice_candidates": [
+      {
+        "product_id": "frt000100ce_07_if167j_mtr3",
+        "obs_id": "frt000100ce",
+        "lat": 46.1905,
+        "lon": -171.48275,
+        "ice_percent": 69.1,
+        "ice_mean_score": 0.59,
+        "ice_max_score": 2.0,
+        "hyd_percent": 37.5,
+        "has_score": true
+      },
+      {
+        "product_id": "frt000100ce_07_brcarj_mtr3",
+        "obs_id": "frt000100ce",
+        "lat": 46.1903755,
+        "lon": -171.482585,
+        "ice_percent": 69.1,
+        "ice_mean_score": 0.59,
+        "ice_max_score": 2.0,
+        "hyd_percent": 37.5,
+        "has_score": true
+      },
+      {
+        "product_id": "frt00008a1e_07_if168j_mtr3",
+        "obs_id": "frt00008a1e",
+        "lat": 55.2403,
+        "lon": 171.9808,
+        "ice_percent": 67.5,
+        "ice_mean_score": 0.581,
+        "ice_max_score": 1.696,
+        "hyd_percent": 1.5,
+        "has_score": true
+      },
+      {
+        "product_id": "frt00020427_07_if167j_mtr3",
+        "obs_id": "frt00020427",
+        "lat": 54.6222,
+        "lon": 213.4462,
+        "ice_percent": 65.1,
+        "ice_mean_score": 0.615,
+        "ice_max_score": 2.0,
+        "hyd_percent": 0.1,
+        "has_score": true
+      },
+      {
+        "product_id": "frt000096a3_07_if168j_mtr3",
+        "obs_id": "frt000096a3",
+        "lat": 52.123421,
+        "lon": 167.11581,
+        "ice_percent": 57.5,
+        "ice_mean_score": 0.408,
+        "ice_max_score": 2.0,
+        "hyd_percent": 21.7,
+        "has_score": true
+      }
+    ],
+    "ice_hotspot": {
+      "center_lat": 50.873,
+      "center_lon": 41.915,
+      "n_products": 5,
+      "max_ice_pct": 69.1
+    }
+  },
+  "cnn": {
+    "observations_classified": 0,
+    "top_minerals": [],
+    "ice_detected": false,
+    "ice_types": [],
+    "h2o_total_pixels": 0,
+    "co2_total_pixels": 0,
+    "h2o_rich_observations": 0,
+    "h2o_hotspot": null
+  },
+  "cross_instrument": {
+    "evidence_consistency": "non_correlated",
+    "coincident_detections": 0,
+    "sharad_crism_min_distance_km": 1515.6,
+    "direct_ice_evidence": [
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_5601801_001_SS19_700_A",
+        "lat": 52.46115,
+        "lon": 0.002600000000001046,
+        "depth_m": 82.3
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_0674101_001_SS19_700_A",
+        "lat": 52.73864999999999,
+        "lon": -0.006200000000006867,
+        "depth_m": 74.4
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_0617401_001_SS19_700_A",
+        "lat": 44.96825,
+        "lon": 0.00549999999999784,
+        "depth_m": 82.3
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_0774301_001_SS19_700_A",
+        "lat": 44.9172,
+        "lon": -0.001649999999997931,
+        "depth_m": 66.5
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_7714503_001_SS4_700_A",
+        "lat": 52.2946,
+        "lon": -162.50635,
+        "depth_m": 74.4
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_3854602_001_SS19_700_A",
+        "lat": 49.6913,
+        "lon": -177.14375,
+        "depth_m": 90.2
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_3940302_001_SS19_700_A",
+        "lat": 47.6125,
+        "lon": -168.1454,
+        "depth_m": 79.2
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_3990401_001_SS19_700_A",
+        "lat": 46.602599999999995,
+        "lon": -165.09505000000001,
+        "depth_m": 77.6
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_4018103_001_SS19_700_A",
+        "lat": 46.70625,
+        "lon": -168.1832,
+        "depth_m": 85.5
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_3898101_001_SS19_700_A",
+        "lat": 46.5499,
+        "lon": -166.21744999999999,
+        "depth_m": 85.5
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_1297701_001_SS19_700_A",
+        "lat": 44.7297,
+        "lon": -161.3986,
+        "depth_m": 71.2
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_0749201_001_SS19_700_A",
+        "lat": 44.73995,
+        "lon": -164.53314999999998,
+        "depth_m": 71.2
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_0753201_001_SS19_700_A",
+        "lat": 44.7651,
+        "lon": -176.84555,
+        "depth_m": 79.2
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_3913901_001_SS19_700_A",
+        "lat": 43.6221,
+        "lon": -160.88215,
+        "depth_m": 79.2
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_6535401_001_SS4_700_A",
+        "lat": 42.52,
+        "lon": -166.14715,
+        "depth_m": 85.5
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_4033901_001_SS19_700_A",
+        "lat": 41.73035,
+        "lon": -162.5491,
+        "depth_m": 91.8
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_5716501_001_SS19_700_A",
+        "lat": 40.4401,
+        "lon": -165.6267,
+        "depth_m": 72.8
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_0362901_001_SS19_700_A",
+        "lat": 38.40475,
+        "lon": -176.57075,
+        "depth_m": 79.2
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_7590502_001_SS4_700_A",
+        "lat": 29.7457,
+        "lon": -162.81215,
+        "depth_m": 79.2
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_6654102_001_SS4_700_A",
+        "lat": 29.7249,
+        "lon": -163.99885,
+        "depth_m": 72.8
+      },
+      {
+        "type": "SHARAD_reflector",
+        "product_id": "R_7490301_001_SS4_700_A",
+        "lat": 29.7569,
+        "lon": -168.0958,
+        "depth_m": 82.3
+      }
+    ],
+    "indirect_ice_evidence": [
+      {
+        "type": "CRISM_spectral",
+        "obs_id": "frt000100ce",
+        "lat": 46.1905,
+        "lon": -171.48275,
+        "ice_percent": 69.1
+      },
+      {
+        "type": "CRISM_spectral",
+        "obs_id": "frt000100ce",
+        "lat": 46.1903755,
+        "lon": -171.482585,
+        "ice_percent": 69.1
+      },
+      {
+        "type": "CRISM_spectral",
+        "obs_id": "frt00008a1e",
+        "lat": 55.2403,
+        "lon": 171.9808,
+        "ice_percent": 67.5
+      },
+      {
+        "type": "CRISM_spectral",
+        "obs_id": "frt00020427",
+        "lat": 54.6222,
+        "lon": 213.4462,
+        "ice_percent": 65.1
+      },
+      {
+        "type": "CRISM_spectral",
+        "obs_id": "frt000096a3",
+        "lat": 52.123421,
+        "lon": 167.11581,
+        "ice_percent": 57.5
+      }
+    ],
+    "targeted_ice_subsurface": {
+      "ice_locations_checked": 5,
+      "ice_locations_with_sharad": 1,
+      "reflectors_at_ice": 1,
+      "targeted_picks": [
+        {
+          "ice_source": "CRISM",
+          "ice_lat": 50.873,
+          "ice_lon": 41.915,
+          "ice_product_id": "ice_hotspot",
+          "sharad_product_id": null,
+          "distance_km": null,
+          "reflector_detected": false,
+          "note": "No SHARAD track within 30 km"
+        },
+        {
+          "ice_source": "CRISM",
+          "ice_lat": 46.1905,
+          "ice_lon": -171.48275,
+          "ice_product_id": "frt000100ce",
+          "ice_percent": 69.1,
+          "sharad_product_id": "R_1274004_001_SS19_700_A",
+          "distance_km": 17.6,
+          "reflector_detected": true,
+          "n_picks": 1330,
+          "median_snr": 87.9,
+          "twt_us": 0.9375,
+          "depth_m_assumed": 79.2,
+          "epsilon_r_note": "Depth uses assumed \u03b5r=3.15 (not measured)"
+        },
+        {
+          "ice_source": "CRISM",
+          "ice_lat": 55.2403,
+          "ice_lon": 171.9808,
+          "ice_product_id": "frt00008a1e",
+          "sharad_product_id": null,
+          "distance_km": null,
+          "reflector_detected": false,
+          "note": "No SHARAD track within 30 km"
+        },
+        {
+          "ice_source": "CRISM",
+          "ice_lat": 54.6222,
+          "ice_lon": 213.4462,
+          "ice_product_id": "frt00020427",
+          "sharad_product_id": null,
+          "distance_km": null,
+          "reflector_detected": false,
+          "note": "No SHARAD track within 30 km"
+        },
+        {
+          "ice_source": "CRISM",
+          "ice_lat": 52.123421,
+          "ice_lon": 167.11581,
+          "ice_product_id": "frt000096a3",
+          "sharad_product_id": null,
+          "distance_km": null,
+          "reflector_detected": false,
+          "note": "No SHARAD track within 30 km"
+        }
+      ]
+    },
+    "stratigraphic_interpretation": {
+      "interpretation": "insufficient_data",
+      "notes": []
+    },
+    "notes": [
+      "CRISM ice cluster >300 km from nearest SHARAD reflector \u2014 classified as separate system"
+    ],
+    "sharad_crism_geometric_intersections": 804,
+    "sharad_hirise_geometric_intersections": 0,
+    "sharad_dtm_geometric_intersections": 0
+  },
+  "engineering": {
+    "safety": "FAVORABLE",
+    "mean_slope": 1.46,
+    "max_slope": 31.7,
+    "favorable_zones": 191,
+    "grid_size": 225,
+    "elevation_m": -3612.0,
+    "best_site": {
+      "lat": 33.87,
+      "lon": 165.86,
+      "mean_slope": 1.7,
+      "pct_below_5deg": 100.0
+    }
+  },
+  "climate": {
+    "climate_score": 0,
+    "climate_summary": "",
+    "annual_stats": {}
+  },
+  "thermal_inertia": {
+    "ti_score": 0,
+    "ti_median": null,
+    "ti_mean": null,
+    "classification": "",
+    "distribution_pct": {},
+    "ti_explanation": ""
+  },
+  "scoring": {
+    "overall_score": 40,
+    "score_range": {
+      "low": 37,
+      "high": 46
+    },
+    "recommendation": "PROMISING_WITH_CAVEATS",
+    "recommendation_v2": {
+      "classification": "Screening-level",
+      "confidence": "LOW",
+      "rationale": "Score 0.40 is in the intermediate range. Evidence is INCONCLUSIVE. Additional data collection is needed before a definitive recommendation.",
+      "critical_flags": []
+    },
+    "evidence_strength": {
+      "subsurface": "MODERATE",
+      "surface_ice": "MODERATE",
+      "terrain": "MODERATE",
+      "climate": "INCONCLUSIVE",
+      "overall": "INCONCLUSIVE"
+    },
+    "scoring_model": {
+      "composite_score": 0.555,
+      "composite_score_100": 56,
+      "weights": {
+        "w1": 0.3,
+        "w2": 0.25,
+        "w3": 0.25,
+        "w4": 0.2
+      },
+      "weight_justification": "w1=0.30 (Subsurface Potential): Subsurface ice is the primary mission objective; SHARAD provides the only direct volumetric ice measurement capability from orbit, making it the single most discriminating dataset for landing site selection.\nw2=0.25 (Surface Ice): Surface ice confirmation via CRISM spectral analysis and CNN mineral classification provides independent validation of ice accessibility.  Two complementary detection methods (spectral indices and deep-learning classification) increase confidence when they agree.\nw3=0.25 (Terrain Safety): Terrain safety is a binary gate -- a site must be landable regardless of science value.  Slope statistics, roughness, and favorable-zone fraction determine whether EDL (Entry, Descent, and Landing) is feasible.\nw4=0.20 (Climate Suitability): Climate affects the operational window (dust storms, CO2 frost, wind loads) but is less discriminating between mid-latitude sites because Mars climate varies more with latitude than with longitude at the same latitude band.",
+      "sub_scores": {
+        "subsurface_potential": {
+          "score": 0.6,
+          "breakdown": {
+            "base_score": 0.6,
+            "depth_category": "moderate_30-80m",
+            "n_detections": 21,
+            "dielectric_bonus": 0.0,
+            "cross_instrument_adjustment": 0.0,
+            "notes": [
+              "Reflectors at ~79 m depth -- moderate drilling required.",
+              "No dielectric constant estimation was performed. Depth estimates use assumed \u03b5r=3.15 (water-ice) \u2014 this is a non-physical fallback, not evidence of ice."
+            ],
+            "fallback_penalty": 0.0,
+            "dielectric_method": "assumed"
+          }
+        },
+        "surface_ice": {
+          "score": 0.5,
+          "breakdown": {
+            "crism_component": 0.5,
+            "cnn_component": 0.0,
+            "crism_high_ice_count": 45,
+            "cnn_h2o_rich_observations": 0,
+            "cnn_h2o_observations": 0,
+            "has_spatial_coherence": true,
+            "notes": [
+              "Strong CRISM ice: 45 high-ice observations with spatial coherence (hotspot detected).",
+              "No CNN mineral classification data available."
+            ]
+          }
+        },
+        "terrain_safety": {
+          "score": 1.0,
+          "breakdown": {
+            "safety_class": "FAVORABLE",
+            "base_score": 1.0,
+            "favorable_fraction": 0.849,
+            "roughness_penalty": 0.0,
+            "mean_slope": 1.46,
+            "max_slope": 31.7,
+            "notes": [
+              "FAVORABLE terrain with 85% favorable grid zones -- excellent landing conditions."
+            ]
+          }
+        },
+        "climate": {
+          "score": 0.0,
+          "breakdown": {
+            "temperature_component": 0.0,
+            "dust_component": 0.0,
+            "wind_component": 0.0,
+            "frost_component": 0.0,
+            "method": "no_data",
+            "notes": [
+              "No climate data available."
+            ]
+          }
+        }
+      },
+      "science_distance_penalty": {
+        "applied": true,
+        "distance_km": 879.6,
+        "factor": 0.5
+      },
+      "final_score": 0.4025,
+      "final_score_100": 40
+    },
+    "strengths": [
+      "SHARAD subsurface: Reflectors at ~79 m depth -- moderate drilling required. No dielectric constant estimation was performed. Depth estimates use assumed \u03b5r=3.15 (water-ice) \u2014 this is a non-physical fallback, not evidence of ice.",
+      "Surface ice evidence: Strong CRISM ice: 45 high-ice observations with spatial coherence (hotspot detected). No CNN mineral classification data available.",
+      "Terrain: FAVORABLE terrain with 85% favorable grid zones -- excellent landing conditions."
+    ],
+    "uncertainties": [
+      "Cross-instrument: non correlated"
+    ]
+  },
+  "landing_site": {
+    "primary_site": {
+      "lat": 53.349,
+      "lon": 8.145,
+      "score": 52,
+      "elevation_m": -4379.0,
+      "mean_slope": 0.35,
+      "reasons": [
+        "Flat terrain: 100% below 5 deg, mean 0.35 deg",
+        "SHARAD subsurface detection 292 km away"
+      ]
+    },
+    "secondary_site": {
+      "lat": 33.87,
+      "lon": 165.86,
+      "score": 40,
+      "elevation_m": -3612.0,
+      "mean_slope": 1.7,
+      "reasons": [
+        "Flat terrain: 100% below 5 deg, mean 1.7 deg"
+      ]
+    },
+    "science_targets": [
+      {
+        "lat": 46.1905,
+        "lon": -171.48275,
+        "obs_id": "frt000100ce",
+        "ice_percent": 69.1,
+        "reason": "High CRISM ice signature (69.1% ice) \u2014 potential traverse target"
+      },
+      {
+        "lat": 46.1903755,
+        "lon": -171.482585,
+        "obs_id": "frt000100ce",
+        "ice_percent": 69.1,
+        "reason": "High CRISM ice signature (69.1% ice) \u2014 potential traverse target"
+      },
+      {
+        "lat": 55.2403,
+        "lon": 171.9808,
+        "obs_id": "frt00008a1e",
+        "ice_percent": 67.5,
+        "reason": "High CRISM ice signature (67.5% ice) \u2014 potential traverse target"
+      }
+    ],
+    "trade_offs": [
+      "3 science target(s) identified outside the primary landing zone that may require extended traverse capability."
+    ]
+  },
+  "instruments_searched": [
+    "CRISM",
+    "SHARAD_HIGHRES"
+  ],
+  "total_products_found": 310,
+  "total_available_locally": 173,
+  "total_downloaded": 28,
+  "physics_pipeline_warnings": [
+    "SHARAD physics inversion failed: 'DerivationStep' object has no attribute 'step'. Subsurface characterization relies on heuristic methods only.",
+    "CRISM spectral analysis (SAM + band parameters) was NOT performed. Mineral classification relies on threshold-based scoring only.",
+    "No HiRISE DTM products found. Terraced crater depth constraints unavailable. Dielectric inversion cannot be performed without independent depth measurements."
+  ],
+  "narrative": "## Mission Assessment: Arcadia Planitia\n\nThis assessment evaluates the suitability of Arcadia Planitia for a surface mission, prioritizing subsurface ice potential and surface composition evidence before applying engineering terrain constraints as a final filter.\n\n### Methodology\n\n**SHARAD Subsurface**: Depth estimated assuming \u03b5r = 3.15 (pure water ice). \u26a0 This is an ASSUMED value, not independently measured.\n\n**CRISM Ice Detection**: Threshold-based ice scoring (\u22655% pixels above 0.3 index). Physics-based spectral analysis was not performed.\n\n**\u26a0 Physics Pipeline Warnings:**\n  - SHARAD physics inversion failed: 'DerivationStep' object has no attribute 'step'. Subsurface characterization relies on heuristic methods only.\n  - CRISM spectral analysis (SAM + band parameters) was NOT performed. Mineral classification relies on threshold-based scoring only.\n  - No HiRISE DTM products found. Terraced crater depth constraints unavailable. Dielectric inversion cannot be performed without independent depth measurements.\n\n### Subsurface Potential (SHARAD Radar)\nSHARAD radargram analysis of 92 tracks yielded **21 subsurface reflector detection(s)**, providing direct evidence of a dielectric interface beneath the surface.\nAssuming a water-ice dielectric constant (\u03b5r = 3.15), the estimated ice-table depth ranges from **63.3 to 148.9 m** (median 79.2 m). This depth is significant and would require substantial drilling capability.\n\n### Surface / Near-Surface Composition (CRISM)\nOf 218 CRISM products analyzed, **45** exhibit significant ice spectral signatures (>5% of pixels above 0.3 threshold) and 125 show hydration indicators.\nIce signatures cluster near **(50.87, 41.91)**, representing the centroid of 5 high-ice observations (maximum 69.1% ice coverage). CRISM detections represent indirect (spectral proxy) evidence of surface or near-surface ice/hydration.\nStrongest ice candidate: **frt000100ce** at (46.19, -171.48) with 69.1% ice-indicative pixels.\n\n### Cross-Instrument Consistency Analysis\nCRISM ice cluster >300 km from nearest SHARAD reflector \u2014 classified as separate system\n\nMinimum SHARAD\u2013CRISM separation: **1516 km**. Coincident detections (SHARAD track within 100 km of CRISM ice): **0**.\n\nEvidence summary: 21 direct (SHARAD reflector) and 5 indirect (CRISM spectral) ice indicators.\n\n### Engineering Feasibility (Terrain \u2014 Final Filter)\nTerrain assessment is applied as a final constraint, not as the primary site-selection driver.\nOverall safety: **FAVORABLE** \u2014 mean slope 1.46 deg, max 31.7 deg.\nGrid analysis (225 points): 191 FAVORABLE, 34 marginal or unfavorable.\n\n### Landing Site Decision\n**Primary Landing Site:** (53.349, 8.145) \u2014 composite score 52/100, mean slope 0.35 deg\n  - Flat terrain: 100% below 5 deg, mean 0.35 deg\n  - SHARAD subsurface detection 292 km away\n\n**Secondary (Backup) Site:** (33.870, 165.860) \u2014 score 40/100, slope 1.7 deg\n\n**Science Targets** (non-landing, traverse candidates):\n  - (46.19, -171.48): High CRISM ice signature (69.1% ice) \u2014 potential traverse target\n  - (46.19, -171.48): High CRISM ice signature (69.1% ice) \u2014 potential traverse target\n  - (55.24, 171.98): High CRISM ice signature (67.5% ice) \u2014 potential traverse target\n\n**Trade-offs:**\n  - 3 science target(s) identified outside the primary landing zone that may require extended traverse capability.\n\n### Alternative Hypotheses\n**SHARAD reflectors**: Could represent (a) ice-regolith interface (primary hypothesis), (b) off-nadir surface clutter (mitigated by coherence filtering and cluttergram comparison), or (c) lithologic boundary (basalt flow contact). Dielectric constant constraints help discriminate: \u03b5r < 4 favors ice, \u03b5r > 5 favors rock.\n**CRISM ice signatures**: Could represent (a) surface/near-surface water ice (primary), (b) atmospheric CO\u2082 ice contamination (mitigated by checking mean/max ratio uniformity), or (c) hydrated minerals mimicking ice absorptions at 1.5\u00b5m.\n\n### Engineering Implications\nEstimated ice depth ~79m: impractical for near-term ISRU missions.\nTerrain is favorable for EDL \u2014 standard landing ellipse achievable.\n\n### Assessment Summary\n**Score: 37\u201346 / 100** | Recommendation: PROMISING WITH CAVEATS\n\n**Strengths:**\n  - SHARAD subsurface: Reflectors at ~79 m depth -- moderate drilling required. No dielectric constant estimation was performed. Depth estimates use assumed \u03b5r=3.15 (water-ice) \u2014 this is a non-physical fallback, not evidence of ice.\n  - Surface ice evidence: Strong CRISM ice: 45 high-ice observations with spatial coherence (hotspot detected). No CNN mineral classification data available.\n  - Terrain: FAVORABLE terrain with 85% favorable grid zones -- excellent landing conditions.\n\n**Uncertainties:**\n  - Cross-instrument: non correlated"
+}
