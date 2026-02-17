@@ -131,6 +131,280 @@ def search_mineral_products(
     results.sort(key=lambda r: r["ice_percent" if key == "ice" else "hyd_percent"], reverse=True)
     return results[:limit]
 
+
+# ── Landform cache (lazy-loaded, indexed by type + latitude band) ────
+
+_landform_by_type_band: dict[str, dict[int, list]] | None = None
+LANDFORM_PROXIMITY_KM = 50.0
+
+LANDFORM_TYPES = ["crater", "terraced_crater", "volcanic", "graben", "channel", "wrinkle_ridge", "lda"]
+
+
+def _load_landform_index() -> dict[str, dict[int, list]]:
+    """Lazy-load landform features and build type + 5-deg latitude-band index."""
+    global _landform_by_type_band
+    if _landform_by_type_band is not None:
+        return _landform_by_type_band
+
+    _landform_by_type_band = {}
+    cache_dir = _backend_dir / "cache"
+    for fname in ("landforms_precomputed.json", "landforms_progress.json"):
+        p = cache_dir / fname
+        if p.exists():
+            try:
+                with open(p) as fp:
+                    data = json.load(fp)
+                features = data.get("features", [])
+                for lf in features:
+                    t = lf.get("type", "")
+                    lat = lf.get("lat", 0.0)
+                    band = int(lat // 5)
+                    _landform_by_type_band.setdefault(t, {}).setdefault(band, []).append(lf)
+                logging.getLogger(__name__).info(
+                    "Loaded %d landforms from %s (%d types)",
+                    len(features), fname, len(_landform_by_type_band),
+                )
+            except Exception as exc:
+                logging.getLogger(__name__).error("Failed to load landform cache: %s", exc)
+            break
+    return _landform_by_type_band
+
+
+def _find_nearest_landform(
+    lat: float, lon: float, landform_type: str, radius_km: float = LANDFORM_PROXIMITY_KM,
+) -> tuple[dict | None, float | None]:
+    """Find the nearest landform of given type within radius_km. Returns (feature, dist_km)."""
+    from api.proximity_router import haversine_km
+
+    index = _load_landform_index()
+    type_bands = index.get(landform_type, {})
+    if not type_bands:
+        return None, None
+
+    center_band = int(lat // 5)
+    candidates = []
+    for offset in (-1, 0, 1):
+        candidates.extend(type_bands.get(center_band + offset, []))
+
+    best, best_dist = None, radius_km
+    for lf in candidates:
+        # Quick degree pre-filter (~60 km per degree on Mars)
+        if abs(lf["lat"] - lat) > 1.0 or abs(lf.get("lon", 0) - lon) > 1.5:
+            continue
+        d = haversine_km(lat, lon, lf["lat"], lf.get("lon", 0))
+        if d < best_dist:
+            best_dist = d
+            best = lf
+    return (best, round(best_dist, 1)) if best else (None, None)
+
+
+# ── Compound search pipeline ─────────────────────────────────────────
+
+def compound_search(
+    instrument: str,
+    intersect_with: str | None = None,
+    mineral_type: str | None = None,
+    min_percent: float | None = None,
+    near_landform: str | None = None,
+    viewport_lat: float | None = None,
+    viewport_lon: float | None = None,
+    limit: int = 10,
+) -> list[dict]:
+    """Unified search: instrument + optional mineral/landform/intersection filters."""
+    from api.registry import get_registry
+    from api.proximity_router import (
+        haversine_km,
+        _bbox_from_geometry,
+        _centroid_from_geometry,
+        _geometries_overlap,
+    )
+
+    _logger = logging.getLogger(__name__)
+    registry = get_registry()
+
+    # Normalize mineral_type
+    mineral_key = None
+    if mineral_type:
+        mt = mineral_type.lower()
+        mineral_key = "ice" if mt in ("h2o", "water", "water ice", "ice") else "hyd"
+        if min_percent is None:
+            min_percent = 10.0
+
+    # Determine which instrument gets the mineral filter
+    crism_family = {"CRISM", "CRISM_TRR3"}
+    mineral_on_primary = mineral_key and instrument.upper() in crism_family
+    mineral_on_secondary = mineral_key and intersect_with and intersect_with.upper() in crism_family
+
+    # ── Step 1: Load primary instrument features ──
+    inst_key = instrument.lower().replace("-", "_").replace(" ", "_")
+    try:
+        idx = registry.load_index(inst_key)
+    except Exception:
+        _logger.error("Cannot load index for %s", inst_key)
+        return []
+
+    features = []
+    for f in idx.get("features", []):
+        props = f.get("properties") or {}
+        geom = f.get("geometry")
+        if not geom or not props.get("product_id"):
+            continue
+        bbox = _bbox_from_geometry(geom)
+        centroid = _centroid_from_geometry(geom)
+        if not bbox or not centroid:
+            continue
+
+        # Viewport pre-filter (±15 deg latitude)
+        if viewport_lat is not None:
+            if abs(centroid["lat"] - viewport_lat) > 15:
+                continue
+
+        features.append({
+            "product_id": props["product_id"],
+            "instrument": instrument.upper(),
+            "lat": round(centroid["lat"], 3),
+            "lon": round(centroid["lon"], 3),
+            "geom": geom,
+            "bbox": bbox,
+        })
+
+    # ── Step 2: Mineral filter on primary ──
+    if mineral_on_primary:
+        passing_obs = set()
+        mineral_data = {}
+        stats = _load_score_stats()
+        coords = _load_crism_coords()
+        for obs_id, entry in stats.items():
+            section = entry.get(mineral_key, {})
+            vp = section.get("valid_pixels", 0)
+            if vp == 0:
+                continue
+            above = section.get("threshold_counts", {}).get("0.3", 0)
+            pct = above / vp * 100.0
+            if pct >= min_percent:
+                passing_obs.add(obs_id)
+                other = "hyd" if mineral_key == "ice" else "ice"
+                os_ = entry.get(other, {})
+                ovp = os_.get("valid_pixels", 0)
+                oab = os_.get("threshold_counts", {}).get("0.3", 0)
+                opct = (oab / ovp * 100.0) if ovp else 0.0
+                mineral_data[obs_id] = {
+                    "ice_percent": round(pct if mineral_key == "ice" else opct, 2),
+                    "hyd_percent": round(pct if mineral_key == "hyd" else opct, 2),
+                }
+
+        filtered = []
+        for feat in features:
+            pid = feat["product_id"]
+            m = re.match(r"^([a-z]{3}[0-9a-f]+)", pid.lower())
+            if m and m.group(1) in passing_obs:
+                feat.update(mineral_data[m.group(1)])
+                filtered.append(feat)
+        features = filtered
+
+    # ── Step 3: Landform proximity filter ──
+    if near_landform:
+        filtered = []
+        for feat in features:
+            lf, dist = _find_nearest_landform(feat["lat"], feat["lon"], near_landform)
+            if lf and dist is not None:
+                feat["near_landform_type"] = near_landform
+                feat["near_landform_distance_km"] = dist
+                filtered.append(feat)
+        features = filtered
+
+    # ── Step 4: Intersection filter ──
+    if intersect_with:
+        sec_key = intersect_with.lower().replace("-", "_").replace(" ", "_")
+        try:
+            sec_idx = registry.load_index(sec_key)
+        except Exception:
+            _logger.error("Cannot load index for %s", sec_key)
+            return []
+
+        # Build secondary features (with optional mineral pre-filter)
+        sec_passing_obs = None
+        sec_mineral_data = {}
+        if mineral_on_secondary:
+            sec_passing_obs = set()
+            stats = _load_score_stats()
+            for obs_id, entry in stats.items():
+                section = entry.get(mineral_key, {})
+                vp = section.get("valid_pixels", 0)
+                if vp == 0:
+                    continue
+                above = section.get("threshold_counts", {}).get("0.3", 0)
+                pct = above / vp * 100.0
+                if pct >= min_percent:
+                    sec_passing_obs.add(obs_id)
+                    other = "hyd" if mineral_key == "ice" else "ice"
+                    os_ = entry.get(other, {})
+                    ovp = os_.get("valid_pixels", 0)
+                    oab = os_.get("threshold_counts", {}).get("0.3", 0)
+                    opct = (oab / ovp * 100.0) if ovp else 0.0
+                    sec_mineral_data[obs_id] = {
+                        "ice_percent": round(pct if mineral_key == "ice" else opct, 2),
+                        "hyd_percent": round(pct if mineral_key == "hyd" else opct, 2),
+                    }
+
+        sec_features = []
+        for f in sec_idx.get("features", []):
+            props = f.get("properties") or {}
+            geom = f.get("geometry")
+            if not geom or not props.get("product_id"):
+                continue
+            pid = props["product_id"]
+
+            # Mineral pre-filter on secondary
+            if sec_passing_obs is not None:
+                m = re.match(r"^([a-z]{3}[0-9a-f]+)", pid.lower())
+                if not m or m.group(1) not in sec_passing_obs:
+                    continue
+
+            bbox = _bbox_from_geometry(geom)
+            centroid = _centroid_from_geometry(geom)
+            if not bbox or not centroid:
+                continue
+
+            sf = {"product_id": pid, "geom": geom, "bbox": bbox, "centroid": centroid}
+            if sec_passing_obs is not None:
+                obs = re.match(r"^([a-z]{3}[0-9a-f]+)", pid.lower())
+                if obs and obs.group(1) in sec_mineral_data:
+                    sf.update(sec_mineral_data[obs.group(1)])
+            sec_features.append(sf)
+
+        # Find overlapping pairs
+        paired = []
+        for feat in features:
+            for sf in sec_features:
+                if _geometries_overlap(feat["geom"], feat["bbox"], sf["geom"], sf["bbox"]):
+                    result = {**feat}
+                    result["paired_product"] = sf["product_id"]
+                    result["paired_instrument"] = intersect_with.upper()
+                    if "ice_percent" in sf:
+                        result["ice_percent"] = sf["ice_percent"]
+                    if "hyd_percent" in sf:
+                        result["hyd_percent"] = sf["hyd_percent"]
+                    paired.append(result)
+                    break  # One match per primary product
+        features = paired
+
+    # ── Step 5: Rank and return ──
+    for feat in features:
+        feat.pop("geom", None)
+        feat.pop("bbox", None)
+
+    if mineral_key and ("ice_percent" in (features[0] if features else {})):
+        sort_key = "ice_percent" if mineral_key == "ice" else "hyd_percent"
+        features.sort(key=lambda r: r.get(sort_key, 0), reverse=True)
+    elif near_landform:
+        features.sort(key=lambda r: r.get("near_landform_distance_km", 999))
+    elif viewport_lat is not None and viewport_lon is not None:
+        features.sort(key=lambda r: abs(r["lat"] - viewport_lat) + abs(r["lon"] - viewport_lon))
+
+    return features[:limit]
+
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marvis", tags=["marvis-chat"])
 
@@ -188,9 +462,8 @@ _BASE_SYSTEM = """You are MARVIS, a terse Mars science research assistant embedd
 WHEN TO USE TOOLS vs TEXT:
 - ONLY call fly_to_location when the user explicitly asks to GO TO, NAVIGATE, ZOOM, or CENTER ON a NEW, DIFFERENT location.
 - ONLY call load_instrument when the user explicitly asks to LOAD, SHOW, or ENABLE a specific instrument dataset.
-- ONLY call find_intersections when the user EXPLICITLY uses the words "intersect", "intersection", or "overlap" referring to two named instruments. NEVER call it for "pick", "select", "open", "show me a product", or general browsing.
 - ONLY call select_product when the user asks to PICK, SELECT, OPEN, INSPECT, or SHOW a specific product or a product from a specific instrument (e.g. "pick one SHARAD", "open a HiRISE product", "select that product").
-- ONLY call search_minerals when the user asks to FIND, SEARCH, or LOCATE observations with high ice, h2o, water, hydration, or mineral content, optionally with a percentage threshold (e.g. "find h2o more than 10%", "search for places with ice").
+- ONLY call search when the user asks to FIND, SEARCH, or LOCATE products with any combination of: (a) a specific instrument, (b) mineral/ice/hydration content threshold, (c) proximity to landforms (crater, terraced crater, volcano, channel, graben, ridge, LDA), (d) intersection/overlap with another instrument. Do NOT call search for general science questions or selecting visible products.
 - For ALL other messages (general science questions, "what products", etc.) → answer with TEXT only. Do NOT call any tool.
 - If unsure whether the user wants navigation or information, answer with text.
 
@@ -305,33 +578,38 @@ def _tool_confirmation(tool: str, params: dict, context: Optional[SessionContext
             msg = f"{inst} is already loaded — footprints should be visible in the current view."
         return msg
 
-    if tool == "find_intersections":
-        inst_a = params.get("instrument_a", "?")
-        inst_b = params.get("instrument_b", "?")
-        pairs = params.get("pairs", [])
-        if pairs:
-            return f"Found {len(pairs)} {inst_a} \u00d7 {inst_b} intersection pairs in this area."
-        return f"No {inst_a} \u00d7 {inst_b} intersections found in the current viewport."
-
     if tool == "select_product":
         inst = params.get("instrument", "?")
         return f"Opening {inst} product in the inspector panel."
 
-    if tool == "search_minerals":
-        mineral_type = params.get("mineral_type", "ice")
+    if tool == "search":
         results = params.get("results", [])
+        inst = params.get("instrument", "?")
+        intersect = params.get("intersect_with")
+        mt = params.get("mineral_type")
         min_pct = params.get("min_percent", 10)
-        type_label = "water ice" if mineral_type == "ice" else "hydration"
+        landform = params.get("near_landform")
+
+        filters = []
+        if mt:
+            label = "water ice" if mt == "ice" else "hydration"
+            filters.append(f">{min_pct:.0f}% {label}")
+        if landform:
+            filters.append(f"near {landform.replace('_', ' ')}s")
+        if intersect:
+            filters.append(f"intersecting {intersect}")
+        filter_str = " " + ", ".join(filters) if filters else ""
+
         if results:
             best = results[0]
-            pct_key = "ice_percent" if mineral_type == "ice" else "hyd_percent"
-            return (
-                f"Found {len(results)} CRISM observations with >{min_pct:.0f}% {type_label} pixels. "
-                f"Best: {best['obs_id']} ({best.get(pct_key, 0):.1f}% at "
-                f"{best.get('lat', 0):.2f}\u00b0, {best.get('lon', 0):.2f}\u00b0). "
-                f"Flying to top result and loading CRISM TRR3."
-            )
-        return f"No CRISM observations found with >{min_pct:.0f}% {type_label} pixels. Try lowering the threshold."
+            msg = f"Found {len(results)} {inst} products{filter_str}. Top: {best['product_id']}"
+            if best.get("ice_percent") is not None:
+                msg += f" ({best['ice_percent']:.1f}% ice)"
+            if best.get("near_landform_distance_km") is not None:
+                msg += f" ({best['near_landform_distance_km']:.0f} km from {landform.replace('_', ' ')})"
+            msg += f" at {best['lat']:.2f}\u00b0, {best['lon']:.2f}\u00b0. Flying to top result."
+            return msg
+        return f"No {inst} products found{filter_str}. Try broadening your search."
 
     return "Done."
 
@@ -396,29 +674,6 @@ _GROQ_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "find_intersections",
-            "description": "Find products from two instruments that geometrically overlap. ONLY use when the user explicitly says 'intersect', 'intersection', or 'overlap' and names two instruments. Do NOT use for 'pick', 'select', 'open', or general browsing.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "instrument_a": {
-                        "type": "string",
-                        "description": "First instrument",
-                        "enum": INSTRUMENT_LIST,
-                    },
-                    "instrument_b": {
-                        "type": "string",
-                        "description": "Second instrument",
-                        "enum": INSTRUMENT_LIST,
-                    },
-                },
-                "required": ["instrument_a", "instrument_b"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "select_product",
             "description": "Pick and open a product from the visible footprints on the map. Use when the user asks to pick, select, open, or inspect a product or a product from a specific instrument.",
             "parameters": {
@@ -437,22 +692,45 @@ _GROQ_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "search_minerals",
-            "description": "Search for CRISM observations with high ice or hydration content. Use when the user asks to FIND, SEARCH, or LOCATE places with h2o, ice, water, hydration, or minerals above a percentage threshold (e.g. 'find h2o more than 10%', 'search for ice').",
+            "name": "search",
+            "description": (
+                "Search for Mars orbital products with optional filters. "
+                "Use when the user asks to FIND, SEARCH, or LOCATE products from an instrument, "
+                "optionally filtered by mineral content (ice/h2o/hydration percentage), "
+                "by proximity to landforms (crater, terraced crater, volcano, channel, graben, ridge, LDA), "
+                "or by intersection/overlap with another instrument. "
+                "Examples: 'find CRISM with ice > 10%', 'find HiRISE DTM near terraced craters', "
+                "'find SHARAD intersecting CRISM with h2o > 10%'."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "instrument": {
+                        "type": "string",
+                        "description": "Primary instrument to search",
+                        "enum": INSTRUMENT_LIST,
+                    },
+                    "intersect_with": {
+                        "type": "string",
+                        "description": "Find products overlapping this second instrument. Only use when user says 'intersect', 'overlap', or 'cross'.",
+                        "enum": INSTRUMENT_LIST,
+                    },
                     "mineral_type": {
                         "type": "string",
-                        "description": "Type of mineral signal: 'ice' for water ice/h2o, 'hyd' for hydration/clay minerals",
+                        "description": "Filter by mineral content: 'ice' for water ice/h2o, 'hyd' for hydration/clay. Applies to CRISM/CRISM_TRR3.",
                         "enum": ["ice", "hyd"],
                     },
                     "min_percent": {
                         "type": "number",
-                        "description": "Minimum percentage of pixels with signal (0-100). Default 10 if not specified.",
+                        "description": "Minimum mineral percentage (0-100). Default 10 if mineral_type set but this is missing.",
+                    },
+                    "near_landform": {
+                        "type": "string",
+                        "description": "Filter to products near a landform type detected from MOLA topography.",
+                        "enum": LANDFORM_TYPES,
                     },
                 },
-                "required": ["mineral_type"],
+                "required": ["instrument"],
             },
         },
     },
