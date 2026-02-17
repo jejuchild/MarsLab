@@ -2892,6 +2892,67 @@ def synthesize_results(
             if science_distance is None or d < science_distance:
                 science_distance = d
 
+    # ── ISRU Accessibility Assessment (Phase 1) ──
+    try:
+        from analysis.isru import compute_isru_accessibility
+
+        # Gather inputs from synthesis
+        sub_cov = synthesis.get("subsurface_coverage", {})
+        refl_summary = sub_cov.get("reflector_summary") or sub_cov.get("depth_summary") or {}
+        median_twt = refl_summary.get("median_twt_us")
+
+        diel = synthesis.get("dielectric_analysis", {})
+        eps_r = diel.get("mean_epsilon_r") or diel.get("median_epsilon_r")
+        eps_source = synthesis.get("epsilon_r_source", "assumed")
+
+        # Get σ from physics inversion if available
+        eps_sigma = None
+        eps_ci = None
+        inv_data = synthesis.get("sharad_physics_inversion", {})
+        if inv_data:
+            eps_sigma = inv_data.get("best_epsilon_r_sigma")
+            eps_ci = inv_data.get("best_epsilon_r_1sigma")
+
+        eng = synthesis.get("engineering_feasibility", {})
+        mean_slope = eng.get("mean_slope", 0.0)
+        elevation = eng.get("elevation_m", 0.0)
+
+        crism_spec = synthesis.get("crism_spectral_analysis", {})
+        ice_frac = crism_spec.get("water_ice_overall_fraction", 0.0)
+
+        isru = compute_isru_accessibility(
+            twt_us=median_twt,
+            epsilon_r=eps_r if eps_source in ("physics_inversion", "terrace_dielectric") else None,
+            epsilon_r_sigma=eps_sigma,
+            epsilon_r_source=eps_source,
+            epsilon_r_ci=eps_ci,
+            mean_slope_deg=mean_slope,
+            elevation_m=elevation,
+            ice_fraction_crism=ice_frac,
+        )
+
+        synthesis["isru_assessment"] = {
+            "depth_m": isru.depth_m,
+            "depth_uncertainty_m": isru.depth_uncertainty_m,
+            "depth_source": isru.depth_source,
+            "accessibility_category": isru.accessibility_category,
+            "accessibility_score": isru.accessibility_score,
+            "isru_tier": isru.isru_tier,
+            "slope_penalty_factor": isru.slope_penalty_factor,
+            "slope_stability": isru.slope_stability,
+            "epsilon_r": isru.epsilon_r,
+            "epsilon_r_ci": isru.epsilon_r_ci,
+            "ice_purity_estimate": isru.ice_purity_estimate,
+            "notes": isru.notes,
+        }
+    except ImportError:
+        synthesis["isru_assessment"] = {
+            "accessibility_category": "module_unavailable",
+            "accessibility_score": 0.0,
+            "isru_tier": "unknown",
+            "notes": ["ISRU accessibility module not available."],
+        }
+
     # ── Composite Scoring v2 (weighted, transparent, multi-dimensional) ──
     scoring_result = compute_composite_score(
         subsurface_data=synthesis["subsurface_coverage"],

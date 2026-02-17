@@ -73,13 +73,20 @@ def normalize_subsurface(
     subsurface_data: Dict[str, Any],
     dielectric_data: Dict[str, Any],
     cross_instrument_data: Dict[str, Any],
+    isru_data: Optional[Dict[str, Any]] = None,
 ) -> Tuple[float, Dict[str, Any]]:
     """Normalize SHARAD subsurface potential to 0-1.
 
-    Scoring ladder:
+    Scoring ladder (when depth is known from physics-based εr):
       0.0  No SHARAD data
       0.2  SHARAD analyzed, no reflectors detected
-      0.4  Reflectors detected, depth > 80 m
+      Uses ISRU accessibility_score when physics-based depth available
+
+    Scoring ladder (fallback when no physics εr):
+      0.0  No SHARAD data
+      0.2  SHARAD analyzed, no reflectors detected
+      0.4  Reflectors detected, depth > 80 m (assumed εr)
+      0.5  Reflectors detected, depth unknown (no εr at all)
       0.6  Reflectors at 30-80 m depth
       0.8  Reflectors at 10-30 m, multiple tracks
       1.0  Reflectors at <10 m, multiple tracks, dielectric er 2.5-3.5
@@ -96,6 +103,10 @@ def normalize_subsurface(
         ``synthesis["dielectric_analysis"]`` from ``synthesize_results``.
     cross_instrument_data : dict
         ``synthesis["cross_instrument"]`` from ``synthesize_results``.
+    isru_data : dict or None
+        ``synthesis["isru_assessment"]`` from ``synthesize_results``.
+        When provided with a physics-based depth, ISRU accessibility_score
+        is used as the base score for the subsurface component.
 
     Returns
     -------
@@ -108,6 +119,8 @@ def normalize_subsurface(
         "n_detections": 0,
         "dielectric_bonus": 0.0,
         "cross_instrument_adjustment": 0.0,
+        "isru_tier": None,
+        "isru_accessibility_score": None,
         "notes": [],
     }
 
