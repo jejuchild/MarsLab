@@ -66,6 +66,13 @@ class StratigraphySummary(BaseModel):
     best_quality: Optional[str] = None
     dem_source: str = "none"
     total_sharad_picks: int = 0
+    # Phase 2: quality-weighted aggregate fields
+    weighted_epsilon_r: Optional[float] = None
+    weighted_epsilon_std: Optional[float] = None
+    confidence_interval_68: Optional[List[float]] = None
+    confidence_interval_95: Optional[List[float]] = None
+    n_good_estimates: int = 0
+    n_marginal_estimates: int = 0
 
 
 class StratigraphyParameters(BaseModel):

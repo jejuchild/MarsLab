@@ -971,9 +971,24 @@ def generate_report_from_evidence_pack(
         lines.append("|--------|-----|----------------|")
 
         if dielectric.get("terrace_estimates_count", 0) > 0:
+            # Phase 2: Prefer quality-weighted εr over raw median
+            w_eps = dielectric.get("terrace_weighted_epsilon_r")
             med_eps = dielectric.get("terrace_median_epsilon_r")
-            med_eps_s = f"{med_eps:.2f}" if isinstance(med_eps, (int, float)) else "N/A"
-            lines.append(f"| Terraced Crater Method | **{med_eps_s}** ({dielectric.get('terrace_estimates_count', 0)} estimates) | Morphological |")
+            display_eps = w_eps if w_eps is not None else med_eps
+            display_eps_s = f"{display_eps:.2f}" if isinstance(display_eps, (int, float)) else "N/A"
+            n_est = dielectric.get("terrace_estimates_count", 0)
+            ci_68 = dielectric.get("terrace_confidence_interval_68")
+            ci_str = ""
+            if ci_68 and len(ci_68) == 2:
+                ci_str = f", 68% CI: {ci_68[0]:.2f}–{ci_68[1]:.2f}"
+            method_label = "Quality-Weighted" if w_eps is not None else "Median"
+            n_good = dielectric.get("terrace_n_good", 0)
+            n_marg = dielectric.get("terrace_n_marginal", 0)
+            qual_note = f" ({n_good} good, {n_marg} marginal)" if w_eps is not None else ""
+            lines.append(
+                f"| Terraced Crater Method | **{display_eps_s}** "
+                f"({method_label}, {n_est} estimates{ci_str}{qual_note}) | Morphological |"
+            )
 
         if dielectric.get("physics_inversions_completed", 0) > 0:
             eps_val = dielectric.get("epsilon_r")
@@ -1004,15 +1019,38 @@ def generate_report_from_evidence_pack(
             except (TypeError, ValueError):
                 pass
 
-        # Terrace details
+        # Terrace details (Phase 2: include weight info)
         estimates = dielectric.get("terrace_estimates", [])
         if estimates:
             lines.append("### Terrace Crater Details")
             lines.append("")
-            lines.append("| Crater | Depth (m) | εr | Quality |")
-            lines.append("|--------|-----------|-----|---------|")
-            for est in estimates[:5]:
-                lines.append(f"| {est.get('crater_id', '?')} | {est.get('depth_true_m', '?')} | {est.get('epsilon_r', '?')} | {est.get('quality', '?')} |")
+            # Phase 2: show per-estimate weights if available
+            w_agg = dielectric.get("terrace_weighted_aggregate")
+            weight_map = {}
+            if w_agg and isinstance(w_agg, dict):
+                for pw in w_agg.get("per_estimate_weights", []):
+                    key = f"{pw.get('crater_id', '')}_{pw.get('depth_metric', '')}"
+                    weight_map[key] = pw.get("weight", 0)
+            has_weights = bool(weight_map)
+            if has_weights:
+                lines.append("| Crater | Depth Metric | Depth (m) | εr | Quality | Weight |")
+                lines.append("|--------|-------------|-----------|-----|---------|--------|")
+            else:
+                lines.append("| Crater | Depth (m) | εr | Quality |")
+                lines.append("|--------|-----------|-----|---------|")
+            for est in estimates[:8]:
+                cid = est.get("crater_id", "?")
+                metric = est.get("depth_metric", "?")
+                depth = est.get("depth_true_m", "?")
+                eps = est.get("epsilon_r", "?")
+                qual = est.get("quality", "?")
+                if has_weights:
+                    w_key = f"{cid}_{metric}"
+                    w_val = weight_map.get(w_key)
+                    w_str = f"{w_val:.3f}" if w_val is not None else "—"
+                    lines.append(f"| {cid} | {metric} | {depth} | {eps} | {qual} | {w_str} |")
+                else:
+                    lines.append(f"| {cid} | {depth} | {eps} | {qual} |")
             lines.append("")
     else:
         lines.append("**No dielectric inversion was performed.**")
@@ -1652,12 +1690,20 @@ def _build_report_markdown(session: AgentSession) -> str:
         lines.append("|--------|-----|----------------|")
 
         if terrace_diel.get("estimates_count", 0) > 0:
+            # Phase 2: Prefer quality-weighted εr over raw median
+            w_agg = terrace_diel.get("weighted_aggregate")
+            w_eps_raw = (w_agg or {}).get("weighted_median_epsilon_r")
             med_eps_raw = terrace_diel.get("median_epsilon_r")
-            med_eps = f"{med_eps_raw:.2f}" if isinstance(med_eps_raw, (int, float)) else "N/A"
-            interp = terrace_diel.get("interpretation", "")
+            display_eps_raw = w_eps_raw if w_eps_raw is not None else med_eps_raw
+            display_eps = f"{display_eps_raw:.2f}" if isinstance(display_eps_raw, (int, float)) else "N/A"
+            interp = (w_agg or {}).get("interpretation") or terrace_diel.get("interpretation", "")
+            n_est = terrace_diel.get("estimates_count", 0)
+            ci_68 = (w_agg or {}).get("confidence_interval_68")
+            ci_str = f", 68% CI: {ci_68[0]:.2f}–{ci_68[1]:.2f}" if ci_68 and len(ci_68) == 2 else ""
+            method_label = "Quality-Weighted" if w_eps_raw is not None else "Median"
             lines.append(
-                f"| Terraced Crater Method | **{med_eps}** "
-                f"({terrace_diel.get('estimates_count', 0)} estimates) | {interp} |"
+                f"| Terraced Crater Method | **{display_eps}** "
+                f"({method_label}, {n_est} estimates{ci_str}) | {interp} |"
             )
 
         if physics_inv.get("inversions_completed", 0) > 0:
@@ -1685,8 +1731,10 @@ def _build_report_markdown(session: AgentSession) -> str:
 
         # εr consistency comparison (when multiple methods available)
         eps_values_for_comparison = []
-        if terrace_diel.get("estimates_count", 0) > 0 and terrace_diel.get("median_epsilon_r") is not None:
-            eps_values_for_comparison.append(("Terraced Crater", float(terrace_diel["median_epsilon_r"])))
+        # Phase 2: prefer weighted εr for comparison
+        terrace_compare_eps = (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r") or terrace_diel.get("median_epsilon_r")
+        if terrace_diel.get("estimates_count", 0) > 0 and terrace_compare_eps is not None:
+            eps_values_for_comparison.append(("Terraced Crater", float(terrace_compare_eps)))
         if physics_inv.get("inversions_completed", 0) > 0 and physics_inv.get("best_epsilon_r") is not None:
             eps_values_for_comparison.append(("Physics Inversion", float(physics_inv["best_epsilon_r"])))
 
@@ -1707,8 +1755,10 @@ def _build_report_markdown(session: AgentSession) -> str:
             lines.append("")
 
         # Ice probability assessment based on εr
+        # Phase 2: prefer weighted terrace εr
         any_eps = (
             physics_inv.get("best_epsilon_r")
+            or (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r")
             or terrace_diel.get("median_epsilon_r")
             or diel.get("median_epsilon_r")
         )
@@ -1729,19 +1779,37 @@ def _build_report_markdown(session: AgentSession) -> str:
             except (TypeError, ValueError):
                 pass
 
-        # Terrace details if available
+        # Terrace details if available (Phase 2: include weights)
         estimates = terrace_diel.get("estimates", [])
         if estimates:
             lines.append("### Terrace Crater Details")
             lines.append("")
-            lines.append("| Crater | Depth (m) | εr | Quality |")
-            lines.append("|--------|-----------|-----|---------|")
-            for est in estimates[:5]:
+            w_agg = terrace_diel.get("weighted_aggregate")
+            weight_map = {}
+            if w_agg and isinstance(w_agg, dict):
+                for pw in w_agg.get("per_estimate_weights", []):
+                    key = f"{pw.get('crater_id', '')}_{pw.get('depth_metric', '')}"
+                    weight_map[key] = pw.get("weight", 0)
+            has_weights = bool(weight_map)
+            if has_weights:
+                lines.append("| Crater | Depth Metric | Depth (m) | εr | Quality | Weight |")
+                lines.append("|--------|-------------|-----------|-----|---------|--------|")
+            else:
+                lines.append("| Crater | Depth (m) | εr | Quality |")
+                lines.append("|--------|-----------|-----|---------|")
+            for est in estimates[:8]:
                 cid = est.get("crater_id", "?")
+                metric = est.get("depth_metric", "?")
                 edepth = est.get("depth_true_m", "?")
                 eps = est.get("epsilon_r", "?")
                 qual = est.get("quality", "?")
-                lines.append(f"| {cid} | {edepth} | {eps} | {qual} |")
+                if has_weights:
+                    w_key = f"{cid}_{metric}"
+                    w_val = weight_map.get(w_key)
+                    w_str = f"{w_val:.3f}" if w_val is not None else "—"
+                    lines.append(f"| {cid} | {metric} | {edepth} | {eps} | {qual} | {w_str} |")
+                else:
+                    lines.append(f"| {cid} | {edepth} | {eps} | {qual} |")
             lines.append("")
 
         # Physics inversion methodology

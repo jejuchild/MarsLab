@@ -1770,7 +1770,18 @@ def terrace_dielectric_analysis(
             summary="No HiRISE DTM directory for terrace analysis",
         )
 
+    # Phase 2: Import quality-weighted aggregation
+    try:
+        from analysis.epsilon_terrace.epsilon_calc import quality_weighted_aggregate, EpsilonEstimate
+    except ImportError:
+        try:
+            from backend.analysis.epsilon_terrace.epsilon_calc import quality_weighted_aggregate, EpsilonEstimate
+        except ImportError:
+            quality_weighted_aggregate = None
+            EpsilonEstimate = None
+
     all_estimates = []
+    all_estimate_objects = []  # Phase 2: keep typed objects for aggregation
     analyzed_tracks = []
 
     for sp in sharad_products[:3]:  # Limit to 3 tracks for speed
@@ -1786,6 +1797,30 @@ def terrace_dielectric_analysis(
             # Only keep good/marginal quality estimates
             good_estimates = [e for e in estimates if e.get("quality") != "unreliable"]
             all_estimates.extend(good_estimates)
+
+            # Phase 2: Reconstruct EpsilonEstimate objects for weighted aggregation
+            if EpsilonEstimate is not None:
+                for est in good_estimates:
+                    try:
+                        all_estimate_objects.append(EpsilonEstimate(
+                            crater_id=est.get("crater_id", pid),
+                            depth_metric=est.get("depth_metric", "unknown"),
+                            depth_true_m=est.get("depth_true_m", 0),
+                            depth_unc_m=est.get("depth_unc_m", 0),
+                            twt_us=est.get("twt_us", 0),
+                            twt_unc_us=est.get("twt_unc_us", 0),
+                            epsilon_r=est.get("epsilon_r", 0),
+                            epsilon_low=est.get("epsilon_low", 0),
+                            epsilon_high=est.get("epsilon_high", 0),
+                            interpretation=est.get("interpretation", ""),
+                            quality=est.get("quality", "marginal"),
+                            quality_note=est.get("quality_note", ""),
+                            sharad_product=est.get("sharad_product", pid),
+                            n_sharad_picks=est.get("n_sharad_picks", 0),
+                        ))
+                    except Exception:
+                        pass
+
             analyzed_tracks.append({
                 "product_id": pid,
                 "dtms_found": result.get("dtms_found", 0),
@@ -1825,20 +1860,40 @@ def terrace_dielectric_analysis(
     else:
         interp = "basaltic regolith or dense rock"
 
+    # Phase 2: Quality-weighted aggregate
+    weighted_aggregate = None
+    if quality_weighted_aggregate is not None and all_estimate_objects:
+        weighted_aggregate = quality_weighted_aggregate(all_estimate_objects)
+
+    data = {
+        "estimates_count": len(all_estimates),
+        "mean_epsilon_r": mean_eps,
+        "median_epsilon_r": median_eps,
+        "min_epsilon_r": round(min(eps_values), 2),
+        "max_epsilon_r": round(max(eps_values), 2),
+        "interpretation": interp,
+        "estimates": all_estimates,
+        "tracks_analyzed": analyzed_tracks,
+    }
+
+    # Phase 2: Add quality-weighted aggregate to output
+    if weighted_aggregate:
+        data["weighted_aggregate"] = weighted_aggregate
+        w_eps = weighted_aggregate.get("weighted_median_epsilon_r", median_eps)
+        w_interp = weighted_aggregate.get("interpretation", interp)
+        ci_68 = weighted_aggregate.get("confidence_interval_68", (0, 0))
+        summary_str = (
+            f"Terrace εr = {w_eps} (quality-weighted, {len(all_estimates)} estimates, "
+            f"68% CI: {ci_68[0]}–{ci_68[1]}): {w_interp}"
+        )
+    else:
+        summary_str = f"Terrace εr = {median_eps} (median, {len(all_estimates)} estimates): {interp}"
+
     return TaskResult(
         task_type="terrace_dielectric",
         success=True,
-        data={
-            "estimates_count": len(all_estimates),
-            "mean_epsilon_r": mean_eps,
-            "median_epsilon_r": median_eps,
-            "min_epsilon_r": round(min(eps_values), 2),
-            "max_epsilon_r": round(max(eps_values), 2),
-            "interpretation": interp,
-            "estimates": all_estimates,
-            "tracks_analyzed": analyzed_tracks,
-        },
-        summary=f"Terrace εr = {median_eps} (median, {len(all_estimates)} estimates): {interp}",
+        data=data,
+        summary=summary_str,
     )
 
 

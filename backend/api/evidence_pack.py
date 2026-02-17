@@ -86,7 +86,9 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
     # Build Gaussian + sensitivity from physics inversion data
     gaussian = None
     sensitivity_table = None
-    eps_val = physics_inv.get("best_epsilon_r") or terrace_diel.get("median_epsilon_r") or diel.get("median_epsilon_r")
+    # Phase 2: prefer quality-weighted terrace εr over raw median
+    terrace_weighted_eps = (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r")
+    eps_val = physics_inv.get("best_epsilon_r") or terrace_weighted_eps or terrace_diel.get("median_epsilon_r") or diel.get("median_epsilon_r")
     eps_ci = physics_inv.get("best_epsilon_r_ci")
 
     # Pull Gaussian data from physics inversion pipeline result
@@ -141,6 +143,13 @@ def assemble_evidence_pack(session: "AgentSession") -> Dict[str, Any]:
         "terrace_estimates": terrace_diel.get("estimates", []),
         "terrace_median_epsilon_r": terrace_diel.get("median_epsilon_r"),
         "terrace_estimates_count": terrace_diel.get("estimates_count", 0),
+        # Phase 2: quality-weighted terrace aggregate
+        "terrace_weighted_aggregate": terrace_diel.get("weighted_aggregate"),
+        "terrace_weighted_epsilon_r": (terrace_diel.get("weighted_aggregate") or {}).get("weighted_median_epsilon_r"),
+        "terrace_confidence_interval_68": (terrace_diel.get("weighted_aggregate") or {}).get("confidence_interval_68"),
+        "terrace_confidence_interval_95": (terrace_diel.get("weighted_aggregate") or {}).get("confidence_interval_95"),
+        "terrace_n_good": (terrace_diel.get("weighted_aggregate") or {}).get("n_good", 0),
+        "terrace_n_marginal": (terrace_diel.get("weighted_aggregate") or {}).get("n_marginal", 0),
         "physics_inversions_completed": physics_inv.get("inversions_completed", 0),
         "physics_methodology": physics_inv.get("methodology", ""),
     }

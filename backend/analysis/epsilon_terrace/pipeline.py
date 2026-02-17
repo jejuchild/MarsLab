@@ -120,6 +120,16 @@ class CraterStratigraphyAnalyzer(AnalysisModule):
             crater_lat, crater_lon, diameter_km, buffer_km,
         )
 
+        # Phase 2: Adaptive max_radius_m scaled to crater diameter
+        # Use at least 1.5x the crater radius, capped at user-specified max
+        adaptive_max_radius_m = max(max_radius_m, diameter_km * 500.0 * 1.5)
+        # Don't exceed 10 km (practical limit for DTM coverage)
+        adaptive_max_radius_m = min(adaptive_max_radius_m, 10000.0)
+        if adaptive_max_radius_m != max_radius_m:
+            logger.info("Stratigraphy: adaptive max_radius = %.0f m (from %.0f m)",
+                        adaptive_max_radius_m, max_radius_m)
+            max_radius_m = adaptive_max_radius_m
+
         params = StratigraphyParameters(
             crater_lat=crater_lat, crater_lon=crater_lon,
             diameter_km=diameter_km, buffer_km=buffer_km,
@@ -172,13 +182,19 @@ class CraterStratigraphyAnalyzer(AnalysisModule):
                 logger.info("Stratigraphy: MOLA fallback terraces=%d", n_med)
 
         # ── Step 3: SHARAD subsurface picks ────────────────────────
+        # Phase 2: Adaptive window based on crater diameter
+        # Larger craters → wider SHARAD window to capture full subsurface extent
+        adaptive_window_km = max(5.0, min(diameter_km * 1.5, buffer_km / 2))
+        logger.info("Stratigraphy: adaptive SHARAD window = %.1f km (diameter=%.1f km)",
+                     adaptive_window_km, diameter_km)
+
         pick_pairs: List[Tuple[TerraceResult, SharadPickResult]] = []
         all_pick_results: List[SharadPickResult] = []
 
         for product_id, dist_km in nearby_tracks[:3]:  # max 3 tracks
             pr = pick_subsurface_interface(
                 product_id, crater_lat, crater_lon,
-                window_km=max(5.0, buffer_km / 2),
+                window_km=adaptive_window_km,
                 min_snr=min_snr,
             )
             all_pick_results.append(pr)
@@ -289,15 +305,36 @@ class CraterStratigraphyAnalyzer(AnalysisModule):
             step = len(overlay_points) // 200
             overlay_points = overlay_points[::step]
 
-        # ── Step 10: Summary ───────────────────────────────────────
+        # ── Step 10: Summary (with Phase 2 quality-weighted aggregate) ─
         best_interp = None
         best_quality = None
+        weighted_eps = None
+        weighted_std = None
+        ci_68 = None
+        ci_95 = None
+        n_good = 0
+        n_marginal = 0
+
         if epsilon_estimates:
             good = [e for e in epsilon_estimates if e.quality == "good"]
             best = good[0] if good else epsilon_estimates[0]
             best_eps = best.epsilon_r
             best_interp = best.interpretation
             best_quality = best.quality
+
+            # Phase 2: Use quality-weighted aggregate if available
+            if eps_result.aggregate:
+                agg = eps_result.aggregate
+                weighted_eps = agg.get("weighted_median_epsilon_r")
+                weighted_std = agg.get("weighted_std")
+                ci_68_raw = agg.get("confidence_interval_68")
+                ci_95_raw = agg.get("confidence_interval_95")
+                ci_68 = list(ci_68_raw) if ci_68_raw else None
+                ci_95 = list(ci_95_raw) if ci_95_raw else None
+                n_good = agg.get("n_good", 0)
+                n_marginal = agg.get("n_marginal", 0)
+                # Override best interpretation with aggregate interpretation
+                best_interp = agg.get("interpretation", best_interp)
 
         total_picks = sum(len(pr.picks) for pr in all_pick_results)
 
@@ -309,6 +346,12 @@ class CraterStratigraphyAnalyzer(AnalysisModule):
             best_quality=best_quality,
             dem_source=dtm_source,
             total_sharad_picks=total_picks,
+            weighted_epsilon_r=weighted_eps,
+            weighted_epsilon_std=weighted_std,
+            confidence_interval_68=ci_68,
+            confidence_interval_95=ci_95,
+            n_good_estimates=n_good,
+            n_marginal_estimates=n_marginal,
         )
 
         # Build error/warning message for partial results
