@@ -8,7 +8,7 @@ import BandRatioCalculator from "./BandRatioCalculator";
 /* =========================================================
  * Types
  * =======================================================*/
-export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM";
+export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM" | "CRISM_TRR3";
 
 export type InspectorContext = {
   instrument: InstrumentType;
@@ -550,7 +550,7 @@ export default function Inspector({
         )}
 
         {/* CRISM Tabs */}
-        {isCRISM && crismTab === "Metadata" && <MetadataTab selected={selected} />}
+        {isCRISM && crismTab === "Metadata" && <MetadataTab selected={selected} onOpenMineralSequence={onOpenMineralSequence} />}
 
         {isCRISM && crismTab === "Spectrum" && (
           <SpectrumTab
@@ -1474,7 +1474,7 @@ function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; o
 /* =========================================================
  * Metadata Tab
  * =======================================================*/
-function MetadataTab({ selected }: { selected: InspectorContext }) {
+function MetadataTab({ selected, onOpenMineralSequence }: { selected: InspectorContext; onOpenMineralSequence?: (obsId: string) => void }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
