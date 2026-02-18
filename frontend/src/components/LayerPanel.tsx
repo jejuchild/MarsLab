@@ -322,8 +322,8 @@ interface LayerPanelProps {
   onCustomDatasetToggle?: (id: string, visible: boolean) => void;
 
   // Analysis mode
-  analysisMode?: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
-  onAnalysisModeChange?: (mode: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null) => void;
+  analysisMode?: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | null;
+  onAnalysisModeChange?: (mode: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | null) => void;
 
   // Fly-To navigation
   onFlyToCoords?: (lat: number, lon: number) => void;

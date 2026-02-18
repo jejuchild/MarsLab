@@ -792,7 +792,7 @@ export default function MeasurementTools({
           });
 
           // Convert globe position to screen position for the text input
-          const screenPos = Cesium.SceneTransforms.wgs84ToWindowCoordinates(
+          const screenPos = Cesium.SceneTransforms.worldToWindowCoordinates(
             viewer.scene,
             Cesium.Cartesian3.fromDegrees(lon, lat, 0, MARS_ELLIPSOID),
           );

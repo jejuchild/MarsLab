@@ -528,17 +528,17 @@ export default function AgenticPanel({
   // Auto-start when initialObjective is provided (e.g., from terraced crater ε inversion)
   const autoStartPending = useRef(false);
   useEffect(() => {
-    if (initialObjective && session.status === "idle" && !autoStartPending.current && !objective) {
+    if (initialObjective && session.sessionState === "idle" && !autoStartPending.current && !objective) {
       setObjective(initialObjective);
       autoStartPending.current = true;
     }
-  }, [initialObjective, session.status, objective]);
+  }, [initialObjective, session.sessionState, objective]);
   useEffect(() => {
-    if (autoStartPending.current && objective === initialObjective && session.status === "idle") {
+    if (autoStartPending.current && objective === initialObjective && session.sessionState === "idle") {
       autoStartPending.current = false;
       handleRun();
     }
-  }, [objective, initialObjective, session.status, handleRun]);
+  }, [objective, initialObjective, session.sessionState, handleRun]);
 
   const handleOpenHistory = useCallback(async () => {
     setShowHistory(true);

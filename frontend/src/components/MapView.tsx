@@ -138,7 +138,7 @@ type MapViewProps = {
     opacity: number;
   }>;
   // Analysis mode
-  analysisMode?: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | null;
+  analysisMode?: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | null;
   // Active HiRISE DTM product for hover elevation probing
   activeDTMProductId?: string | null;
   linePoints?: Array<{ lat: number; lon: number }>;
@@ -1259,10 +1259,6 @@ export default function MapView({
         if (pickedFieldNote && pickedFieldNote.id instanceof Cesium.Entity) {
           const fnEnt = pickedFieldNote.id as Cesium.Entity;
           const noteId = fnEnt.properties?.noteId?.getValue?.();
-          const fnProductId = fnEnt.properties?.productId?.getValue?.();
-          const fnInstrument = fnEnt.properties?.instrument?.getValue?.();
-
-
           // Find the full note data from fieldNotesRef
           const note = fieldNotesRef.current.find(n => n.id === noteId);
           if (note && onFieldNoteClickRef.current) {

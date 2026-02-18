@@ -5,6 +5,7 @@ import {
   useCallback,
   useMemo,
   memo,
+  type JSX,
 } from "react";
 import { createPortal } from "react-dom";
 

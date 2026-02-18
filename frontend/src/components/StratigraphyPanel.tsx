@@ -291,9 +291,9 @@ export default function StratigraphyPanel({
                           borderRadius: 6,
                         }}
                         labelFormatter={(v) => `${v} m from center`}
-                        formatter={(value: number, name: string) => {
-                          if (name === "elev") return [`${value?.toFixed(1)} m`, "Median"];
-                          return [value?.toFixed(1), name];
+                        formatter={(value: number | undefined, name?: string) => {
+                          if (name === "elev") return [`${(value ?? 0).toFixed(1)} m`, "Median"];
+                          return [(value ?? 0).toFixed(1), name ?? ""];
                         }}
                       />
                       {/* Min/max envelope */}

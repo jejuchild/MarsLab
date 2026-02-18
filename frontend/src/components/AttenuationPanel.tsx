@@ -327,12 +327,12 @@ export default function AttenuationPanel({
                           borderRadius: 6,
                         }}
                         labelFormatter={(v) => `${v} km`}
-                        formatter={(value: number, name: string) => {
+                        formatter={(value: number | undefined, name?: string) => {
                           if (name === "alpha")
-                            return [`${value?.toFixed(4)} dB/m`, "Attenuation"];
+                            return [`${(value ?? 0).toFixed(4)} dB/m`, "Attenuation"];
                           if (name === "depth")
-                            return [`${value?.toFixed(1)} m`, "Depth"];
-                          return [value, name];
+                            return [`${(value ?? 0).toFixed(1)} m`, "Depth"];
+                          return [value ?? 0, name ?? ""];
                         }}
                       />
                       {/* Transparency threshold reference lines */}

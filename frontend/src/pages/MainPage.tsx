@@ -215,7 +215,7 @@ export default function MainPage() {
   const {
     fieldNotes, showFieldNoteModal, setShowFieldNoteModal,
     showFieldNotesOnMap, setShowFieldNotesOnMap,
-    fieldNoteActiveTag, setFieldNoteActiveTag,
+    fieldNoteActiveTag: _fieldNoteActiveTag, setFieldNoteActiveTag,
     mapFieldNotesForView, refreshFieldNotes, handleOpenFieldNote,
   } = useFieldNotes();
 

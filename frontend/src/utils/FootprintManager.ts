@@ -267,8 +267,6 @@ export class FootprintManager {
       this.features.set(instrument, data.features);
       this.renderFeatures(instrument, data.features);
 
-      const entityCount = this.entityIds.get(instrument)?.size ?? 0;
-
       const result: LoadResult = {
         instrument,
         count: data.features.length,
