@@ -524,10 +524,8 @@ def compute_dem_patch(
     """
     ds = _get_dem()
 
-    # Normalize longitude to 0-360 range (DEM uses 0-360)
-    lon0_normalized = lon0 % 360
-    if lon0_normalized < 0:
-        lon0_normalized += 360
+    # Normalize longitude to -180..180 (DEM native convention)
+    lon0_normalized = ((lon0 + 180) % 360) - 180
 
     # Centre pixel
     row_c, col_c = ds.index(lon0_normalized, lat0)
@@ -1075,10 +1073,8 @@ def estimate_thermal_inertia(lat: float, lon: float) -> dict:
     """
     ds = _get_dem()
 
-    # Normalize longitude for the DEM (0-360)
-    lon_norm = lon % 360
-    if lon_norm < 0:
-        lon_norm += 360
+    # Normalize longitude to -180..180 (DEM native convention)
+    lon_norm = ((lon + 180) % 360) - 180
 
     row, col = ds.index(lon_norm, lat)
 
@@ -1168,10 +1164,8 @@ async def export_geotiff(
     try:
         ds = _get_dem()
 
-        # Normalize longitude for the DEM (0-360)
-        lon_norm = lon % 360
-        if lon_norm < 0:
-            lon_norm += 360
+        # Normalize longitude to -180..180 (DEM native convention)
+        lon_norm = ((lon + 180) % 360) - 180
 
         radius_m = radius_km * 1000.0
 
@@ -1284,9 +1278,8 @@ async def transect_profile(
         lats = np.linspace(start_lat, end_lat, num_points)
         lons = np.linspace(start_lon, end_lon, num_points)
 
-        # Normalize longitudes for DEM (0-360)
-        lons_norm = lons % 360
-        lons_norm[lons_norm < 0] += 360
+        # Normalize longitudes to -180..180 (DEM native convention)
+        lons_norm = ((lons + 180) % 360) - 180
 
         results = []
         cumulative_dist = 0.0

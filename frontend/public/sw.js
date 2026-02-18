@@ -150,7 +150,6 @@ function classifyRequest(url, request) {
   // API calls — GeoJSON indices, footprint data, search results
   if (pathname.startsWith("/api/") ||
       pathname.endsWith(".geojson") ||
-      pathname.startsWith("/terrain/") ||
       pathname.startsWith("/sharad/") ||
       pathname.startsWith("/hirise/") ||
       pathname.startsWith("/crism/") ||

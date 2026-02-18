@@ -126,10 +126,8 @@ def extract_dem_window(
     radius_km = min(radius_km, MAX_SCAN_RADIUS_KM)
     ds = _get_dem()
 
-    # Normalize longitude to 0-360 (DEM convention)
-    lon0_360 = lon0 % 360
-    if lon0_360 < 0:
-        lon0_360 += 360
+    # Normalize longitude to -180..180 (DEM convention)
+    lon0_norm = ((lon0 + 180) % 360) - 180
 
     # Pixel sizes in degrees
     px_deg_ew = abs(ds.transform.a)
@@ -149,7 +147,7 @@ def extract_dem_window(
     half_ns = int(math.ceil(radius_m / px_m_ns)) + 2
 
     # Center pixel
-    row_c, col_c = ds.index(lon0_360, lat0)
+    row_c, col_c = ds.index(lon0_norm, lat0)
     row_c = max(0, min(ds.height - 1, row_c))
     col_c = max(0, min(ds.width - 1, col_c))
 
@@ -179,7 +177,7 @@ def extract_dem_window(
         "ncols": elev.shape[1],
         "lat0": lat0,
         "lon0": lon0,
-        "lon0_360": lon0_360,
+        "lon0_norm": lon0_norm,
         "radius_km": radius_km,
         "transform_a": ds.transform.a,  # pixel width in degrees
         "transform_f": ds.transform.f,  # top-left latitude
@@ -208,12 +206,15 @@ def pixel_to_latlon(row: int, col: int, meta: dict) -> tuple:
     abs_row = meta["row0"] + row
     abs_col = meta["col0"] + col
 
-    # Transform from pixel to geographic
-    lon_360 = meta["transform_c"] + abs_col * meta["px_deg_ew"]
+    # Transform from pixel to geographic (DEM uses -180..180)
+    lon = meta["transform_c"] + abs_col * meta["px_deg_ew"]
     lat = meta["transform_f"] - abs_row * meta["px_deg_ns"]
 
-    # Convert 0-360 to -180/180
-    lon = lon_360 if lon_360 <= 180 else lon_360 - 360
+    # Clamp to -180..180 for safety
+    if lon > 180:
+        lon -= 360
+    elif lon < -180:
+        lon += 360
 
     return lat, lon
 
