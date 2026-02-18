@@ -185,7 +185,7 @@ def compute_centroid(feature: dict) -> Optional[dict]:
         return None
 
     if geom_type == "Point":
-        return geom
+        return {"type": "Point", "coordinates": [normalize_lon(coords[0]), coords[1]]}
     elif geom_type == "Polygon":
         ring = coords[0] if coords else []
         if not ring:
@@ -203,6 +203,25 @@ def compute_centroid(feature: dict) -> Optional[dict]:
         return {"type": "Point", "coordinates": [normalize_lon(mid_coord[0]), mid_coord[1]]}
 
     return None
+
+
+def normalize_geometry_coords(geom: dict) -> dict:
+    """Normalize all longitude values in a geometry to -180..180 range."""
+    geom_type = geom.get("type")
+    coords = geom.get("coordinates")
+    if not coords:
+        return geom
+
+    if geom_type == "Point":
+        return {"type": "Point", "coordinates": [normalize_lon(coords[0]), coords[1]]}
+    elif geom_type == "LineString":
+        return {"type": "LineString", "coordinates": [[normalize_lon(c[0]), c[1]] for c in coords]}
+    elif geom_type == "Polygon":
+        new_rings = []
+        for ring in coords:
+            new_rings.append([[normalize_lon(c[0]), c[1]] for c in ring])
+        return {"type": "Polygon", "coordinates": new_rings}
+    return geom
 
 
 def simplify_geometry(geom: dict, tolerance: float) -> dict:
@@ -369,6 +388,8 @@ async def get_footprints(
         else:  # lod == "poly"
             geom = feature.get("geometry")
             if geom:
+                # Normalize coordinates to -180..180 range
+                geom = normalize_geometry_coords(geom)
                 # Apply simplification if requested
                 if simplify and SHAPELY_AVAILABLE:
                     tolerance = SIMPLIFY_TOLERANCES.get(simplify, 0.005)

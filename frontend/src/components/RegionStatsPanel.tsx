@@ -106,7 +106,7 @@ export default function RegionStatsPanel({
       setData(null);
 
       try {
-        const res = await fetch("/terrain/region_stats", {
+        const res = await fetch("/api/terrain/region_stats", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(vertices),

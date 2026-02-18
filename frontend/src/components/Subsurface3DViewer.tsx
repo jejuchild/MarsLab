@@ -64,7 +64,7 @@ async function fetchDEMPatch(
     grid_size: gridSize.toString(),
   });
 
-  const res = await fetch(`/terrain/dem_patch?${params}`);
+  const res = await fetch(`/api/terrain/dem_patch?${params}`);
   if (!res.ok) {
     const errorText = await res.text().catch(() => "Unknown error");
     throw new Error(`DEM fetch failed (${res.status}): ${errorText.slice(0, 200)}`);

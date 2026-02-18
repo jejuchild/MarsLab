@@ -162,7 +162,7 @@ export default function SlopeAnalysis({
           lon: point.lon.toString(),
           radius_m: radiusM.toString(),
         });
-        const res = await fetch(`/terrain/slope_stats?${params}`, {
+        const res = await fetch(`/api/terrain/slope_stats?${params}`, {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -197,7 +197,7 @@ export default function SlopeAnalysis({
           lat: point.lat.toString(),
           lon: point.lon.toString(),
         });
-        const res = await fetch(`/terrain/thermal_inertia?${params}`, {
+        const res = await fetch(`/api/terrain/thermal_inertia?${params}`, {
           signal: controller.signal,
         });
         if (res.ok) {
@@ -459,7 +459,7 @@ export default function SlopeAnalysis({
                   <button
                     onClick={() =>
                       window.open(
-                        `/terrain/export_geotiff?lat=${point.lat}&lon=${point.lon}&radius_km=5&data_type=elevation`
+                        `/api/terrain/export_geotiff?lat=${point.lat}&lon=${point.lon}&radius_km=5&data_type=elevation`
                       )
                     }
                     className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium bg-emerald-500/20 border border-emerald-500/30 rounded text-emerald-400 hover:bg-emerald-500/30 transition-colors"
@@ -470,7 +470,7 @@ export default function SlopeAnalysis({
                   <button
                     onClick={() =>
                       window.open(
-                        `/terrain/export_geotiff?lat=${point.lat}&lon=${point.lon}&radius_km=5&data_type=slope`
+                        `/api/terrain/export_geotiff?lat=${point.lat}&lon=${point.lon}&radius_km=5&data_type=slope`
                       )
                     }
                     className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium bg-amber-500/20 border border-amber-500/30 rounded text-amber-400 hover:bg-amber-500/30 transition-colors"

@@ -47,7 +47,7 @@ export async function loadDTMElevationGrid(
   const promise = (async () => {
     try {
       const res = await fetch(
-        `/terrain/hirise_dtm_elevation_grid?product_id=${encodeURIComponent(productId)}&max_size=256`
+        `/api/terrain/hirise_dtm_elevation_grid?product_id=${encodeURIComponent(productId)}&max_size=256`
       );
       if (!res.ok) {
         console.error(`[DTMHover] Failed to load grid for ${productId}`);

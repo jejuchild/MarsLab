@@ -113,7 +113,7 @@ export default function LineProfile({
         });
 
         // Try the enhanced transect endpoint first
-        let res = await fetch(`/terrain/transect_profile?${params}`, {
+        let res = await fetch(`/api/terrain/transect_profile?${params}`, {
           signal: controller.signal,
         });
 
@@ -126,7 +126,7 @@ export default function LineProfile({
             end_lon: endPoint.lon.toString(),
             num_samples: "300",
           });
-          res = await fetch(`/terrain/line_profile?${fallbackParams}`, {
+          res = await fetch(`/api/terrain/line_profile?${fallbackParams}`, {
             signal: controller.signal,
           });
         }

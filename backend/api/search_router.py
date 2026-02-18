@@ -147,6 +147,12 @@ _LOCAL_INDICES = {
 _all_products_cache: list | None = None
 
 
+def invalidate_products_cache():
+    """Reset the all-products cache so the next search re-reads index files."""
+    global _all_products_cache
+    _all_products_cache = None
+
+
 def _load_all_products() -> list:
     """Load all products from all index.geojson files. Cached after first call."""
     global _all_products_cache
@@ -860,13 +866,55 @@ async def search_spatial(
             count=len(dtm_results),
         )
 
+    # Local-first: search local indices first for faster response
+    _inst_local_map = {
+        Instrument.CRISM: ("CRISM", "crism"),
+        Instrument.HIRISE: ("HIRISE", "hirise"),
+        Instrument.SHARAD: ("SHARAD", "sharad"),
+        Instrument.SHARAD_HIGHRES: ("SHARAD_HIGHRES", "sharad_highres"),
+    }
+
+    local_results = []
+    if inst_filter and inst_filter in _inst_local_map:
+        key, val = _inst_local_map[inst_filter]
+        local_results = search_local_spatial(
+            key, val, minlat, maxlat, westernlon, easternlon, limit
+        )
+    elif inst_filter is None:
+        # Search all local indices
+        for key, val in _inst_local_map.values():
+            local_results.extend(search_local_spatial(
+                key, val, minlat, maxlat, westernlon, easternlon, limit
+            ))
+        local_results = local_results[:limit]
+
+    # If local results are sufficient, skip slow ODE call
+    if len(local_results) >= limit:
+        return SearchResponse(
+            query=f"lat=[{minlat}, {maxlat}], lon=[{westernlon}, {easternlon}]",
+            results=local_results,
+            count=len(local_results),
+        )
+
+    # Supplement with ODE results
     try:
         products = await search_ode_spatial(minlat, maxlat, westernlon, easternlon, inst_filter, limit)
     except Exception as e:
+        # If ODE fails but we have local results, return those
+        if local_results:
+            return SearchResponse(
+                query=f"lat=[{minlat}, {maxlat}], lon=[{westernlon}, {easternlon}]",
+                results=local_results,
+                count=len(local_results),
+            )
         raise HTTPException(500, f"ODE spatial search failed: {e}")
 
-    results = []
+    # Merge: local results first, then ODE results not already present
+    local_pids = {r.product_id.upper() for r in local_results}
+    results = list(local_results)
     for p in products:
+        if p.product_id.upper() in local_pids:
+            continue
         if p.instrument == Instrument.CRISM:
             base_key = parse_crism_base_key(p.product_id)
         else:
@@ -885,6 +933,8 @@ async def search_spatial(
             has_browse=existence.has_browse,
             missing_files=existence.missing_files,
         ))
+
+    results = results[:limit]
 
     return SearchResponse(
         query=f"lat=[{minlat}, {maxlat}], lon=[{westernlon}, {easternlon}]",

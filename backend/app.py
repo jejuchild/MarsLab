@@ -461,7 +461,7 @@ app.include_router(
     prefix="/hirise",
     tags=["HiRISE"]
 )
-app.include_router(terrain_router)  # /terrain/slope_stats
+app.include_router(terrain_router)  # /api/terrain/slope_stats
 app.include_router(sharad_highres_router)  # /api/sharad_highres/*
 app.include_router(suggestions_router)  # /api/feature_suggestions
 app.include_router(fieldnotes_router)  # /api/fieldnotes

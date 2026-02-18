@@ -46,7 +46,7 @@ async function fetchDEMPatch(
     grid_size: gridSize.toString(),
   });
 
-  const res = await fetch(`/terrain/dem_patch?${params}`);
+  const res = await fetch(`/api/terrain/dem_patch?${params}`);
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Failed to fetch DEM patch" }));
     throw new Error(error.error || "Failed to fetch DEM patch");

@@ -88,7 +88,7 @@ async function fetchHiRiseDTMPatch(
     grid_size: gridSize.toString(),
   });
 
-  const res = await fetch(`/terrain/hirise_dtm_patch?${params}`);
+  const res = await fetch(`/api/terrain/hirise_dtm_patch?${params}`);
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: "Failed to fetch HiRISE DTM patch" }));
     throw new Error(error.error || error.detail || "Failed to fetch HiRISE DTM patch");

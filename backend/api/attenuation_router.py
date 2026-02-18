@@ -10,6 +10,7 @@ import io
 import csv
 import logging
 import re
+from collections import OrderedDict
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -19,6 +20,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/attenuation", tags=["Radar Attenuation"])
 
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+# LRU result cache — avoids re-running 4s pipeline for identical params
+_mapper_cache: OrderedDict = OrderedDict()
+_MAPPER_CACHE_MAX = 32
 
 
 def _validate_product_id(pid: str):
@@ -34,11 +39,16 @@ def _run_mapper(
     search_hi: int,
     dtm_product_id: str,
 ):
-    """Instantiate and run RadarAttenuationMapper."""
+    """Instantiate and run RadarAttenuationMapper (with LRU cache)."""
+    cache_key = (product_id, epsilon_r, snr_threshold, search_lo, search_hi, dtm_product_id)
+    if cache_key in _mapper_cache:
+        _mapper_cache.move_to_end(cache_key)
+        return _mapper_cache[cache_key]
+
     from analysis.radar_attenuation.pipeline import RadarAttenuationMapper
 
     mapper = RadarAttenuationMapper()
-    return mapper.run(
+    result = mapper.run(
         product_id=product_id,
         epsilon_r=epsilon_r,
         snr_threshold=snr_threshold,
@@ -46,6 +56,12 @@ def _run_mapper(
         search_hi=search_hi,
         dtm_product_id=dtm_product_id,
     )
+    # Only cache successful results
+    if result.success:
+        _mapper_cache[cache_key] = result
+        if len(_mapper_cache) > _MAPPER_CACHE_MAX:
+            _mapper_cache.popitem(last=False)
+    return result
 
 
 @router.get("/profile")
@@ -84,7 +100,10 @@ async def attenuation_profile(
         raise HTTPException(status_code=500, detail=str(e))
 
     if not result.success:
-        raise HTTPException(status_code=500, detail=result.error or "Unknown error")
+        err = result.error or "Unknown error"
+        if "not found" in err.lower() or "no data" in err.lower() or "does not exist" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        raise HTTPException(status_code=500, detail=err)
 
     return result.model_dump()
 
@@ -118,7 +137,10 @@ async def export_csv(
         raise HTTPException(status_code=500, detail=str(e))
 
     if not result.success:
-        raise HTTPException(status_code=500, detail=result.error or "Unknown error")
+        err = result.error or "Unknown error"
+        if "not found" in err.lower() or "no data" in err.lower() or "does not exist" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        raise HTTPException(status_code=500, detail=err)
 
     buf = io.StringIO()
     writer = csv.writer(buf)

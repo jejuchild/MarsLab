@@ -512,6 +512,13 @@ class DownloadManager:
                     refresh_geojson_cache(str(task.instrument.value))
                 except Exception as e:
                     print(f"[CACHE] Failed to refresh cache for {task.instrument}: {e}")
+
+                # Invalidate search products cache so new products appear in search
+                try:
+                    from .search_router import invalidate_products_cache
+                    invalidate_products_cache()
+                except Exception as e:
+                    print(f"[CACHE] Failed to invalidate products cache: {e}")
             elif core_failed:
                 task.status = DownloadStatus.FAILED
                 task.error = f"Failed to download core files: {', '.join(f.filename for f in core_failed)}"

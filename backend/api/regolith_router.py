@@ -10,6 +10,7 @@ import io
 import csv
 import logging
 import re
+from collections import OrderedDict
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -19,6 +20,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/regolith", tags=["Regolith Thickness"])
 
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9_\-]+$")
+
+# LRU result cache — avoids re-running 4s pipeline for identical params
+_rte_cache: OrderedDict = OrderedDict()
+_RTE_CACHE_MAX = 32
 
 
 def _validate_product_id(pid: str):
@@ -39,11 +44,20 @@ def _run_rte(
     clutter_snr_threshold: float = 3.0,
     clutter_bin_tolerance: int = 3,
 ):
-    """Instantiate and run RegolithThicknessEstimator."""
+    """Instantiate and run RegolithThicknessEstimator (with LRU cache)."""
+    cache_key = (
+        product_id, epsilon_r, snr_threshold, search_lo, search_hi,
+        dtm_product_id, mode, epsilon_uncertainty,
+        clutter_mode, clutter_snr_threshold, clutter_bin_tolerance,
+    )
+    if cache_key in _rte_cache:
+        _rte_cache.move_to_end(cache_key)
+        return _rte_cache[cache_key]
+
     from analysis.regolith_thickness.pipeline import RegolithThicknessEstimator
 
     rte = RegolithThicknessEstimator()
-    return rte.run(
+    result = rte.run(
         product_id=product_id,
         epsilon_r=epsilon_r,
         snr_threshold=snr_threshold,
@@ -56,6 +70,12 @@ def _run_rte(
         clutter_snr_threshold=clutter_snr_threshold,
         clutter_bin_tolerance=clutter_bin_tolerance,
     )
+    # Only cache successful results
+    if result.success:
+        _rte_cache[cache_key] = result
+        if len(_rte_cache) > _RTE_CACHE_MAX:
+            _rte_cache.popitem(last=False)
+    return result
 
 
 @router.get("/thickness_profile")
@@ -107,7 +127,10 @@ async def thickness_profile(
         raise HTTPException(status_code=500, detail=str(e))
 
     if not result.success:
-        raise HTTPException(status_code=500, detail=result.error or "Unknown error")
+        err = result.error or "Unknown error"
+        if "not found" in err.lower() or "no data" in err.lower() or "does not exist" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        raise HTTPException(status_code=500, detail=err)
 
     return result.model_dump()
 
@@ -154,7 +177,10 @@ async def export_csv(
         raise HTTPException(status_code=500, detail=str(e))
 
     if not result.success:
-        raise HTTPException(status_code=500, detail=result.error or "Unknown error")
+        err = result.error or "Unknown error"
+        if "not found" in err.lower() or "no data" in err.lower() or "does not exist" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        raise HTTPException(status_code=500, detail=err)
 
     # Stream CSV with all columns
     buf = io.StringIO()

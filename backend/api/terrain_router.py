@@ -17,7 +17,7 @@ from fastapi import APIRouter, Query, Body
 from fastapi.responses import JSONResponse, FileResponse
 from cachetools import LRUCache
 
-router = APIRouter(prefix="/terrain", tags=["Terrain"])
+router = APIRouter(prefix="/api/terrain", tags=["Terrain"])
 
 # Path to the global Mars DEM (project root = backend/../)
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
