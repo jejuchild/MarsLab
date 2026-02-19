@@ -288,12 +288,13 @@ async def get_precomputed_features(
     north: float = Query(..., ge=-90, le=90, description="North latitude"),
     types: Optional[str] = Query(None, description="Comma-separated feature types to include"),
     min_confidence: float = Query(0.0, ge=0, le=1, description="Minimum confidence threshold"),
+    limit: int = Query(1000, ge=1, le=10000, description="Maximum number of features to return"),
 ):
     """
     Query pre-computed landform features within a bounding box.
 
-    Returns all features whose centroid falls within [west, south, east, north].
-    Supports optional type filtering and confidence threshold.
+    Returns features whose centroid falls within [west, south, east, north],
+    sorted by confidence (descending), capped at `limit`.
     """
     if _precomputed_cache is None:
         return JSONResponse(
@@ -336,8 +337,17 @@ async def get_precomputed_features(
 
         results.append(f)
 
+    total_matched = len(results)
+
+    # Sort by confidence descending, then cap at limit
+    if total_matched > limit:
+        results.sort(key=lambda f: f.get("confidence", 0), reverse=True)
+        results = results[:limit]
+
     return JSONResponse(content={
         "count": len(results),
+        "total_matched": total_matched,
+        "truncated": total_matched > limit,
         "bbox": {"west": west, "south": south, "east": east, "north": north},
         "features": results,
     })

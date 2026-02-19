@@ -94,11 +94,26 @@ export default function CraterDetectPanel({
   const [loaded, setLoaded] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [totalMatched, setTotalMatched] = useState(0);
+  const [truncated, setTruncated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
+  // Type selection for loading
+  const [loadTypes, setLoadTypes] = useState<Record<string, boolean>>({
+    crater: true,
+    terraced_crater: true,
+    volcanic: true,
+    graben: true,
+    channel: true,
+    wrinkle_ridge: true,
+    lda: true,
+  });
+
+  // Display filters (post-load)
   const [filterType, setFilterType] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"confidence" | "size" | "type">("confidence");
+
+  const MAX_FEATURES = 1000;
 
   // Check if precomputed cache is available on mount
   useEffect(() => {
@@ -122,11 +137,19 @@ export default function CraterDetectPanel({
   const loadFeatures = useCallback(() => {
     const vp = cameraViewportRef?.current;
     if (!vp) {
-      console.warn("[LandformPanel] cameraViewportRef is null, ref:", cameraViewportRef);
       setError("Camera viewport not available. Try panning the map first.");
       return;
     }
-    console.log("[LandformPanel] Loading features for viewport:", vp);
+
+    // Build selected types
+    const selectedTypes = Object.entries(loadTypes)
+      .filter(([, on]) => on)
+      .map(([t]) => t);
+    if (selectedTypes.length === 0) {
+      setError("Select at least one landform type to load.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     const params = new URLSearchParams({
@@ -134,13 +157,16 @@ export default function CraterDetectPanel({
       south: String(vp.minLat),
       east: String(vp.eastLon),
       north: String(vp.maxLat),
+      types: selectedTypes.join(","),
+      limit: String(MAX_FEATURES),
     });
     fetch(`/api/mola-detect/features?${params}`)
       .then((r) => r.json())
       .then((d) => {
-        console.log("[LandformPanel] API response: count=", d.count, "bbox=", d.bbox);
         if (d.features) {
           setFeatures(d.features as DetectedFeature[]);
+          setTotalMatched(d.total_matched ?? d.count ?? 0);
+          setTruncated(!!d.truncated);
           setLoaded(true);
         } else if (d.error) {
           setError(d.error);
@@ -148,13 +174,19 @@ export default function CraterDetectPanel({
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [cameraViewportRef]);
+  }, [cameraViewportRef, loadTypes]);
 
   // Unload — clear all features from map
   const unloadFeatures = useCallback(() => {
     setFeatures([]);
     setLoaded(false);
+    setTruncated(false);
+    setTotalMatched(0);
     setError(null);
+  }, []);
+
+  const toggleLoadType = useCallback((type: string) => {
+    setLoadTypes((prev) => ({ ...prev, [type]: !prev[type] }));
   }, []);
 
   // Computed
@@ -200,17 +232,48 @@ export default function CraterDetectPanel({
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3 text-[11px]">
-        {/* Load / Unload control */}
-        {available === false ? (
+        {/* Unavailable warning */}
+        {available === false && (
           <div className="bg-amber-500/10 border border-amber-500/20 rounded p-2 text-[10px] text-amber-400">
             <span className="material-symbols-outlined text-xs mr-1 align-middle">warning</span>
             No pre-computed landform cache available. Run the precompute script first.
           </div>
-        ) : !loaded ? (
+        )}
+
+        {/* Type selection checkboxes */}
+        {available !== false && (
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-semibold text-[#6b7c9c] uppercase tracking-wider">
+              Landform Types
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {Object.entries(FEATURE_LABELS).map(([type, label]) => (
+                <label
+                  key={type}
+                  className="flex items-center gap-1.5 cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    checked={loadTypes[type] ?? false}
+                    onChange={() => toggleLoadType(type)}
+                    disabled={loading}
+                    className="rounded border-[#232f48] bg-[#1a2333] text-rose-500 focus:ring-rose-500/20 w-3 h-3"
+                  />
+                  <span className="text-[10px]" style={{ color: FEATURE_COLORS[type] }}>
+                    {label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Load / Unload button */}
+        {available !== false && !loaded && (
           <button
             onClick={loadFeatures}
             disabled={loading || available === null}
-            className={`w-full py-2.5 rounded text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
+            className={`w-full py-2 rounded text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
               loading || available === null
                 ? "bg-[#1a2333] text-[#4a5568] border border-[#232f48] cursor-wait"
                 : "bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30"
@@ -219,7 +282,7 @@ export default function CraterDetectPanel({
             {loading ? (
               <>
                 <div className="animate-spin w-3 h-3 border-2 border-rose-500/30 border-t-rose-500 rounded-full" />
-                Loading landforms...
+                Loading...
               </>
             ) : available === null ? (
               <>
@@ -233,13 +296,21 @@ export default function CraterDetectPanel({
               </>
             )}
           </button>
-        ) : (
+        )}
+
+        {/* Loaded state */}
+        {loaded && (
           <div className="bg-[#1a2333] rounded p-2 border border-emerald-500/20">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-xs text-emerald-400">check_circle</span>
                 <span className="text-[10px] text-[#c8d4e8] font-medium">
                   {features.length.toLocaleString()} landforms loaded
+                  {truncated && (
+                    <span className="text-amber-400 ml-1">
+                      (max {MAX_FEATURES}, {totalMatched.toLocaleString()} in viewport)
+                    </span>
+                  )}
                 </span>
               </div>
               <button
@@ -273,7 +344,7 @@ export default function CraterDetectPanel({
         {totalCount > 0 && !loaded && (
           <p className="text-[9px] text-[#4a5568]">
             {totalCount.toLocaleString()} pre-computed landforms in cache.
-            Pan/zoom to the area of interest, then click Load.
+            Select types, zoom to an area, then click Load (max {MAX_FEATURES}).
           </p>
         )}
 

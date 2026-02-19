@@ -1555,6 +1555,7 @@ export default function MapView({
   }, []);
 
   // Keep cameraViewportRef updated on every camera moveEnd (for on-demand reads)
+  // Uses corner-picking for accurate bounds (computeViewRectangle returns full globe in 2D mode)
   useEffect(() => {
     if (!cameraViewportRef) return;
     let removeListener: (() => void) | null = null;
@@ -1563,13 +1564,34 @@ export default function MapView({
       const v = viewerRef.current;
       if (!v) return;
       try {
-        const rect = v.camera.computeViewRectangle(v.scene.globe.ellipsoid);
-        if (rect) {
+        // Pick screen corners + edges for accurate viewport (same approach as FootprintManager)
+        const canvas = v.scene.canvas;
+        const cam = v.camera;
+        const gridSize = 4;
+        const lons: number[] = [];
+        const lats: number[] = [];
+
+        for (let i = 0; i <= gridSize; i++) {
+          for (let j = 0; j <= gridSize; j++) {
+            const pt = new Cesium.Cartesian2(
+              (canvas.width * i) / gridSize,
+              (canvas.height * j) / gridSize
+            );
+            const c = cam.pickEllipsoid(pt, MARS_ELLIPSOID);
+            if (c) {
+              const carto = Cesium.Cartographic.fromCartesian(c, MARS_ELLIPSOID);
+              lons.push(Cesium.Math.toDegrees(carto.longitude));
+              lats.push(Cesium.Math.toDegrees(carto.latitude));
+            }
+          }
+        }
+
+        if (lats.length >= 4) {
           cameraViewportRef!.current = {
-            minLat: Cesium.Math.toDegrees(rect.south),
-            maxLat: Cesium.Math.toDegrees(rect.north),
-            westLon: Cesium.Math.toDegrees(rect.west),
-            eastLon: Cesium.Math.toDegrees(rect.east),
+            minLat: Math.min(...lats),
+            maxLat: Math.max(...lats),
+            westLon: Math.min(...lons),
+            eastLon: Math.max(...lons),
           };
         }
       } catch { /* viewer not ready yet */ }
