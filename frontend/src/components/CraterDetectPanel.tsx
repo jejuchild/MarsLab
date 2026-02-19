@@ -140,8 +140,8 @@ export default function CraterDetectPanel({
     // Warn if viewport is too wide (user should zoom in)
     const latSpan = vp.maxLat - vp.minLat;
     const lonSpan = vp.eastLon - vp.westLon;
-    if (latSpan > 90 || lonSpan > 120) {
-      setError("Viewport is too wide. Zoom in to a smaller area before loading landforms.");
+    if (latSpan > 160 || lonSpan > 300) {
+      setError("Viewport is too wide. Zoom in a bit before loading landforms.");
       return;
     }
 

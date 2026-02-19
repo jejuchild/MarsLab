@@ -29,9 +29,11 @@ from analysis.shared.constants import SPEED_OF_LIGHT, SHARAD_SAMPLE_INTERVAL_US
 from analysis.shared.coordinates import lon_to_180, centric_to_graphic, cumulative_distance_m
 from analysis.shared.dem_sampling import sample_dem_along_track
 from analysis.shared.overlay import interpolate_colormap, CMAP_THICKNESS
-from analysis.shared.sharad_clutter import find_clutter_pair
-from analysis.shared.clutter_alignment import ClutterAligner
 from analysis.shared.clutter_mask import compute_clutter_mask
+from analysis.shared.subsurface_picker import (
+    suppress_clutter_adaptive,
+    pick_discontinuous_reflectors,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +143,7 @@ class RegolithThicknessEstimator(AnalysisModule):
             _get_power,
             _get_geometry,
             _pick_surface,
+            _get_aligned_cluttergram,
         )
 
         logger.info(
@@ -197,30 +200,31 @@ class RegolithThicknessEstimator(AnalysisModule):
         clutter_snr_arr = np.full(total_rows, np.nan, dtype=np.float32)
 
         if clutter_mode != "off":
-            clutter_pair = find_clutter_pair(product_id)
-            if clutter_pair:
-                img_path, xml_path = clutter_pair
-                try:
-                    # Load cluttergram binary data
-                    clutter_data = np.fromfile(img_path, dtype=np.float32)
-                    # Reshape assuming (n_ranges, n_traces) — may need calibration
-                    # Typical SHARAD: 1024 or 2048 range bins
-                    n_clutter_traces_guess = clutter_data.size // 667  # Assume 667 range bins like RDR
-                    if n_clutter_traces_guess > 0:
-                        clutter_power = clutter_data.reshape(667, -1).astype(np.float32)
-                        logger.info(f"Loaded cluttergram: shape={clutter_power.shape}")
-
-                        # Align clutter to RDR using surface as anchor
-                        aligner = ClutterAligner(clutter_power, surface, total_rows)
-                        clutter_power_aligned = aligner.align_full()
-                        clutter_available = True
-                        logger.info("Clutter alignment complete")
-                    else:
-                        logger.warning("Cluttergram size mismatch; skipping clutter")
-                except Exception as e:
-                    logger.warning(f"Failed to load cluttergram: {e}")
+            # Use canonical alignment from SHARAD router to avoid duplicated
+            # parsing/layout assumptions in RTE.
+            clutter_power_aligned = _get_aligned_cluttergram(product_id)
+            clutter_available = clutter_power_aligned is not None
+            if clutter_available:
+                logger.info("RTE: aligned cluttergram loaded: shape=%s", clutter_power_aligned.shape)
             else:
-                logger.debug(f"No cluttergram found for {product_id}")
+                logger.debug("RTE: no aligned cluttergram found for %s", product_id)
+
+        # Optional clutter suppression before interface picking.
+        power_for_pick = power
+        if clutter_available and clutter_mode != "off":
+            power_for_pick, clutter_scales, clutter_corr = suppress_clutter_adaptive(
+                power=power,
+                surface_bins=surface,
+                clutter_aligned=clutter_power_aligned,
+                search_lo=search_lo,
+                search_hi=search_hi,
+            )
+            logger.info(
+                "RTE: adaptive clutter suppression applied "
+                "(scale_median=%.3f, corr_median=%.3f)",
+                float(np.median(clutter_scales[np.isfinite(clutter_scales)])) if clutter_scales.size else 0.0,
+                float(np.median(clutter_corr[np.isfinite(clutter_corr)])) if clutter_corr.size else 0.0,
+            )
 
         # ── Step 4: Vectorized near-surface reflector detection ─────
         n_traces = total_rows
@@ -235,60 +239,34 @@ class RegolithThicknessEstimator(AnalysisModule):
         valid_surface = surface >= 0
         valid_indices = np.where(valid_surface)[0]
 
-        logger.debug("RTE: %d/%d traces have valid surface pick",
-                      len(valid_indices), n_traces)
+        logger.debug("RTE: %d/%d traces have valid surface pick", len(valid_indices), n_traces)
 
-        # PHASE 1: mode-aware ring guard bins and thresholds
         ring_guard_bins = RING_GUARD_BINS_SHALLOW if mode == "shallow" else RING_GUARD_BINS_DEFAULT
-
-        for i in valid_indices:
-            sb = int(surface[i])
-            lo = sb + search_lo
-            hi = min(sb + search_hi, n_bins)
-            if hi <= lo + 5:
-                continue  # not enough room to search
-
-            band = power[i, lo:hi].astype(np.float64)
-            noise = float(np.median(band)) + 1e-12
-            peak_idx = int(np.argmax(band))
-            peak_val = float(band[peak_idx])
-            snr = peak_val / noise
-
-            # PHASE 1: Enhanced surface ringing rejection
-            # Guard band check: reject if peak is in first N bins
-            if peak_idx < ring_guard_bins:
-                ringing_rejected[i] = True
-                continue
-
-            # PHASE 1: Power proximity check: reject if too close to surface power
-            surface_peak_power = power[i, sb] if sb < n_bins else 0.0
-            if surface_peak_power > 0 and peak_val > 0.6 * surface_peak_power:
-                ringing_rejected[i] = True
-                continue
-
-            if snr >= snr_threshold:
-                detected[i] = True
-                delta_bins_arr[i] = search_lo + peak_idx
-                snr_arr[i] = snr
+        pick_arrays = pick_discontinuous_reflectors(
+            power=power_for_pick,
+            surface_bins=surface,
+            search_lo=search_lo,
+            search_hi=search_hi,
+            min_snr=snr_threshold,
+            clutter_aligned=clutter_power_aligned if clutter_available else None,
+            ring_guard_bins=ring_guard_bins,
+            neighbor_window=3 if mode == "shallow" else 4,
+            neighbor_bin_tol=7 if mode == "shallow" else 9,
+        )
+        detected[:] = pick_arrays.detected
+        delta_bins_arr[:] = pick_arrays.delta_bins
+        snr_arr[:] = pick_arrays.snr
+        ringing_rejected[:] = pick_arrays.ringing_rejected
 
         n_valid = int(detected.sum())
         logger.info("RTE: raw detections: %d/%d (%.1f%%)",
                      n_valid, n_traces, 100 * n_valid / max(n_traces, 1))
 
         # ── Step 5: Coherence filtering ─────────────────────────────
+        # Use local neighborhood support (from discontinuous picker) as coherence.
         coherence = np.zeros(n_traces, dtype=np.float32)
-
-        if n_valid >= 10:
-            # PHASE 1: mode-aware coherence filtering parameters
-            median_kernel = MEDIAN_KERNEL_SHALLOW if mode == "shallow" else MEDIAN_KERNEL_DEFAULT
-            outlier_threshold = OUTLIER_THRESHOLD_SHALLOW if mode == "shallow" else OUTLIER_THRESHOLD_DEFAULT
-            coherence = self._coherence_filter(
-                detected, delta_bins_arr, snr_arr, coherence,
-                median_kernel=median_kernel,
-                outlier_threshold=outlier_threshold,
-            )
-        elif n_valid > 0:
-            coherence[detected] = 0.5
+        if n_valid > 0:
+            coherence[detected] = np.clip(pick_arrays.support[detected] / 3.0, 0.35, 1.0).astype(np.float32)
 
         # ── Step 6: Convert TWT → depth ─────────────────────────────
         velocity = SPEED_OF_LIGHT / math.sqrt(epsilon_r)

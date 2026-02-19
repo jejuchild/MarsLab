@@ -90,14 +90,20 @@ def pick_subsurface_interface(
 
     try:
         from backend.api.sharad_highres_router import (
-            _get_power, _get_geometry, _pick_surface, _lon_to_180,
+            _get_power, _get_geometry, _pick_surface, _lon_to_180, _get_aligned_cluttergram,
+        )
+        from backend.analysis.shared.subsurface_picker import (
+            suppress_clutter_adaptive, pick_discontinuous_reflectors,
         )
     except ImportError:
         try:
             import sys
             sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
             from api.sharad_highres_router import (
-                _get_power, _get_geometry, _pick_surface, _lon_to_180,
+                _get_power, _get_geometry, _pick_surface, _lon_to_180, _get_aligned_cluttergram,
+            )
+            from analysis.shared.subsurface_picker import (
+                suppress_clutter_adaptive, pick_discontinuous_reflectors,
             )
         except ImportError as e:
             result.error = f"Cannot import SHARAD router: {e}"
@@ -145,54 +151,73 @@ def pick_subsurface_interface(
         return result
 
     n_bins = power.shape[1]
+    # Subset arrays to the crater neighborhood for clutter-aware discontinuous picking.
+    sub_idx = candidate_indices.astype(np.int32)
+    power_sub = np.asarray(power[sub_idx], dtype=np.float32)
+    surface_sub = np.asarray(surface[sub_idx], dtype=np.int32)
+
+    clutter_aligned = _get_aligned_cluttergram(sharad_product_id)
+    clutter_sub = None
+    if clutter_aligned is not None:
+        clutter_sub = np.asarray(clutter_aligned[:, sub_idx], dtype=np.float32)
+
+    power_for_pick, _, _ = suppress_clutter_adaptive(
+        power=power_sub,
+        surface_bins=surface_sub,
+        clutter_aligned=clutter_sub,
+        search_lo=search_lo_bins,
+        search_hi=search_hi_bins,
+    )
+
+    pick_arrays = pick_discontinuous_reflectors(
+        power=power_for_pick,
+        surface_bins=surface_sub,
+        search_lo=search_lo_bins,
+        search_hi=search_hi_bins,
+        min_snr=min_snr,
+        clutter_aligned=clutter_sub,
+        ring_guard_bins=3,
+        neighbor_window=3,
+        neighbor_bin_tol=8,
+    )
+
     picks = []
+    det_local = np.where(pick_arrays.detected)[0]
+    for j in det_local:
+        idx = int(sub_idx[j])
+        s_bin = int(surface_sub[j])
+        delta_bins = int(pick_arrays.delta_bins[j])
+        iface_bin = s_bin + delta_bins
+        twt_us = delta_bins * SHARAD_SAMPLE_INTERVAL_US
+        snr = float(pick_arrays.snr[j])
 
-    for idx in candidate_indices:
-        s_bin = int(surface[idx])
-        lo = min(s_bin + search_lo_bins, n_bins - 1)
-        hi = min(s_bin + search_hi_bins, n_bins)
-        if hi <= lo:
-            continue
-
-        band = power[idx, lo:hi].astype(np.float64)
-        noise = float(np.median(band)) + 1e-12
-        peak_pos = int(np.argmax(band))
-        peak_val = float(band[peak_pos])
-        snr = peak_val / noise
-
-        if snr >= min_snr:
-            iface_bin = lo + peak_pos
-            delta_bins = iface_bin - s_bin
-            twt_us = delta_bins * SHARAD_SAMPLE_INTERVAL_US
-
-            picks.append(SharadPick(
-                product_id=sharad_product_id,
-                trace_idx=int(idx),
-                lat=float(lats_graphic[idx]),
-                lon=float(lons180[idx]),
-                surface_bin=s_bin,
-                interface_bin=iface_bin,
-                delta_bins=delta_bins,
-                twt_us=twt_us,
-                twt_unc_us=SHARAD_SAMPLE_INTERVAL_US,  # ±1 bin as minimum
-                snr=round(snr, 2),
-                along_track_km=round(float(cum_dist_km[idx]), 2),
-                distance_to_crater_km=round(float(dists[idx]), 2),
-            ))
+        picks.append(SharadPick(
+            product_id=sharad_product_id,
+            trace_idx=idx,
+            lat=float(lats_graphic[idx]),
+            lon=float(lons180[idx]),
+            surface_bin=s_bin,
+            interface_bin=iface_bin,
+            delta_bins=delta_bins,
+            twt_us=twt_us,
+            twt_unc_us=SHARAD_SAMPLE_INTERVAL_US,  # ±1 bin as minimum
+            snr=round(snr, 2),
+            along_track_km=round(float(cum_dist_km[idx]), 2),
+            distance_to_crater_km=round(float(dists[idx]), 2),
+        ))
 
     if not picks:
         result.error = f"No subsurface reflectors found (SNR>{min_snr}) near crater"
         return result
 
-    # Coherence filter: keep picks with consistent twt
-    twt_values = np.array([p.twt_us for p in picks])
-    if len(twt_values) >= 3:
+    # Light robust trim only; do not force global continuity (interfaces can be discontinuous).
+    twt_values = np.array([p.twt_us for p in picks], dtype=np.float64)
+    if len(twt_values) >= 5:
         med = float(np.median(twt_values))
         mad = float(np.median(np.abs(twt_values - med)))
-        # Keep within 3 MAD of median
-        threshold = max(mad * 3, SHARAD_SAMPLE_INTERVAL_US * 3)
+        threshold = max(mad * 4, SHARAD_SAMPLE_INTERVAL_US * 4)
         coherent = [p for p in picks if abs(p.twt_us - med) <= threshold]
-        if len(coherent) >= 2:
+        if len(coherent) >= 3:
             picks = coherent
 
     result.picks = picks

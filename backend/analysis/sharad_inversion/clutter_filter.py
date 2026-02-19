@@ -51,7 +51,8 @@ def assess_clutter(
                 notes="No cluttergram available for this product"
             )
 
-        n_traces, n_bins = clutter_arr.shape
+        # Router-aligned cluttergram is (range_bins, traces).
+        n_bins, n_traces = clutter_arr.shape
 
         # Bounds check
         if trace_idx < 0 or trace_idx >= n_traces:
@@ -72,19 +73,19 @@ def assess_clutter(
         trace_lo = max(0, trace_idx - 5)
         trace_hi = min(n_traces, trace_idx + 6)
 
-        clutter_patch = clutter_arr[trace_lo:trace_hi, bin_lo:bin_hi].astype(np.float64)
+        clutter_patch = clutter_arr[bin_lo:bin_hi, trace_lo:trace_hi].astype(np.float64)
 
         if clutter_patch.size == 0:
             return ClutterAssessment(cluttergram_available=True, notes="Empty clutter patch")
 
         # Compute clutter power at pick location relative to background
-        clutter_at_pick = float(clutter_arr[trace_idx, interface_bin])
+        clutter_at_pick = float(clutter_arr[interface_bin, trace_idx])
 
         # Background: median of full subsurface column below surface
         sub_start = max(0, surface_bin + 20)
         sub_end = min(n_bins, surface_bin + 200)
         if sub_end > sub_start:
-            bg_col = clutter_arr[trace_idx, sub_start:sub_end].astype(np.float64)
+            bg_col = clutter_arr[sub_start:sub_end, trace_idx].astype(np.float64)
             bg_median = float(np.median(bg_col[bg_col > 0])) if np.any(bg_col > 0) else 1.0
         else:
             bg_median = 1.0
