@@ -1,0 +1,32 @@
+{
+  "crater_lat": 47.2,
+  "crater_lon": -166.3,
+  "n_layers": 3,
+  "total_depth_m": 12.3,
+  "instruments": [
+    "HiRISE"
+  ],
+  "layers": [
+    {
+      "top_m": 0.0,
+      "bottom_m": 0.8,
+      "thickness_m": 0.8,
+      "mineral": null,
+      "epsilon_r": 0.0
+    },
+    {
+      "top_m": 0.8,
+      "bottom_m": 9.8,
+      "thickness_m": 9.0,
+      "mineral": null,
+      "epsilon_r": 0.0
+    },
+    {
+      "top_m": 9.8,
+      "bottom_m": 12.3,
+      "thickness_m": 2.5,
+      "mineral": null,
+      "epsilon_r": 0.0
+    }
+  ]
+}

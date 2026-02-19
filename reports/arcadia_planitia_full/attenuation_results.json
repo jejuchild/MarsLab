@@ -1,0 +1,50 @@
+{
+  "n_tracks": 3,
+  "tracks": [
+    {
+      "product_id": "R_3933702_001_SS19_700_A",
+      "alpha_mean": 0.1212,
+      "alpha_std": 0.0536,
+      "dominant_material": "Clay-rich / briny",
+      "detection_rate": 0.4204,
+      "material_distribution": {
+        "unclassified": 17747,
+        "Moderate loss (mixed)": 1762,
+        "Clay-rich / briny": 9938,
+        "Dusty ice / porous basalt": 1113,
+        "Clean ice / low-loss rock": 54,
+        "Pure ice": 3
+      }
+    },
+    {
+      "product_id": "R_3898101_001_SS19_700_A",
+      "alpha_mean": 0.1263,
+      "alpha_std": 0.0521,
+      "dominant_material": "Clay-rich / briny",
+      "detection_rate": 0.4,
+      "material_distribution": {
+        "unclassified": 18685,
+        "Clay-rich / briny": 10021,
+        "Moderate loss (mixed)": 1736,
+        "Dusty ice / porous basalt": 662,
+        "Pure ice": 1,
+        "Clean ice / low-loss rock": 37
+      }
+    },
+    {
+      "product_id": "R_4043102_001_SS19_700_A",
+      "alpha_mean": 0.1101,
+      "alpha_std": 0.0528,
+      "dominant_material": "Clay-rich / briny",
+      "detection_rate": 0.3724,
+      "material_distribution": {
+        "unclassified": 19194,
+        "Clay-rich / briny": 7804,
+        "Moderate loss (mixed)": 2054,
+        "Dusty ice / porous basalt": 1331,
+        "Clean ice / low-loss rock": 179,
+        "Pure ice": 21
+      }
+    }
+  ]
+}

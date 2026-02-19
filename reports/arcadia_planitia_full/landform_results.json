@@ -1,0 +1,1711 @@
+{
+  "craters": 3,
+  "volcanics": 6,
+  "graben": 1,
+  "channels": 62,
+  "ridges": 98,
+  "ldas": 0,
+  "total": 170,
+  "features": [
+    {
+      "type": "terraced_crater",
+      "lat": 45.15793,
+      "lon": -174.57104,
+      "diameter_km": 15.28,
+      "depth_m": 96.0,
+      "confidence": 0.242,
+      "morphology": "terraced",
+      "description": "Terraced crater (1 bench, terrace depth 20 m), d/D=0.0063, circularity=0.692"
+    },
+    {
+      "type": "volcanic",
+      "lat": 50.17525,
+      "lon": -173.73088,
+      "diameter_km": 10.91,
+      "depth_m": 109.2,
+      "confidence": 0.244,
+      "morphology": "shield",
+      "description": "Volcanic construct (10.9 km), mean flank slope 2.0 deg, relief 109 m"
+    },
+    {
+      "type": "volcanic",
+      "lat": 49.02805,
+      "lon": -168.87215,
+      "diameter_km": 8.16,
+      "depth_m": 186.5,
+      "confidence": 0.591,
+      "morphology": "shield",
+      "description": "Volcanic construct (8.2 km), mean flank slope 3.1 deg, relief 186 m"
+    },
+    {
+      "type": "volcanic",
+      "lat": 47.1959,
+      "lon": -169.63807,
+      "diameter_km": 8.05,
+      "depth_m": 167.7,
+      "confidence": 0.592,
+      "morphology": "shield",
+      "description": "Volcanic construct (8.1 km), mean flank slope 3.2 deg, relief 168 m"
+    },
+    {
+      "type": "volcanic",
+      "lat": 49.5038,
+      "lon": -173.81861,
+      "diameter_km": 7.79,
+      "depth_m": 131.8,
+      "confidence": 0.201,
+      "morphology": "shield",
+      "description": "Volcanic construct (7.8 km), mean flank slope 2.0 deg, relief 132 m"
+    },
+    {
+      "type": "volcanic",
+      "lat": 49.9863,
+      "lon": -173.51494,
+      "diameter_km": 7.52,
+      "depth_m": 62.0,
+      "confidence": 0.32,
+      "morphology": "shield",
+      "description": "Volcanic construct (7.5 km), mean flank slope 1.3 deg, relief 62 m"
+    },
+    {
+      "type": "crater",
+      "lat": 44.15582,
+      "lon": -173.09655,
+      "diameter_km": 6.99,
+      "depth_m": 102.0,
+      "confidence": 0.514,
+      "morphology": "simple",
+      "description": "Simple crater, d/D=0.0146, circularity=0.892"
+    },
+    {
+      "type": "volcanic",
+      "lat": 45.06008,
+      "lon": -174.37197,
+      "diameter_km": 6.26,
+      "depth_m": 77.1,
+      "confidence": 0.341,
+      "morphology": "shield",
+      "description": "Volcanic construct (6.3 km), mean flank slope 2.0 deg, relief 77 m"
+    },
+    {
+      "type": "crater",
+      "lat": 44.84414,
+      "lon": -175.17163,
+      "diameter_km": 5.23,
+      "depth_m": 40.8,
+      "confidence": 0.448,
+      "morphology": "simple",
+      "description": "Simple crater, d/D=0.0078, circularity=0.859"
+    },
+    {
+      "type": "graben",
+      "lat": 44.14232,
+      "lon": -175.15476,
+      "diameter_km": 0.0,
+      "depth_m": 136.0,
+      "confidence": 0.741,
+      "morphology": "",
+      "description": "Graben, 20.6 km x 3.3 km, aspect ratio 6.2, depth 136 m"
+    },
+    {
+      "type": "channel",
+      "lat": 44.51348,
+      "lon": -174.16615,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.529,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 17.1 km, width ~1.1 km, depth ~0 m, sinuosity 1.03"
+    },
+    {
+      "type": "channel",
+      "lat": 44.19294,
+      "lon": -173.02569,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.409,
+      "morphology": "sinuous_channel",
+      "description": "Channel/valley: length 17.7 km, width ~4.1 km, depth ~0 m, sinuosity 1.86"
+    },
+    {
+      "type": "channel",
+      "lat": 45.0972,
+      "lon": -175.50567,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.394,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 17.1 km, width ~3.1 km, depth ~0 m, sinuosity 1.12"
+    },
+    {
+      "type": "channel",
+      "lat": 44.88126,
+      "lon": -175.37408,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.394,
+      "morphology": "sinuous_channel",
+      "description": "Channel/valley: length 14.0 km, width ~3.1 km, depth ~0 m, sinuosity 1.59"
+    },
+    {
+      "type": "channel",
+      "lat": 50.02004,
+      "lon": -171.03159,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.377,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.0 km, width ~1.0 km, depth ~0 m, sinuosity 1.02"
+    },
+    {
+      "type": "channel",
+      "lat": 50.78597,
+      "lon": -175.64064,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.372,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 14.4 km, width ~2.8 km, depth ~0 m, sinuosity 1.11"
+    },
+    {
+      "type": "channel",
+      "lat": 49.28786,
+      "lon": -168.44364,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.365,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.2 km, width ~0.9 km, depth ~0 m, sinuosity 1.01"
+    },
+    {
+      "type": "channel",
+      "lat": 47.78975,
+      "lon": -169.14545,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.361,
+      "morphology": "sinuous_channel",
+      "description": "Channel/valley: length 6.8 km, width ~1.5 km, depth ~0 m, sinuosity 3.26"
+    },
+    {
+      "type": "channel",
+      "lat": 47.1183,
+      "lon": -171.93923,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.353,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 8.3 km, width ~1.5 km, depth ~0 m, sinuosity 1.01"
+    },
+    {
+      "type": "channel",
+      "lat": 49.37896,
+      "lon": -167.4314,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.352,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.6 km, width ~1.1 km, depth ~0 m, sinuosity 1.02"
+    },
+    {
+      "type": "channel",
+      "lat": 46.60543,
+      "lon": -172.87386,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.352,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 12.4 km, width ~2.7 km, depth ~0 m, sinuosity 1.06"
+    },
+    {
+      "type": "channel",
+      "lat": 45.1107,
+      "lon": -175.23237,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.347,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 17.6 km, width ~4.1 km, depth ~0 m, sinuosity 1.05"
+    },
+    {
+      "type": "channel",
+      "lat": 47.80999,
+      "lon": -171.30152,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.344,
+      "morphology": "sinuous_channel",
+      "description": "Channel/valley: length 8.2 km, width ~2.1 km, depth ~0 m, sinuosity 3.57"
+    },
+    {
+      "type": "channel",
+      "lat": 45.1107,
+      "lon": -174.8241,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.339,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 18.7 km, width ~5.0 km, depth ~0 m, sinuosity 1.06"
+    },
+    {
+      "type": "channel",
+      "lat": 47.85723,
+      "lon": -169.57059,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.327,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.0 km, width ~1.3 km, depth ~0 m, sinuosity 1.43"
+    },
+    {
+      "type": "channel",
+      "lat": 50.39457,
+      "lon": -176.50778,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.321,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.1 km, width ~1.6 km, depth ~0 m, sinuosity 1.31"
+    },
+    {
+      "type": "channel",
+      "lat": 48.35323,
+      "lon": -170.64019,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.321,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 11.5 km, width ~2.8 km, depth ~0 m, sinuosity 1.12"
+    },
+    {
+      "type": "channel",
+      "lat": 46.63242,
+      "lon": -175.74186,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.317,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.1 km, width ~1.2 km, depth ~0 m, sinuosity 1.04"
+    },
+    {
+      "type": "channel",
+      "lat": 45.24566,
+      "lon": -172.5297,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.316,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.8 km, width ~1.1 km, depth ~0 m, sinuosity 1.02"
+    },
+    {
+      "type": "channel",
+      "lat": 47.60417,
+      "lon": -167.05687,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.31,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.0 km, width ~1.3 km, depth ~0 m, sinuosity 1.04"
+    },
+    {
+      "type": "channel",
+      "lat": 46.69653,
+      "lon": -172.14167,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.307,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.8 km, width ~1.3 km, depth ~0 m, sinuosity 1.03"
+    },
+    {
+      "type": "channel",
+      "lat": 45.69105,
+      "lon": -168.20407,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.307,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 7.4 km, width ~1.7 km, depth ~0 m, sinuosity 1.04"
+    },
+    {
+      "type": "channel",
+      "lat": 45.53246,
+      "lon": -175.42807,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.307,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.6 km, width ~2.0 km, depth ~0 m, sinuosity 1.33"
+    },
+    {
+      "type": "channel",
+      "lat": 47.52994,
+      "lon": -172.47234,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.302,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.8 km, width ~1.7 km, depth ~0 m, sinuosity 1.04"
+    },
+    {
+      "type": "channel",
+      "lat": 49.93906,
+      "lon": -175.00293,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.301,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 7.0 km, width ~1.6 km, depth ~0 m, sinuosity 1.03"
+    },
+    {
+      "type": "channel",
+      "lat": 49.46669,
+      "lon": -168.79454,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.301,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.8 km, width ~1.9 km, depth ~0 m, sinuosity 1.37"
+    },
+    {
+      "type": "channel",
+      "lat": 50.20224,
+      "lon": -172.39811,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.3,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 7.4 km, width ~2.6 km, depth ~0 m, sinuosity 1.39"
+    },
+    {
+      "type": "channel",
+      "lat": 44.3144,
+      "lon": -171.04846,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.299,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 3.8 km, width ~1.2 km, depth ~0 m, sinuosity 1.10"
+    },
+    {
+      "type": "channel",
+      "lat": 46.29501,
+      "lon": -173.35636,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.296,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.5 km, width ~1.4 km, depth ~0 m, sinuosity 1.01"
+    },
+    {
+      "type": "channel",
+      "lat": 48.61978,
+      "lon": -168.95988,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.295,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.2 km, width ~1.3 km, depth ~0 m, sinuosity 1.05"
+    },
+    {
+      "type": "channel",
+      "lat": 50.23936,
+      "lon": -169.5436,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.292,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.3 km, width ~1.5 km, depth ~0 m, sinuosity 1.25"
+    },
+    {
+      "type": "channel",
+      "lat": 47.54344,
+      "lon": -167.15135,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.292,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.6 km, width ~1.2 km, depth ~0 m, sinuosity 1.05"
+    },
+    {
+      "type": "channel",
+      "lat": 50.27648,
+      "lon": -172.5938,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.291,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 11.2 km, width ~3.1 km, depth ~0 m, sinuosity 1.08"
+    },
+    {
+      "type": "channel",
+      "lat": 48.10692,
+      "lon": -167.80255,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.287,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.1 km, width ~1.5 km, depth ~0 m, sinuosity 1.07"
+    },
+    {
+      "type": "channel",
+      "lat": 50.00655,
+      "lon": -168.61572,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.285,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.2 km, width ~1.4 km, depth ~0 m, sinuosity 1.07"
+    },
+    {
+      "type": "channel",
+      "lat": 49.75349,
+      "lon": -167.58661,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.283,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.3 km, width ~1.3 km, depth ~0 m, sinuosity 1.02"
+    },
+    {
+      "type": "channel",
+      "lat": 46.50421,
+      "lon": -168.94975,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.283,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.0 km, width ~1.5 km, depth ~0 m, sinuosity 1.03"
+    },
+    {
+      "type": "channel",
+      "lat": 48.13728,
+      "lon": -171.94935,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.281,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.0 km, width ~1.4 km, depth ~0 m, sinuosity 1.29"
+    },
+    {
+      "type": "channel",
+      "lat": 46.99008,
+      "lon": -172.56344,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.281,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.9 km, width ~1.3 km, depth ~0 m, sinuosity 1.03"
+    },
+    {
+      "type": "channel",
+      "lat": 47.6784,
+      "lon": -167.23908,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.279,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 9.2 km, width ~2.7 km, depth ~0 m, sinuosity 1.09"
+    },
+    {
+      "type": "channel",
+      "lat": 46.44347,
+      "lon": -173.34961,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.276,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.7 km, width ~1.4 km, depth ~0 m, sinuosity 1.05"
+    },
+    {
+      "type": "channel",
+      "lat": 46.4536,
+      "lon": -170.03285,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.275,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.5 km, width ~2.0 km, depth ~0 m, sinuosity 1.47"
+    },
+    {
+      "type": "channel",
+      "lat": 46.4536,
+      "lon": -168.03537,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.274,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.8 km, width ~1.6 km, depth ~0 m, sinuosity 1.11"
+    },
+    {
+      "type": "channel",
+      "lat": 49.21363,
+      "lon": -167.14797,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.272,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.4 km, width ~1.5 km, depth ~0 m, sinuosity 1.07"
+    },
+    {
+      "type": "channel",
+      "lat": 49.39246,
+      "lon": -171.838,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.27,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.8 km, width ~1.3 km, depth ~0 m, sinuosity 1.02"
+    },
+    {
+      "type": "channel",
+      "lat": 46.46034,
+      "lon": -173.4947,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.27,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.2 km, width ~1.6 km, depth ~0 m, sinuosity 1.38"
+    },
+    {
+      "type": "channel",
+      "lat": 50.0909,
+      "lon": -169.60771,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.265,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 7.1 km, width ~2.2 km, depth ~0 m, sinuosity 1.08"
+    },
+    {
+      "type": "channel",
+      "lat": 49.54092,
+      "lon": -168.82829,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.261,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.9 km, width ~1.9 km, depth ~0 m, sinuosity 1.03"
+    },
+    {
+      "type": "channel",
+      "lat": 47.36461,
+      "lon": -173.06281,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.26,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.0 km, width ~1.5 km, depth ~0 m, sinuosity 1.09"
+    },
+    {
+      "type": "channel",
+      "lat": 47.95171,
+      "lon": -167.85317,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.259,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.6 km, width ~1.9 km, depth ~0 m, sinuosity 1.11"
+    },
+    {
+      "type": "channel",
+      "lat": 47.64804,
+      "lon": -169.55372,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.258,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.6 km, width ~1.7 km, depth ~0 m, sinuosity 1.02"
+    },
+    {
+      "type": "channel",
+      "lat": 47.71552,
+      "lon": -172.94471,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.257,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 6.9 km, width ~2.6 km, depth ~0 m, sinuosity 1.11"
+    },
+    {
+      "type": "channel",
+      "lat": 48.10017,
+      "lon": -169.71231,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.256,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.6 km, width ~1.7 km, depth ~0 m, sinuosity 1.02"
+    },
+    {
+      "type": "channel",
+      "lat": 50.65438,
+      "lon": -169.79666,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.255,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.2 km, width ~1.6 km, depth ~0 m, sinuosity 1.03"
+    },
+    {
+      "type": "channel",
+      "lat": 45.58982,
+      "lon": -174.76674,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.255,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 3.9 km, width ~1.6 km, depth ~0 m, sinuosity 1.24"
+    },
+    {
+      "type": "channel",
+      "lat": 48.39709,
+      "lon": -170.81564,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.252,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.1 km, width ~1.6 km, depth ~0 m, sinuosity 1.02"
+    },
+    {
+      "type": "channel",
+      "lat": 47.97195,
+      "lon": -173.31249,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.251,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.4 km, width ~1.9 km, depth ~0 m, sinuosity 1.06"
+    },
+    {
+      "type": "channel",
+      "lat": 45.44136,
+      "lon": -174.54067,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.251,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.0 km, width ~1.6 km, depth ~0 m, sinuosity 1.04"
+    },
+    {
+      "type": "channel",
+      "lat": 44.16594,
+      "lon": -169.27704,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.251,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.7 km, width ~1.7 km, depth ~0 m, sinuosity 1.01"
+    },
+    {
+      "type": "channel",
+      "lat": 50.39457,
+      "lon": -171.28465,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.25,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.7 km, width ~1.9 km, depth ~0 m, sinuosity 1.04"
+    },
+    {
+      "type": "channel",
+      "lat": 45.17143,
+      "lon": -168.47738,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.248,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 5.2 km, width ~1.9 km, depth ~0 m, sinuosity 1.11"
+    },
+    {
+      "type": "channel",
+      "lat": 46.71003,
+      "lon": -172.89073,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.245,
+      "morphology": "linear_channel",
+      "description": "Channel/valley: length 4.7 km, width ~1.6 km, depth ~0 m, sinuosity 1.07"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.45612,
+      "lon": -174.17964,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.586,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 12.1 km, width ~1.0 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.07358,
+      "lon": -175.2931,
+      "diameter_km": 0.0,
+      "depth_m": 4.0,
+      "confidence": 0.56,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 19.0 km, width ~2.3 km, height ~4 m, on plains with mean slope 1.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.65564,
+      "lon": -174.48331,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.505,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 12.5 km, width ~2.0 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.87451,
+      "lon": -168.96325,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.504,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.2 km, width ~1.0 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.98923,
+      "lon": -175.33697,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.491,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 22.9 km, width ~4.2 km, height ~0 m, on plains with mean slope 0.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.85048,
+      "lon": -173.82536,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.475,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 7.3 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.10818,
+      "lon": -171.97297,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.464,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.0 km, width ~1.1 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.3975,
+      "lon": -171.56807,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.464,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 7.6 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.81251,
+      "lon": -171.15306,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.462,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.7 km, width ~1.0 km, height ~0 m, on plains with mean slope 0.2 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.36587,
+      "lon": -171.39599,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.45,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 9.3 km, width ~1.8 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.83699,
+      "lon": -169.2568,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.442,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.5 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.6 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.13769,
+      "lon": -174.4327,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.442,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 22.9 km, width ~4.2 km, height ~0 m, on plains with mean slope 1.6 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.93906,
+      "lon": -170.2994,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.44,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.8 km, width ~1.2 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.60039,
+      "lon": -176.30196,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.439,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 10.0 km, width ~2.3 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.04744,
+      "lon": -169.72243,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.435,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.2 km, width ~1.2 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.07696,
+      "lon": -174.73637,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.434,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 27.9 km, width ~5.7 km, height ~0 m, on plains with mean slope 2.0 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.1685,
+      "lon": -173.58242,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.432,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 13.8 km, width ~2.6 km, height ~0 m, on plains with mean slope 1.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.50421,
+      "lon": -173.5588,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.432,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 11.9 km, width ~2.6 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.00992,
+      "lon": -173.272,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.43,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.8 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.31022,
+      "lon": -168.70007,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.429,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.4 km, width ~1.5 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.17269,
+      "lon": -170.29603,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.427,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.0 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.18619,
+      "lon": -169.14208,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.426,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 7.4 km, width ~1.5 km, height ~0 m, on plains with mean slope 0.6 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.182,
+      "lon": -175.51242,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.425,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.8 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.96435,
+      "lon": -168.47063,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.423,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.7 km, width ~1.2 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.14277,
+      "lon": -167.34367,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.42,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 9.6 km, width ~2.4 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.57295,
+      "lon": -175.42807,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.42,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.5 km, width ~1.5 km, height ~0 m, on plains with mean slope 0.8 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.11452,
+      "lon": -176.88906,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.418,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.0 km, width ~1.6 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.25412,
+      "lon": -168.03199,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.418,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.1 km, width ~1.3 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.42998,
+      "lon": -171.68617,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.418,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.6 km, width ~1.6 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.03606,
+      "lon": -173.30912,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.417,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.6 km, width ~1.2 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.73536,
+      "lon": -175.78235,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.416,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.6 km, width ~1.5 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.39709,
+      "lon": -170.5997,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.416,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 14.2 km, width ~3.4 km, height ~0 m, on plains with mean slope 0.7 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.88085,
+      "lon": -169.1657,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.416,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.9 km, width ~1.2 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.56454,
+      "lon": -168.73718,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.414,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.3 km, width ~1.3 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.19127,
+      "lon": -170.67056,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.414,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 13.7 km, width ~3.8 km, height ~0 m, on plains with mean slope 0.7 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.70117,
+      "lon": -176.62588,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.414,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.9 km, width ~1.3 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.16131,
+      "lon": -176.65625,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.414,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 7.3 km, width ~1.8 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.2444,
+      "lon": -170.52547,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.413,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.4 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.13179,
+      "lon": -175.67775,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.411,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.5 km, width ~1.5 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.36924,
+      "lon": -175.04004,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.411,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.7 km, width ~1.3 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.79015,
+      "lon": -170.69755,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.411,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 8.0 km, width ~1.9 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.16176,
+      "lon": -172.44197,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.41,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.5 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.70625,
+      "lon": -173.87597,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.409,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 7.4 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.13094,
+      "lon": -175.45506,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.409,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 9.0 km, width ~2.1 km, height ~0 m, on plains with mean slope 0.8 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.1048,
+      "lon": -171.90886,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.408,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.9 km, width ~1.8 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.05208,
+      "lon": -169.11171,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.408,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.1 km, width ~1.3 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.2309,
+      "lon": -169.92488,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.407,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 10.9 km, width ~2.4 km, height ~0 m, on plains with mean slope 0.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.76528,
+      "lon": -170.53222,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.407,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 8.5 km, width ~2.2 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.33172,
+      "lon": -167.1581,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.406,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 9.5 km, width ~2.4 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.40132,
+      "lon": -168.36941,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.405,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.4 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.22078,
+      "lon": -169.49636,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.405,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.1 km, width ~1.5 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.01329,
+      "lon": -169.91475,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.404,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.4 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.73662,
+      "lon": -168.65283,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.404,
+      "morphology": "sinuous_ridge",
+      "description": "Wrinkle ridge: length 4.5 km, width ~1.5 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.49535,
+      "lon": -175.31335,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.404,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 10.5 km, width ~2.6 km, height ~0 m, on plains with mean slope 0.8 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.7965,
+      "lon": -171.34538,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.403,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.7 km, width ~1.3 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.44685,
+      "lon": -170.38376,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.402,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 10.7 km, width ~2.9 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.26928,
+      "lon": -171.09232,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.398,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 8.2 km, width ~2.1 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.80284,
+      "lon": -176.79121,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.394,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 8.5 km, width ~2.2 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.65604,
+      "lon": -171.60181,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.394,
+      "morphology": "sinuous_ridge",
+      "description": "Wrinkle ridge: length 7.4 km, width ~2.3 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.5949,
+      "lon": -171.65243,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.393,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 3.8 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.19802,
+      "lon": -172.65116,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.392,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.4 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.15204,
+      "lon": -175.53604,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.392,
+      "morphology": "sinuous_ridge",
+      "description": "Wrinkle ridge: length 4.0 km, width ~1.5 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.48185,
+      "lon": -174.70938,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.392,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 10.2 km, width ~2.5 km, height ~0 m, on plains with mean slope 0.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.78889,
+      "lon": -168.53811,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.391,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.0 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.84077,
+      "lon": -174.85784,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.386,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 8.1 km, width ~1.9 km, height ~0 m, on plains with mean slope 1.2 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.13265,
+      "lon": -168.81816,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.385,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.7 km, width ~1.3 km, height ~0 m, on plains with mean slope 1.2 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.51181,
+      "lon": -172.21928,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.384,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.8 km, width ~1.9 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.81633,
+      "lon": -169.45587,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.383,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.5 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.42957,
+      "lon": -167.34367,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.383,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.4 km, width ~1.8 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.82434,
+      "lon": -175.03329,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.382,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.5 km, width ~1.9 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.5177,
+      "lon": -169.55372,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.382,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.3 km, width ~1.8 km, height ~0 m, on plains with mean slope 0.6 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.59364,
+      "lon": -167.59673,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.381,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 7.7 km, width ~2.6 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.73027,
+      "lon": -173.4812,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.381,
+      "morphology": "sinuous_ridge",
+      "description": "Wrinkle ridge: length 5.3 km, width ~1.9 km, height ~0 m, on plains with mean slope 0.7 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.62064,
+      "lon": -167.75194,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.38,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.4 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.04281,
+      "lon": -169.61783,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.38,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 7.0 km, width ~2.3 km, height ~0 m, on plains with mean slope 0.6 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.90825,
+      "lon": -174.51031,
+      "diameter_km": 0.0,
+      "depth_m": 5.0,
+      "confidence": 0.38,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 9.0 km, width ~2.4 km, height ~5 m, on plains with mean slope 1.0 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 44.6012,
+      "lon": -170.71779,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.38,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.7 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.70666,
+      "lon": -172.61405,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.379,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.8 km, width ~2.1 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.23977,
+      "lon": -167.50226,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.378,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.9 km, width ~2.0 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.70666,
+      "lon": -169.3344,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.378,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.8 km, width ~1.6 km, height ~0 m, on plains with mean slope 0.4 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.35071,
+      "lon": -168.26481,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.376,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.6 km, width ~1.6 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.56242,
+      "lon": -169.42213,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.374,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.2 km, width ~1.9 km, height ~0 m, on plains with mean slope 0.3 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.44433,
+      "lon": -170.47486,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.374,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.9 km, width ~2.4 km, height ~0 m, on plains with mean slope 0.6 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.18115,
+      "lon": -170.55921,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.374,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.6 km, width ~2.0 km, height ~0 m, on plains with mean slope 0.7 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.77288,
+      "lon": -169.20281,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.374,
+      "morphology": "sinuous_ridge",
+      "description": "Wrinkle ridge: length 7.4 km, width ~2.1 km, height ~0 m, on plains with mean slope 0.7 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.45571,
+      "lon": -173.15728,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.374,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.2 km, width ~1.6 km, height ~0 m, on plains with mean slope 0.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.98333,
+      "lon": -173.81861,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.371,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.0 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.7 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.20603,
+      "lon": -169.74605,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.369,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 13.9 km, width ~3.6 km, height ~0 m, on plains with mean slope 1.6 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.50209,
+      "lon": -172.86711,
+      "diameter_km": 0.0,
+      "depth_m": 0.5,
+      "confidence": 0.369,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.7 km, width ~1.4 km, height ~0 m, on plains with mean slope 0.8 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 47.19253,
+      "lon": -169.51323,
+      "diameter_km": 0.0,
+      "depth_m": 7.5,
+      "confidence": 0.366,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 8.6 km, width ~2.1 km, height ~8 m, on plains with mean slope 1.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 49.7906,
+      "lon": -174.0548,
+      "diameter_km": 0.0,
+      "depth_m": 7.5,
+      "confidence": 0.361,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 4.9 km, width ~1.4 km, height ~8 m, on plains with mean slope 1.5 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.06346,
+      "lon": -174.89158,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.36,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 5.9 km, width ~1.8 km, height ~0 m, on plains with mean slope 0.8 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.02972,
+      "lon": -174.51705,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.36,
+      "morphology": "sinuous_ridge",
+      "description": "Wrinkle ridge: length 3.8 km, width ~1.7 km, height ~0 m, on plains with mean slope 0.6 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 50.30009,
+      "lon": -172.40485,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.356,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.8 km, width ~2.0 km, height ~0 m, on plains with mean slope 1.1 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.19842,
+      "lon": -174.9017,
+      "diameter_km": 0.0,
+      "depth_m": 4.0,
+      "confidence": 0.354,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 7.8 km, width ~1.8 km, height ~4 m, on plains with mean slope 2.2 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 48.3431,
+      "lon": -175.00968,
+      "diameter_km": 0.0,
+      "depth_m": 1.0,
+      "confidence": 0.345,
+      "morphology": "sinuous_ridge",
+      "description": "Wrinkle ridge: length 4.5 km, width ~1.9 km, height ~1 m, on plains with mean slope 0.9 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 45.03984,
+      "lon": -174.25725,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.343,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 6.1 km, width ~2.1 km, height ~0 m, on plains with mean slope 1.0 deg"
+    },
+    {
+      "type": "wrinkle_ridge",
+      "lat": 46.6223,
+      "lon": -172.91435,
+      "diameter_km": 0.0,
+      "depth_m": 0.0,
+      "confidence": 0.342,
+      "morphology": "linear_ridge",
+      "description": "Wrinkle ridge: length 8.1 km, width ~2.3 km, height ~0 m, on plains with mean slope 1.3 deg"
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "n_observations": 4,
+  "observations": {
+    "frt0000a255_07": {
+      "classes": [
+        [
+          "Al smectite 2",
+          163121
+        ],
+        [
+          "Monohydrated sulfate",
+          807
+        ],
+        [
+          "Alunite",
+          301
+        ],
+        [
+          "H2O Ice",
+          6
+        ],
+        [
+          "Fe smectite",
+          1
+        ]
+      ],
+      "total_classified": 164236,
+      "total_pixels": 345600,
+      "classification_rate": 47.52199074074074
+    },
+    "frt00009e0b_07": {
+      "classes": [
+        [
+          "Al smectite 2",
+          47560
+        ],
+        [
+          "Monohydrated sulfate",
+          7217
+        ],
+        [
+          "Alunite",
+          5859
+        ],
+        [
+          "H2O Ice",
+          4038
+        ],
+        [
+          "Fe smectite",
+          2240
+        ],
+        [
+          "Chlorite-smectite",
+          465
+        ],
+        [
+          "Al smectite 1",
+          1
+        ]
+      ],
+      "total_classified": 67380,
+      "total_pixels": 345600,
+      "classification_rate": 19.49652777777778
+    },
+    "frt00017af8_07": {
+      "classes": [
+        [
+          "Ferricopiapite",
+          18079
+        ],
+        [
+          "Chlorite-smectite",
+          1840
+        ],
+        [
+          "CO2 Ice",
+          691
+        ],
+        [
+          "H2O Ice",
+          636
+        ],
+        [
+          "Al smectite 2",
+          509
+        ],
+        [
+          "Monohydrated sulfate",
+          109
+        ],
+        [
+          "Alunite",
+          65
+        ],
+        [
+          "Ferric Hydroxysulfate",
+          3
+        ],
+        [
+          "Illite",
+          1
+        ]
+      ],
+      "total_classified": 21933,
+      "total_pixels": 326400,
+      "classification_rate": 6.719669117647059
+    },
+    "frt00016511_07": {
+      "classes": [
+        [
+          "Monohydrated sulfate",
+          6870
+        ],
+        [
+          "H2O Ice",
+          704
+        ],
+        [
+          "Al smectite 2",
+          32
+        ],
+        [
+          "Alunite",
+          6
+        ],
+        [
+          "Ferricopiapite",
+          4
+        ],
+        [
+          "CO2 Ice",
+          2
+        ]
+      ],
+      "total_classified": 7618,
+      "total_pixels": 345600,
+      "classification_rate": 2.2042824074074074
+    }
+  }
+}

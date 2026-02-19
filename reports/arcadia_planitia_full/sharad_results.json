@@ -1,0 +1,52 @@
+{
+  "product_id": "R_3933702_001_SS19_700_A",
+  "n_traces": 30617,
+  "n_bins": 667,
+  "detection_rate": 0.8130450403370676,
+  "confidence": "high",
+  "mean_depth_bins": 37.83730365966336,
+  "depth_estimates": [
+    {
+      "label": "Vacuum",
+      "epsilon_r": 1.0,
+      "mean_m": 212.68759252917886,
+      "min_m": 129.2854975125,
+      "max_m": 685.775247675
+    },
+    {
+      "label": "Porous Ice",
+      "epsilon_r": 2.8,
+      "mean_m": 127.10514772066533,
+      "min_m": 77.2628626994853,
+      "max_m": 409.82909779726975
+    },
+    {
+      "label": "Pure Water Ice",
+      "epsilon_r": 3.1,
+      "mean_m": 120.79843517446476,
+      "min_m": 73.42922830874383,
+      "max_m": 389.49416755072815
+    },
+    {
+      "label": "Basalt (low)",
+      "epsilon_r": 4.0,
+      "mean_m": 106.34379626458943,
+      "min_m": 64.64274875625,
+      "max_m": 342.8876238375
+    },
+    {
+      "label": "Basalt (mid)",
+      "epsilon_r": 5.0,
+      "mean_m": 95.11678297320405,
+      "min_m": 57.81823218856599,
+      "max_m": 306.6880142176109
+    },
+    {
+      "label": "Basalt (high)",
+      "epsilon_r": 6.0,
+      "mean_m": 86.82934605291196,
+      "min_m": 52.780583341248146,
+      "max_m": 279.966572505751
+    }
+  ]
+}

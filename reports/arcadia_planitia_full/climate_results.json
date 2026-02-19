@@ -1,0 +1,183 @@
+{
+  "temperature": {
+    "mean_k": 203.5,
+    "max_k": 227.2,
+    "min_k": 179.8,
+    "diurnal_swing_k": 47.4
+  },
+  "pressure_pa": 636.0,
+  "dust": {
+    "tau_mean": 0.32,
+    "tau_peak": 0.32,
+    "storm_risk": "LOW"
+  },
+  "wind": {
+    "mean_ms": 5.4,
+    "gust_ms": 13.4,
+    "wind_hazard": "MODERATE"
+  },
+  "frost": {
+    "frost_probability": 0.0,
+    "seasonal_frost": false,
+    "description": "No CO2 frost expected at this latitude/season"
+  },
+  "climate_score": 8,
+  "seasonal_profile": [
+    {
+      "ls": 0,
+      "ls_label": "Ls 0-30 (N Early Spring)",
+      "temperature": {
+        "mean_k": 185.1,
+        "max_k": 208.8,
+        "min_k": 161.4
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.32,
+      "wind_mean_ms": 5.4,
+      "frost_probability": 0.03
+    },
+    {
+      "ls": 30,
+      "ls_label": "Ls 30-60 (N Mid Spring)",
+      "temperature": {
+        "mean_k": 194.3,
+        "max_k": 218.0,
+        "min_k": 170.6
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.32,
+      "wind_mean_ms": 5.4,
+      "frost_probability": 0.0
+    },
+    {
+      "ls": 60,
+      "ls_label": "Ls 60-90 (N Late Spring)",
+      "temperature": {
+        "mean_k": 201.1,
+        "max_k": 224.8,
+        "min_k": 177.4
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.32,
+      "wind_mean_ms": 5.4,
+      "frost_probability": 0.0
+    },
+    {
+      "ls": 90,
+      "ls_label": "Ls 90-120 (N Early Summer)",
+      "temperature": {
+        "mean_k": 203.5,
+        "max_k": 227.2,
+        "min_k": 179.8
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.32,
+      "wind_mean_ms": 5.4,
+      "frost_probability": 0.0
+    },
+    {
+      "ls": 120,
+      "ls_label": "Ls 120-150 (N Mid Summer)",
+      "temperature": {
+        "mean_k": 201.1,
+        "max_k": 224.8,
+        "min_k": 177.4
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.32,
+      "wind_mean_ms": 5.4,
+      "frost_probability": 0.0
+    },
+    {
+      "ls": 150,
+      "ls_label": "Ls 150-180 (N Late Summer)",
+      "temperature": {
+        "mean_k": 194.3,
+        "max_k": 218.0,
+        "min_k": 170.6
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.32,
+      "wind_mean_ms": 5.4,
+      "frost_probability": 0.0
+    },
+    {
+      "ls": 180,
+      "ls_label": "Ls 180-210 (N Early Autumn)",
+      "temperature": {
+        "mean_k": 185.1,
+        "max_k": 208.8,
+        "min_k": 161.4
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.34,
+      "wind_mean_ms": 5.4,
+      "frost_probability": 0.03
+    },
+    {
+      "ls": 210,
+      "ls_label": "Ls 210-240 (N Mid Autumn)",
+      "temperature": {
+        "mean_k": 175.9,
+        "max_k": 199.6,
+        "min_k": 152.2
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.37,
+      "wind_mean_ms": 5.9,
+      "frost_probability": 0.22
+    },
+    {
+      "ls": 240,
+      "ls_label": "Ls 240-270 (N Late Autumn)",
+      "temperature": {
+        "mean_k": 169.1,
+        "max_k": 192.8,
+        "min_k": 148.0
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.4,
+      "wind_mean_ms": 6.7,
+      "frost_probability": 0.3
+    },
+    {
+      "ls": 270,
+      "ls_label": "Ls 270-300 (N Early Winter)",
+      "temperature": {
+        "mean_k": 166.7,
+        "max_k": 190.4,
+        "min_k": 148.0
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.4,
+      "wind_mean_ms": 6.7,
+      "frost_probability": 0.3
+    },
+    {
+      "ls": 300,
+      "ls_label": "Ls 300-330 (N Mid Winter)",
+      "temperature": {
+        "mean_k": 169.1,
+        "max_k": 192.8,
+        "min_k": 148.0
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.37,
+      "wind_mean_ms": 5.9,
+      "frost_probability": 0.3
+    },
+    {
+      "ls": 330,
+      "ls_label": "Ls 330-360 (N Late Winter)",
+      "temperature": {
+        "mean_k": 175.9,
+        "max_k": 199.6,
+        "min_k": 152.2
+      },
+      "pressure_pa": 636.0,
+      "dust_tau": 0.34,
+      "wind_mean_ms": 5.4,
+      "frost_probability": 0.22
+    }
+  ]
+}
