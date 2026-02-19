@@ -183,6 +183,9 @@ type MapViewProps = {
     boundary?: [number, number][];
   }>;
 
+  // Camera viewport ref — updated on moveEnd for on-demand viewport queries
+  cameraViewportRef?: React.MutableRefObject<{ minLat: number; maxLat: number; westLon: number; eastLon: number } | null>;
+
   // Easter eggs
   terraformMode?: boolean;
   onOlympusMonsTripleClick?: () => void;
@@ -645,6 +648,7 @@ export default function MapView({
   showMeasurementTools = false,
   onMeasurementPinNote,
   craterDetectFeatures,
+  cameraViewportRef,
   terraformMode = false,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
@@ -1549,6 +1553,42 @@ export default function MapView({
       }
     };
   }, []);
+
+  // Keep cameraViewportRef updated on every camera moveEnd (for on-demand reads)
+  useEffect(() => {
+    if (!cameraViewportRef) return;
+    let removeListener: (() => void) | null = null;
+
+    function updateViewport() {
+      const v = viewerRef.current;
+      if (!v) return;
+      try {
+        const rect = v.camera.computeViewRectangle(v.scene.globe.ellipsoid);
+        if (rect) {
+          cameraViewportRef!.current = {
+            minLat: Cesium.Math.toDegrees(rect.south),
+            maxLat: Cesium.Math.toDegrees(rect.north),
+            westLon: Cesium.Math.toDegrees(rect.west),
+            eastLon: Cesium.Math.toDegrees(rect.east),
+          };
+        }
+      } catch { /* viewer not ready yet */ }
+    }
+
+    // Poll until viewer is ready, then attach listener
+    const poll = setInterval(() => {
+      const viewer = viewerRef.current;
+      if (!viewer) return;
+      clearInterval(poll);
+      updateViewport();
+      removeListener = viewer.camera.moveEnd.addEventListener(updateViewport);
+    }, 150);
+
+    return () => {
+      clearInterval(poll);
+      removeListener?.();
+    };
+  }, [cameraViewportRef]);
 
   // View Bound Selection Mode - drag to draw rectangle
   useEffect(() => {

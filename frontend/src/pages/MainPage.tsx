@@ -297,6 +297,9 @@ export default function MainPage() {
   // Bounding box for view restriction
   const [viewBounds, setViewBounds] = useState<BoundingBox>(null);
 
+  // Camera viewport ref — updated by MapView on camera.moveEnd, read on demand
+  const cameraViewportRef = useRef<{ minLat: number; maxLat: number; westLon: number; eastLon: number } | null>(null);
+
   // View bound selection mode (drag to select region on map)
   const [viewBoundSelectionMode, setViewBoundSelectionMode] = useState(false);
 
@@ -1761,8 +1764,7 @@ export default function MainPage() {
     ) : analysisMode === "crater_detect" ? (
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading landform detector...</div>}>
         <CraterDetectPanel
-          scanCenter={craterDetectCenter}
-          viewBounds={viewBounds}
+          cameraViewportRef={cameraViewportRef}
           onClose={() => { setAnalysisMode(null); setCraterDetectCenter(null); setCraterDetectFeatures([]); }}
           onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
           onSearchHiRISE={(lat, lon) => {
@@ -1937,6 +1939,7 @@ export default function MainPage() {
         onOlympusMonsTripleClick={handleOlympusMonsClick}
         onOlympusMonsClimber={handleOlympusMonsClimber}
         craterDetectFeatures={craterDetectFeatures}
+        cameraViewportRef={cameraViewportRef}
       />
 
       {/* MARVIS FAB — floating chat widget with grounded tool calling */}
