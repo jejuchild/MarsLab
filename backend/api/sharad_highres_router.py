@@ -587,17 +587,72 @@ def _compute_trace_mapping(
 
     # Interpolate cluttergram trace coordinates
     clutter_lats = np.linspace(start_lat, stop_lat, n_clutter_traces)
+    # Handle potential anti-meridian crossing by taking the shortest path.
+    dlon = stop_lon - start_lon
+    if dlon > 180:
+        stop_lon -= 360
+    elif dlon < -180:
+        stop_lon += 360
     clutter_lons = np.linspace(start_lon, stop_lon, n_clutter_traces)
 
     # KD-tree nearest-neighbor against RDR per-trace coordinates
     from scipy.spatial import cKDTree
-    rdr_coords = np.column_stack([rdr_geometry["lat"], rdr_geometry["lon"]])
+    rdr_lons = np.asarray(rdr_geometry["lon"], dtype=np.float64)
+    # Unwrap longitudes so spatial distance behaves continuously near 0/360 seam.
+    rdr_lons = np.degrees(np.unwrap(np.radians(rdr_lons)))
+    clutter_lons = np.degrees(np.unwrap(np.radians(clutter_lons)))
+    rdr_coords = np.column_stack([rdr_geometry["lat"], rdr_lons])
     tree = cKDTree(rdr_coords)
 
     clutter_coords = np.column_stack([clutter_lats, clutter_lons])
     _, indices = tree.query(clutter_coords)
 
     return indices.astype(np.int32)
+
+
+def _project_clutter_to_rdr_axis(
+    clutter_aligned: np.ndarray,
+    trace_map: np.ndarray,
+    rdr_total_traces: int,
+) -> np.ndarray:
+    """Project clutter traces to the full RDR trace axis using mapping-aware interpolation."""
+    if clutter_aligned.shape[1] == rdr_total_traces:
+        return clutter_aligned.astype(np.float32, copy=False)
+
+    tm = np.clip(np.asarray(trace_map, dtype=np.int32), 0, rdr_total_traces - 1)
+    order = np.argsort(tm, kind="mergesort")
+    tm_sorted = tm[order]
+    vals_sorted = clutter_aligned[:, order].astype(np.float32, copy=False)
+
+    uniq_tm, starts, counts = np.unique(
+        tm_sorted, return_index=True, return_counts=True
+    )
+    if uniq_tm.size == 0:
+        return np.zeros((clutter_aligned.shape[0], rdr_total_traces), dtype=np.float32)
+
+    # Aggregate duplicate mappings before interpolation.
+    vals_collapsed = np.empty((vals_sorted.shape[0], uniq_tm.size), dtype=np.float32)
+    for j, (s_idx, cnt) in enumerate(zip(starts, counts)):
+        if cnt == 1:
+            vals_collapsed[:, j] = vals_sorted[:, s_idx]
+        else:
+            vals_collapsed[:, j] = vals_sorted[:, s_idx : s_idx + cnt].mean(axis=1)
+
+    if uniq_tm.size == 1:
+        return np.repeat(vals_collapsed[:, :1], rdr_total_traces, axis=1)
+
+    x = np.arange(rdr_total_traces, dtype=np.float32)
+    xp = uniq_tm.astype(np.float32)
+    out = np.empty((vals_collapsed.shape[0], rdr_total_traces), dtype=np.float32)
+    for r in range(vals_collapsed.shape[0]):
+        out[r] = np.interp(
+            x,
+            xp,
+            vals_collapsed[r],
+            left=float(vals_collapsed[r, 0]),
+            right=float(vals_collapsed[r, -1]),
+        ).astype(np.float32)
+    return out
 
 
 def _get_aligned_cluttergram(product_id: str) -> np.ndarray | None:
@@ -611,13 +666,13 @@ def _get_aligned_cluttergram(product_id: str) -> np.ndarray | None:
     shifted to match the RDR's median surface bin position — avoids unreliable
     per-trace RDR surface detection.
 
-    Result shape: (667, n_clutter_traces), cached as cluttergram_aligned_v2.npy.
+    Result shape: (667, rdr_total_traces), cached as cluttergram_aligned_v3.npy.
     """
     pid = product_id.upper()
 
     info = _resolve_product(product_id)
     cache_dir = info["cache_dir"]
-    aligned_path = os.path.join(cache_dir, "cluttergram_aligned_v2.npy")
+    aligned_path = os.path.join(cache_dir, "cluttergram_aligned_v3.npy")
 
     if os.path.exists(aligned_path):
         return np.load(aligned_path, mmap_mode="r")
@@ -632,58 +687,68 @@ def _get_aligned_cluttergram(product_id: str) -> np.ndarray | None:
         return None
 
     clutter_bins, n_clutter_traces = clutter.shape
-    if clutter_bins == N_RANGE_BINS:
-        return clutter
 
-    # --- Horizontal alignment: coordinate-based trace mapping ---
+    # --- Horizontal mapping: coordinate-based trace mapping ---
     geom, rdr_total_traces = _get_geometry(product_id)
     trace_map = _compute_trace_mapping(clutter_info, geom, rdr_total_traces)
 
-    # --- Vertical alignment: smoothed peak + median anchor ---
-    # 1. Cluttergram surface peaks (reliable on clean simulation data)
-    clutter_peaks = np.argmax(clutter, axis=0)
-    from scipy.ndimage import median_filter
-    kernel = min(31, n_clutter_traces if n_clutter_traces % 2 == 1 else n_clutter_traces - 1)
-    kernel = max(kernel, 1)
-    smooth_peaks = median_filter(clutter_peaks, size=kernel).astype(np.int32)
+    # --- Vertical alignment: use surface-anchored extraction when clutter has deep range ---
+    if clutter_bins > N_RANGE_BINS:
+        clutter_peaks = np.argmax(clutter, axis=0)
+        from scipy.ndimage import median_filter
 
-    # 2. RDR surface anchor: use coordinate-mapped RDR traces to get a
-    #    robust surface estimate.  For each cluttergram trace, look at
-    #    the matched RDR trace's coarse surface (argmax in first 200 bins),
-    #    then take the median as the anchor.
-    power, _ = _get_power(product_id)
-    mapped_rdr_surface = np.argmax(power[trace_map, :200], axis=1)
-    rdr_surface_median = int(np.median(mapped_rdr_surface))
-    if rdr_surface_median <= 0:
-        rdr_surface_median = int(N_RANGE_BINS * 0.22)
+        kernel = min(
+            31,
+            n_clutter_traces if n_clutter_traces % 2 == 1 else n_clutter_traces - 1,
+        )
+        kernel = max(kernel, 1)
+        smooth_peaks = median_filter(clutter_peaks, size=kernel).astype(np.int32)
 
-    # 3. Per-trace vertical offset
-    per_trace_offset = smooth_peaks - rdr_surface_median
+        power, _ = _get_power(product_id)
+        mapped_rdr_surface = np.argmax(power[trace_map, :200], axis=1)
+        rdr_surface_median = int(np.median(mapped_rdr_surface))
+        if rdr_surface_median < 0:
+            rdr_surface_median = int(N_RANGE_BINS * 0.22)
 
-    # Sanity: offsets should be positive and leave room for 667 bins
-    median_offset = int(np.median(per_trace_offset))
-    median_offset = max(1, min(median_offset, clutter_bins - N_RANGE_BINS))
-    sane = (per_trace_offset > 0) & (per_trace_offset + N_RANGE_BINS <= clutter_bins)
-    if not sane.all():
-        per_trace_offset = np.where(sane, per_trace_offset, median_offset)
+        per_trace_offset = smooth_peaks - rdr_surface_median
+        median_offset = int(np.median(per_trace_offset))
+        median_offset = max(0, min(median_offset, clutter_bins - N_RANGE_BINS))
+        sane = (per_trace_offset >= 0) & (per_trace_offset + N_RANGE_BINS <= clutter_bins)
+        if not sane.all():
+            per_trace_offset = np.where(sane, per_trace_offset, median_offset)
 
-    # --- Extract aligned array ---
-    row_grid = np.arange(N_RANGE_BINS)[:, None] + per_trace_offset[None, :]
-    valid = (row_grid >= 0) & (row_grid < clutter_bins)
-    row_clipped = np.clip(row_grid, 0, clutter_bins - 1)
-    col_grid = np.arange(n_clutter_traces)[None, :]
+        row_grid = np.arange(N_RANGE_BINS)[:, None] + per_trace_offset[None, :]
+        valid = (row_grid >= 0) & (row_grid < clutter_bins)
+        row_clipped = np.clip(row_grid, 0, clutter_bins - 1)
+        col_grid = np.arange(n_clutter_traces)[None, :]
+        aligned_sparse = np.where(
+            valid, clutter[row_clipped, col_grid], 0.0
+        ).astype(np.float32)
 
-    aligned = np.where(valid, clutter[row_clipped, col_grid], 0.0).astype(np.float32)
+        peak_med = int(np.median(smooth_peaks))
+        offset_min = int(per_trace_offset.min())
+        offset_max = int(per_trace_offset.max())
+    else:
+        aligned_sparse = np.ascontiguousarray(clutter, dtype=np.float32)
+        peak_med = int(np.median(np.argmax(clutter, axis=0)))
+        offset_min = 0
+        offset_max = 0
+        rdr_surface_median = int(np.median(np.argmax(aligned_sparse, axis=0)))
+
+    # Project to full RDR along-track axis so clutter and radargram share the same x-axis.
+    aligned = _project_clutter_to_rdr_axis(aligned_sparse, trace_map, rdr_total_traces)
 
     np.save(aligned_path, aligned)
     aligned = np.load(aligned_path, mmap_mode="r")
 
-    print(f"[SHARAD] Coord-aligned cluttergram for {pid}: "
-          f"smooth_peak median={int(np.median(smooth_peaks))}, "
-          f"rdr_surface median={rdr_surface_median}, "
-          f"offset range=[{per_trace_offset.min()}, {per_trace_offset.max()}], "
-          f"{clutter_bins}->{N_RANGE_BINS} bins, "
-          f"trace mapping: {n_clutter_traces} clutter -> {rdr_total_traces} RDR")
+    print(
+        f"[SHARAD] Coord-aligned cluttergram for {pid}: "
+        f"smooth_peak median={peak_med}, "
+        f"rdr_surface median={rdr_surface_median}, "
+        f"offset range=[{offset_min}, {offset_max}], "
+        f"{clutter_bins}->{N_RANGE_BINS} bins, "
+        f"trace mapping: {n_clutter_traces} clutter -> {rdr_total_traces} RDR"
+    )
 
     return aligned
 
@@ -702,10 +767,17 @@ def _render_cluttergram_png(
     Uses adaptive floor based on actual data range.
     global_vmin/global_vmax: if provided, use for normalization (for consistent tiles).
     """
+    clutter = np.asarray(clutter, dtype=np.float32)
+    clutter = np.nan_to_num(clutter, nan=0.0, posinf=0.0, neginf=0.0)
+
     # Cluttergram layout: (range_bins, traces) — downsample along axis 1 (traces)
     if downsample > 1:
         n = clutter.shape[1] // downsample * downsample
-        p = clutter[:, :n].reshape(clutter.shape[0], -1, downsample).mean(axis=2)
+        if n == 0:
+            # Degenerate slice; keep a single empty-like column to avoid render failure.
+            p = np.zeros((clutter.shape[0], 1), dtype=np.float32)
+        else:
+            p = clutter[:, :n].reshape(clutter.shape[0], -1, downsample).mean(axis=2)
     else:
         p = np.ascontiguousarray(clutter).astype(np.float32)
 
@@ -717,11 +789,19 @@ def _render_cluttergram_png(
         floor = 1e-30
     p = np.log10(np.maximum(p, floor))
 
+    finite_vals = p[np.isfinite(p)]
+    if finite_vals.size == 0:
+        finite_vals = np.array([0.0], dtype=np.float32)
+
     if global_vmin is not None and global_vmax is not None:
-        vmin, vmax = global_vmin, global_vmax
+        vmin, vmax = float(global_vmin), float(global_vmax)
     else:
-        vmin = np.percentile(p, pmin)
-        vmax = np.percentile(p, pmax)
+        vmin = float(np.percentile(finite_vals, pmin))
+        vmax = float(np.percentile(finite_vals, pmax))
+    if not np.isfinite(vmin):
+        vmin = float(finite_vals.min())
+    if not np.isfinite(vmax):
+        vmax = float(finite_vals.max())
     if vmax <= vmin:
         vmax = vmin + 1
 
@@ -1024,10 +1104,8 @@ async def get_cluttergram(
     start_trace: int = Query(0, ge=0, description="First trace index (in RDR space, for tiled rendering)"),
     end_trace: int = Query(-1, description="Last trace index exclusive (-1 = all)"),
 ):
-    """Return surface clutter simulation aligned and resampled to match the RDR as PNG."""
+    """Return surface clutter simulation aligned to the RDR trace/range axes as PNG."""
     try:
-        from scipy.ndimage import zoom
-
         # Use aligned cluttergram (667 bins, surface-matched to RDR)
         clutter = _get_aligned_cluttergram(product_id)
         if clutter is None:
@@ -1036,16 +1114,7 @@ async def get_cluttergram(
                 status_code=404,
             )
 
-        # Resample traces to match the RDR total trace count so the
-        # cluttergram PNG has the same width as the radargram PNG.
-        _, rdr_total_traces = _get_power(product_id)
-        clutter_traces = clutter.shape[1]
-        if clutter_traces != rdr_total_traces:
-            trace_ratio = rdr_total_traces / clutter_traces
-            # zoom: axis 0 (bins) = 1.0, axis 1 (traces) = ratio
-            clutter = zoom(clutter, (1.0, trace_ratio), order=1).astype(np.float32)
-
-        # Slice to requested trace range (in RDR-space after resampling)
+        # Slice to requested trace range (in RDR trace space)
         total_clutter_traces = clutter.shape[1]
         st = max(0, min(start_trace, total_clutter_traces))
         et = total_clutter_traces if end_trace < 0 else max(st, min(end_trace, total_clutter_traces))

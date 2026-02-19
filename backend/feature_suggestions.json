@@ -1,5 +1,19 @@
 [
   {
+    "id": "1da5ddb6",
+    "title": "SHARAD loss tangent",
+    "description": "SHARAD Data 에서 loss tanget를 계산할 수 있으면 좋겠어요 \n수식은 E.I.Petersen et al., (2018) ALL OUR APRONS ARE ICY: NO EVIDENCE FOR DEBRIS-RICH “LOBATE DEBRIS APRONS” IN\nDEUTERONILUS MENSAE , 2018년 LPSC 초록에 있습니다. LDA 지형에서 Cluttergram으로 제거하고 남은 subsurface 에 대해서 유전율 3.1을 가정하고 계산할 수 있습니다. 감사합니다!",
+    "status": "unread",
+    "created_at": "2026-02-19T08:26:10.342120+00:00"
+  },
+  {
+    "id": "3d5d078a",
+    "title": "SHARAD Cluttergram",
+    "description": "SHARAD RDR에서 surface peak와 cluttergram이 잘 정합되지 않습니다. 위계가 달라서 그렇다고 하는데, 정합이 잘 되면 subsurface를 찾는 데 도움이 될 것 같습니다 감사합니다~!",
+    "status": "unread",
+    "created_at": "2026-02-19T08:19:11.375915+00:00"
+  },
+  {
     "id": "ebbfdc7b",
     "title": "검색기능",
     "description": "검색했을때 (hirise, sharad까지 해봄) HiRISE는 오른쪽에 quickmap은 뜨는데 footprint나 정확한 위치로 확대가 잘 안됩니다! HiRISE load를 안해둔 상태면 원래 footprint 가 안 뜨는건가 해서 다시 load도 해봤는데, footprint는 여전히 안뜹니다. \nSHARAD도 검색했을 때 해당 경로가 hilighted 된다던지 하면 좋을 것 같습니다 ! 감사합니다~",
