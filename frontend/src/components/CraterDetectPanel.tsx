@@ -141,6 +141,14 @@ export default function CraterDetectPanel({
       return;
     }
 
+    // Warn if viewport is too wide (user should zoom in)
+    const latSpan = vp.maxLat - vp.minLat;
+    const lonSpan = vp.eastLon - vp.westLon;
+    if (latSpan > 90 || lonSpan > 120) {
+      setError("Viewport is too wide. Zoom in to a smaller area before loading landforms.");
+      return;
+    }
+
     // Build selected types
     const selectedTypes = Object.entries(loadTypes)
       .filter(([, on]) => on)
@@ -424,10 +432,6 @@ export default function CraterDetectPanel({
                   key={f.id}
                   feature={f}
                   onFlyTo={onFlyTo}
-                  onSearchHiRISE={onSearchHiRISE}
-                  onSearchSHARAD={onSearchSHARAD}
-                  onRunEpsilonInversion={onRunEpsilonInversion}
-                  onOpenStratColumn={onOpenStratColumn}
                 />
               ))}
             </div>
@@ -458,17 +462,9 @@ export default function CraterDetectPanel({
 function FeatureRow({
   feature: f,
   onFlyTo,
-  onSearchHiRISE,
-  onSearchSHARAD,
-  onRunEpsilonInversion,
-  onOpenStratColumn,
 }: {
   feature: DetectedFeature;
   onFlyTo?: (lat: number, lon: number) => void;
-  onSearchHiRISE?: (lat: number, lon: number) => void;
-  onSearchSHARAD?: (lat: number, lon: number) => void;
-  onRunEpsilonInversion?: (feature: DetectedFeature) => void;
-  onOpenStratColumn?: (feature: DetectedFeature) => void;
 }) {
   const color = FEATURE_COLORS[f.type] || "#6b7c9c";
   const [expanded, setExpanded] = useState(false);
@@ -588,69 +584,13 @@ function FeatureRow({
                 onFlyTo?.(f.lat, f.lon);
               }}
               className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#0d1219] border border-[#232f48] text-[9px] text-[#92a4c9] hover:text-white hover:border-[#3a4a68] transition-colors"
-              title="Fly to location"
+              title="Fly to this landform on the map"
             >
               <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>
                 flight
               </span>
               Fly To
             </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSearchHiRISE?.(f.lat, f.lon);
-              }}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#0d1219] border border-[#232f48] text-[9px] text-[#92a4c9] hover:text-cyan-400 hover:border-cyan-500/30 transition-colors"
-              title="Search HiRISE data"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>
-                photo_camera
-              </span>
-              HiRISE
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSearchSHARAD?.(f.lat, f.lon);
-              }}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#0d1219] border border-[#232f48] text-[9px] text-[#92a4c9] hover:text-purple-400 hover:border-purple-500/30 transition-colors"
-              title="Search SHARAD data"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>
-                radar
-              </span>
-              SHARAD
-            </button>
-            {f.type === "terraced_crater" && f.terrace_depth_m != null && f.terrace_depth_m > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRunEpsilonInversion?.(f);
-                }}
-                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-[9px] text-rose-400 hover:text-rose-300 hover:border-rose-500/50 hover:bg-rose-500/20 transition-colors"
-                title="Run dielectric inversion using terrace depth + SHARAD"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>
-                  science
-                </span>
-                Run \u03b5 Inversion
-              </button>
-            )}
-            {(f.type === "crater" || f.type === "terraced_crater") && f.diameter_km != null && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenStratColumn?.(f);
-                }}
-                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] text-emerald-400 hover:text-emerald-300 hover:border-emerald-500/50 hover:bg-emerald-500/20 transition-colors"
-                title="Build composite stratigraphic column from HiRISE + CRISM + SHARAD"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: "10px" }}>
-                  view_column
-                </span>
-                Strat Column
-              </button>
-            )}
           </div>
         </div>
       )}

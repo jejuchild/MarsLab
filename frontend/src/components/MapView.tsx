@@ -1555,7 +1555,7 @@ export default function MapView({
   }, []);
 
   // Keep cameraViewportRef updated on every camera moveEnd (for on-demand reads)
-  // Uses corner-picking for accurate bounds (computeViewRectangle returns full globe in 2D mode)
+  // Uses screen corner-picking on the Mars ellipsoid for accurate viewport bounds
   useEffect(() => {
     if (!cameraViewportRef) return;
     let removeListener: (() => void) | null = null;
@@ -1564,10 +1564,11 @@ export default function MapView({
       const v = viewerRef.current;
       if (!v) return;
       try {
-        // Pick screen corners + edges for accurate viewport (same approach as FootprintManager)
         const canvas = v.scene.canvas;
         const cam = v.camera;
-        const gridSize = 4;
+
+        // Sample a grid of screen points and pick positions on the Mars ellipsoid
+        const gridSize = 5;
         const lons: number[] = [];
         const lats: number[] = [];
 
@@ -1586,14 +1587,22 @@ export default function MapView({
           }
         }
 
-        if (lats.length >= 4) {
-          cameraViewportRef!.current = {
-            minLat: Math.min(...lats),
-            maxLat: Math.max(...lats),
-            westLon: Math.min(...lons),
-            eastLon: Math.max(...lons),
-          };
-        }
+        // Need enough points to have a meaningful viewport
+        if (lats.length < 4) return;
+
+        const south = Math.min(...lats);
+        const north = Math.max(...lats);
+        const west = Math.min(...lons);
+        const east = Math.max(...lons);
+
+        // Sanity: if viewport spans nearly full globe, the user is zoomed out too far
+        // for meaningful landform loading — still store it, but frontend can warn
+        cameraViewportRef!.current = {
+          minLat: south,
+          maxLat: north,
+          westLon: west,
+          eastLon: east,
+        };
       } catch { /* viewer not ready yet */ }
     }
 
@@ -2443,7 +2452,7 @@ export default function MapView({
 
     const { lat, lon } = flyToCoords;
     viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(lon, lat, 50000),
+      destination: Cesium.Cartesian3.fromDegrees(lon, lat, 50000, MARS_ELLIPSOID),
       duration: 1.0,
     });
 
@@ -3324,18 +3333,19 @@ export default function MapView({
       const cesiumColor = Cesium.Color.fromCssColorString(color);
 
       if (f.type === "lda" && f.boundary && f.boundary.length > 2) {
-        // LDA: polygon
-        const positions = f.boundary.flatMap(([lat, lon]: [number, number]) => [lon, lat]);
+        // LDA: polygon — convert each point using Mars ellipsoid
+        const positions = f.boundary.map(([lat, lon]: [number, number]) =>
+          Cesium.Cartesian3.fromDegrees(lon, lat, 0, MARS_ELLIPSOID)
+        );
         viewer.entities.add({
           id: `DETECT_${f.id}`,
           polygon: {
-            hierarchy: Cesium.Cartesian3.fromDegreesArray(positions),
-            material: cesiumColor.withAlpha(0.15),
+            hierarchy: positions,
+            material: cesiumColor.withAlpha(0.25),
             outline: true,
-            outlineColor: cesiumColor.withAlpha(0.7),
+            outlineColor: cesiumColor.withAlpha(0.8),
           },
         });
-        // Label at center
         viewer.entities.add({
           id: `DETECT_L_${f.id}`,
           position: Cesium.Cartesian3.fromDegrees(f.lon, f.lat, 0, MARS_ELLIPSOID),
@@ -3351,18 +3361,19 @@ export default function MapView({
           },
         });
       } else if ((f.type === "channel" || f.type === "wrinkle_ridge" || f.type === "graben") && f.path && f.path.length > 1) {
-        // Polyline features
-        const positions = f.path.flatMap(([lat, lon]: [number, number]) => [lon, lat]);
+        // Polyline features — convert each point using Mars ellipsoid
+        const positions = f.path.map(([lat, lon]: [number, number]) =>
+          Cesium.Cartesian3.fromDegrees(lon, lat, 0, MARS_ELLIPSOID)
+        );
         viewer.entities.add({
           id: `DETECT_${f.id}`,
           polyline: {
-            positions: Cesium.Cartesian3.fromDegreesArray(positions),
+            positions,
             width: f.type === "graben" ? 3 : 2,
             material: cesiumColor.withAlpha(0.8),
             clampToGround: true,
           },
         });
-        // Label at midpoint
         const midIdx = Math.floor(f.path.length / 2);
         const midPt = f.path[midIdx];
         const sizeLabel = f.length_km ? `${f.length_km.toFixed(0)} km` : "";
@@ -3381,7 +3392,7 @@ export default function MapView({
           },
         });
       } else {
-        // Craters, volcanics — ellipse
+        // Craters, volcanics — ellipse + visible point marker
         const radiusM = (f.diameter_km || 5) * 500;
         viewer.entities.add({
           id: `DETECT_${f.id}`,
@@ -3389,12 +3400,12 @@ export default function MapView({
           ellipse: {
             semiMajorAxis: radiusM,
             semiMinorAxis: radiusM,
-            material: cesiumColor.withAlpha(0.12),
+            material: cesiumColor.withAlpha(0.2),
             outline: true,
-            outlineColor: cesiumColor.withAlpha(0.7),
+            outlineColor: cesiumColor.withAlpha(0.8),
           },
           point: {
-            pixelSize: 5,
+            pixelSize: 7,
             color: cesiumColor,
             outlineColor: Cesium.Color.WHITE,
             outlineWidth: 1,
@@ -3408,7 +3419,7 @@ export default function MapView({
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -10),
+            pixelOffset: new Cesium.Cartesian2(0, -12),
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
             scaleByDistance: new Cesium.NearFarScalar(5e4, 1.0, 2e6, 0.3),
           },
