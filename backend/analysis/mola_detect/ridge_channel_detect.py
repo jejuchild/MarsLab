@@ -159,6 +159,28 @@ def _straight_line_km(coords: list[list[float]]) -> float:
     return _path_length([coords[0], coords[-1]])
 
 
+def _build_crater_rim_mask(
+    slope_deg: np.ndarray,
+    px_m: float,
+    buffer_km: float = 2.0,
+    steep_threshold: float = 12.0,
+) -> np.ndarray:
+    """
+    Build a binary mask of crater rim zones to exclude from channel/ridge
+    detection.
+
+    Crater rims are identified by steep slopes (>12 deg), then dilated by
+    ~2 km to create exclusion zones that cover the full rim width including
+    the convex crest and concave inner wall.
+    """
+    steep_mask = slope_deg > steep_threshold
+    buffer_px = km_to_pixels(buffer_km, px_m)
+    crater_zone = ndimage.binary_dilation(
+        steep_mask, structure=disk_footprint(buffer_px),
+    )
+    return crater_zone
+
+
 # ---------------------------------------------------------------------------
 # Channel / valley detection
 # ---------------------------------------------------------------------------
@@ -200,6 +222,7 @@ def detect_channels(
         px_m_ns = ctx.px_m_ns
         elev_filled = ctx.elev_filled
         neg_laplacian = ctx.neg_laplacian
+        slope_deg = ctx.slope_deg
     else:
         _progress("extracting_dem", {})
         elev, meta = extract_dem_window(lat0, lon0, radius_km)
@@ -213,6 +236,7 @@ def detect_channels(
         elev_smooth = ndimage.gaussian_filter(elev_filled, sigma=2.0)
         from .common import _compute_laplacian
         neg_laplacian = _compute_laplacian(elev_smooth, px_m_ew, px_m_ns)
+        slope_deg = compute_slope_map(elev_filled, px_m_ns, px_m_ew)
 
     # 5. Threshold for valleys (neg_laplacian > 0 = valley)
     valley_values = neg_laplacian[neg_laplacian > 0]
@@ -224,6 +248,12 @@ def detect_channels(
     # 6. Morphological cleanup
     valley_mask = ndimage.binary_erosion(valley_mask, iterations=1)
     valley_mask = ndimage.binary_dilation(valley_mask, iterations=1)
+
+    # 6b. Exclude crater rim zones — steep slopes (~crater walls) + 2km buffer
+    crater_rim_mask = _build_crater_rim_mask(
+        slope_deg, (px_m_ew + px_m_ns) / 2,
+    )
+    valley_mask &= ~crater_rim_mask
 
     # 7. Label connected components
     labels, n_labels = ndimage.label(valley_mask)
@@ -425,6 +455,12 @@ def detect_ridges(
     # Morphological cleanup
     ridge_mask = ndimage.binary_erosion(ridge_mask, iterations=1)
     ridge_mask = ndimage.binary_dilation(ridge_mask, iterations=1)
+
+    # 4b. Exclude crater rim zones — steep slopes (~crater walls) + 2km buffer
+    crater_rim_mask = _build_crater_rim_mask(
+        slope_deg, (px_m_ew + px_m_ns) / 2,
+    )
+    ridge_mask &= ~crater_rim_mask
 
     # 5. Label connected components
     labels, n_labels = ndimage.label(ridge_mask)

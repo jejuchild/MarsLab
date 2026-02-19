@@ -301,10 +301,8 @@ def detect_ldas(
         lobateness = _compute_lobateness(rows, cols)
         if lobateness > 0.95:
             # Nearly convex; LDAs should be somewhat lobate / irregular
-            # But we also allow lobateness > 0.4 (i.e., must fill at least
-            # 40 % of its convex hull -- very lobate shapes score lower)
             pass
-        if lobateness < 0.4:
+        if lobateness < 0.3:
             continue
 
         # --- Extract boundary polygon ---
@@ -344,11 +342,16 @@ def detect_ldas(
 
         # --- Confidence ---
         # Weighted composite of adjacency, lobateness, latitude, area
-        adj_score = min(adj_frac / 0.5, 1.0)  # 50 % adjacency = max
-        lob_score = 1.0 - lobateness  # more lobate (lower ratio) = higher score
-        lob_score = max(lob_score, 0.0)
+        adj_score = min(adj_frac / 0.35, 1.0)  # 35 % adjacency = max
+        # Lobateness scoring: ideal LDA range is 0.5-0.8
+        if lobateness < 0.5:
+            lob_score = lobateness / 0.5       # ramp up: 0.3→0.6, 0.5→1.0
+        elif lobateness <= 0.8:
+            lob_score = 1.0                    # ideal range
+        else:
+            lob_score = max(0.0, 1.0 - (lobateness - 0.8) / 0.2)  # ramp down
         lat_match = 1.0 if _in_lda_latitude(centroid_lat) else 0.3
-        area_score = min(area_km2 / 200.0, 1.0)  # 200 km^2 = max
+        area_score = min(area_km2 / 80.0, 1.0)  # 80 km^2 = max
 
         confidence = (
             0.35 * adj_score
