@@ -1979,24 +1979,39 @@ def sharad_physics_inversion(
         derivation_log = []
         for d in pipeline_result.derivation_log:
             derivation_log.append({
-                "step": d.step,
-                "equation": d.equation,
+                "step": d.step_number,
+                "description": d.description,
+                "equation": d.formula,
                 "inputs": d.inputs,
-                "output": d.output,
+                "output": d.result,
                 "notes": d.notes,
             })
 
         inversion_details = []
-        for inv in pipeline_result.results:
+        for inv in pipeline_result.inversions:
+            inv_obj = inv.inversion
+            if not inv_obj:
+                continue
+
+            # Aggregate clutter summary from accepted picks (if available).
+            clutter_scores = [
+                float(rp.clutter.clutter_likelihood_score)
+                for rp in inv.reflector_picks
+                if rp.clutter is not None
+            ]
+            mean_clutter_score = (
+                (sum(clutter_scores) / len(clutter_scores)) if clutter_scores else None
+            )
+
             detail = {
                 "sharad_product_id": inv.sharad_product_id,
                 "dtm_product_id": inv.dtm_product_id,
-                "epsilon_r": inv.epsilon_r,
-                "epsilon_r_ci": inv.epsilon_r_ci,
-                "depth_m": inv.depth_m,
-                "twt_us": inv.twt_us,
-                "quality": inv.quality,
-                "material_interpretation": inv.material_interpretation,
+                "epsilon_r": inv_obj.epsilon_r,
+                "epsilon_r_ci": [inv_obj.epsilon_r_low, inv_obj.epsilon_r_high],
+                "depth_m": inv_obj.depth_m,
+                "twt_us": inv_obj.twt_us,
+                "quality": inv_obj.quality,
+                "material_interpretation": inv_obj.interpretation,
             }
             if inv.hyperbola_validation:
                 detail["hyperbola_validation"] = {
@@ -2004,11 +2019,10 @@ def sharad_physics_inversion(
                     "agreement": inv.hyperbola_validation.agreement,
                     "delta_epsilon": inv.hyperbola_validation.delta_epsilon,
                 }
-            if inv.clutter_assessment:
+            if mean_clutter_score is not None:
                 detail["clutter_assessment"] = {
-                    "is_clutter": inv.clutter_assessment.is_clutter,
-                    "clutter_score": inv.clutter_assessment.clutter_score,
-                    "snr_at_pick": inv.clutter_assessment.snr_at_pick,
+                    "is_clutter": bool(mean_clutter_score >= 0.7),
+                    "clutter_score": mean_clutter_score,
                 }
             inversion_details.append(detail)
 

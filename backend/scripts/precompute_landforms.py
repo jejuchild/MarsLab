@@ -172,31 +172,50 @@ def deduplicate_features(
     Two features are considered duplicates if they have the same type
     and their centroids are within proximity_km. The instance with
     higher confidence is kept.
+
+    Uses spatial grid bucketing for O(n) performance instead of O(n²).
     """
     if not features:
         return []
 
+    # Grid cell size in degrees (~proximity_km at Mars equator)
+    # Mars circumference ~21,344 km → 1 deg ≈ 59.3 km
+    cell_deg = proximity_km / 59.3
+
     # Sort by confidence descending so we keep higher-confidence first
     features_sorted = sorted(features, key=lambda f: f.get("confidence", 0), reverse=True)
     kept: list[dict] = []
-    # Group by type for faster comparison
-    by_type: dict[str, list[dict]] = {}
+
+    # Spatial grid per type: (type, grid_row, grid_col) → list of kept features
+    grid: dict[tuple[str, int, int], list[dict]] = {}
 
     for f in features_sorted:
         ftype = f["type"]
         lat = f["lat"]
         lon = f["lon"]
 
+        grid_r = int(lat / cell_deg)
+        grid_c = int(lon / cell_deg)
+
         is_dup = False
-        for existing in by_type.get(ftype, []):
-            dist = _haversine_km(lat, lon, existing["lat"], existing["lon"])
-            if dist < proximity_km:
-                is_dup = True
+        # Check this cell and all 8 neighbours
+        for dr in (-1, 0, 1):
+            if is_dup:
                 break
+            for dc in (-1, 0, 1):
+                key = (ftype, grid_r + dr, grid_c + dc)
+                for existing in grid.get(key, []):
+                    dist = _haversine_km(lat, lon, existing["lat"], existing["lon"])
+                    if dist < proximity_km:
+                        is_dup = True
+                        break
+                if is_dup:
+                    break
 
         if not is_dup:
             kept.append(f)
-            by_type.setdefault(ftype, []).append(f)
+            key = (ftype, grid_r, grid_c)
+            grid.setdefault(key, []).append(f)
 
     return kept
 

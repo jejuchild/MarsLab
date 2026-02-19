@@ -151,9 +151,21 @@ def _parse_and_cache(cache: dict):
 
     # Return from disk cache if available
     if os.path.exists(power_path) and os.path.exists(geom_path):
-        cache["power"] = np.load(power_path, mmap_mode="r")
+        power_cached = np.load(power_path, mmap_mode="r")
+        if not np.isfinite(power_cached).all():
+            power_clean = np.nan_to_num(
+                np.asarray(power_cached, dtype=np.float32),
+                nan=0.0,
+                posinf=0.0,
+                neginf=0.0,
+            ).astype(np.float32)
+            np.save(power_path, power_clean)
+            power_cached = np.load(power_path, mmap_mode="r")
+        cache["power"] = power_cached
         g = np.load(geom_path)
         cache["geometry"] = {"lat": g["lat"], "lon": g["lon"], "alt": g["alt"]}
+        # Ensure total_rows reflects cached array shape, not potentially stale LBL FILE_RECORDS.
+        cache["total_rows"] = int(power_cached.shape[0])
         return
 
     if not os.path.exists(dat_path):
@@ -176,6 +188,10 @@ def _parse_and_cache(cache: dict):
     imag = np.frombuffer(raw[:, ECHO_IMAG_OFFSET:ECHO_IMAG_OFFSET + ECHO_BYTES].tobytes(),
                          dtype="<f4").reshape(total_rows, N_RANGE_BINS)
     power = (real ** 2 + imag ** 2).astype(np.float32)
+    # Some products can contain non-finite float payloads after squaring; keep
+    # rendering/analysis stable by converting them to zero-energy samples.
+    if not np.isfinite(power).all():
+        power = np.nan_to_num(power, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
     # Extract geometry columns
     lons = np.frombuffer(raw[:, LON_OFFSET:LON_OFFSET + 8].tobytes(),
@@ -190,6 +206,7 @@ def _parse_and_cache(cache: dict):
 
     cache["power"] = np.load(power_path, mmap_mode="r")
     cache["geometry"] = {"lat": lats, "lon": lons, "alt": alts}
+    cache["total_rows"] = int(total_rows)
 
 
 def _get_power(product_id: str) -> tuple[np.ndarray, int]:
@@ -197,7 +214,7 @@ def _get_power(product_id: str) -> tuple[np.ndarray, int]:
     cache = _get_product_data(product_id)
     if cache["power"] is None:
         _parse_and_cache(cache)
-    return cache["power"], cache["total_rows"]
+    return cache["power"], int(cache["power"].shape[0])
 
 
 def _get_geometry(product_id: str) -> tuple[dict, int]:
@@ -205,7 +222,7 @@ def _get_geometry(product_id: str) -> tuple[dict, int]:
     cache = _get_product_data(product_id)
     if cache["geometry"] is None:
         _parse_and_cache(cache)
-    return cache["geometry"], cache["total_rows"]
+    return cache["geometry"], int(cache["geometry"]["lat"].shape[0])
 
 
 def _lon_to_180(lon: np.ndarray) -> np.ndarray:
@@ -374,9 +391,15 @@ def _render_radargram_png(
     if cache_key and cache_key in _png_cache:
         return _png_cache[cache_key]
 
+    power = np.asarray(power, dtype=np.float32)
+    power = np.nan_to_num(power, nan=0.0, posinf=0.0, neginf=0.0)
+
     if downsample > 1:
         n = power.shape[0] // downsample * downsample
-        p = power[:n].reshape(-1, downsample, power.shape[1]).mean(axis=1)
+        if n == 0:
+            p = np.zeros((1, power.shape[1]), dtype=np.float32)
+        else:
+            p = power[:n].reshape(-1, downsample, power.shape[1]).mean(axis=1)
     else:
         p = np.array(power, dtype=np.float32)
 
@@ -389,11 +412,13 @@ def _render_radargram_png(
 
     if per_trace:
         # Per-trace normalization (vectorized) — matches PDS browse image style
+        p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
         vmins = np.percentile(p, pmin, axis=1, keepdims=True)
         vmaxs = np.percentile(p, pmax, axis=1, keepdims=True)
         vmaxs = np.where(vmaxs <= vmins, vmins + 1, vmaxs)
         img = ((p - vmins) / (vmaxs - vmins) * 255).clip(0, 255).astype(np.uint8)
     else:
+        p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
         if global_vmin is not None and global_vmax is not None:
             vmin, vmax = global_vmin, global_vmax
         else:

@@ -428,7 +428,7 @@ export default function MainPage() {
   const [regionVertices, setRegionVertices] = useState<{lat: number; lon: number}[]>([]);
 
   // Crater/Landform Detection
-  const [craterDetectCenter, setCraterDetectCenter] = useState<{lat: number; lon: number} | null>(null);
+  const [, setCraterDetectCenter] = useState<{lat: number; lon: number} | null>(null);
   const [craterDetectFeatures, setCraterDetectFeatures] = useState<DetectedFeature[]>([]);
   const [epsilonTarget, setEpsilonTarget] = useState<DetectedFeature | null>(null);
   const [stratColumnTarget, setStratColumnTarget] = useState<DetectedFeature | null>(null);

@@ -82,11 +82,7 @@ export default function CraterDetectPanel({
   cameraViewportRef,
   onClose,
   onFlyTo,
-  onSearchHiRISE,
-  onSearchSHARAD,
   onFeaturesChanged,
-  onRunEpsilonInversion,
-  onOpenStratColumn,
 }: CraterDetectPanelProps) {
   // Precomputed features state — loaded on demand via "Load" button
   const [features, setFeatures] = useState<DetectedFeature[]>([]);
