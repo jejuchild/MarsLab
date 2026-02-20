@@ -162,7 +162,7 @@ export default function CraterDetectPanel({
       east: String(vp.eastLon),
       north: String(vp.maxLat),
       types: selectedTypes.join(","),
-      min_confidence: "0.7",
+      min_confidence: "0.5",
       limit: String(MAX_FEATURES),
     });
     fetch(`/api/mola-detect/features?${params}`)
