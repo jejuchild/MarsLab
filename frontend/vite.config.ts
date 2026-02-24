@@ -36,7 +36,7 @@ export default defineConfig({
     proxy: {
       // Proxy all API requests to backend
       "/api": {
-        target: "http://localhost:8002",
+        target: "http://localhost:8000",
         // Disable response buffering for SSE streams
         configure: (proxy) => {
           proxy.on("proxyRes", (proxyRes) => {
@@ -48,17 +48,17 @@ export default defineConfig({
           });
         },
       },
-      "/hirise": "http://localhost:8002",
-      "/crism": "http://localhost:8002",
-      "/hirise_index.geojson": "http://localhost:8002",
-      "/crism_index.geojson": "http://localhost:8002",
-      "/hirise_lbl": "http://localhost:8002",
-      "/crism_lbl": "http://localhost:8002",
-      "/hirise_viewer": "http://localhost:8002",
-      "/world_meta": "http://localhost:8002",
-      "/world_tiles": "http://localhost:8002",
-      "/sharad_index.geojson": "http://localhost:8002",
-      "/sharad": "http://localhost:8002",
+      "/hirise": "http://localhost:8000",
+      "/crism": "http://localhost:8000",
+      "/hirise_index.geojson": "http://localhost:8000",
+      "/crism_index.geojson": "http://localhost:8000",
+      "/hirise_lbl": "http://localhost:8000",
+      "/crism_lbl": "http://localhost:8000",
+      "/hirise_viewer": "http://localhost:8000",
+      "/world_meta": "http://localhost:8000",
+      "/world_tiles": "http://localhost:8000",
+      "/sharad_index.geojson": "http://localhost:8000",
+      "/sharad": "http://localhost:8000",
     },
   },
 });
