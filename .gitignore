@@ -15,6 +15,7 @@ backend/hirise_quickview/
 backend/sharad_data/
 backend/sharad_highres/
 backend/sharad_quickview/
+backend/hirise_ice_data/
 backend/.overlay_cache/
 
 # Large data folders
@@ -36,6 +37,10 @@ frontend/node_modules/
 *.npy
 backend/mineral_cnn_data/
 backend/mineral_cnn_results/
+
+# SQLite WAL/SHM
+*.db-wal
+*.db-shm
 
 # Logs
 *.log

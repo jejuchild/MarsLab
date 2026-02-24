@@ -20,13 +20,9 @@ Usage:
 import argparse
 import asyncio
 import logging
-import os
 import re
 import sqlite3
-import sys
-import time
 from pathlib import Path
-from urllib.parse import quote, urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -539,6 +535,9 @@ async def _download_one(
 
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 log.warning(f"  {image_id}: {e} (attempt {attempt+1})")
+                # Clean up partial download
+                tmp = dest.with_suffix(".tmp")
+                tmp.unlink(missing_ok=True)
                 await asyncio.sleep(2 ** attempt)
 
     log.error(f"  {image_id}: failed after {DOWNLOAD_RETRY} attempts")
