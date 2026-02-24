@@ -189,7 +189,8 @@ async def crawl_catalog(conn: sqlite3.Connection, limit: int = 0):
             }
 
             resp = await session.get(RESULTS_URL, params=params)
-            html = await resp.text()
+            raw = await resp.read()
+            html = raw.decode("utf-8", errors="replace")
             soup = BeautifulSoup(html, "html.parser")
 
             # Parse total pages from "Page X of Y pages (Z images)"
@@ -213,7 +214,8 @@ async def crawl_catalog(conn: sqlite3.Connection, limit: int = 0):
                     await asyncio.sleep(REQUEST_DELAY)
                     params["page"] = str(page)
                     resp = await session.get(RESULTS_URL, params=params)
-                    html = await resp.text()
+                    raw = await resp.read()
+                    html = raw.decode("utf-8", errors="replace")
                     soup = BeautifulSoup(html, "html.parser")
 
                 new_on_page = _parse_results_page(conn, soup, theme)
@@ -312,7 +314,8 @@ async def scrape_details(conn: sqlite3.Connection, limit: int = 0):
                 if resp.status != 200:
                     log.warning(f"  {image_id}: HTTP {resp.status}")
                     continue
-                html = await resp.text()
+                raw = await resp.read()
+                html = raw.decode("utf-8", errors="replace")
                 meta = _parse_detail_page(html)
                 _update_detail(conn, image_id, meta)
             except Exception as e:
