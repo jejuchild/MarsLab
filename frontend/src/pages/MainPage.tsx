@@ -21,6 +21,7 @@ import CopilotFab from "../components/CopilotFab";
 import type { FieldNote } from "../api/fieldnotes";
 import useFieldNotes from "../hooks/useFieldNotes";
 import AppShell from "../components/layout/AppShell";
+import Footer from "../components/layout/Footer";
 import BottomSheet from "../components/BottomSheet";
 import useIsMobile from "../hooks/useIsMobile";
 import useUrlState from "../hooks/useUrlState";
@@ -1808,6 +1809,7 @@ export default function MainPage() {
           onRedo={redo}
         />
       }
+      footer={<Footer />}
       leftPanel={isMobile ? null : layerPanelContent}
       rightPanel={isMobile ? undefined : (
         rightPanelCollapsed ? (

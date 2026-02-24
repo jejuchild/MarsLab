@@ -9,6 +9,8 @@ interface AppShellProps {
   isMobile?: boolean;
   /** Bottom navigation bar for mobile */
   mobileNav?: ReactNode;
+  /** Footer (institutional logos) */
+  footer?: ReactNode;
 }
 
 /**
@@ -38,12 +40,14 @@ export default function AppShell({
   children,
   isMobile = false,
   mobileNav,
+  footer,
 }: AppShellProps) {
   if (isMobile) {
     return (
       <div className="flex h-screen flex-col overflow-hidden bg-bg-dark">
         <header className="z-50 shrink-0">{header}</header>
         <main className="relative flex-1 overflow-hidden">{children}</main>
+        {footer && <div className="z-10 shrink-0">{footer}</div>}
         {mobileNav && (
           <nav className="z-50 shrink-0 mobile-bottom-nav">{mobileNav}</nav>
         )}
@@ -69,6 +73,9 @@ export default function AppShell({
           <aside className="z-10 shrink-0">{rightPanel}</aside>
         )}
       </div>
+
+      {/* Footer (institutional logos) */}
+      {footer && <div className="z-10 shrink-0">{footer}</div>}
     </div>
   );
 }
