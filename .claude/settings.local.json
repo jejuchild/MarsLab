@@ -194,7 +194,13 @@
       "Bash(git log:*)",
       "Bash(git rm:*)",
       "WebFetch(domain:scv.snu.ac.kr)",
-      "Bash(unzip:*)"
+      "Bash(unzip:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(echo NOT_INSTALLED:*)",
+      "Bash(echo NO_BUN:*)",
+      "WebFetch(domain:opencode.ai)",
+      "Bash(which opencode:*)",
+      "Bash(npx oh-my-opencode:*)"
     ]
   }
 }
