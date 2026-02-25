@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useReducer } from "react";
+import DOMPurify from 'dompurify';
 
 /* =========================================================
  * Types
@@ -345,6 +346,7 @@ export default function AgenticPanel({
   const [objective, setObjective] = useState("");
   const [autoDownload, setAutoDownload] = useState(true);
   const [groqStatus, setGroqStatus] = useState<boolean | null>(null);
+  const mountedRef = useRef(true);
   const logRef = useRef<HTMLDivElement>(null);
   const reasoningRef = useRef<HTMLDivElement>(null);
 
@@ -384,15 +386,43 @@ export default function AgenticPanel({
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Keyboard: Escape to close panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   // Narrative phase ref (not state — used in processEvent synchronously)
   const narrativePhaseRef = useRef(false);
 
   // Check Ollama status on mount
   useEffect(() => {
-    fetch("/api/agent/status")
+    const controller = new AbortController();
+    let cancelled = false;
+
+    fetch("/api/agent/status", { signal: controller.signal })
       .then((r) => r.json())
-      .then((d) => setGroqStatus(d.groq_available))
-      .catch(() => setGroqStatus(false));
+      .then((d) => {
+        if (!cancelled) setGroqStatus(d.groq_available);
+      })
+      .catch(() => {
+        if (!cancelled) setGroqStatus(false);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, []);
 
   // Auto-scroll log
@@ -424,6 +454,7 @@ export default function AgenticPanel({
 
   // ── Shared SSE event processor ──────────────────────────
   const processEvent = useCallback((event: AgentEvent) => {
+    if (!mountedRef.current) return;
     // Update narrative phase ref for synchronous access in reducer
     if (event.event === "thought_start" && event.data.phase === "narrative") {
       narrativePhaseRef.current = true;
@@ -518,9 +549,11 @@ export default function AgenticPanel({
         throw new Error(err.detail || "Failed to start agent");
       }
 
+      if (!mountedRef.current) return;
       dispatch({ type: "EVENT", event: { event: "reasoning_start", data: { phase: "planning" } }, narrativePhase: false });
       await consumeSSEStream(res);
     } catch (e) {
+      if (!mountedRef.current) return;
       dispatch({ type: "EVENT", event: { event: "error", data: { error: e instanceof Error ? e.message : "Unknown error" } }, narrativePhase: false });
     }
   }, [objective, autoDownload, consumeSSEStream]);
@@ -541,17 +574,19 @@ export default function AgenticPanel({
   }, [objective, initialObjective, session.sessionState, handleRun]);
 
   const handleOpenHistory = useCallback(async () => {
+    if (!mountedRef.current) return;
     setShowHistory(true);
     setHistoryLoading(true);
     try {
       const res = await fetch("/api/agent/sessions");
       if (res.ok) {
+        if (!mountedRef.current) return;
         setPastSessions(await res.json());
       }
     } catch {
       // empty list is fine
     } finally {
-      setHistoryLoading(false);
+      if (mountedRef.current) setHistoryLoading(false);
     }
   }, []);
 
@@ -602,6 +637,7 @@ export default function AgenticPanel({
       const jsonRes = await fetch(`/api/agent/session/${sid}`);
       if (!jsonRes.ok) throw new Error("Failed to load session");
       const data = await jsonRes.json();
+      if (!mountedRef.current) return;
 
       const effectiveStatus = data.status as string;
       if (effectiveStatus === "done" || effectiveStatus === "error") {
@@ -609,6 +645,7 @@ export default function AgenticPanel({
         // Dispatch session_start AFTER loadSessionFromJson (which calls RESET and wipes sessionId)
         dispatch({ type: "EVENT", event: { event: "session_start", data: { session_id: sid } }, narrativePhase: false });
       } else {
+        if (!mountedRef.current) return;
         setObjective((data.objective as string) || sessionObjective || "");
         // Set sessionId before resuming SSE stream
         dispatch({ type: "EVENT", event: { event: "session_start", data: { session_id: sid } }, narrativePhase: false });
@@ -620,6 +657,7 @@ export default function AgenticPanel({
         await consumeSSEStream(res);
       }
     } catch (e) {
+      if (!mountedRef.current) return;
       dispatch({ type: "EVENT", event: { event: "error", data: { error: e instanceof Error ? e.message : "Failed to load session" } }, narrativePhase: false });
     }
   }, [consumeSSEStream, loadSessionFromJson]);
@@ -641,6 +679,8 @@ export default function AgenticPanel({
     sessionMode, iterationCount, activeAction,
   } = session;
 
+  const scoreRange = synthesis?.score_range as { low?: number; high?: number } | undefined;
+
   // Estimated time remaining
   const estRemaining = agentMode === "react"
     ? (iterationCount > 2 && elapsed > 0
@@ -654,7 +694,7 @@ export default function AgenticPanel({
     : (totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0);
 
   return (
-    <div className="relative flex flex-col h-full bg-[#0d1520] text-[#c8d6e5] border-l border-[#232f48]" style={{ width: panelWidth, minWidth: panelWidth }}>
+    <div className="relative flex flex-col h-full bg-[#0d1520] text-[#c8d6e5] border-l border-[#232f48]" style={{ width: panelWidth, minWidth: panelWidth }} role="complementary" aria-label="Agentic AI panel">
       {/* Resize handle (left edge — drag to widen/narrow) */}
       <div
         className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20 hover:bg-violet-500/30 active:bg-violet-500/50 transition-colors"
@@ -679,12 +719,14 @@ export default function AgenticPanel({
             disabled={isRunning}
             className="text-[#6b7c9c] hover:text-white transition-colors disabled:opacity-30"
             title="Past sessions"
+            aria-label="View past sessions"
           >
             <span className="material-symbols-outlined text-lg">history</span>
           </button>
           <button
             onClick={onClose}
             className="text-[#6b7c9c] hover:text-white transition-colors"
+            aria-label="Close agentic panel"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
@@ -764,6 +806,7 @@ export default function AgenticPanel({
           placeholder="Describe your mission objective...&#10;e.g., Plan a rover traverse in Jezero Crater to find shallow ice. Evaluate slope feasibility and subsurface ice indicators."
           className="w-full h-20 bg-[#1a2333] border border-[#232f48] rounded-lg px-3 py-2 text-xs text-[#c8d6e5] placeholder-[#4a5a7a] resize-none focus:outline-none focus:border-violet-500/50"
           disabled={isRunning}
+          aria-label="Mission objective"
         />
         <div className="flex items-center justify-between mt-2">
           <label className="flex items-center gap-1.5 text-[9px] text-[#6b7c9c]">
@@ -780,6 +823,7 @@ export default function AgenticPanel({
             <button
               onClick={handleStop}
               className="px-4 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/20"
+              aria-label="Stop agent execution"
             >
               <span className="flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-sm">stop_circle</span>
@@ -795,6 +839,7 @@ export default function AgenticPanel({
                   ? "bg-[#1a2333] text-[#4a5a7a] cursor-not-allowed"
                   : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-600/20"
               }`}
+              aria-label="Run agent"
             >
               Run Agent
             </button>
@@ -902,7 +947,7 @@ export default function AgenticPanel({
             {chatLog.map((entry, i) => {
               if (entry.type === "thought") {
                 return (
-                  <div key={i} className="bg-violet-500/5 border border-violet-500/20 rounded-lg p-3">
+                  <div key={`thought-${entry.iteration}-${i}`} className="bg-violet-500/5 border border-violet-500/20 rounded-lg p-3">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className={`material-symbols-outlined text-xs text-violet-400 ${entry.streaming ? "animate-pulse" : ""}`}>
                         psychology
@@ -924,7 +969,7 @@ export default function AgenticPanel({
               }
               if (entry.type === "action") {
                 return (
-                  <div key={i} className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-2.5">
+                  <div key={`action-${entry.tool}-${i}`} className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-2.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="material-symbols-outlined text-xs text-amber-400">
                         {TOOL_ICONS[entry.tool] || "build"}
@@ -941,7 +986,7 @@ export default function AgenticPanel({
               }
               if (entry.type === "observation") {
                 return (
-                  <div key={i} className={`border rounded-lg p-2.5 ${
+                  <div key={`observation-${i}`} className={`border rounded-lg p-2.5 ${
                     entry.success
                       ? "bg-emerald-500/5 border-emerald-500/20"
                       : "bg-red-500/5 border-red-500/20"
@@ -959,7 +1004,7 @@ export default function AgenticPanel({
               }
               if (entry.type === "respond") {
                 return (
-                  <div key={i} className="bg-sky-500/10 border border-sky-500/20 rounded-lg p-3">
+                  <div key={`respond-${i}`} className="bg-sky-500/10 border border-sky-500/20 rounded-lg p-3">
                     <div className="flex items-start gap-1.5">
                       <span className="material-symbols-outlined text-xs text-sky-400 mt-0.5">chat</span>
                       <span className="text-[10px] text-[#c8d6e5] leading-relaxed">{entry.message}</span>
@@ -969,7 +1014,7 @@ export default function AgenticPanel({
               }
               if (entry.type === "finish") {
                 return (
-                  <div key={i} className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+                  <div key={`finish-${i}`} className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="material-symbols-outlined text-xs text-emerald-400">task_alt</span>
                       <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Agent Finished</span>
@@ -1025,9 +1070,7 @@ export default function AgenticPanel({
                   progress_activity
                 </span>
                 <span className="text-[10px] text-amber-300 font-medium">
-                  {TOOL_ACTIVITY[activeAction.tool]
-                    ? TOOL_ACTIVITY[activeAction.tool](activeAction.params)
-                    : `Running ${activeAction.tool}...`}
+                  {TOOL_ACTIVITY[activeAction.tool]?.(activeAction.params) ?? `Running ${activeAction.tool}...`}
                 </span>
               </div>
             )}
@@ -1173,8 +1216,8 @@ export default function AgenticPanel({
               <div className="flex items-end justify-between mb-1">
                 <span className="text-[10px] text-[#92a4c9]">Overall Score</span>
                 <span className="text-lg font-bold text-white">
-                  {(synthesis.score_range as any)?.low !== undefined
-                    ? `${(synthesis.score_range as any).low}–${(synthesis.score_range as any).high}`
+                  {scoreRange?.low !== undefined
+                    ? `${scoreRange.low}–${scoreRange.high}`
                     : synthesis.overall_score as number}/100
                 </span>
               </div>
@@ -1294,7 +1337,7 @@ export default function AgenticPanel({
                          [&_h2]:text-xs [&_h2]:font-bold [&_h2]:text-white [&_h2]:mt-3 [&_h2]:mb-1
                          [&_h3]:text-[11px] [&_h3]:font-bold [&_h3]:text-[#92a4c9] [&_h3]:mt-2 [&_h3]:mb-1
                          [&_ul]:pl-4 [&_li]:text-[10px] [&_strong]:text-white [&_p]:mb-1.5"
-              dangerouslySetInnerHTML={{ __html: markdownToHtml(narrative) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(markdownToHtml(narrative)) }}
             />
           </div>
         )}

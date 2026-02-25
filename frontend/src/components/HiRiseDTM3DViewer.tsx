@@ -570,17 +570,7 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
             );
           }
 
-          console.log("[HiRiseDTM3D] Loaded patch:", {
-            productId: point.productId,
-            patchSizeM,
-            rows: patchData.rows,
-            cols: patchData.cols,
-            radiusM: patchData.radius_m,
-            spacing_m: patchData.spacing_m,
-            elevMin: patchData.min_elevation_m,
-            elevMax: patchData.max_elevation_m,
-            elevRange: patchData.elevation_range_m,
-          });
+
 
           setData(patchData);
         }
@@ -667,7 +657,7 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
 
         if (!cancelled) {
           setFootprintData(allOverlays);
-          console.log(`[HiRiseDTM3D] Loaded ${allOverlays.length} footprints`);
+
         }
       } catch (e) {
         console.error("[HiRiseDTM3D] Footprint fetch error:", e);

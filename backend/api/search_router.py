@@ -10,7 +10,7 @@ Endpoints:
 - GET /api/download - List all download tasks
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Optional, List
 import asyncio
@@ -40,6 +40,8 @@ from .download_manager import (
     check_local_existence_detailed,
     DownloadStatus,
 )
+from .validation import validate_product_id
+from .rate_limit import limiter
 
 
 import aiohttp
@@ -544,7 +546,9 @@ class DownloadResponse(BaseModel):
 # =============================================================================
 
 @router.get("/search", response_model=SearchResponse)
+@limiter.limit("30/minute")
 async def search_products(
+    request: Request,
     q: str = Query(..., min_length=1, description="Search query (product ID or partial)"),
     instrument: Optional[str] = Query(None, description="Filter by instrument: crism or hirise"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results"),
@@ -725,7 +729,9 @@ async def search_products(
 
 
 @router.get("/search/local")
+@limiter.limit("30/minute")
 async def search_local_products(
+    request: Request,
     q: str = Query(..., min_length=1, description="Search query (product ID or partial)"),
     limit: int = Query(20, ge=1, le=100, description="Maximum results"),
 ):
@@ -791,11 +797,13 @@ async def search_local_products(
 
 
 @router.get("/search/spatial", response_model=SearchResponse)
+@limiter.limit("30/minute")
 async def search_spatial(
+    request: Request,
     minlat: float = Query(..., ge=-90, le=90, description="Southern latitude boundary"),
     maxlat: float = Query(..., ge=-90, le=90, description="Northern latitude boundary"),
-    westernlon: float = Query(..., ge=-180, le=360, description="Western longitude boundary"),
-    easternlon: float = Query(..., ge=-180, le=360, description="Eastern longitude boundary"),
+    westernlon: float = Query(..., ge=-360, le=360, description="Western longitude boundary"),
+    easternlon: float = Query(..., ge=-360, le=360, description="Eastern longitude boundary"),
     instrument: Optional[str] = Query(None, description="Filter by instrument"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results"),
 ):
@@ -827,6 +835,11 @@ async def search_spatial(
 
     Returns products in the Arcadia Planitia region.
     """
+    if minlat < -90 or minlat > 90 or maxlat < -90 or maxlat > 90:
+        raise HTTPException(400, "Latitude must be between -90 and 90")
+    if westernlon < -360 or westernlon > 360 or easternlon < -360 or easternlon > 360:
+        raise HTTPException(400, "Longitude must be between -360 and 360")
+
     # Validate lat range
     if minlat > maxlat:
         raise HTTPException(400, "minlat must be less than or equal to maxlat")
@@ -948,7 +961,8 @@ async def search_spatial(
 # =============================================================================
 
 @router.get("/exists/{instrument}/{product_id}")
-async def check_exists(instrument: str, product_id: str):
+@limiter.limit("30/minute")
+async def check_exists(request: Request, instrument: str, product_id: str):
     """
     Check if a product already exists locally (with detailed file info).
 
@@ -974,6 +988,11 @@ async def check_exists(instrument: str, product_id: str):
     GET /api/exists/crism/frt00009312_07_if165l_trr3
     ```
     """
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     # Handle crism_trr3 separately (not in Instrument enum — uses mineral_cnn_data/)
     if instrument.lower() == "crism_trr3":
         from .mineral_cnn.constants import TRR_DATA_DIR
@@ -1032,7 +1051,8 @@ async def check_exists(instrument: str, product_id: str):
 # =============================================================================
 
 @router.post("/download", response_model=DownloadResponse)
-async def start_download(request: DownloadRequest):
+@limiter.limit("20/minute")
+async def start_download(http_request: Request, request: DownloadRequest):
     """
     Start downloading a product bundle (or missing files only).
 
@@ -1083,6 +1103,11 @@ async def start_download(request: DownloadRequest):
     ```
     """
     try:
+        request.product_id = validate_product_id(request.product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
+    try:
         inst = Instrument(request.instrument.lower())
     except ValueError:
         raise HTTPException(400, f"Invalid instrument: {request.instrument}. Valid options: {', '.join(e.value for e in Instrument)}.")
@@ -1107,7 +1132,8 @@ async def start_download(request: DownloadRequest):
 
 
 @router.get("/download", response_model=List[DownloadResponse])
-async def list_downloads():
+@limiter.limit("20/minute")
+async def list_downloads(request: Request):
     """
     List all download tasks.
 
@@ -1119,7 +1145,8 @@ async def list_downloads():
 
 
 @router.get("/download/{task_id}", response_model=DownloadResponse)
-async def get_download_status(task_id: str):
+@limiter.limit("20/minute")
+async def get_download_status(request: Request, task_id: str):
     """
     Get the status of a specific download task.
 
@@ -1150,7 +1177,8 @@ async def get_download_status(task_id: str):
 
 
 @router.delete("/download/history")
-async def clear_download_history():
+@limiter.limit("20/minute")
+async def clear_download_history(request: Request):
     """
     Clear all completed and failed download tasks from history.
     Active downloads are not affected.
@@ -1164,7 +1192,8 @@ async def clear_download_history():
 
 
 @router.post("/download/{task_id}/retry", response_model=DownloadResponse)
-async def retry_download(task_id: str):
+@limiter.limit("20/minute")
+async def retry_download(request: Request, task_id: str):
     """Retry a failed download task. Creates a new task with the same parameters."""
     task = await download_manager.retry_task(task_id)
     if not task:
@@ -1173,7 +1202,8 @@ async def retry_download(task_id: str):
 
 
 @router.delete("/download/{task_id}")
-async def cancel_download(task_id: str):
+@limiter.limit("20/minute")
+async def cancel_download(request: Request, task_id: str):
     """
     Cancel a specific download task.
 
@@ -1199,7 +1229,8 @@ async def cancel_download(task_id: str):
 
 
 @router.delete("/download")
-async def cancel_all_downloads():
+@limiter.limit("20/minute")
+async def cancel_all_downloads(request: Request):
     """
     Cancel all active download tasks.
 

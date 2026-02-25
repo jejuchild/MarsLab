@@ -4,6 +4,7 @@ import { Toaster } from "react-hot-toast";
 import MainPage from "./pages/MainPage";
 import useServiceWorker from "./hooks/useServiceWorker";
 import OfflineIndicator from "./components/OfflineIndicator";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Lazy-load secondary pages (not needed on initial load)
 const DataDownloadPage = lazy(() => import("./pages/DataDownloadPage"));
@@ -14,7 +15,7 @@ export default function App() {
   const { isOnline, isUpdateAvailable, cacheStats, updateApp } = useServiceWorker();
 
   return (
-    <>
+    <ErrorBoundary>
       <OfflineIndicator
         isOnline={isOnline}
         isUpdateAvailable={isUpdateAvailable}
@@ -46,6 +47,6 @@ export default function App() {
           <Route path="/suggestions" element={<FeatureSuggestionsPage />} />
         </Routes>
       </Suspense>
-    </>
+    </ErrorBoundary>
   );
 }

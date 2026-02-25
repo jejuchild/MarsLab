@@ -449,13 +449,7 @@ export default function Subsurface3DViewer({
     fetchDEMPatch(trackGeometry.centerLat, trackGeometry.centerLon, terrainRadiusM, 128)
       .then((data) => {
         if (!cancelled) {
-          console.log("[Subsurface3D] Loaded terrain:", {
-            rows: data.rows,
-            cols: data.cols,
-            radius_m: data.radius_m,
-            trackLengthM: trackGeometry.trackLengthM,
-            terrainDiameter: data.radius_m * 2,
-          });
+
           setTerrainData(data);
         }
       })

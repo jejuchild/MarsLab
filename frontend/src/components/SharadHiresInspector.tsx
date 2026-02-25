@@ -336,8 +336,9 @@ export default function SharadHiresInspector({
           setViewX({ start: 0, end: Math.min(1, cw / img.width) });
           setViewY({ start: 0, end: Math.min(1, ch / img.height) });
         }
-      } catch (e: any) {
-        if (!cancelled) setError(e.message || "Unknown error");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Unknown error";
+        if (!cancelled) setError(msg);
       } finally {
         if (!cancelled) setLoading(false);
       }

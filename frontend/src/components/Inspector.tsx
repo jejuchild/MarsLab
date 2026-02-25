@@ -207,6 +207,15 @@ export default function Inspector({
     [fieldNotes, selected]
   );
 
+  // Keyboard: Escape to close panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   const [hiriseTab, setHiriseTab] = useState<HiRISETabKey>("Metadata");
   const [crismTab, setCrismTab] = useState<CRISMTabKey>("Metadata");
   const [windowSize, setWindowSize] = useState(5);
@@ -423,6 +432,8 @@ export default function Inspector({
     <aside
       className={`relative flex flex-col bg-surface-dark/40 ${isMobile ? 'w-full' : 'h-full border-l border-border-dark'}`}
       style={isMobile ? undefined : { width: panelWidth }}
+      role="complementary"
+      aria-label="Product inspector"
     >
       {/* Resize handle (left edge) - desktop only */}
       {!isMobile && (
@@ -438,6 +449,7 @@ export default function Inspector({
             <button
               key={t}
               onClick={() => setHiriseTab(t)}
+              aria-label={`${t} tab`}
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
                 hiriseTab === t
                   ? "border-b-2 border-primary bg-primary/5 text-white"
@@ -453,6 +465,7 @@ export default function Inspector({
             <button
               key={t}
               onClick={() => setCrismTab(t)}
+              aria-label={`${t} tab`}
               className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
                 crismTab === t
                   ? "border-b-2 border-primary bg-primary/5 text-white"
@@ -485,6 +498,7 @@ export default function Inspector({
               onClick={onCollapse}
               className="flex items-center justify-center px-1.5 text-slate-500 hover:text-white transition-colors"
               title="Collapse panel"
+              aria-label="Collapse inspector panel"
             >
               <span className="material-symbols-outlined text-base">chevron_right</span>
             </button>
@@ -492,6 +506,7 @@ export default function Inspector({
           <button
             onClick={onClose}
             className="flex items-center justify-center px-3 text-slate-500 hover:text-red-400 transition-colors"
+            aria-label="Close inspector"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
@@ -1326,9 +1341,10 @@ function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; o
           setErrorMsg("Pipeline completed but results not available");
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setStatus("error");
-      setErrorMsg(e.message || "Pipeline failed");
+      const msg = e instanceof Error ? e.message : "Pipeline failed";
+      setErrorMsg(msg);
     }
   };
 

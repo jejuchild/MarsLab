@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import DOMPurify from 'dompurify';
 import type { TerrainPoint } from "./SlopeAnalysis";
 
 /* =========================================================
@@ -79,6 +80,7 @@ export default function AiAnalysisPanel({
   // Panel width (resizable)
   const [panelWidth, setPanelWidth] = useState(420);
   const abortRef = useRef<AbortController | null>(null);
+  const askAbortRef = useRef<AbortController | null>(null);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -101,11 +103,21 @@ export default function AiAnalysisPanel({
     document.addEventListener("mouseup", onUp);
   }, [panelWidth]);
 
+  // Keyboard: Escape to close panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   // Auto-gather evidence when pin or radius changes
   useEffect(() => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    let cancelled = false;
 
     async function fetchEvidence() {
       setEvidenceLoading(true);
@@ -124,24 +136,40 @@ export default function AiAnalysisPanel({
           throw new Error(body?.detail || `HTTP ${res.status}`);
         }
         const data: Evidence = await res.json();
-        setEvidence(data);
-        setActiveTab("evidence");
-      } catch (e: any) {
-        if (e.name !== "AbortError") {
+        if (!cancelled) {
+          setEvidence(data);
+          setActiveTab("evidence");
+        }
+      } catch (e: unknown) {
+        if (!cancelled && e instanceof Error && e.name !== "AbortError") {
           setEvidenceError(e.message ?? "Failed to gather evidence");
         }
       } finally {
-        setEvidenceLoading(false);
+        if (!cancelled) setEvidenceLoading(false);
       }
     }
 
     fetchEvidence();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [pin.lat, pin.lon, radiusKm]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      askAbortRef.current?.abort();
+    };
+  }, []);
 
   // Ask Gemini
   const handleAsk = useCallback(async () => {
     if (!question.trim() || !evidence) return;
+
+    askAbortRef.current?.abort();
+    const controller = new AbortController();
+    askAbortRef.current = controller;
 
     setAnswerLoading(true);
     setAnswerError(null);
@@ -153,17 +181,20 @@ export default function AiAnalysisPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: question.trim(), evidence }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.detail || `HTTP ${res.status}`);
       }
       const data: AskResponse = await res.json();
-      setAnswer(data);
-    } catch (e: any) {
-      setAnswerError(e.message ?? "Analysis failed");
+      if (askAbortRef.current === controller) setAnswer(data);
+    } catch (e: unknown) {
+      if (askAbortRef.current === controller && e instanceof Error && e.name !== "AbortError") {
+        setAnswerError(e.message ?? "Analysis failed");
+      }
     } finally {
-      setAnswerLoading(false);
+      if (askAbortRef.current === controller) setAnswerLoading(false);
     }
   }, [question, evidence]);
 
@@ -180,6 +211,8 @@ export default function AiAnalysisPanel({
     <aside
       className="relative flex h-full flex-col border-l border-border-dark bg-surface-dark/40"
       style={{ width: panelWidth }}
+      role="complementary"
+      aria-label="AI Analysis panel"
     >
       {/* Resize handle */}
       <div
@@ -204,6 +237,7 @@ export default function AiAnalysisPanel({
           <button
             onClick={onClose}
             className="flex items-center justify-center p-1 text-slate-500 hover:text-red-400 transition-colors"
+            aria-label="Close AI analysis panel"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
@@ -216,6 +250,7 @@ export default function AiAnalysisPanel({
             <button
               key={r}
               onClick={() => setRadiusKm(r)}
+              aria-label={`Set search radius to ${r} kilometers`}
               className={`px-2 py-0.5 text-[10px] rounded-md border transition-colors ${
                 radiusKm === r
                   ? "bg-violet-500/20 border-violet-500/50 text-violet-400"
@@ -235,6 +270,7 @@ export default function AiAnalysisPanel({
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Ask about this area... e.g. Is there evidence of subsurface ice?"
           className="w-full h-16 px-2 py-1.5 text-xs bg-surface-dark border border-border-dark rounded-lg text-slate-300 placeholder:text-slate-600 resize-none focus:outline-none focus:border-violet-500/50"
+          aria-label="Analysis question"
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAsk();
           }}
@@ -243,6 +279,7 @@ export default function AiAnalysisPanel({
           onClick={handleAsk}
           disabled={!question.trim() || !evidence || answerLoading}
           className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold uppercase tracking-widest bg-violet-600/20 border border-violet-600/50 text-violet-400 hover:bg-violet-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          aria-label="Run AI analysis"
         >
           {answerLoading ? (
             <>
@@ -314,7 +351,7 @@ export default function AiAnalysisPanel({
               <>
                 {/* Markdown answer */}
                 <div className="prose prose-invert prose-xs max-w-none text-xs text-slate-300 leading-relaxed [&_h3]:text-violet-400 [&_h3]:text-xs [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-1 [&_ul]:space-y-0.5 [&_li]:text-slate-400">
-                  <div dangerouslySetInnerHTML={{ __html: renderMarkdown(answer.answer_markdown) }} />
+                  <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(answer.answer_markdown)) }} />
                 </div>
 
                 {/* Highlights chips */}
@@ -323,7 +360,7 @@ export default function AiAnalysisPanel({
                     <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Supports</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {answer.highlights.supports.map((s, i) => (
-                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">{s}</span>
+                        <span key={`${s}-${i}`} className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 text-green-400">{s}</span>
                       ))}
                     </div>
                   </div>
@@ -333,7 +370,7 @@ export default function AiAnalysisPanel({
                     <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Uncertainties</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {answer.highlights.uncertainties.map((u, i) => (
-                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{u}</span>
+                        <span key={`${u}-${i}`} className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400">{u}</span>
                       ))}
                     </div>
                   </div>
@@ -343,7 +380,7 @@ export default function AiAnalysisPanel({
                     <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold">Next Steps</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {answer.highlights.actions.map((a, i) => (
-                        <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-400">{a}</span>
+                        <span key={`${a}-${i}`} className="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 text-violet-400">{a}</span>
                       ))}
                     </div>
                   </div>
@@ -437,7 +474,7 @@ export default function AiAnalysisPanel({
                   </span>
                 </div>
                 {evidence.field_notes.map((n, i) => (
-                  <div key={i} className="text-[9px] text-slate-400 mt-1">
+                  <div key={`${n.product_id}-${i}`} className="text-[9px] text-slate-400 mt-1">
                     <span className="text-amber-400">{n.product_id}</span>
                     {n.memo && <span className="ml-1 text-slate-500">— {n.memo.slice(0, 80)}</span>}
                   </div>

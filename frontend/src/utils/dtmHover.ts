@@ -66,7 +66,7 @@ export async function loadDTMElevationGrid(
       };
 
       gridCache.set(productId, grid);
-      console.log(`[DTMHover] Loaded grid for ${productId}: ${grid.rows}x${grid.cols}`);
+
       return grid;
     } catch (e) {
       console.error(`[DTMHover] Error loading grid:`, e);

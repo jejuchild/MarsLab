@@ -100,8 +100,9 @@ export default function AttenuationPanel({
         setResult(data);
         lastRunRef.current = { epsilonR: er, snrThreshold: snr, searchLo: lo, searchHi: hi };
         onOverlayUpdate?.(data.overlay_segments);
-      } catch (e: any) {
-        setError(e.message || "Analysis failed");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Analysis failed";
+        setError(msg);
       } finally {
         setLoading(false);
       }

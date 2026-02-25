@@ -876,7 +876,7 @@ export default function MainPage() {
         setAnalysisMode(urlState.mode as AnalysisMode);
       } else {
         // Break the loop: clear mode from URL
-        console.warn("[MarsLab] Crash-loop detected — skipping agentic mode restore");
+
         updateUrl({ mode: undefined });
       }
     }
@@ -1823,6 +1823,7 @@ export default function MainPage() {
               onClick={() => setRightPanelCollapsed(false)}
               className="p-1 rounded hover:bg-[#232f48] text-[#6b7c9c] hover:text-white transition-colors"
               title="Expand panel"
+              aria-label="Expand side panel"
             >
               <span className="material-symbols-outlined text-base">chevron_left</span>
             </button>
@@ -1842,6 +1843,7 @@ export default function MainPage() {
                 onClick={() => { setRightPanelCollapsed(true); panelManager.recordManualCollapse(); }}
                 className="absolute top-2 right-12 z-30 p-1 rounded hover:bg-[#232f48] text-[#6b7c9c] hover:text-white transition-colors"
                 title="Collapse panel"
+                aria-label="Collapse side panel"
               >
                 <span className="material-symbols-outlined text-base">chevron_right</span>
               </button>
@@ -1865,6 +1867,8 @@ export default function MainPage() {
             className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors ${
               mobilePanel === 'layers' ? 'text-primary' : 'text-slate-400'
             }`}
+            aria-label="Toggle layers panel"
+            aria-expanded={mobilePanel === 'layers'}
           >
             <span className="material-symbols-outlined text-xl">layers</span>
             <span className="text-[10px] font-medium">Layers</span>
@@ -1874,6 +1878,8 @@ export default function MainPage() {
             className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors ${
               mobilePanel === 'inspector' ? 'text-primary' : 'text-slate-400'
             }`}
+            aria-label="Toggle inspector panel"
+            aria-expanded={mobilePanel === 'inspector'}
           >
             <span className="material-symbols-outlined text-xl">info</span>
             <span className="text-[10px] font-medium">Inspector</span>
@@ -2035,6 +2041,7 @@ export default function MainPage() {
               <button
                 onClick={() => setSharadPopup(null)}
                 className="p-1.5 rounded hover:bg-[#232f48] transition-colors text-[#92a4c9] hover:text-white"
+                aria-label="Close SHARAD popup"
               >
                 <span className="material-symbols-outlined text-xl">close</span>
               </button>
@@ -2062,6 +2069,7 @@ export default function MainPage() {
               <button
                 onClick={() => setSharadPopup(null)}
                 className="px-3 py-1.5 text-[11px] font-medium bg-primary/20 border border-primary/50 rounded text-primary hover:bg-primary/30 transition-colors"
+                aria-label="Close SHARAD popup"
               >
                 Close
               </button>

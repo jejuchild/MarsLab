@@ -9,6 +9,8 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from api.validation import validate_product_id
+
 router = APIRouter(prefix="/api/fieldnotes", tags=["Field Notes"])
 
 # ---------------------------------------------------------------------------
@@ -131,5 +133,10 @@ def list_tags():
 @router.get("/product/{product_id}")
 def get_notes_for_product(product_id: str):
     """Get all notes for a specific product."""
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     data = _load()
     return [n for n in data if n["product_id"] == product_id]

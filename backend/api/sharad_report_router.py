@@ -15,6 +15,8 @@ import re
 from fastapi import APIRouter, HTTPException, Path
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 
+from api.validation import validate_product_id
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/sharad-report", tags=["SHARAD Report"])
@@ -22,14 +24,11 @@ router = APIRouter(prefix="/api/sharad-report", tags=["SHARAD Report"])
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPORT_DIR = os.path.join(_BACKEND_DIR, "sharad_reports")
 
-# Product ID validation
-_PRODUCT_RE = re.compile(r"^[a-zA-Z0-9_]+$")
-
-
 def _validate_product_id(product_id: str) -> str:
-    if not _PRODUCT_RE.match(product_id):
-        raise HTTPException(status_code=400, detail="Invalid product ID")
-    return product_id
+    try:
+        return validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
 
 
 # =============================================================================

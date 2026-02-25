@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import DOMPurify from 'dompurify';
 
 /* =========================================================
  * Types
@@ -921,7 +922,7 @@ export default function ReportPanel({
         {view === "progress" && (
           <>
             {regionProgress.map((rp, i) => (
-              <div key={i} className={`bg-[#1a2333] border rounded-lg overflow-hidden ${
+              <div key={rp.region_id} className={`bg-[#1a2333] border rounded-lg overflow-hidden ${
                 rp.status === "running" ? "border-amber-500/30" :
                 rp.status === "completed" ? "border-emerald-500/20" :
                 rp.status === "failed" ? "border-red-500/20" : "border-[#232f48]"
@@ -1018,7 +1019,7 @@ export default function ReportPanel({
                 </div>
                 <div
                   className="text-[10px] text-[#c8d6e5] leading-relaxed [&_strong]:text-white [&_p]:mb-1.5"
-                  dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(executiveSummary || reasoningText) }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(simpleMarkdownToHtml(executiveSummary || reasoningText)) }}
                 />
               </div>
             )}
@@ -1075,7 +1076,7 @@ export default function ReportPanel({
                       {r.highlights.length > 0 && (
                         <div className="mt-1.5 flex flex-wrap gap-1">
                           {r.highlights.map((h, hi) => (
-                            <span key={hi} className="text-[7px] px-1.5 py-0.5 bg-[#1a2333] rounded text-[#92a4c9]">{h}</span>
+                            <span key={`${h}-${hi}`} className="text-[7px] px-1.5 py-0.5 bg-[#1a2333] rounded text-[#92a4c9]">{h}</span>
                           ))}
                         </div>
                       )}
@@ -1134,7 +1135,7 @@ export default function ReportPanel({
                 {recommended.highlights.length > 0 && (
                   <div className="mt-1.5 space-y-0.5">
                     {recommended.highlights.map((h, i) => (
-                      <div key={i} className="text-[9px] text-[#92a4c9]">• {h}</div>
+                      <div key={`${h}-${i}`} className="text-[9px] text-[#92a4c9]">• {h}</div>
                     ))}
                   </div>
                 )}

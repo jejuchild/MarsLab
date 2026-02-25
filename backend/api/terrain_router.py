@@ -692,7 +692,7 @@ async def get_dem_patch(
             for key, val in result.items():
                 try:
                     json.dumps({key: val})
-                except:
+                except (ValueError, TypeError):
                     print(f"[DEM_PATCH] Problem with key '{key}': {type(val)}")
             raise
         return JSONResponse(content=result)

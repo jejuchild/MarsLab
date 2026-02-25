@@ -29,7 +29,16 @@ from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import Response, JSONResponse
 from cachetools import LRUCache
 
+from api.validation import validate_product_id
+
 router = APIRouter(prefix="/api/sharad_highres", tags=["SHARAD High-Res"])
+
+
+def _validate_router_product_id(product_id: str) -> str:
+    try:
+        return validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
 
 # ── Paths ──────────────────────────────────────────────
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -871,6 +880,8 @@ async def get_metadata(
     product_id: str = Query(..., description="Product ID (e.g. R_5663601_001_SS19_700_A)"),
 ):
     """Return dataset metadata."""
+    product_id = _validate_router_product_id(product_id)
+
     try:
         geom, total_rows = _get_geometry(product_id)
         lons180 = _lon_to_180(geom["lon"])
@@ -915,6 +926,8 @@ async def get_radargram(
     end_trace: int = Query(-1, description="Last trace index exclusive (-1 = all)"),
 ):
     """Return radargram as PNG image. Supports tiled rendering via start_trace/end_trace."""
+    product_id = _validate_router_product_id(product_id)
+
     try:
         power, total_rows = _get_power(product_id)
 
@@ -967,6 +980,8 @@ async def get_radargram_meta(
     downsample: int = Query(50, ge=1, le=500),
 ):
     """Return radargram axis info (for overlaying coordinates)."""
+    product_id = _validate_router_product_id(product_id)
+
     try:
         geom, total_rows = _get_geometry(product_id)
         n_traces_out = total_rows // downsample
@@ -995,6 +1010,8 @@ async def get_surface(
     downsample: int = Query(50, ge=1, le=500),
 ):
     """Return auto-picked surface line as polyline in radargram coordinates."""
+    product_id = _validate_router_product_id(product_id)
+
     try:
         power, total_rows = _get_power(product_id)
         surface = _pick_surface(product_id, power)
@@ -1047,6 +1064,8 @@ async def depth_conversion(
 
     If boundary_m == 0 or epsilon_r1 == epsilon_r2, uses uniform εr₁.
     """
+    product_id = _validate_router_product_id(product_id)
+
     try:
         power, total_rows = _get_power(product_id)
 
@@ -1130,6 +1149,8 @@ async def get_cluttergram(
     end_trace: int = Query(-1, description="Last trace index exclusive (-1 = all)"),
 ):
     """Return surface clutter simulation aligned to the RDR trace/range axes as PNG."""
+    product_id = _validate_router_product_id(product_id)
+
     try:
         # Use aligned cluttergram (667 bins, surface-matched to RDR)
         clutter = _get_aligned_cluttergram(product_id)
@@ -1171,6 +1192,8 @@ async def get_cluttergram_meta(
     product_id: str = Query(..., description="Product ID"),
 ):
     """Return cluttergram metadata (availability, dimensions)."""
+    product_id = _validate_router_product_id(product_id)
+
     info = _resolve_cluttergram(product_id)
     if info is None:
         return JSONResponse(content={"available": False})
@@ -1194,6 +1217,8 @@ async def get_track(
     downsample: int = Query(50, ge=1, le=500),
 ):
     """Return ground-track lat/lon arrays (for Cesium polyline)."""
+    product_id = _validate_router_product_id(product_id)
+
     try:
         geom, total_rows = _get_geometry(product_id)
         n = total_rows // downsample
@@ -1261,6 +1286,8 @@ async def get_mola_profile(
       - elevation_m: MOLA elevation at each trace
       - lats / lons: coordinates of each sample (in -180..180 lon)
     """
+    product_id = _validate_router_product_id(product_id)
+
     cache_key = f"{product_id.upper()}_{downsample}"
     if cache_key in _mola_cache:
         return JSONResponse(content=_mola_cache[cache_key])

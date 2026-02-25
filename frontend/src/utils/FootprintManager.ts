@@ -229,7 +229,7 @@ export class FootprintManager {
   private async _doLoadFootprints(instrument: InstrumentType): Promise<LoadResult | null> {
     const bbox = this.getViewportBbox();
     if (!bbox) {
-      console.warn("[FootprintManager] Cannot compute viewport");
+
       return null;
     }
 

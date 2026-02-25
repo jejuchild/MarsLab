@@ -18,6 +18,9 @@
 
     /* Linting */
     "strict": true,
+    // "noUncheckedIndexedAccess": true, // TODO: enable after fixing ~200 array access sites
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,

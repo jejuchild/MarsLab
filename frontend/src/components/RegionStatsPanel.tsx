@@ -99,6 +99,7 @@ export default function RegionStatsPanel({
     }
 
     const controller = new AbortController();
+    let cancelled = false;
 
     async function fetchStats() {
       setLoading(true);
@@ -117,18 +118,21 @@ export default function RegionStatsPanel({
           throw new Error(body?.error || `HTTP ${res.status}`);
         }
         const json: RegionStatsData = await res.json();
-        setData(json);
-      } catch (e: any) {
-        if (e.name !== "AbortError") {
+        if (!cancelled) setData(json);
+      } catch (e: unknown) {
+        if (!cancelled && e instanceof Error && e.name !== "AbortError") {
           setError(e.message ?? "Unknown error");
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchStats();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [vertices]);
 
   const safetyConfig = data ? SAFETY_CONFIG[data.safety_rating] : SAFETY_CONFIG.UNKNOWN;

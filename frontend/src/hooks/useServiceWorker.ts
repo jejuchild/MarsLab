@@ -93,9 +93,7 @@ export default function useServiceWorker(): ServiceWorkerState {
           setIsUpdateAvailable(true);
         }
       })
-      .catch((err) => {
-        console.warn("[MarsLab] Service worker registration failed:", err);
-      });
+      .catch(() => {});
 
     // When the new SW takes over, reload the page for a clean state
     let refreshing = false;

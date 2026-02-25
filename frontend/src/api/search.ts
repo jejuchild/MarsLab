@@ -68,6 +68,15 @@ export interface ExistsResponse {
   instrument: Instrument;
 }
 
+async function parseErrorDetail(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = await res.json() as { detail?: string; error?: string };
+    return body.detail || body.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 // =============================================================================
 // Search API
 // =============================================================================
@@ -96,8 +105,7 @@ export async function searchProducts(
   const res = await fetch(`/api/search?${params}`);
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Search failed" }));
-    throw new Error(error.detail || "Search failed");
+    throw new Error(await parseErrorDetail(res, "Search failed"));
   }
 
   return res.json();
@@ -140,8 +148,7 @@ export async function searchSpatial(
   const res = await fetch(`/api/search/spatial?${params}`);
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Spatial search failed" }));
-    throw new Error(error.detail || "Spatial search failed");
+    throw new Error(await parseErrorDetail(res, "Spatial search failed"));
   }
 
   return res.json();
@@ -205,8 +212,7 @@ export async function startDownload(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Download failed" }));
-    throw new Error(error.detail || "Download failed");
+    throw new Error(await parseErrorDetail(res, "Download failed"));
   }
 
   return res.json();
@@ -366,8 +372,7 @@ export async function retryDownload(taskId: string): Promise<DownloadTask> {
     method: "POST",
   });
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Retry failed" }));
-    throw new Error(error.detail || "Retry failed");
+    throw new Error(await parseErrorDetail(res, "Retry failed"));
   }
   return res.json();
 }
@@ -464,8 +469,7 @@ export async function aiSearch(query: string, maxResults: number = 10): Promise<
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "AI search failed" }));
-    throw new Error(error.detail || "AI search failed");
+    throw new Error(await parseErrorDetail(res, "AI search failed"));
   }
 
   return res.json();
@@ -551,8 +555,7 @@ export async function geminiPreview(query: string, maxResults: number = 20): Pro
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Gemini preview failed" }));
-    throw new Error(error.detail || "Gemini preview failed");
+    throw new Error(await parseErrorDetail(res, "Gemini preview failed"));
   }
 
   return res.json();
@@ -577,8 +580,7 @@ export async function geminiExecute(query: string, maxResults: number = 20, plan
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Gemini search failed" }));
-    throw new Error(error.detail || "Gemini search failed");
+    throw new Error(await parseErrorDetail(res, "Gemini search failed"));
   }
 
   return res.json();
@@ -646,8 +648,7 @@ export async function searchByPoint(
   const res = await fetch(`/api/search/point?${params}`);
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Point search failed" }));
-    throw new Error(error.detail || error.error || "Point search failed");
+    throw new Error(await parseErrorDetail(res, "Point search failed"));
   }
 
   return res.json();
@@ -698,8 +699,7 @@ export async function searchProximity(
 
   const res = await fetch(`/api/proximity/search?${params}`);
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Proximity search failed" }));
-    throw new Error(error.detail || "Proximity search failed");
+    throw new Error(await parseErrorDetail(res, "Proximity search failed"));
   }
   return res.json();
 }
@@ -819,8 +819,7 @@ export async function startSmartSearch(
     body: JSON.stringify({ query, max_results: maxResults }),
   });
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: "Smart search failed" }));
-    throw new Error(error.detail || "Smart search failed");
+    throw new Error(await parseErrorDetail(res, "Smart search failed"));
   }
   return res.json();
 }

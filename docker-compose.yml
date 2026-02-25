@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/hirise_data:/app/hirise_data
+      - ./backend/crism_data:/app/crism_data
+      - ./backend/sharad_data:/app/sharad_data
+    restart: unless-stopped
+
+  frontend:
+    image: node:20-slim
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm install && npm run dev -- --host"
+    depends_on:
+      - backend

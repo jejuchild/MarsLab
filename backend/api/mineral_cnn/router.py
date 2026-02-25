@@ -19,6 +19,8 @@ from PIL import Image
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse, Response, JSONResponse
 
+from api.validation import validate_product_id
+
 from .pipeline import (
     run_classification, has_cached_result, load_cached_result, _result_dir,
 )
@@ -28,6 +30,13 @@ from .constants import CLASS_NAME, CONFIDENCE_THRESHOLD, RESULTS_DIR, GROUPS_UM
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/mineral-cnn", tags=["CNN Mineral Classification"])
+
+
+def _validate_obs_id_or_400(obs_id: str) -> str:
+    try:
+        return validate_product_id(obs_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid observation ID")
 
 
 # ============================================================
@@ -42,6 +51,8 @@ async def classify_observation(
     Run CNN mineral classification on a CRISM TRR3 observation.
     Returns an SSE stream with progress events.
     """
+    obs_id = _validate_obs_id_or_400(obs_id)
+
     async def event_generator():
         async for event in run_classification(obs_id, force=force):
             yield f"data: {json.dumps(event)}\n\n"
@@ -69,6 +80,8 @@ async def acquire_observation(
     Full pipeline: download TRR3+DDR from ODE, run JCAT+CNN, generate quickview, update index.
     Returns an SSE stream with progress events.
     """
+    obs_id = _validate_obs_id_or_400(obs_id)
+
     from .acquire import acquire_and_classify
 
     async def event_generator():
@@ -92,6 +105,8 @@ async def acquire_observation(
 @router.get("/acquire/{obs_id}/status")
 async def acquire_status(obs_id: str):
     """Check if TRR3 data exists locally and if classification results are cached."""
+    obs_id = _validate_obs_id_or_400(obs_id)
+
     from .acquire import check_acquire_status
     try:
         return JSONResponse(check_acquire_status(obs_id))
@@ -105,6 +120,8 @@ async def acquire_status(obs_id: str):
 @router.get("/result/{obs_id}/stats")
 async def get_result_stats(obs_id: str):
     """Get classification summary statistics."""
+    obs_id = _validate_obs_id_or_400(obs_id)
+
     try:
         if not has_cached_result(obs_id):
             raise HTTPException(
@@ -186,6 +203,8 @@ _MINERAL_COLORS = {
 @router.get("/result/{obs_id}/mineral-map.png")
 async def get_mineral_map_png(obs_id: str):
     """Serve colored PNG mineral classification map."""
+    obs_id = _validate_obs_id_or_400(obs_id)
+
     try:
         _ = has_cached_result(obs_id)  # validates obs_id
     except ValueError as e:
@@ -243,6 +262,8 @@ async def get_mineral_map_png(obs_id: str):
 @router.get("/result/{obs_id}/confidence-map.png")
 async def get_confidence_map_png(obs_id: str):
     """Serve grayscale PNG confidence map (brighter = higher confidence)."""
+    obs_id = _validate_obs_id_or_400(obs_id)
+
     try:
         _ = has_cached_result(obs_id)  # validates obs_id
     except ValueError as e:
@@ -294,6 +315,8 @@ async def get_pixel_classification(
     sample: int = Query(..., description="Column index (0-based)"),
 ):
     """Query CNN classification for a single pixel."""
+    obs_id = _validate_obs_id_or_400(obs_id)
+
     try:
         cached = has_cached_result(obs_id)
     except ValueError as e:
@@ -370,6 +393,8 @@ async def get_status():
 @router.get("/result/{obs_id}/legend")
 async def get_mineral_legend(obs_id: str):
     """Get the color legend for a classified observation's mineral map."""
+    obs_id = _validate_obs_id_or_400(obs_id)
+
     try:
         cached = has_cached_result(obs_id)
     except ValueError as e:
@@ -400,9 +425,7 @@ async def get_mineral_legend(obs_id: str):
 @router.get("/quickview/{obs_id}")
 async def get_trr3_quickview(obs_id: str, band: int = Query(None, description="Band index (0-based). Default: middle VNIR band")):
     """Serve a grayscale PNG quickview from a TRR3 VNIR band."""
-    import re
-    if not re.match(r'^[a-zA-Z0-9_]+$', obs_id):
-        raise HTTPException(status_code=400, detail="Invalid obs_id")
+    obs_id = _validate_obs_id_or_400(obs_id)
 
     from .constants import TRR_DATA_DIR
 

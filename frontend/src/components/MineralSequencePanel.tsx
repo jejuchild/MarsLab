@@ -110,8 +110,9 @@ export default function MineralSequencePanel({
         const data = await fetchMineralSequence(obsId, dir, off);
         setResult(data);
         lastRunRef.current = { direction: dir, offset: off };
-      } catch (e: any) {
-        setError(e.message || "Analysis failed");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Analysis failed";
+        setError(msg);
       } finally {
         setLoading(false);
       }

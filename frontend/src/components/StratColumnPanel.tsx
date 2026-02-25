@@ -100,8 +100,9 @@ export default function StratColumnPanel({
         const data = await fetchStratColumn(lat, lon, diameter_km || 0, buf, crism, sharad);
         setResult(data);
         lastRunRef.current = { bufferKm: buf, includeCrism: crism, includeSharad: sharad };
-      } catch (e: any) {
-        setError(e.message || "Analysis failed");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Analysis failed";
+        setError(msg);
       } finally {
         setLoading(false);
       }

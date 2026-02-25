@@ -97,6 +97,7 @@ export default function LineProfile({
 
   useEffect(() => {
     const controller = new AbortController();
+    let cancelled = false;
 
     async function fetchProfile() {
       setLoading(true);
@@ -147,6 +148,7 @@ export default function LineProfile({
           lon: p.lon,
         }));
 
+        if (cancelled) return;
         setData({
           profile,
           total_distance_km: json.total_distance_km,
@@ -154,17 +156,20 @@ export default function LineProfile({
           start: json.start,
           end: json.end,
         });
-      } catch (e: any) {
-        if (e.name !== "AbortError") {
+      } catch (e: unknown) {
+        if (!cancelled && e instanceof Error && e.name !== "AbortError") {
           setError(e.message ?? "Unknown error");
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchProfile();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [startPoint.lat, startPoint.lon, endPoint.lat, endPoint.lon]);
 
   // Compute elevation range for chart domain

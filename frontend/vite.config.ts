@@ -1,9 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    ...(process.env.ANALYZE ? [visualizer({ open: true, filename: "dist/stats.html" })] : []),
+  ],
 
   build: {
     // Disable modulepreload polyfill — stops preloading ALL vendor chunks (5.4MB)

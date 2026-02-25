@@ -9,6 +9,7 @@ from PIL import Image
 from .resolver import resolve_crism_paths
 from .loader import load_cube, load_wavelength
 from .rgb import make_rgb, IGNORE_VALUE
+from api.validation import validate_product_id
 print("🔥 CRISM ROUTER LOADED 🔥")
 
 router = APIRouter(tags=["CRISM"])
@@ -22,6 +23,11 @@ class RGBRequest(BaseModel):
 
 @router.post("/{product_id}/rgb")
 def crism_rgb(product_id: str, req: RGBRequest):
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     try:
         print("[CRISM RGB] product_id =", product_id)
         hdr, img, wv = resolve_crism_paths(product_id)
@@ -74,6 +80,11 @@ def crism_spectrum(product_id: str, req: SpectrumRequest):
     Get the spectrum (reflectance vs wavelength) for a single pixel.
     Returns wavelengths (in micrometers) and reflectance values.
     """
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     try:
         print(f"[CRISM Spectrum] product_id={product_id}, line={req.line}, sample={req.sample}")
         hdr, img, wv = resolve_crism_paths(product_id)

@@ -150,6 +150,7 @@ export default function SlopeAnalysis({
 
   useEffect(() => {
     const controller = new AbortController();
+    let cancelled = false;
 
     async function fetchSlope() {
       setLoading(true);
@@ -170,23 +171,27 @@ export default function SlopeAnalysis({
           throw new Error(body?.error || `HTTP ${res.status}`);
         }
         const json: SlopeStats = await res.json();
-        setData(json);
-      } catch (e: any) {
-        if (e.name !== "AbortError") {
+        if (!cancelled) setData(json);
+      } catch (e: unknown) {
+        if (!cancelled && e instanceof Error && e.name !== "AbortError") {
           setError(e.message ?? "Unknown error");
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchSlope();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [point.lat, point.lon, radiusM]);
 
   // Fetch thermal inertia
   useEffect(() => {
     const controller = new AbortController();
+    let cancelled = false;
 
     async function fetchTI() {
       setTiLoading(true);
@@ -202,17 +207,20 @@ export default function SlopeAnalysis({
         });
         if (res.ok) {
           const json: ThermalInertia = await res.json();
-          setTiData(json);
+          if (!cancelled) setTiData(json);
         }
       } catch {
         // Silently ignore -- thermal inertia is supplemental
       } finally {
-        setTiLoading(false);
+        if (!cancelled) setTiLoading(false);
       }
     }
 
     fetchTI();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [point.lat, point.lon]);
 
   return (

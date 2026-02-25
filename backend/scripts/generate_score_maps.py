@@ -306,8 +306,8 @@ def main():
             with open(STATS_FILE, "r") as f:
                 all_stats = json.load(f)
             print(f"[INFO] Loaded existing stats for {len(all_stats)} observations")
-        except:
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"[WARN] Failed to load existing stats: {e}")
 
     gen_count = 0
     skip_count = 0

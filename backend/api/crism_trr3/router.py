@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from .loader import get_cube_memmap, get_shape, get_wavelengths, get_pixel_spectrum
 from api.crism.rgb import nearest_band
 from api.mineral_cnn.constants import FILL_VALUE
+from api.validation import validate_product_id
 
 router = APIRouter(prefix="/api/crism-trr3", tags=["CRISM TRR3"])
 
@@ -24,6 +25,10 @@ _OBS_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
 
 def _validate_obs_id(obs_id: str):
     if not _OBS_ID_PATTERN.match(obs_id):
+        raise HTTPException(status_code=400, detail="Invalid observation ID")
+    try:
+        validate_product_id(obs_id)
+    except ValueError:
         raise HTTPException(status_code=400, detail="Invalid observation ID")
 
 

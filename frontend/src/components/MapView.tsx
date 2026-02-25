@@ -4,20 +4,18 @@ import toast from "react-hot-toast";
 import * as Cesium from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import FootprintManager from "../utils/FootprintManager";
+import { LRUMap } from "../utils/LRUMap";
 import { normalizeLonForMap } from "../utils/coordinates";
-import DTMHoverReadout, { type DTMHoverReadoutHandle } from "./DTMHoverReadout";
-import MeasurementTools from "./MeasurementTools";
+import MapToolbar from "./map/MapToolbar";
 import {
   loadDTMElevationGrid,
-  getElevationFromGrid,
-  isWithinDTMBounds,
   throttle,
-  type DTMElevationGrid,
 } from "../utils/dtmHover";
 import type { FieldNote } from "../api/fieldnotes";
 import { computeOverlapFilter, type OverlapResult, type OverlapStats } from "../utils/overlapFilter";
 import type { InstrumentType as FPInstrumentType } from "../utils/FootprintManager";
 import { getInstrumentCesiumColor } from "../config/instrumentRegistry";
+import useDTMHover from "../hooks/useDTMHover";
 
 
 /* ==================================================
@@ -213,7 +211,7 @@ const FIELDNOTE_COLORS: Record<string, string> = {
 };
 
 // Create a canvas-based icon for field note marker (cached per instrument)
-const _fieldNoteIconCache = new Map<string, string>();
+const _fieldNoteIconCache = new LRUMap<string, string>(64);
 function createFieldNoteIcon(instrument: string): string {
   const cached = _fieldNoteIconCache.get(instrument);
   if (cached) return cached;
@@ -288,7 +286,8 @@ const normalizeLonTo180 = normalizeLonForMap;
 function extractCrismObsId(productId: string): string {
   // Match 3 letters followed by 8 hex digits at the start
   const match = productId.match(/^([a-z]{3}[0-9a-f]{8})/i);
-  return match ? match[1].toLowerCase() : productId.toLowerCase();
+  const obsId = match?.[1];
+  return obsId ? obsId.toLowerCase() : productId.toLowerCase();
 }
 
 /* ==================================================
@@ -307,7 +306,7 @@ interface ProductBounds {
   lines?: number;
   samples?: number;
 }
-const boundsCache = new Map<string, ProductBounds>();
+const boundsCache = new LRUMap<string, ProductBounds>(500);
 
 async function loadHiRISELBL(id: string): Promise<string | null> {
   if (hiriseLBLCache.has(id)) return hiriseLBLCache.get(id)!;
@@ -358,16 +357,36 @@ async function loadCRISMLBL(id: string): Promise<string | null> {
   return null;
 }
 
+type GeoJsonIndexFeature = {
+  properties?: {
+    product_id?: string;
+    west?: number;
+    east?: number;
+    south?: number;
+    north?: number;
+  };
+  geometry?: {
+    coordinates?: number[][][];
+  };
+};
+
+type GeoJsonIndex = {
+  features?: GeoJsonIndexFeature[];
+};
+
 // Cache for HiRISE DTM index
-let hiriseDTMIndexCache: any = null;
+let hiriseDTMIndexCache: GeoJsonIndex | null = null;
 // Cache for CRISM TRR3 index
-let crismTRR3IndexCache: any = null;
+let crismTRR3IndexCache: GeoJsonIndex | null = null;
 
 // Compute bounding box from GeoJSON polygon coordinates
 function boundsFromPolygon(coords: number[][]): ProductBounds | null {
   if (!coords || coords.length < 3) return null;
   let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
-  for (const [lon, lat] of coords) {
+  for (const pair of coords) {
+    const lon = pair[0];
+    const lat = pair[1];
+    if (lon == null || lat == null) continue;
     if (lon < west) west = lon;
     if (lon > east) east = lon;
     if (lat < south) south = lat;
@@ -402,6 +421,14 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
       for (const feature of hiriseDTMIndexCache.features) {
         if (feature.properties?.product_id === productId) {
           const props = feature.properties;
+          if (
+            props.west == null ||
+            props.east == null ||
+            props.south == null ||
+            props.north == null
+          ) {
+            continue;
+          }
           const bounds: ProductBounds = {
             west: props.west,
             east: props.east,
@@ -434,6 +461,7 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
       for (const feature of crismTRR3IndexCache.features) {
         if (feature.properties?.product_id === productId) {
           const coords = feature.geometry?.coordinates?.[0];
+          if (!coords) continue;
           const bounds = boundsFromPolygon(coords);
           if (bounds) {
             boundsCache.set(productId, bounds);
@@ -483,8 +511,10 @@ function getFootprintBounds(viewer: Cesium.Viewer, productId: string): ProductBo
     const ent = viewer.entities.getById(`${prefix}_FP_${productId}`);
     if (!ent?.rectangle?.coordinates) continue;
     try {
-      const rect = (ent.rectangle.coordinates as any).getValue?.(Cesium.JulianDate.now()) ??
-                   (ent.rectangle.coordinates as any);
+      const coords = ent.rectangle.coordinates;
+      const rect = coords instanceof Cesium.ConstantProperty
+        ? coords.getValue(Cesium.JulianDate.now())
+        : coords;
       if (rect instanceof Cesium.Rectangle) {
         const bounds: ProductBounds = {
           west: Cesium.Math.toDegrees(rect.west),
@@ -510,7 +540,7 @@ type HighlightState = {
   rectEnt: Cesium.Entity | null;
   labelEnt: Cesium.Entity | null;
   pointEnt: Cesium.Entity | null;
-  origRectMaterial: any;
+  origRectMaterial: Cesium.MaterialProperty | undefined;
   origOutlineColor: Cesium.Color | undefined;
   origLabelScale: number | undefined;
   origPointSize: number | undefined;
@@ -717,28 +747,18 @@ export default function MapView({
   const olympusMonsClickCountRef = useRef(0);
   const olympusMonsClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // DTM Hover System - refs for performance (no re-renders on hover)
-  const dtmHoverReadoutRef = useRef<DTMHoverReadoutHandle>(null);
-  const dtmHoverMarkerRef = useRef<Cesium.Entity | null>(null);
-  const dtmGridCacheRef = useRef<Map<string, DTMElevationGrid>>(new Map());
-  const DTM_GRID_CACHE_MAX = 4;
-  const setDtmGrid = useCallback((productId: string, grid: DTMElevationGrid) => {
-    const cache = dtmGridCacheRef.current;
-    cache.set(productId, grid);
-    // Evict oldest entries if cache exceeds limit (keep active product)
-    if (cache.size > DTM_GRID_CACHE_MAX) {
-      const active = activeDTMProductRef.current;
-      for (const key of cache.keys()) {
-        if (key !== active && key !== productId) {
-          cache.delete(key);
-          if (cache.size <= DTM_GRID_CACHE_MAX) break;
-        }
-      }
-    }
-  }, []);
-  const dtmHoverModeRef = useRef<"hover" | "click">("hover");
-  const [dtmHoverMode, setDtmHoverMode] = useState<"hover" | "click">("hover");
-  const activeDTMProductRef = useRef<string | null>(null);
+  const {
+    dtmHoverReadoutRef,
+    dtmGridCacheRef,
+    activeDTMProductRef,
+    dtmHoverMode,
+    setDtmGrid,
+    handleDTMHoverModeChange,
+    initializeDTMHover,
+  } = useDTMHover({
+    activeDTMProductId,
+    marsEllipsoid: MARS_ELLIPSOID,
+  });
   const showHiRISEDTMRef = useRef(showHiRISEDTM);
 
   // Keep refs in sync with props
@@ -809,7 +829,7 @@ export default function MapView({
     rectEnt: null,
     labelEnt: null,
     pointEnt: null,
-    origRectMaterial: null,
+    origRectMaterial: undefined,
     origOutlineColor: undefined,
     origLabelScale: undefined,
     origPointSize: undefined,
@@ -824,7 +844,8 @@ export default function MapView({
     if (!ref.current) return;
 
     try {
-      (Cesium as any).buildModuleUrl?.setBaseUrl?.("/cesium/");
+      const moduleUrl = Cesium as unknown as { buildModuleUrl?: { setBaseUrl?: (url: string) => void } };
+      moduleUrl.buildModuleUrl?.setBaseUrl?.("/cesium/");
     } catch {}
 
     const viewer = new Cesium.Viewer(ref.current, {
@@ -854,9 +875,7 @@ export default function MapView({
 
     // Suppress Cesium tile-load errors (network failures) so they don't
     // bubble up as unhandled rejections and crash the page.
-    viewer.scene.renderError.addEventListener((_scene: any, error: any) => {
-      console.warn("[Cesium] render error (suppressed):", error);
-    });
+    viewer.scene.renderError.addEventListener(() => {});
 
     viewer.scene.globe = new Cesium.Globe(MARS_ELLIPSOID);
     viewer.scene.globe.depthTestAgainstTerrain = false;
@@ -949,25 +968,27 @@ export default function MapView({
 
       const clearHighlight = () => {
         if (hs.rectEnt?.rectangle) {
-          hs.rectEnt.rectangle.material = hs.origRectMaterial;
+          if (hs.origRectMaterial) {
+            hs.rectEnt.rectangle.material = hs.origRectMaterial;
+          }
           if (hs.origOutlineColor && hs.rectEnt.rectangle.outlineColor) {
             hs.rectEnt.rectangle.outlineColor = new Cesium.ConstantProperty(
               hs.origOutlineColor
-            ) as any;
+            );
           }
         }
         if (hs.labelEnt?.label && typeof hs.origLabelScale === "number") {
-          (hs.labelEnt.label.scale as any) = hs.origLabelScale;
+          hs.labelEnt.label.scale = new Cesium.ConstantProperty(hs.origLabelScale);
         }
         if (hs.pointEnt?.point && typeof hs.origPointSize === "number") {
-          (hs.pointEnt.point.pixelSize as any) = hs.origPointSize;
+          hs.pointEnt.point.pixelSize = new Cesium.ConstantProperty(hs.origPointSize);
         }
 
         hs.key = null;
         hs.rectEnt = null;
         hs.labelEnt = null;
         hs.pointEnt = null;
-        hs.origRectMaterial = null;
+        hs.origRectMaterial = undefined;
         hs.origOutlineColor = undefined;
         hs.origLabelScale = undefined;
         hs.origPointSize = undefined;
@@ -992,8 +1013,7 @@ export default function MapView({
               null;
           }
 
-          const rectTarget =
-            rectFallback && (rectFallback as any).rectangle ? rectFallback : null;
+          const rectTarget = rectFallback?.rectangle ? rectFallback : null;
 
           const labelEnt = inst === "CUSTOM"
             ? viewer.entities.getById(`CUSTOM_LABEL_${pid}`) || null
@@ -1013,10 +1033,7 @@ export default function MapView({
             hs.rectEnt = rectTarget;
             hs.origRectMaterial = rectTarget.rectangle.material;
 
-            const ocAny: any = rectTarget.rectangle.outlineColor;
-            const ocVal =
-              ocAny?.getValue?.(Cesium.JulianDate.now()) ??
-              (ocAny instanceof Cesium.Color ? ocAny : undefined);
+            const ocVal = rectTarget.rectangle.outlineColor?.getValue?.(Cesium.JulianDate.now());
             if (ocVal instanceof Cesium.Color) {
               hs.origOutlineColor = ocVal;
             }
@@ -1025,20 +1042,20 @@ export default function MapView({
 
             rectTarget.rectangle.outlineColor = new Cesium.ConstantProperty(
               Cesium.Color.WHITE
-            ) as any;
+            );
 
             if (labelEnt?.label) {
               hs.labelEnt = labelEnt;
-              const cur = (labelEnt.label.scale as any);
+              const cur = labelEnt.label.scale?.getValue?.(Cesium.JulianDate.now());
               hs.origLabelScale = typeof cur === "number" ? cur : 1.0;
-              (labelEnt.label.scale as any) = 1.2;
+              labelEnt.label.scale = new Cesium.ConstantProperty(1.2);
             }
 
             if (pointEnt?.point) {
               hs.pointEnt = pointEnt;
-              const cur = (pointEnt.point.pixelSize as any);
+              const cur = pointEnt.point.pixelSize?.getValue?.(Cesium.JulianDate.now());
               hs.origPointSize = typeof cur === "number" ? cur : 6;
-              (pointEnt.point.pixelSize as any) = (hs.origPointSize ?? 6) + 2;
+              pointEnt.point.pixelSize = new Cesium.ConstantProperty((hs.origPointSize ?? 6) + 2);
             }
 
             onHoverProductRef.current?.(pid);
@@ -1125,7 +1142,9 @@ export default function MapView({
             const north = Cesium.Math.toDegrees(rect.north);
 
             if (clickLon >= west && clickLon <= east && clickLat >= south && clickLat <= north) {
-              const instrument = (overlayEnt.properties as any)?.instrument?.getValue?.() as InstrumentType;
+              const instrumentProp =
+                (overlayEnt.properties as unknown as { instrument?: Cesium.Property })?.instrument;
+              const instrument = instrumentProp?.getValue(Cesium.JulianDate.now()) as InstrumentType | undefined;
               overlayProduct = { productId, instrument: instrument || (productId.startsWith("ESP_") ? "HIRISE" : "CRISM") };
               break;
             }
@@ -1186,8 +1205,7 @@ export default function MapView({
                   pixelSample = Math.max(0, Math.min(shape.cols - 1, pixelSample));
                 }
               }
-            } catch (e) {
-              console.warn("[TRR3] Failed to get shape for pixel coords:", e);
+            } catch {
             }
           }
 
@@ -1450,102 +1468,12 @@ export default function MapView({
       Cesium.ScreenSpaceEventType.LEFT_CLICK
     );
 
-    // ========================================
-    // DTM Hover System - Fast elevation probe
-    // ========================================
-
-    // Create persistent hover marker (billboard) - created ONCE
-    const dtmHoverMarker = viewer.entities.add({
-      id: "DTM_HOVER_MARKER",
-      position: Cesium.Cartesian3.fromDegrees(0, 0, 0),
-      billboard: {
-        image: (() => {
-          // Create a small crosshair canvas
-          const canvas = document.createElement("canvas");
-          canvas.width = 24;
-          canvas.height = 24;
-          const ctx = canvas.getContext("2d")!;
-          ctx.strokeStyle = "#f59e0b"; // amber-500
-          ctx.lineWidth = 2;
-          // Outer circle
-          ctx.beginPath();
-          ctx.arc(12, 12, 8, 0, Math.PI * 2);
-          ctx.stroke();
-          // Crosshair
-          ctx.beginPath();
-          ctx.moveTo(12, 2);
-          ctx.lineTo(12, 6);
-          ctx.moveTo(12, 18);
-          ctx.lineTo(12, 22);
-          ctx.moveTo(2, 12);
-          ctx.lineTo(6, 12);
-          ctx.moveTo(18, 12);
-          ctx.lineTo(22, 12);
-          ctx.stroke();
-          // Center dot
-          ctx.fillStyle = "#f59e0b";
-          ctx.beginPath();
-          ctx.arc(12, 12, 2, 0, Math.PI * 2);
-          ctx.fill();
-          return canvas;
-        })(),
-        scale: 1.0,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-      show: false, // Hidden by default
-    });
-    dtmHoverMarkerRef.current = dtmHoverMarker;
-
-    // Throttled DTM hover handler (25 Hz = 40ms)
-    const dtmHoverHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    const throttledDTMHover = throttle((endPosition: Cesium.Cartesian2) => {
-      if (dtmHoverModeRef.current !== "hover") return;
-
-      const cartesian = viewer.camera.pickEllipsoid(endPosition, MARS_ELLIPSOID);
-      if (!cartesian) {
-        dtmHoverMarker.show = false;
-        dtmHoverReadoutRef.current?.hide();
-        return;
-      }
-
-      const carto = Cesium.Cartographic.fromCartesian(cartesian);
-      const lat = Cesium.Math.toDegrees(carto.latitude);
-      const lon = Cesium.Math.toDegrees(carto.longitude);
-
-      // Check if we're over any DTM footprint with a cached grid
-      const grid = dtmGridCacheRef.current.get(activeDTMProductRef.current || "");
-      if (!grid || !isWithinDTMBounds(grid, lat, lon)) {
-        dtmHoverMarker.show = false;
-        dtmHoverReadoutRef.current?.hide();
-        return;
-      }
-
-      // O(1) elevation lookup
-      const elevation = getElevationFromGrid(grid, lat, lon);
-
-      // Update marker position (no entity recreation)
-      dtmHoverMarker.position = Cesium.Cartesian3.fromDegrees(lon, lat, 0) as any;
-      dtmHoverMarker.show = true;
-
-      // Update readout (via ref, no React re-render)
-      dtmHoverReadoutRef.current?.update(lat, lon, elevation, grid.productId);
-
-      viewer.scene.requestRender();
-    }, 40);
-
-    dtmHoverHandler.setInputAction(
-      (m: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
-        throttledDTMHover(m.endPosition);
-      },
-      Cesium.ScreenSpaceEventType.MOUSE_MOVE
-    );
+    const cleanupDTMHover = initializeDTMHover(viewer);
 
     return () => {
       hoverHandler.destroy();
       clickHandler.destroy();
-      dtmHoverHandler.destroy();
+      cleanupDTMHover();
       // Dispose FootprintManager
       if (footprintManagerRef.current) {
         footprintManagerRef.current.dispose();
@@ -1827,15 +1755,11 @@ export default function MapView({
     // the visibility effect doesn't re-run (show state unchanged)
     (async () => {
       try {
-        console.log(`[MapView] Loading ${instrument} footprints...`);
         const result = await fm.loadFootprints(instrument);
         if (cancelled) return;
-        console.log(`[MapView] ${instrument} load result:`, result);
         if (result && result.count > 0) {
           fm.setVisible(instrument, true);
           setFootprintVersion(v => v + 1);
-        } else {
-          console.warn(`[MapView] ${instrument}: no footprints found in viewport`);
         }
       } catch (e) {
         if (!cancelled) toast.error(`Failed to load ${instrument} footprints`);
@@ -2356,7 +2280,6 @@ export default function MapView({
           : await loadCRISMLBL(pid);
 
         if (!lbl) {
-          console.warn("[FlyTo] No LBL found for", pid);
           onFlyToComplete?.();
           return;
         }
@@ -2437,7 +2360,6 @@ export default function MapView({
         }
       }
 
-      console.warn("[FlyTo] Could not find entity or LBL for", pid);
       onFlyToComplete?.();
     }
 
@@ -2488,23 +2410,23 @@ export default function MapView({
     if (entity.rectangle) {
       entity.rectangle.material = new Cesium.ColorMaterialProperty(
         Cesium.Color.MAGENTA.withAlpha(0.7)
-      ) as any;
-      entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE) as any;
-      entity.rectangle.outlineWidth = new Cesium.ConstantProperty(3) as any;
+      );
+      entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE);
+      entity.rectangle.outlineWidth = new Cesium.ConstantProperty(3);
     }
     // Also handle polyline entities (SHARAD)
     if (entity.polyline) {
       const origPolyMaterial = entity.polyline.material;
       const origPolyWidth = entity.polyline.width;
-      entity.polyline.material = new Cesium.ColorMaterialProperty(Cesium.Color.MAGENTA) as any;
-      entity.polyline.width = new Cesium.ConstantProperty(5) as any;
+      entity.polyline.material = new Cesium.ColorMaterialProperty(Cesium.Color.MAGENTA);
+      entity.polyline.width = new Cesium.ConstantProperty(5);
 
       viewer.scene.requestRender();
 
       const timer = setTimeout(() => {
         if (entity?.polyline) {
-          entity.polyline.material = origPolyMaterial as any;
-          entity.polyline.width = origPolyWidth as any;
+          entity.polyline.material = origPolyMaterial;
+          entity.polyline.width = origPolyWidth;
         }
         viewer.scene.requestRender();
         onHighlightComplete?.();
@@ -2517,9 +2439,9 @@ export default function MapView({
     // Restore after 3 seconds
     const timer = setTimeout(() => {
       if (entity?.rectangle) {
-        entity.rectangle.material = origMaterial as any;
-        entity.rectangle.outlineColor = origOutline as any;
-        entity.rectangle.outlineWidth = origOutlineWidth as any;
+        if (origMaterial) entity.rectangle.material = origMaterial;
+        if (origOutline) entity.rectangle.outlineColor = origOutline;
+        if (origOutlineWidth) entity.rectangle.outlineWidth = origOutlineWidth;
       }
       viewer.scene.requestRender();
       onHighlightComplete?.();
@@ -2655,12 +2577,19 @@ export default function MapView({
     const getCTXTileInfo = (productId: string): { tileUrl: string; west: number; south: number; east: number; north: number } | null => {
       const fpEnt = viewer.entities.getById(`CTX_FP_${productId}`);
       if (!fpEnt?.properties) return null;
-      const p = fpEnt.properties as any;
-      const tileUrl = p.tile_url?.getValue?.();
-      const west = p.bbox_west?.getValue?.();
-      const south = p.bbox_south?.getValue?.();
-      const east = p.bbox_east?.getValue?.();
-      const north = p.bbox_north?.getValue?.();
+      const props = fpEnt.properties as unknown as {
+        tile_url?: Cesium.Property;
+        bbox_west?: Cesium.Property;
+        bbox_south?: Cesium.Property;
+        bbox_east?: Cesium.Property;
+        bbox_north?: Cesium.Property;
+      };
+      const now = Cesium.JulianDate.now();
+      const tileUrl = props.tile_url?.getValue(now) as string | undefined;
+      const west = props.bbox_west?.getValue(now) as number | undefined;
+      const south = props.bbox_south?.getValue(now) as number | undefined;
+      const east = props.bbox_east?.getValue(now) as number | undefined;
+      const north = props.bbox_north?.getValue(now) as number | undefined;
       if (!tileUrl || west == null || south == null || east == null || north == null) return null;
       return { tileUrl, west, south, east, north };
     };
@@ -2776,10 +2705,8 @@ export default function MapView({
           // Fallback: extract bounds from existing footprint entity
           if (!bounds && viewerRef.current) {
             bounds = getFootprintBounds(viewerRef.current, productId);
-            if (bounds) console.warn(`[Overlay] Using footprint bounds fallback for ${productId}`);
           }
           if (!bounds || !viewerRef.current) {
-            console.warn(`[Overlay] No bounds for quickview: ${productId}`);
             return null;
           }
 
@@ -2939,10 +2866,8 @@ export default function MapView({
           let bounds = await getProductBounds(productId);
           if (!bounds && viewerRef.current) {
             bounds = getFootprintBounds(viewerRef.current, productId);
-            if (bounds) console.warn(`[Overlay] Using footprint bounds fallback for ${productId}`);
           }
           if (!bounds || !viewerRef.current) {
-            console.warn(`[Overlay] No bounds for highres: ${productId}`);
             return null;
           }
 
@@ -3111,7 +3036,6 @@ export default function MapView({
           let bounds = await getProductBounds(productId);
           if (!bounds && viewerRef.current) {
             bounds = getFootprintBounds(viewerRef.current, productId);
-            if (bounds) console.warn(`[Browse] Using footprint bounds fallback for ${productId}`);
           }
 
           if (bounds) {
@@ -3123,7 +3047,6 @@ export default function MapView({
             // Last resort: try LBL directly
             const lbl = await loadCRISMLBL(productId);
             if (!lbl) {
-              console.warn("[Browse] No bounds for", productId);
               continue;
             }
 
@@ -3133,7 +3056,6 @@ export default function MapView({
             const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
 
             if (minLat == null || maxLat == null || westLon360 == null || eastLon360 == null) {
-              console.warn("[Browse] Missing bounds for", productId);
               continue;
             }
 
@@ -3151,7 +3073,6 @@ export default function MapView({
           // Pre-validate image exists to avoid gray rectangles
           const headRes = await fetch(imageUrl, { method: "HEAD" });
           if (!headRes.ok) {
-            console.warn(`[Browse] Image not found: ${imageUrl}`);
             continue;
           }
 
@@ -3233,21 +3154,19 @@ export default function MapView({
 
         try {
           // Load LBL for bounds
-          const lbl = await loadCRISMLBL(productId);
-          if (!lbl) {
-            console.warn("[Score] No LBL for", productId);
-            continue;
-          }
+            const lbl = await loadCRISMLBL(productId);
+            if (!lbl) {
+              continue;
+            }
 
           const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
           const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
           const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
           const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
 
-          if (minLat == null || maxLat == null || westLon360 == null || eastLon360 == null) {
-            console.warn("[Score] Missing bounds for", productId);
-            continue;
-          }
+            if (minLat == null || maxLat == null || westLon360 == null || eastLon360 == null) {
+              continue;
+            }
 
           const west = normalizeLonTo180(westLon360);
           const east = normalizeLonTo180(eastLon360);
@@ -3262,7 +3181,6 @@ export default function MapView({
           // Pre-validate image exists to avoid gray rectangles
           const headRes = await fetch(imageUrl, { method: "HEAD" });
           if (!headRes.ok) {
-            console.warn(`[Score] Image not found: ${imageUrl}`);
             continue;
           }
 
@@ -3814,13 +3732,13 @@ export default function MapView({
 
       if (highlighted) {
         entity.rectangle.material = getHiliteMaterial(instrument);
-        entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE) as any;
+        entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE);
       } else {
         // Restore to original light fill using instrument color
-        const rgb = getInstrumentCesiumColor(instrument.toLowerCase() as any);
+        const rgb = getInstrumentCesiumColor(instrument.toLowerCase());
         const baseColor = new Cesium.Color(rgb.r, rgb.g, rgb.b, 1.0);
         entity.rectangle.material = new Cesium.ColorMaterialProperty(baseColor.withAlpha(0.10));
-        entity.rectangle.outlineColor = new Cesium.ConstantProperty(baseColor) as any;
+        entity.rectangle.outlineColor = new Cesium.ConstantProperty(baseColor);
       }
     };
 
@@ -3860,13 +3778,13 @@ export default function MapView({
                      viewer.entities.getById(`${instrument}_LABEL_${hoveredProductId}`);
     if (labelEnt) {
       labelEnt.show = true;
-      if (labelEnt.label) (labelEnt.label.scale as any) = 1.3;
+      if (labelEnt.label) labelEnt.label.scale = new Cesium.ConstantProperty(1.3);
     }
 
     const pointEnt = viewer.entities.getById(`${instrument}_VP_POINT_${hoveredProductId}`) ||
                      viewer.entities.getById(`${instrument}_POINT_${hoveredProductId}`);
     if (pointEnt?.point) {
-      (pointEnt.point.pixelSize as any) = 10;
+      pointEnt.point.pixelSize = new Cesium.ConstantProperty(10);
     }
 
     viewer.scene.requestRender();
@@ -3882,11 +3800,11 @@ export default function MapView({
 
       if (labelEnt) {
         labelEnt.show = false;
-        if (labelEnt.label) (labelEnt.label.scale as any) = 1.0;
+        if (labelEnt.label) labelEnt.label.scale = new Cesium.ConstantProperty(1.0);
       }
 
       if (pointEnt?.point) {
-        (pointEnt.point.pixelSize as any) = 6;
+        pointEnt.point.pixelSize = new Cesium.ConstantProperty(6);
       }
 
       viewer.scene.requestRender();
@@ -4137,7 +4055,7 @@ export default function MapView({
               }
             }
           } catch (err) {
-            console.warn(`[FieldNotes] Failed to fetch coords for ${instrument}:`, err);
+            console.error(`[FieldNotes] Failed to fetch coords for ${instrument}:`, err);
           }
         })();
       }
@@ -4149,41 +4067,6 @@ export default function MapView({
       cancelled = true;
     };
   }, [fieldNotes]);
-
-  // Keep DTM hover mode ref in sync with state
-  useEffect(() => {
-    dtmHoverModeRef.current = dtmHoverMode;
-  }, [dtmHoverMode]);
-
-  // Sync activeDTMProductId prop with ref and load elevation grid
-  useEffect(() => {
-    if (activeDTMProductId) {
-      activeDTMProductRef.current = activeDTMProductId;
-
-      // Load elevation grid if not already cached
-      if (!dtmGridCacheRef.current.has(activeDTMProductId)) {
-        loadDTMElevationGrid(activeDTMProductId).then((grid) => {
-          if (grid) {
-            setDtmGrid(activeDTMProductId, grid);
-          }
-        });
-      }
-    } else {
-      activeDTMProductRef.current = null;
-    }
-  }, [activeDTMProductId]);
-
-  // Handle DTM hover mode change
-  const handleDTMHoverModeChange = useCallback((mode: "hover" | "click") => {
-    setDtmHoverMode(mode);
-    if (mode === "click") {
-      // Hide marker in click mode until clicked
-      if (dtmHoverMarkerRef.current) {
-        dtmHoverMarkerRef.current.show = false;
-      }
-      dtmHoverReadoutRef.current?.hide();
-    }
-  }, []);
 
   // ──────────── AI Analysis Pin + Radius Circle ────────────
   useEffect(() => {
@@ -4613,76 +4496,18 @@ export default function MapView({
 
   return (
     <>
-      <div ref={ref} className="absolute inset-0" />
-
-      {/* Coordinate Display */}
-      {hover && (
-        <div className="absolute bottom-6 left-6 rounded-lg border border-border-dark bg-bg-dark/90 p-3 backdrop-blur-md">
-          <div className="flex items-center gap-4">
-            <div className="space-y-1">
-              <div className="text-[9px] uppercase tracking-tighter text-slate-500">Longitude</div>
-              <div className="font-mono text-xs">{hover.lon.toFixed(4)}°</div>
-            </div>
-            <div className="h-6 w-px bg-border-dark" />
-            <div className="space-y-1">
-              <div className="text-[9px] uppercase tracking-tighter text-slate-500">Latitude</div>
-              <div className="font-mono text-xs">{hover.lat.toFixed(4)}°</div>
-            </div>
-          </div>
-        </div>
-      )}
+      <div ref={ref} className="absolute inset-0" role="application" aria-label="Mars 3D Globe" />
 
       {/* Footprint loading indicators moved to LayerPanel */}
-
-      {/* Score Overlay Legend */}
-      {scoreOverlays.size > 0 && (
-        <div className="absolute bottom-6 right-6 rounded-lg border border-border-dark bg-bg-dark/90 p-3 backdrop-blur-md">
-          {/* Determine which score types are active */}
-          {(() => {
-            const activeTypes = new Set<ScoreProductType>();
-            scoreOverlays.forEach((types) => types.forEach((t) => activeTypes.add(t)));
-            return (
-              <div className="space-y-2">
-                <div className="text-[9px] uppercase tracking-widest text-slate-500 font-bold">
-                  {activeTypes.has("score_ice") && activeTypes.has("score_hyd")
-                    ? "Ice / Hydration Score"
-                    : activeTypes.has("score_ice")
-                    ? "Ice Score"
-                    : "Hydration Score"}
-                </div>
-                {/* Gradient bar */}
-                <div
-                  className="h-2.5 w-40 rounded-sm border border-white/10"
-                  style={{
-                    background: "linear-gradient(to right, #ffffff 0%, #808080 25%, #000000 50%, #5a0000 75%, #b40000 100%)",
-                  }}
-                />
-                {/* Tick labels */}
-                <div className="flex justify-between text-[8px] font-mono text-slate-400 w-40">
-                  <span>0</span>
-                  <span>0.5</span>
-                  <span>1.0</span>
-                  <span>1.5</span>
-                  <span>2.0</span>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* DTM Hover Readout - shows elevation on hover */}
-      <DTMHoverReadout
-        ref={dtmHoverReadoutRef}
-        mode={dtmHoverMode}
-        onModeChange={handleDTMHoverModeChange}
-      />
-
-      {/* Measurement & Annotation Tools */}
-      <MeasurementTools
+      <MapToolbar
+        hover={hover}
+        scoreOverlays={scoreOverlays}
+        dtmHoverReadoutRef={dtmHoverReadoutRef}
+        dtmHoverMode={dtmHoverMode}
+        onDTMHoverModeChange={handleDTMHoverModeChange}
         viewer={viewerRef.current}
-        isVisible={showMeasurementTools}
-        onPinNote={onMeasurementPinNote}
+        showMeasurementTools={showMeasurementTools}
+        onMeasurementPinNote={onMeasurementPinNote}
       />
     </>
   );

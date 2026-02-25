@@ -126,8 +126,9 @@ export default function RegolithPanel({
           clutterMode: clutter,
         };
         onOverlayUpdate?.(data.overlay_segments);
-      } catch (e: any) {
-        setError(e.message || "Analysis failed");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Analysis failed";
+        setError(msg);
       } finally {
         setLoading(false);
       }

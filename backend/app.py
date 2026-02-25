@@ -1,14 +1,17 @@
 # app.py
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi.responses import JSONResponse  # ✅ (추가) CORS 확실히 타게 JSON으로 반환
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 import os
-import json  # ✅ (추가)
+import json
 import gzip
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
@@ -26,6 +29,17 @@ from PIL import Image
 from datetime import datetime
 
 from api.crism.processing import make_rgb
+from api.rate_limit import limiter
+from api.validation import validate_product_id
+# ======================================================
+# Logging configuration
+# ======================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("marslab")
 
 
 # ======================================================
@@ -38,13 +52,13 @@ async def _background_index_repair(app: FastAPI):
         repair_results = await repair_all_indices(app.state.http_session)
         total_added = sum(r.get("added", 0) for r in repair_results.values())
         if total_added > 0:
-            print(f"[REPAIR] Added {total_added} orphaned products to indices, refreshing caches...")
+            logger.info(f"[REPAIR] Added {total_added} orphaned products to indices, refreshing caches...")
             _preload_indices_parallel()  # Refresh in-memory caches
         for name, stats in repair_results.items():
             if stats.get("orphaned", 0) > 0:
-                print(f"[REPAIR] {name}: scanned={stats['scanned']}, orphaned={stats['orphaned']}, added={stats['added']}")
+                logger.info(f"[REPAIR] {name}: scanned={stats['scanned']}, orphaned={stats['orphaned']}, added={stats['added']}")
     except Exception as e:
-        print(f"[REPAIR] Index repair failed (non-fatal): {e}")
+        logger.warning(f"[REPAIR] Index repair failed (non-fatal): {e}")
 
 
 @asynccontextmanager
@@ -71,18 +85,31 @@ async def lifespan(app: FastAPI):
 # App init
 # ======================================================
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # GZip compression - compresses JSON responses (2.7MB CRISM → ~270KB)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# ✅ CORS: 명시적으로 (iframe + fetch 안정화)
+# CORS: restrict to known origins (use CORS_ORIGINS env var for production)
+ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -103,9 +130,9 @@ def _preload_geojson(key: str, path: str):
         _geojson_bytes_cache[key] = raw
         # Phase 2c: pre-compress gzip bytes at startup (avoid per-request gzip)
         _geojson_gz_cache[key] = gzip.compress(raw, compresslevel=6)
-        print(f"[CACHE] Preloaded {key}: {len(raw):,} bytes, gzip {len(_geojson_gz_cache[key]):,} bytes")
+        logger.info(f"[CACHE] Preloaded {key}: {len(raw):,} bytes, gzip {len(_geojson_gz_cache[key]):,} bytes")
     else:
-        print(f"[CACHE] Skipped {key}: {path} not found")
+        logger.info(f"[CACHE] Skipped {key}: {path} not found")
 
 # ======================================================
 # Phase 2c: Parallel startup - load all GeoJSON files concurrently
@@ -130,7 +157,7 @@ def _preload_indices_parallel():
         }
         for future in futures:
             future.result()  # propagate exceptions
-    print(f"[CACHE] All indices preloaded in parallel ({len(_geojson_cache)} total)")
+    logger.info(f"[CACHE] All indices preloaded in parallel ({len(_geojson_cache)} total)")
 
 
 def refresh_geojson_cache(instrument_key: str):
@@ -141,7 +168,7 @@ def refresh_geojson_cache(instrument_key: str):
     """
     path = _INDEX_FILES.get(instrument_key)
     if not path:
-        print(f"[CACHE] Unknown instrument key for refresh: {instrument_key}")
+        logger.warning(f"[CACHE] Unknown instrument key for refresh: {instrument_key}")
         return
     _preload_geojson(instrument_key, path)
     # Clear the footprints_router lru_cache so it picks up fresh data
@@ -150,7 +177,7 @@ def refresh_geojson_cache(instrument_key: str):
         load_geojson_index.cache_clear()
     except ImportError:
         pass
-    print(f"[CACHE] Refreshed {instrument_key} cache after download")
+    logger.info(f"[CACHE] Refreshed {instrument_key} cache after download")
 
 
 # ======================================================
@@ -338,12 +365,18 @@ def _cleanup_overlay_cache():
 _cleanup_overlay_cache()
 
 @app.get("/hirise/overlay/{product_id}.png")
-def get_hirise_overlay(product_id: str, max_size: int = 2048):
+@limiter.limit("20/minute")
+def get_hirise_overlay(request: Request, product_id: str, max_size: int = 2048):
     """
     Serve HiRISE image at reduced resolution with transparent background.
     Black pixels (DN=0) are made transparent.
     Uses disk cache for faster subsequent loads.
     """
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     # Check cache first
     cache_file = os.path.join(OVERLAY_CACHE_DIR, f"{product_id}_{max_size}.png")
     if os.path.exists(cache_file):
@@ -512,11 +545,17 @@ from api.strat_column_router import router as strat_column_router
 app.include_router(strat_column_router)  # /api/strat-column/* — Stratigraphic Column
 
 @app.get("/hirise/quickview/{product_id}.png")
-def get_hirise_quickview_transparent(product_id: str):
+@limiter.limit("20/minute")
+def get_hirise_quickview_transparent(request: Request, product_id: str):
     """
     Serve HiRISE quickview image with transparent background.
     Black pixels are made transparent.
     """
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     # Try JPG first (most common)
     jpg_path = os.path.join(BASE_DIR, "hirise_quickview", f"{product_id}.jpg")
     png_path = os.path.join(BASE_DIR, "hirise_quickview", f"{product_id}.png")
@@ -616,12 +655,18 @@ def _generate_trr3_quickview(trr_img_path: str, trr_lbl_path: str, cache_dir: st
 
 
 @app.get("/crism/quickview/{product_id}.png")
-def get_crism_quickview_transparent(product_id: str):
+@limiter.limit("20/minute")
+def get_crism_quickview_transparent(request: Request, product_id: str):
     """
     Serve CRISM quickview image with transparent background.
     Black pixels are made transparent.
     Searches multiple locations: crism_quickview/, crism_data/ browse images.
     """
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     obs_id = product_id.split("_")[0]  # e.g. frt00008a1e
     # base = obs_id + _NN (e.g. frt00008a1e_07)
     parts = product_id.split("_")
@@ -731,8 +776,14 @@ def get_sharad_index():
     raise HTTPException(status_code=404, detail="SHARAD index.geojson not found")
 
 @app.get("/sharad/quickview/{product_id}.jpg")
-def get_sharad_quickview(product_id: str):
+@limiter.limit("20/minute")
+def get_sharad_quickview(request: Request, product_id: str):
     """Serve SHARAD quickview (THM) image."""
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     jpg_path = os.path.join(BASE_DIR, "sharad_quickview", f"{product_id}.jpg")
     if not os.path.exists(jpg_path):
         raise HTTPException(status_code=404, detail=f"SHARAD quickview not found: {product_id}")
@@ -783,11 +834,17 @@ os.makedirs(HIRISE_DTM_OVERLAY_CACHE_DIR, exist_ok=True)
 
 
 @app.get("/hirise_dtm/overlay/{product_id}.png")
-def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
+@limiter.limit("20/minute")
+def get_hirise_dtm_overlay(request: Request, product_id: str, max_size: int = 2048):
     """
     Serve HiRISE DTM orthoimage as overlay PNG with transparent background.
     Reads the JP2 orthoimage and generates a transparent PNG.
     """
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     from pyproj import CRS, Transformer
 
     # Check cache first
@@ -906,7 +963,9 @@ def get_hirise_dtm_overlay(product_id: str, max_size: int = 2048):
 
 
 @app.get("/hirise_dtm/elevation/{product_id}")
+@limiter.limit("20/minute")
 def get_hirise_dtm_elevation(
+    request: Request,
     product_id: str,
     lat: float,
     lon: float,
@@ -916,6 +975,11 @@ def get_hirise_dtm_elevation(
     Get elevation data from HiRISE DTM at a specific location.
     Returns elevation value and statistics within radius.
     """
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid product ID format")
+
     from pyproj import CRS, Transformer
 
     # Find DTM file
@@ -1179,3 +1243,13 @@ def save_feature_memo(memo: FeatureMemo):
         f.write(content)
     return {"ok": True}
 
+# ======================================================
+# Health check endpoint
+# ======================================================
+@app.get("/health")
+async def health_check():
+    return JSONResponse(content={
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "indices_loaded": len(_geojson_cache),
+    })

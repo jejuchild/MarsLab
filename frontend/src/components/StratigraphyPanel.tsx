@@ -112,8 +112,9 @@ export default function StratigraphyPanel({
         );
         setResult(data);
         lastRunRef.current = { bufferKm: buf, minSnr: snr, maxRadiusM: maxR };
-      } catch (e: any) {
-        setError(e.message || "Analysis failed");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Analysis failed";
+        setError(msg);
       } finally {
         setLoading(false);
       }

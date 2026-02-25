@@ -10,7 +10,7 @@ bounding box centered on the point to find all relevant products.
 
 import asyncio
 from typing import List, Dict, Optional
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from .ode_client import (
@@ -29,13 +29,14 @@ router = APIRouter(prefix="/api/search", tags=["Point Search"])
 # Constants
 # =============================================================================
 
-# Default search radius in degrees (approximately 60km at equator on Mars)
-DEFAULT_SEARCH_RADIUS_DEG = 1.0
+DEFAULT_SEARCH_RADIUS_KM = 60.0
 
 # Mars mean radius in km (for distance calculations)
 MARS_RADIUS_KM = 3389.5
 
 import math
+
+from .rate_limit import limiter
 
 # =============================================================================
 # Helper Functions
@@ -158,18 +159,19 @@ def point_to_line_distance_km(
         return cross_track_km  # Perpendicular distance
 
 
-def create_bbox_around_point(lat: float, lon: float, radius_deg: float = DEFAULT_SEARCH_RADIUS_DEG):
+def create_bbox_around_point(lat: float, lon: float, radius_km: float = DEFAULT_SEARCH_RADIUS_KM):
     """
     Create a bounding box around a point.
 
     Args:
         lat: Center latitude
         lon: Center longitude
-        radius_deg: Search radius in degrees
+        radius_km: Search radius in kilometers
 
     Returns:
         Tuple of (minlat, maxlat, westernlon, easternlon)
     """
+    radius_deg = radius_km / (math.pi * MARS_RADIUS_KM / 180.0)
     minlat = max(-90, lat - radius_deg)
     maxlat = min(90, lat + radius_deg)
 
@@ -185,14 +187,16 @@ def create_bbox_around_point(lat: float, lon: float, radius_deg: float = DEFAULT
 # =============================================================================
 
 @router.get("/point")
+@limiter.limit("30/minute")
 async def search_by_point(
+    request: Request,
     lat: float = Query(..., ge=-90, le=90, description="Latitude in degrees (-90 to 90)"),
-    lon: float = Query(..., description="Longitude in degrees (any range, normalized internally)"),
+    lon: float = Query(..., ge=-360, le=360, description="Longitude in degrees (-360 to 360)"),
     radius: float = Query(
-        DEFAULT_SEARCH_RADIUS_DEG,
-        ge=0.1,
-        le=10,
-        description="Search radius in degrees (default 1.0, roughly 60km)"
+        DEFAULT_SEARCH_RADIUS_KM,
+        ge=0,
+        le=1000,
+        description="Search radius in km (default 60, allowed 0 to 1000)"
     ),
     limit: int = Query(20, ge=1, le=100, description="Maximum results per instrument"),
 ):
@@ -229,6 +233,13 @@ async def search_by_point(
     GET /api/search/point?lat=18.5&lon=-77.0&radius=1.0
     ```
     """
+    if lat < -90 or lat > 90:
+        raise HTTPException(status_code=400, detail="Latitude must be between -90 and 90")
+    if lon < -360 or lon > 360:
+        raise HTTPException(status_code=400, detail="Longitude must be between -360 and 360")
+    if radius < 0 or radius > 1000:
+        raise HTTPException(status_code=400, detail="Radius must be between 0 and 1000 km")
+
     try:
         # Normalize longitude
         lon_normalized = normalize_longitude_180(lon)

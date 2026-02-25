@@ -82,6 +82,7 @@ export default function TemporalComparison({
   // Fetch temporal pairs
   useEffect(() => {
     const controller = new AbortController();
+    let cancelled = false;
 
     async function fetchPairs() {
       setLoading(true);
@@ -107,21 +108,25 @@ export default function TemporalComparison({
         }
 
         const data: TemporalResult = await res.json();
+        if (cancelled) return;
         if (data.error) {
           setError(data.error);
         }
         setResult(data);
-      } catch (e: any) {
-        if (e.name !== "AbortError") {
+      } catch (e: unknown) {
+        if (!cancelled && e instanceof Error && e.name !== "AbortError") {
           setError(e.message ?? "Failed to fetch temporal pairs");
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchPairs();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [lat, lon, instrument]);
 
   return (

@@ -35,8 +35,16 @@ frontend/node_modules/
 *.img
 *.IMG
 *.npy
+*.tif
+*.TIF
+*.jp2
+*.JP2
+*.cub
 backend/mineral_cnn_data/
 backend/mineral_cnn_results/
+backend/asp_workspace/
+backend/custom_data/
+backend/cache/
 
 # SQLite WAL/SHM
 *.db-wal
@@ -61,3 +69,16 @@ build/
 # Environment
 .env
 .env.local
+
+# Reports and analysis outputs
+backend/agent_reports/
+backend/multi_reports/
+backend/sharad_reports/
+backend/results/
+
+# Private data
+backend/private_memos/
+
+# Archive
+archive.zip
+*.zip

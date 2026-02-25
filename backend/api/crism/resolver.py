@@ -1,21 +1,21 @@
 import os
 import re
+import logging
+
+from api.validation import validate_product_id
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 CRISM_DATA_ROOT = os.path.join(BASE_DIR, "crism_data")
-print("===== CRISM DEBUG =====")
-print("CRISM_DATA_ROOT =", CRISM_DATA_ROOT)
-print("exists =", os.path.exists(CRISM_DATA_ROOT))
-print("=======================")
 
 def resolve_crism_paths(product_id: str):
-    # product_id 예:
-    # frt00009c0a_07_if164j_mtr3
+    product_id = validate_product_id(product_id)
 
     hdr = os.path.join(CRISM_DATA_ROOT, f"{product_id}.hdr")
     img = os.path.join(CRISM_DATA_ROOT, f"{product_id}.img")
 
-    # if → wv 치환
+    # if → wv substitution
     wv_product_id = re.sub(
         r"_if([0-9a-z]+)_",
         r"_wv\1_",
