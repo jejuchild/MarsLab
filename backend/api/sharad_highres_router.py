@@ -1039,6 +1039,140 @@ async def get_surface(
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
+@router.get("/reflectors")
+async def get_reflectors(
+    product_id: str = Query(..., description="SHARAD product ID"),
+    epsilon_r: float = Query(3.1, gt=0, le=20, description="Dielectric constant for depth conversion"),
+    min_snr: float = Query(3.0, ge=0, description="Minimum SNR for reflector detection"),
+):
+    """
+    Detect subsurface reflectors in a SHARAD radargram and return their
+    positions with computed depths.
+
+    Returns a list of reflector segments with lat/lon/depth for 3D overlay.
+    """
+    product_id = _validate_router_product_id(product_id)
+
+    try:
+        power, total_rows = _get_power(product_id)
+        surface = _pick_surface(product_id, power)
+        geom, _ = _get_geometry(product_id)
+
+        n_traces = min(total_rows, int(surface.shape[0]), int(geom["lat"].shape[0]), int(geom["lon"].shape[0]))
+        if n_traces <= 0:
+            return JSONResponse(content={
+                "product_id": product_id,
+                "epsilon_r": epsilon_r,
+                "reflectors": [],
+                "total_reflectors": 0,
+            })
+
+        n_bins = int(power.shape[1])
+        lats_graphic = _centric_to_graphic(geom["lat"][:n_traces])
+        lons180 = _lon_to_180(geom["lon"][:n_traces])
+        depth_scale = (SHARAD_SAMPLE_INTERVAL_US * 1e-6 * SPEED_OF_LIGHT) / (2.0 * math.sqrt(epsilon_r))
+
+        picks: list[dict] = []
+
+        for trace_idx in range(n_traces):
+            s_bin = int(surface[trace_idx])
+            if s_bin < 0:
+                continue
+
+            lo = s_bin + 10
+            hi = min(s_bin + 201, n_bins)
+            if lo >= hi:
+                continue
+
+            trace_power = np.asarray(power[trace_idx], dtype=np.float64)
+            if trace_power.size == 0:
+                continue
+
+            noise_slice = trace_power[max(0, n_bins - 100):n_bins]
+            if noise_slice.size == 0:
+                continue
+            noise_floor = float(np.median(noise_slice))
+            if not np.isfinite(noise_floor) or noise_floor <= 0:
+                noise_floor = 1e-12
+
+            band = trace_power[lo:hi]
+            if band.size == 0:
+                continue
+
+            rel_peak_idx = int(np.argmax(band))
+            peak_power = float(band[rel_peak_idx])
+            if not np.isfinite(peak_power) or peak_power <= 0:
+                continue
+
+            snr = peak_power / noise_floor
+            if not np.isfinite(snr) or snr < min_snr:
+                continue
+
+            bin_idx = lo + rel_peak_idx
+            delta_bins = bin_idx - s_bin
+            if delta_bins <= 0:
+                continue
+
+            lat = float(lats_graphic[trace_idx])
+            lon = float(lons180[trace_idx])
+            if not np.isfinite(lat) or not np.isfinite(lon):
+                continue
+
+            depth_m = float(delta_bins) * depth_scale
+            picks.append({
+                "trace_idx": int(trace_idx),
+                "lat": round(lat, 4),
+                "lon": round(lon, 4),
+                "depth_m": round(depth_m, 1),
+                "snr": round(float(snr), 2),
+                "bin_idx": int(bin_idx),
+            })
+
+        segments: list[dict] = []
+        current: list[dict] = []
+        prev_trace_idx: int | None = None
+
+        for pick in picks:
+            trace_idx = int(pick["trace_idx"])
+            if prev_trace_idx is None or trace_idx == prev_trace_idx + 1:
+                current.append(pick)
+            else:
+                if current:
+                    mean_depth = float(np.mean([float(p["depth_m"]) for p in current]))
+                    mean_snr = float(np.mean([float(p["snr"]) for p in current]))
+                    segments.append({
+                        "segment_id": len(segments),
+                        "traces": current,
+                        "mean_depth_m": round(mean_depth, 1),
+                        "mean_snr": round(mean_snr, 2),
+                        "n_traces": len(current),
+                    })
+                current = [pick]
+            prev_trace_idx = trace_idx
+
+        if current:
+            mean_depth = float(np.mean([float(p["depth_m"]) for p in current]))
+            mean_snr = float(np.mean([float(p["snr"]) for p in current]))
+            segments.append({
+                "segment_id": len(segments),
+                "traces": current,
+                "mean_depth_m": round(mean_depth, 1),
+                "mean_snr": round(mean_snr, 2),
+                "n_traces": len(current),
+            })
+
+        return JSONResponse(content={
+            "product_id": product_id,
+            "epsilon_r": epsilon_r,
+            "reflectors": segments,
+            "total_reflectors": len(segments),
+        })
+    except FileNotFoundError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=404)
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+
+
 @router.get("/depth_conversion")
 async def depth_conversion(
     product_id: str = Query(..., description="Product ID"),

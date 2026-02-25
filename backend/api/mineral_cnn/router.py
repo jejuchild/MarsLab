@@ -133,18 +133,36 @@ async def get_result_stats(obs_id: str):
 
     result = load_cached_result(obs_id)
 
-    # Build human-readable mineral stats
+    # Build human-readable mineral stats with per-mineral confidence
     minerals = {}
     total_classified = 0
     for cls_id_str, count in result.class_stats.items():
         cls_id = int(cls_id_str)
         name = CLASS_NAME.get(cls_id, f"Class {cls_id}")
+
+        # Compute per-mineral confidence statistics
+        mineral_mask = result.mineral_map == cls_id
+        if mineral_mask.any():
+            conf_values = result.confidence_map[mineral_mask]
+            avg_conf = float(np.mean(conf_values))
+            min_conf = float(np.min(conf_values))
+            max_conf = float(np.max(conf_values))
+        else:
+            avg_conf = min_conf = max_conf = 0.0
+
         minerals[name] = {
             "mineral_id": cls_id,
             "pixel_count": count,
             "percent_of_image": round(100 * count / (result.rows * result.cols), 2),
+            "avg_confidence": round(avg_conf, 4),
+            "min_confidence": round(min_conf, 4),
+            "max_confidence": round(max_conf, 4),
         }
         total_classified += count
+
+    # Compute overall mean confidence for classified pixels
+    classified_valid = (result.mineral_map >= 0) & result.valid_mask
+    mean_confidence = round(float(np.mean(result.confidence_map[classified_valid])), 4) if classified_valid.any() else 0.0
 
     total_valid = int(result.valid_mask.sum())
 
@@ -156,6 +174,7 @@ async def get_result_stats(obs_id: str):
         "classified_pixels": total_classified,
         "unclassified_pixels": total_valid - total_classified,
         "confidence_threshold": result.confidence_threshold,
+        "mean_confidence": mean_confidence,
         "elapsed_seconds": result.elapsed_seconds,
         "adr_used": result.adr_used,
         "minerals": minerals,
@@ -408,12 +427,18 @@ async def get_mineral_legend(obs_id: str):
     for cls_id_str in sorted(result.class_stats, key=lambda x: result.class_stats[x], reverse=True):
         cls_id = int(cls_id_str)
         color = _MINERAL_COLORS.get(cls_id, (128, 128, 128))
+
+        # Compute per-mineral average confidence
+        mineral_mask = result.mineral_map == cls_id
+        avg_conf = float(np.mean(result.confidence_map[mineral_mask])) if mineral_mask.any() else 0.0
+
         legend.append({
             "mineral_id": cls_id,
             "name": CLASS_NAME.get(cls_id, f"Class {cls_id}"),
             "color_rgb": list(color),
             "color_hex": f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}",
             "pixel_count": result.class_stats[cls_id_str],
+            "avg_confidence": round(avg_conf, 4),
         })
 
     return JSONResponse({"obs_id": obs_id, "legend": legend})

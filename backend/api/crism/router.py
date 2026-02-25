@@ -5,11 +5,14 @@ from fastapi.responses import Response, JSONResponse
 import numpy as np
 import io
 from PIL import Image
+import importlib
 
 from .resolver import resolve_crism_paths
 from .loader import load_cube, load_wavelength
 from .rgb import make_rgb, IGNORE_VALUE
 from api.validation import validate_product_id
+
+dust_detection = importlib.import_module("analysis.crism_spectral.dust_detection")
 print("🔥 CRISM ROUTER LOADED 🔥")
 
 router = APIRouter(tags=["CRISM"])
@@ -72,6 +75,9 @@ def crism_rgb(product_id: str, req: RGBRequest):
 class SpectrumRequest(BaseModel):
     line: int
     sample: int
+    lat: float | None = None
+    lon: float | None = None
+    ls: float | None = None
 
 
 @router.post("/{product_id}/spectrum")
@@ -112,15 +118,30 @@ def crism_spectrum(product_id: str, req: SpectrumRequest):
         valid_count = np.isfinite(spectrum).sum()
         print(f"[CRISM Spectrum] Valid bands: {valid_count}/{len(spectrum)}")
 
-        # Convert to lists for JSON
+        reflectance_values = [float(v) if np.isfinite(v) else None for v in spectrum]
+        dust_assessment = dust_detection.assess_dust_risk(
+            lat=req.lat if req.lat is not None else 0.0,
+            lon=req.lon if req.lon is not None else 0.0,
+            ls=req.ls,
+            wavelengths=wavelengths.tolist(),
+            reflectance=reflectance_values,
+        )
+
         return JSONResponse({
             "product_id": product_id,
             "line": req.line,
             "sample": req.sample,
             "wavelengths": wavelengths.tolist(),
-            "reflectance": [float(v) if np.isfinite(v) else None for v in spectrum],
+            "reflectance": reflectance_values,
             "n_bands": int(n_bands),
             "valid_bands": int(valid_count),
+            "dust_assessment": {
+                "tau_estimated": dust_assessment.tau_estimated,
+                "risk_level": dust_assessment.risk_level,
+                "spectral_slope": dust_assessment.spectral_slope,
+                "band_depth_suppression_pct": dust_assessment.band_depth_suppression_pct,
+                "warning_message": dust_assessment.warning_message,
+            },
         })
 
     except FileNotFoundError as e:

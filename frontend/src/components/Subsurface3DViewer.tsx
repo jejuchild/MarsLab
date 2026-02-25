@@ -15,6 +15,7 @@ import * as THREE from "three";
 // =============================================================================
 
 interface Subsurface3DViewerProps {
+  productId: string;
   startTrace: number;
   endTrace: number;
   lats: number[];
@@ -24,6 +25,30 @@ interface Subsurface3DViewerProps {
   molaElevations: (number | null)[];
   onClose: () => void;
 }
+
+type ReflectorTrace = {
+  trace_idx: number;
+  lat: number;
+  lon: number;
+  depth_m: number;
+  snr: number;
+  bin_idx: number;
+};
+
+type ReflectorSegment = {
+  segment_id: number;
+  traces: ReflectorTrace[];
+  mean_depth_m: number;
+  mean_snr: number;
+  n_traces: number;
+};
+
+type ReflectorResponse = {
+  product_id: string;
+  epsilon_r: number;
+  reflectors: ReflectorSegment[];
+  total_reflectors: number;
+};
 
 interface DEMPatchData {
   elevations: number[];
@@ -310,6 +335,120 @@ function EndConnectors({
   );
 }
 
+function snrToColor(snr: number): string {
+  const blue = new THREE.Color("#3b82f6");
+  const yellow = new THREE.Color("#facc15");
+  const red = new THREE.Color("#ef4444");
+  const color = new THREE.Color();
+
+  if (snr <= 5) {
+    color.copy(blue);
+  } else if (snr < 8) {
+    const t = (snr - 5) / 3;
+    color.lerpColors(blue, yellow, Math.max(0, Math.min(1, t)));
+  } else {
+    const t = (snr - 8) / 4;
+    color.lerpColors(yellow, red, Math.max(0, Math.min(1, t)));
+  }
+
+  return color.getStyle();
+}
+
+function ReflectorMarkers({
+  reflectors,
+  trackGeometry,
+  terrainData,
+  verticalExaggeration,
+}: {
+  reflectors: ReflectorTrace[];
+  trackGeometry: {
+    centerLat: number;
+    centerLon: number;
+    metersPerDegLat: number;
+    metersPerDegLon: number;
+  };
+  terrainData: DEMPatchData;
+  verticalExaggeration: number;
+}) {
+  const markerRadius = useMemo(() => Math.max(6, terrainData.radius_m * 0.001), [terrainData.radius_m]);
+
+  const markerPoints = useMemo(() => {
+    const { centerLat, centerLon, metersPerDegLat, metersPerDegLon } = trackGeometry;
+    const centerElev = (terrainData.min_elevation_m + terrainData.max_elevation_m) / 2;
+    const { bounds, rows, cols, elevations } = terrainData;
+    const maxMarkers = 2500;
+    const stride = reflectors.length > maxMarkers ? Math.ceil(reflectors.length / maxMarkers) : 1;
+
+    const sampleElevation = (lat: number, lon360: number): number | null => {
+      if (rows < 2 || cols < 2 || elevations.length < rows * cols) return null;
+
+      const lonRange = bounds.east - bounds.west;
+      const latRange = bounds.north - bounds.south;
+      if (lonRange <= 0 || latRange <= 0) return null;
+
+      const u = (lon360 - bounds.west) / lonRange;
+      const v = (bounds.north - lat) / latRange;
+      if (u < 0 || u > 1 || v < 0 || v > 1) return null;
+
+      const colF = u * (cols - 1);
+      const rowF = v * (rows - 1);
+
+      const c0 = Math.floor(colF);
+      const r0 = Math.floor(rowF);
+      const c1 = Math.min(cols - 1, c0 + 1);
+      const r1 = Math.min(rows - 1, r0 + 1);
+
+      const q11 = elevations[r0 * cols + c0];
+      const q21 = elevations[r0 * cols + c1];
+      const q12 = elevations[r1 * cols + c0];
+      const q22 = elevations[r1 * cols + c1];
+      if (q11 == null || q21 == null || q12 == null || q22 == null) return null;
+
+      const tx = colF - c0;
+      const ty = rowF - r0;
+      const top = q11 * (1 - tx) + q21 * tx;
+      const bottom = q12 * (1 - tx) + q22 * tx;
+      return top * (1 - ty) + bottom * ty;
+    };
+
+    const points: Array<{ position: [number, number, number]; color: string; key: string }> = [];
+
+    for (let i = 0; i < reflectors.length; i += stride) {
+      const r = reflectors[i];
+      if (!r) continue;
+
+      const lon360 = ((r.lon % 360) + 360) % 360;
+      const x = (lon360 - centerLon) * metersPerDegLon;
+      const z = -(r.lat - centerLat) * metersPerDegLat;
+
+      const surfElev = sampleElevation(r.lat, lon360);
+      if (surfElev == null) continue;
+
+      const y = (surfElev - r.depth_m - centerElev) * verticalExaggeration;
+      points.push({
+        position: [x, y, z],
+        color: snrToColor(r.snr),
+        key: `${r.trace_idx}-${r.bin_idx}-${i}`,
+      });
+    }
+
+    return points;
+  }, [reflectors, trackGeometry, terrainData, verticalExaggeration]);
+
+  if (markerPoints.length === 0) return null;
+
+  return (
+    <>
+      {markerPoints.map((marker) => (
+        <mesh key={marker.key} position={marker.position}>
+          <sphereGeometry args={[markerRadius, 10, 10]} />
+          <meshStandardMaterial color={marker.color} emissive={marker.color} emissiveIntensity={0.2} />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
 // =============================================================================
 // Camera Setup
 // =============================================================================
@@ -344,6 +483,7 @@ function CameraSetup({
 // =============================================================================
 
 export default function Subsurface3DViewer({
+  productId,
   startTrace,
   endTrace,
   lats,
@@ -359,7 +499,9 @@ export default function Subsurface3DViewer({
 
   const [verticalExaggeration, setVerticalExaggeration] = useState(5);
   const [showSubsurface, setShowSubsurface] = useState(true);
+  const [showReflectors, setShowReflectors] = useState(true);
   const [showWireframe, setShowWireframe] = useState(false);
+  const [reflectorData, setReflectorData] = useState<ReflectorTrace[]>([]);
 
   // Ensure start <= end
   const rangeStart = Math.min(startTrace, endTrace);
@@ -384,6 +526,10 @@ export default function Subsurface3DViewer({
     }
     return points;
   }, [rangeStart, rangeEnd, lats, lons, molaElevations]);
+
+  const visibleReflectors = useMemo(() => {
+    return reflectorData.filter((r) => r.trace_idx >= rangeStart && r.trace_idx <= rangeEnd);
+  }, [reflectorData, rangeStart, rangeEnd]);
 
   // Compute track geometry (this defines the subsurface extent)
   const trackGeometry = useMemo(() => {
@@ -466,6 +612,48 @@ export default function Subsurface3DViewer({
     return () => { cancelled = true; };
   }, [trackGeometry.centerLat, trackGeometry.centerLon, terrainRadiusM, trackPoints.length, trackGeometry.trackLengthM]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!productId) {
+      setReflectorData([]);
+      return;
+    }
+
+    const params = new URLSearchParams({
+      product_id: productId,
+      epsilon_r: epsilonR.toString(),
+    });
+
+    fetch(`/api/sharad_highres/reflectors?${params.toString()}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text().catch(() => "Unknown error");
+          throw new Error(`Reflector fetch failed (${res.status}): ${text.slice(0, 160)}`);
+        }
+        return res.json() as Promise<ReflectorResponse>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const traces = data.reflectors.flatMap((segment) => segment.traces ?? []);
+        const clean = traces.filter((r) =>
+          Number.isFinite(r.trace_idx)
+          && Number.isFinite(r.lat)
+          && Number.isFinite(r.lon)
+          && Number.isFinite(r.depth_m)
+          && Number.isFinite(r.snr)
+          && Number.isFinite(r.bin_idx)
+        );
+        setReflectorData(clean);
+      })
+      .catch(() => {
+        if (!cancelled) setReflectorData([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productId, epsilonR]);
+
   return (
     <div className="flex flex-col h-full bg-[#0a0f18]">
       {/* Header */}
@@ -513,6 +701,16 @@ export default function Subsurface3DViewer({
             className="rounded border-slate-600 bg-transparent text-cyan-500"
           />
           <span className="text-[10px] text-slate-300">Interface</span>
+        </label>
+
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showReflectors}
+            onChange={(e) => setShowReflectors(e.target.checked)}
+            className="rounded border-slate-600 bg-transparent text-cyan-500"
+          />
+          <span className="text-[10px] text-slate-300">Reflectors</span>
         </label>
 
         <label className="flex items-center gap-1.5 cursor-pointer">
@@ -598,6 +796,15 @@ export default function Subsurface3DViewer({
                 trackGeometry={trackGeometry}
                 terrainData={terrainData}
                 meanDepth={meanDepth}
+                verticalExaggeration={verticalExaggeration}
+              />
+            )}
+
+            {showReflectors && (
+              <ReflectorMarkers
+                reflectors={visibleReflectors}
+                trackGeometry={trackGeometry}
+                terrainData={terrainData}
                 verticalExaggeration={verticalExaggeration}
               />
             )}

@@ -37,6 +37,14 @@ type SpectrumData = {
   validBands: number;
 };
 
+type DustAssessment = {
+  tau_estimated: number;
+  risk_level: "LOW" | "MODERATE" | "HIGH";
+  spectral_slope: number | null;
+  band_depth_suppression_pct: number;
+  warning_message: string | null;
+};
+
 type WindowStats = {
   mean: number;
   median: number;
@@ -248,6 +256,7 @@ export default function Inspector({
 
   // CRISM spectrum state
   const [spectrumData, setSpectrumData] = useState<SpectrumData | null>(null);
+  const [dustAssessment, setDustAssessment] = useState<DustAssessment | null>(null);
   const [spectrumLoading, setSpectrumLoading] = useState(false);
 
   // Local RGB state for sliders
@@ -338,11 +347,13 @@ export default function Inspector({
   useEffect(() => {
     if (!selected || (selected.instrument !== "CRISM" && selected.instrument !== "CRISM_TRR3")) {
       setSpectrumData(null);
+      setDustAssessment(null);
       return;
     }
 
     if (selected.pixelLine === undefined || selected.pixelSample === undefined) {
       setSpectrumData(null);
+      setDustAssessment(null);
       return;
     }
 
@@ -351,6 +362,8 @@ export default function Inspector({
     const pixelLine = selected.pixelLine;
     const pixelSample = selected.pixelSample;
     const isTRR3 = selected.instrument === "CRISM_TRR3";
+    const lat = selected.lat;
+    const lon = selected.lon;
 
     async function fetchSpectrum() {
       setSpectrumLoading(true);
@@ -371,6 +384,8 @@ export default function Inspector({
           body: JSON.stringify({
             line: pixelLine,
             sample: pixelSample,
+            lat,
+            lon,
           }),
         });
 
@@ -384,17 +399,19 @@ export default function Inspector({
           reflectance: data.reflectance,
           validBands: data.valid_bands,
         });
+        setDustAssessment(data.dust_assessment ?? null);
       } catch (e) {
         console.error("Failed to fetch spectrum:", e);
         toast.error("Failed to load spectrum data");
         setSpectrumData(null);
+        setDustAssessment(null);
       } finally {
         setSpectrumLoading(false);
       }
     }
 
     fetchSpectrum();
-  }, [selected?.productId, selected?.pixelLine, selected?.pixelSample]);
+  }, [selected?.productId, selected?.pixelLine, selected?.pixelSample, selected?.lat, selected?.lon]);
 
   if (!selected) return null;
 
@@ -576,6 +593,7 @@ export default function Inspector({
           <SpectrumTab
             selected={selected}
             spectrumData={spectrumData}
+            dustAssessment={dustAssessment}
             loading={spectrumLoading}
             onPinSpectrum={onPinSpectrum}
           />
@@ -970,11 +988,13 @@ function BandsTab({
 function SpectrumTab({
   selected,
   spectrumData,
+  dustAssessment,
   loading,
   onPinSpectrum,
 }: {
   selected: InspectorContext;
   spectrumData: SpectrumData | null;
+  dustAssessment: DustAssessment | null;
   loading: boolean;
   onPinSpectrum?: (spectrum: { productId: string; lat: number; lon: number; wavelengths: number[]; reflectance: (number | null)[] }) => void;
 }) {
@@ -1106,6 +1126,30 @@ function SpectrumTab({
           <span className="font-mono text-white">{selected.pixelSample}</span>
         </div>
       </div>
+
+      {dustAssessment && dustAssessment.risk_level !== "LOW" && (
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] leading-relaxed ${
+          dustAssessment.risk_level === "HIGH"
+            ? "bg-red-500/10 border border-red-500/30 text-red-400"
+            : "bg-amber-500/10 border border-amber-500/30 text-amber-400"
+        }`}>
+          <span className="material-symbols-outlined text-sm flex-shrink-0">
+            {dustAssessment.risk_level === "HIGH" ? "warning" : "info"}
+          </span>
+          <div>
+            <span className="font-semibold">
+              {dustAssessment.risk_level === "HIGH" ? "High" : "Moderate"} Dust Risk
+            </span>
+            {" · "}tau~{dustAssessment.tau_estimated.toFixed(1)}
+            {dustAssessment.band_depth_suppression_pct > 0 && (
+              <> · Band depths suppressed ~{dustAssessment.band_depth_suppression_pct.toFixed(0)}%</>
+            )}
+            {dustAssessment.warning_message && (
+              <div className="mt-0.5 opacity-80">{dustAssessment.warning_message}</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Spectrum Chart */}
       <div className="rounded-lg border border-border-dark bg-bg-dark/60 p-3">
@@ -1446,14 +1490,21 @@ function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; o
           </div>
 
           {/* Stats summary */}
-          <div className="grid grid-cols-2 gap-2 text-[10px]">
+          <div className="grid grid-cols-3 gap-2 text-[10px]">
             <div className="rounded border border-border-dark/50 bg-bg-dark/40 p-2">
               <div className="text-[9px] uppercase text-slate-500">Classified</div>
               <div className="font-mono text-white">{stats.classified_pixels?.toLocaleString()}</div>
             </div>
             <div className="rounded border border-border-dark/50 bg-bg-dark/40 p-2">
-              <div className="text-[9px] uppercase text-slate-500">Confidence</div>
+              <div className="text-[9px] uppercase text-slate-500">Threshold</div>
               <div className="font-mono text-white">≥{((stats.confidence_threshold ?? 0.95) * 100).toFixed(0)}%</div>
+            </div>
+            <div className="rounded border border-border-dark/50 bg-bg-dark/40 p-2">
+              <div className="text-[9px] uppercase text-slate-500">Mean Conf.</div>
+              <div className={`font-mono ${ 
+                (stats.mean_confidence ?? 0) >= 0.95 ? "text-emerald-400" :
+                (stats.mean_confidence ?? 0) >= 0.80 ? "text-amber-400" : "text-red-400"
+              }`}>{((stats.mean_confidence ?? 0) * 100).toFixed(1)}%</div>
             </div>
           </div>
 
@@ -1462,16 +1513,26 @@ function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; o
             <div className="space-y-1">
               <h5 className="text-[9px] uppercase text-slate-500 font-bold">Minerals Detected</h5>
               <div className="max-h-40 overflow-y-auto scrollbar-dark space-y-0.5">
-                {legend.map((item: any) => (
-                  <div key={item.mineral_id} className="flex items-center gap-2 py-0.5">
-                    <span
-                      className="w-3 h-3 rounded-sm flex-shrink-0"
-                      style={{ backgroundColor: item.color_hex }}
-                    />
-                    <span className="text-[10px] text-white flex-1 truncate">{item.name}</span>
-                    <span className="text-[9px] text-slate-500 font-mono">{item.pixel_count}</span>
-                  </div>
-                ))}
+                {legend.map((item: any) => {
+                  const conf = item.avg_confidence as number | undefined;
+                  const confPct = ((conf ?? 0) * 100);
+                  const confColor = confPct >= 95 ? "text-emerald-400" : confPct >= 80 ? "text-amber-400" : "text-red-400";
+                  return (
+                    <div key={item.mineral_id} className="flex items-center gap-2 py-0.5">
+                      <span
+                        className="w-3 h-3 rounded-sm flex-shrink-0"
+                        style={{ backgroundColor: item.color_hex }}
+                      />
+                      <span className="text-[10px] text-white flex-1 truncate">{item.name}</span>
+                      {conf != null && conf > 0 && (
+                        <span className={`text-[8px] font-mono px-1 py-0.5 rounded ${confColor} bg-surface-dark/60`}>
+                          {confPct.toFixed(0)}%
+                        </span>
+                      )}
+                      <span className="text-[9px] text-slate-500 font-mono">{item.pixel_count}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
