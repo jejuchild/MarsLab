@@ -474,15 +474,25 @@ export class FootprintManager {
 
         const nlon = normalizeLon(lon);
 
+        // Render as a small rectangle instead of a circle dot
+        // Use typical footprint half-sizes per instrument
+        const halfW = instrument === "HIRISE" ? 0.08 : 0.07;  // degrees longitude
+        const halfH = instrument === "HIRISE" ? 0.15 : 0.06;  // degrees latitude
+
+        const west = nlon - halfW;
+        const east = nlon + halfW;
+        const south = lat - halfH;
+        const north = lat + halfH;
+
         this.viewer.entities.add({
           id: entityId,
-          position: Cesium.Cartesian3.fromDegrees(nlon, lat, 0, this.ellipsoid),
-          point: {
-            pixelSize: 8,
-            color: color.withAlpha(0.9),
-            outlineColor: Cesium.Color.BLACK,
+          rectangle: {
+            coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
+            material: color.withAlpha(0.10),
+            outline: true,
+            outlineColor: color,
             outlineWidth: 1,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            height: 0,
           },
           properties: entityProps,
         });
@@ -501,15 +511,14 @@ export class FootprintManager {
             outlineColor: Cesium.Color.BLACK,
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -10),
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
             disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3e6),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5e6),
           },
           properties: entityProps,
         });
         ids.add(labelId);
-      }
     }
 
     this.viewer.entities.resumeEvents();
