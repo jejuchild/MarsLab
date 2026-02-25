@@ -519,6 +519,7 @@ export class FootprintManager {
           properties: entityProps,
         });
         ids.add(labelId);
+      }
     }
 
     this.viewer.entities.resumeEvents();
