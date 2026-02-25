@@ -303,6 +303,7 @@ function ComparisonModeInner({
     (e: React.MouseEvent | React.TouchEvent) => {
       if ("touches" in e) {
         const touch = e.touches[0];
+        if (!touch) return;
         dragStartRef.current = {
           x: touch.clientX,
           y: touch.clientY,
@@ -334,8 +335,10 @@ function ComparisonModeInner({
 
       let clientX: number, clientY: number;
       if ("touches" in e) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
+        const touch = e.touches[0];
+        if (!touch) return;
+        clientX = touch.clientX;
+        clientY = touch.clientY;
       } else {
         clientX = e.clientX;
         clientY = e.clientY;

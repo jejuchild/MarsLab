@@ -340,8 +340,9 @@ export function OlympusMonsClimber({ onClose }: OlympusMonsClimberProps) {
 
   const pathD =
     "M " + MOUNTAIN_POINTS.map(([x, y]) => `${x},${y}`).join(" L ");
-  const cx = CLIMB_PATH[climberIdx][0];
-  const cy = CLIMB_PATH[climberIdx][1];
+  const climberPoint = CLIMB_PATH[climberIdx]!;
+  const cx = climberPoint[0];
+  const cy = climberPoint[1];
 
   // Altitude labels along the left side
   const altitudes = [

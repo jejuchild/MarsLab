@@ -472,7 +472,7 @@ export default function MainPage() {
         toast("Spectrum already pinned");
         return prev;
       }
-      const color = SPECTRUM_COLORS[prev.length % SPECTRUM_COLORS.length];
+      const color = SPECTRUM_COLORS[prev.length % SPECTRUM_COLORS.length]!;
       return [...prev, { ...spectrum, id: `${spectrum.productId}-${Date.now()}`, color }];
     });
     setShowSpectralComparison(true);
@@ -709,6 +709,7 @@ export default function MainPage() {
   }>, params: Record<string, unknown>) => {
     if (results.length === 0) return;
     const best = results[0];
+    if (!best) return;
     const primaryInst = (best.instrument || params.instrument || "") as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
 
     // Load primary instrument
@@ -1020,12 +1021,15 @@ export default function MainPage() {
             const coords = feat.geometry.coordinates;
             if (feat.geometry.type === "LineString" && coords.length >= 2) {
               const midIdx = Math.floor(coords.length / 2);
-              lat = coords[midIdx][1];
-              lon = coords[midIdx][0];
+              const mid = coords[midIdx];
+              if (Array.isArray(mid) && mid.length >= 2) {
+                lat = mid[1]!;
+                lon = mid[0]!;
+              }
             } else if (feat.geometry.type === "Polygon" && coords[0]?.length >= 4) {
               const ring = coords[0];
-              lat = ring.reduce((s: number, c: number[]) => s + c[1], 0) / ring.length;
-              lon = ring.reduce((s: number, c: number[]) => s + c[0], 0) / ring.length;
+              lat = ring.reduce((s: number, c: number[]) => s + (c[1] ?? 0), 0) / ring.length;
+              lon = ring.reduce((s: number, c: number[]) => s + (c[0] ?? 0), 0) / ring.length;
             }
             break;
           }
@@ -1187,7 +1191,7 @@ export default function MainPage() {
         const next = [...prev, { lat, lon }];
         if (next.length === 2) {
           // Two points collected — trigger profile computation
-          setLineProfileData({ start: next[0], end: next[1] });
+          setLineProfileData({ start: next[0]!, end: next[1]! });
         }
         return next;
       });
@@ -1465,6 +1469,7 @@ export default function MainPage() {
       if (INSTRUMENT_KEY_MAP[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         const instId = INSTRUMENT_KEY_MAP[e.key];
+        if (!instId) return;
         setInstrumentVisibility((prev) => ({ ...prev, [instId]: !prev[instId] }));
         return;
       }
