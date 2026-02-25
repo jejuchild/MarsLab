@@ -153,7 +153,7 @@ export default function BandRatioCalculator({
 
       while (lo < hi) {
         const mid = Math.floor((lo + hi) / 2);
-        if (wavelengths[mid] < targetWl) {
+        if (wavelengths[mid]! < targetWl) {
           lo = mid + 1;
         } else {
           hi = mid;
@@ -161,7 +161,7 @@ export default function BandRatioCalculator({
       }
 
       // Check if lo-1 is closer
-      if (lo > 0 && Math.abs(wavelengths[lo - 1] - targetWl) < Math.abs(wavelengths[lo] - targetWl)) {
+      if (lo > 0 && Math.abs(wavelengths[lo - 1]! - targetWl) < Math.abs(wavelengths[lo]! - targetWl)) {
         return lo - 1;
       }
       return lo;
@@ -174,7 +174,7 @@ export default function BandRatioCalculator({
     (targetWl: number): number | null => {
       const idx = findNearestIndex(targetWl);
       if (idx < 0 || idx >= reflectance.length) return null;
-      return reflectance[idx];
+      return reflectance[idx]!;
     },
     [findNearestIndex, reflectance]
   );
@@ -184,7 +184,7 @@ export default function BandRatioCalculator({
     (targetWl: number): number | null => {
       const idx = findNearestIndex(targetWl);
       if (idx < 0 || idx >= wavelengths.length) return null;
-      return wavelengths[idx];
+      return wavelengths[idx]!;
     },
     [findNearestIndex, wavelengths]
   );

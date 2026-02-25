@@ -575,7 +575,7 @@ export default function SpaceGame({ onClose }: SpaceGameProps) {
           x: 30 + Math.random() * (W - 60),
           y: -12,
           speed: 1.5,
-          type: types[Math.floor(Math.random() * types.length)],
+          type: types[Math.floor(Math.random() * types.length)]!,
         });
       }
 
@@ -628,10 +628,10 @@ export default function SpaceGame({ onClose }: SpaceGameProps) {
 
       /* ── Collision: player bullets vs asteroids ── */
       for (let bi = s.bullets.length - 1; bi >= 0; bi--) {
-        const b = s.bullets[bi];
+        const b = s.bullets[bi]!;
         if (b.isAlien) continue;
         for (let ai = s.asteroids.length - 1; ai >= 0; ai--) {
-          const a = s.asteroids[ai];
+          const a = s.asteroids[ai]!;
           const dx = b.x - a.x, dy = b.y - a.y;
           if (dx * dx + dy * dy < a.r * a.r) {
             s.bullets.splice(bi, 1);
@@ -650,10 +650,10 @@ export default function SpaceGame({ onClose }: SpaceGameProps) {
 
       /* ── Collision: player bullets vs aliens ── */
       for (let bi = s.bullets.length - 1; bi >= 0; bi--) {
-        const b = s.bullets[bi];
+        const b = s.bullets[bi]!;
         if (b.isAlien) continue;
         for (let ai = s.aliens.length - 1; ai >= 0; ai--) {
-          const a = s.aliens[ai];
+          const a = s.aliens[ai]!;
           if (b.x > a.x - a.w / 2 && b.x < a.x + a.w / 2 && b.y > a.y - a.h / 2 && b.y < a.y + a.h / 2) {
             s.bullets.splice(bi, 1);
             a.hp--;
@@ -674,7 +674,7 @@ export default function SpaceGame({ onClose }: SpaceGameProps) {
       const hitR = hasShield ? SHIP_W * 0.7 : SHIP_W * 0.4;
       // Asteroids
       for (let ai = s.asteroids.length - 1; ai >= 0; ai--) {
-        const a = s.asteroids[ai];
+        const a = s.asteroids[ai]!;
         const dx = s.ship.x - a.x, dy = s.ship.y - a.y;
         if (dx * dx + dy * dy < (a.r + hitR) * (a.r + hitR)) {
           spawnParticles(a.x, a.y, 10, MARS.danger);
@@ -689,7 +689,7 @@ export default function SpaceGame({ onClose }: SpaceGameProps) {
       }
       // Aliens
       for (let ai = s.aliens.length - 1; ai >= 0; ai--) {
-        const a = s.aliens[ai];
+        const a = s.aliens[ai]!;
         const dx = s.ship.x - a.x, dy = s.ship.y - a.y;
         if (Math.abs(dx) < (a.w / 2 + hitR) && Math.abs(dy) < (a.h / 2 + hitR)) {
           spawnParticles(a.x, a.y, 14, MARS.danger);
@@ -704,7 +704,7 @@ export default function SpaceGame({ onClose }: SpaceGameProps) {
       }
       // Alien bullets
       for (let bi = s.bullets.length - 1; bi >= 0; bi--) {
-        const b = s.bullets[bi];
+        const b = s.bullets[bi]!;
         if (!b.isAlien) continue;
         const dx = s.ship.x - b.x, dy = s.ship.y - b.y;
         if (dx * dx + dy * dy < hitR * hitR) {
@@ -721,7 +721,7 @@ export default function SpaceGame({ onClose }: SpaceGameProps) {
 
       /* ── Collision: ship vs powerups ── */
       for (let pi = s.powerups.length - 1; pi >= 0; pi--) {
-        const p = s.powerups[pi];
+        const p = s.powerups[pi]!;
         const dx = s.ship.x - p.x, dy = s.ship.y - p.y;
         if (dx * dx + dy * dy < (hitR + 10) * (hitR + 10)) {
           s.powerups.splice(pi, 1);

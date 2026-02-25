@@ -89,9 +89,9 @@ function marsSphericalAreaKm2(vertices: LatLon[]): number {
   // Compute interior angles via spherical geometry
   let angleSum = 0;
   for (let i = 0; i < n; i++) {
-    const prev = vecs[(i - 1 + n) % n];
-    const curr = vecs[i];
-    const next = vecs[(i + 1) % n];
+    const prev = vecs[(i - 1 + n) % n]!;
+    const curr = vecs[i]!;
+    const next = vecs[(i + 1) % n]!;
 
     // Project prev and next onto tangent plane at curr
     // to find the interior angle at this vertex
@@ -566,7 +566,7 @@ export default function MeasurementTools({
             setPendingEntities([dotId]);
           } else {
             // Second point - complete measurement
-            const start = pts[0];
+            const start = pts[0]!;
             const end: LatLon = { lat, lon };
             const dist = marsGreatCircleDistanceKm(start, end);
             const label = formatDistance(dist);
@@ -668,7 +668,7 @@ export default function MeasurementTools({
 
             // If we have at least 1 prior point, draw an edge to the new vertex
             if (curPts.length > 0) {
-              const prev = curPts[curPts.length - 1];
+              const prev = curPts[curPts.length - 1]!;
               const edgeId = uid();
               addEntity({
                 id: edgeId,
@@ -708,7 +708,7 @@ export default function MeasurementTools({
             setPendingEntities([dotId]);
           } else {
             // Second point - complete
-            const start = pts[0];
+            const start = pts[0]!;
             const end: LatLon = { lat, lon };
             const dist = marsGreatCircleDistanceKm(start, end);
 
@@ -827,8 +827,8 @@ export default function MeasurementTools({
         if (pts.length < 3) return;
 
         // Close polygon: draw closing edge
-        const first = pts[0];
-        const last = pts[pts.length - 1];
+        const first = pts[0]!;
+        const last = pts[pts.length - 1]!;
         const closingEdgeId = uid();
         addEntity({
           id: closingEdgeId,

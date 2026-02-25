@@ -1781,7 +1781,7 @@ export default function MapView({
     // Remove old bbox entities
     const toRemove: string[] = [];
     for (let i = 0; i < viewer.entities.values.length; i++) {
-      const e = viewer.entities.values[i];
+      const e = viewer.entities.values[i]!;
       if (e.id && typeof e.id === "string" && e.id.startsWith("BBOX_")) {
         toRemove.push(e.id);
       }
@@ -2046,7 +2046,7 @@ export default function MapView({
       `${Math.abs(lat).toFixed(4)}\u00b0${lat >= 0 ? "N" : "S"}, ${Math.abs(lon).toFixed(4)}\u00b0${lon >= 0 ? "E" : "W"}`;
 
     // First point marker
-    const p1 = linePoints[0];
+    const p1 = linePoints[0]!;
     viewer.entities.add({
       id: LP_MARKER_A,
       position: Cesium.Cartesian3.fromDegrees(p1.lon, p1.lat, 0, MARS_ELLIPSOID),
@@ -2076,7 +2076,7 @@ export default function MapView({
 
     // Second point + polyline
     if (linePoints.length >= 2) {
-      const p2 = linePoints[1];
+      const p2 = linePoints[1]!;
       viewer.entities.add({
         id: LP_MARKER_B,
         position: Cesium.Cartesian3.fromDegrees(p2.lon, p2.lat, 0, MARS_ELLIPSOID),
@@ -3294,6 +3294,7 @@ export default function MapView({
         });
         const midIdx = Math.floor(f.path.length / 2);
         const midPt = f.path[midIdx];
+        if (!midPt) continue;
         const sizeLabel = f.length_km ? `${f.length_km.toFixed(0)} km` : "";
         viewer.entities.add({
           id: `DETECT_L_${f.id}`,
@@ -3904,7 +3905,7 @@ export default function MapView({
     // Remove entities for datasets that no longer exist
     const toRemove: Cesium.Entity[] = [];
     for (let i = 0; i < viewer.entities.values.length; i++) {
-      const ent = viewer.entities.values[i];
+      const ent = viewer.entities.values[i]!;
       if (ent.id.startsWith("CUSTOM_OVERLAY_") || ent.id.startsWith("CUSTOM_FP_") || ent.id.startsWith("CUSTOM_LABEL_")) {
         if (!desiredIds.has(ent.id)) {
           toRemove.push(ent);
@@ -3968,7 +3969,7 @@ export default function MapView({
     // Remove existing field note markers
     const toRemove: Cesium.Entity[] = [];
     for (let i = 0; i < viewer.entities.values.length; i++) {
-      const ent = viewer.entities.values[i];
+      const ent = viewer.entities.values[i]!;
       if (ent.id.startsWith(PREFIX)) toRemove.push(ent);
     }
     for (const ent of toRemove) viewer.entities.remove(ent);
@@ -4197,7 +4198,7 @@ export default function MapView({
     function removeAllGrid() {
       const toRemove: Cesium.Entity[] = [];
       for (let i = 0; i < viewer!.entities.values.length; i++) {
-        const ent = viewer!.entities.values[i];
+        const ent = viewer!.entities.values[i]!;
         if (ent.id.startsWith(GRID_PREFIX)) toRemove.push(ent);
       }
       for (const ent of toRemove) viewer!.entities.remove(ent);
@@ -4280,7 +4281,7 @@ export default function MapView({
           pts.push(lon, lat);
         }
         // Ensure we reach the east edge
-        if (pts.length >= 2 && pts[pts.length - 2] < lineEast) {
+        if (pts.length >= 2 && pts[pts.length - 2]! < lineEast) {
           pts.push(lineEast, lat);
         }
         if (pts.length < 4) continue;
@@ -4326,7 +4327,7 @@ export default function MapView({
         for (let lat = lineSouth; lat <= lineNorth; lat += Math.min(spacing, 5)) {
           pts.push(lon, lat);
         }
-        if (pts.length >= 2 && pts[pts.length - 1] < lineNorth) {
+        if (pts.length >= 2 && pts[pts.length - 1]! < lineNorth) {
           pts.push(lon, lineNorth);
         }
         if (pts.length < 4) continue;

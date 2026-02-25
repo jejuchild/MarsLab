@@ -29,13 +29,17 @@ export default function BottomSheet({
 
   // Handle drag-to-dismiss
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    dragStartY.current = e.touches[0].clientY;
+    const touch = e.touches[0];
+    if (!touch) return;
+    dragStartY.current = touch.clientY;
     currentTranslateY.current = 0;
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (dragStartY.current === null || !sheetRef.current) return;
-    const deltaY = e.touches[0].clientY - dragStartY.current;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const deltaY = touch.clientY - dragStartY.current;
     // Only allow dragging down
     if (deltaY > 0) {
       currentTranslateY.current = deltaY;
