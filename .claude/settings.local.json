@@ -200,7 +200,8 @@
       "Bash(echo NO_BUN:*)",
       "WebFetch(domain:opencode.ai)",
       "Bash(which opencode:*)",
-      "Bash(npx oh-my-opencode:*)"
+      "Bash(npx oh-my-opencode:*)",
+      "Bash(opencode auth:*)"
     ]
   }
 }
