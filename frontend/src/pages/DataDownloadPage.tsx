@@ -2064,7 +2064,7 @@ export default function DataDownloadPage() {
     setDownloadRefreshTrigger(t => t + 1);
 
     for (let i = 0; i < toDownload.length; i++) {
-      const r = toDownload[i];
+      const r = toDownload[i]!;
       try {
         await startDownload(
           r.product_id,

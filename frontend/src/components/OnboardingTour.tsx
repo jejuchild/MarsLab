@@ -169,7 +169,7 @@ export default function OnboardingTour({ forceOpen, onComplete }: OnboardingTour
 
   if (!isOpen) return null;
 
-  const step = TOUR_STEPS[currentStep];
+  const step = TOUR_STEPS[currentStep]!;
   const spotlight = getSpotlightRect(step.target);
   const isLastStep = currentStep === TOUR_STEPS.length - 1;
   const isFirstStep = currentStep === 0;

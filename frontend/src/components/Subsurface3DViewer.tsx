@@ -136,7 +136,7 @@ function TerrainMesh({
         const vertexIndex = row * cols + col;
         const x = -meshWidth / 2 + col * stepX;
         const z = meshHeight / 2 - row * stepZ;
-        const elev = elevations[vertexIndex];
+        const elev = elevations[vertexIndex]!;
         const y = (elev - centerElev) * verticalExaggeration;
 
         positions[vertexIndex * 3] = x;
@@ -287,8 +287,11 @@ function EndConnectors({
     const centerElev = (terrainData.min_elevation_m + terrainData.max_elevation_m) / 2;
 
     const result: [number, number, number][][] = [];
+    const first = points[0];
+    const last = points[points.length - 1];
+    if (!first || !last) return [];
 
-    for (const p of [points[0], points[points.length - 1]]) {
+    for (const p of [first, last]) {
       const x = (p.lon - centerLon) * metersPerDegLon;
       const z = -(p.lat - centerLat) * metersPerDegLat;
       const surfaceY = (p.elev - centerElev) * verticalExaggeration + 5;

@@ -107,7 +107,7 @@ export default function KeyboardShortcuts({ isOpen, onClose }: KeyboardShortcuts
           {/* Content */}
           <div className="px-6 py-4 max-h-[60vh] overflow-y-auto scrollbar-dark space-y-5">
             {grouped.map(({ category, items }) => {
-              const meta = CATEGORY_LABELS[category];
+              const meta = CATEGORY_LABELS[category]!;
               return (
                 <div key={category}>
                   {/* Category header */}

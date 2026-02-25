@@ -50,7 +50,7 @@ export default function FieldNoteModal({
         ]);
         if (cancelled) return;
         if (notes.length > 0) {
-          const note = notes[0];
+          const note = notes[0]!;
           setExisting(note);
           setMemo(note.memo);
           setTags(note.tags);
@@ -111,7 +111,9 @@ export default function FieldNoteModal({
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (focusedIndex >= 0 && focusedIndex < filteredSuggestions.length) {
-        addTag(filteredSuggestions[focusedIndex]);
+        const selectedTag = filteredSuggestions[focusedIndex];
+        if (!selectedTag) return;
+        addTag(selectedTag);
       } else if (tagInput.trim()) {
         addTag(tagInput);
       }

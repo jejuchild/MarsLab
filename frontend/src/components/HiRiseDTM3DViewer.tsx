@@ -175,7 +175,7 @@ const TerrainMesh = forwardRef<
         const z = meshHeight / 2 - row * stepZ;
 
         // Y: elevation (normalized and exaggerated)
-        const elev = elevations[elevIndex];
+        const elev = elevations[elevIndex]!;
         const y = (elev - centerElev) * verticalExaggeration;
 
         // Set position
@@ -354,7 +354,7 @@ function HoverRaycast({
         const intersects = raycaster.intersectObject(meshRef.current);
 
         if (intersects.length > 0) {
-          const hit = intersects[0];
+          const hit = intersects[0]!;
           const { x, y, z } = hit.point;
 
           // Convert local coords back to lat/lon
@@ -449,8 +449,9 @@ function FootprintLines({
 
         const pts: number[] = [];
         for (const coord of ring) {
-          const lon = coord[0];
-          const lat = coord[1];
+          if (coord.length < 2) continue;
+          const lon = coord[0]!;
+          const lat = coord[1]!;
           // Convert lat/lon to mesh coords
           const x = ((lon - bounds.west) / lonRange) * radius_m * 2 - radius_m;
           const z = radius_m - ((lat - bounds.south) / latRange) * radius_m * 2;

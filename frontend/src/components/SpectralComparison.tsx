@@ -46,8 +46,8 @@ export default function SpectralComparison({
     for (const s of spectra) {
       for (let i = 0; i < s.wavelengths.length; i++) {
         const r = s.reflectance[i];
-        if (r === null) continue;
-        const wl = s.wavelengths[i];
+        if (r == null) continue;
+        const wl = s.wavelengths[i]!;
         if (wl < wlMinVal) wlMinVal = wl;
         if (wl > wlMaxVal) wlMaxVal = wl;
         if (r < rMinVal) rMinVal = r;
@@ -84,11 +84,11 @@ export default function SpectralComparison({
 
     for (let i = 0; i < s.wavelengths.length; i++) {
       const r = s.reflectance[i];
-      if (r === null) {
+      if (r == null) {
         drawing = false;
         continue;
       }
-      const x = xScale(s.wavelengths[i]);
+      const x = xScale(s.wavelengths[i]!);
       const y = yScale(r);
       if (!drawing) {
         segments.push(`M ${x.toFixed(1)} ${y.toFixed(1)}`);

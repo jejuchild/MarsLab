@@ -440,7 +440,7 @@ function TimelineNavigatorRaw({
     const step = validProducts.length / MAX_RENDERED_DOTS;
     const sampled: TimelineProduct[] = [];
     for (let i = 0; i < MAX_RENDERED_DOTS; i++) {
-      sampled.push(validProducts[Math.floor(i * step)]);
+      sampled.push(validProducts[Math.floor(i * step)]!);
     }
     return sampled;
   }, [validProducts]);

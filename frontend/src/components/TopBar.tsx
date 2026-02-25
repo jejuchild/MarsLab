@@ -97,8 +97,8 @@ function detectSearchMode(query: string): SearchMode {
 function parseCoordinates(query: string): { lat: number; lon: number } | null {
   const match = query.trim().match(/^(-?\d+\.?\d*)\s*[,\s]\s*(-?\d+\.?\d*)$/);
   if (match) {
-    const lat = parseFloat(match[1]);
-    const lon = parseFloat(match[2]);
+    const lat = parseFloat(match[1]!);
+    const lon = parseFloat(match[2]!);
     if (lat >= -90 && lat <= 90 && lon >= -360 && lon <= 360) {
       return { lat, lon };
     }

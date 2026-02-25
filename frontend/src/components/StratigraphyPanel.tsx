@@ -142,7 +142,7 @@ export default function StratigraphyPanel({
     ?? result?.epsilon_estimates?.[0];
 
   /* ── Quality badge ──────────────────────────────────── */
-  const qc = QUALITY_COLORS[bestEst?.quality ?? ""] ?? QUALITY_COLORS.unreliable;
+  const qc = QUALITY_COLORS[bestEst?.quality ?? ""] ?? QUALITY_COLORS.unreliable!;
 
   return (
     <aside
@@ -520,7 +520,7 @@ function Badge({ icon, text }: { icon: string; text: string }) {
 }
 
 function EpsilonRow({ est }: { est: EpsilonEstimateInfo }) {
-  const qc = QUALITY_COLORS[est.quality] ?? QUALITY_COLORS.unreliable;
+  const qc = QUALITY_COLORS[est.quality] ?? QUALITY_COLORS.unreliable!;
   return (
     <div className="bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/50">
       <div className="flex items-center gap-2">

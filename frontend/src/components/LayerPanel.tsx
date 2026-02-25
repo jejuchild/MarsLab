@@ -15,7 +15,7 @@ type FootprintCount = { count: number; truncated: boolean; total: number } | nul
  */
 function extractCrismObsId(productId: string): string {
   const match = productId.match(/^([a-z]{3}[0-9a-f]{8})/i);
-  return match ? match[1].toLowerCase() : productId.toLowerCase();
+  return match ? match[1]!.toLowerCase() : productId.toLowerCase();
 }
 
 // Static Tailwind class lookup per instrument (avoids dynamic class issues)
@@ -216,7 +216,7 @@ function IceScoreFilterSection({
               min="0"
               max={SCORE_THRESHOLDS.length - 1}
               value={currentScoreIndex}
-              onChange={(e) => handleScoreChange(SCORE_THRESHOLDS[Number(e.target.value)])}
+              onChange={(e) => handleScoreChange(SCORE_THRESHOLDS[Number(e.target.value)]!)}
               disabled={!currentFilter.enabled}
               className={`w-full h-1 rounded-lg appearance-none cursor-pointer
                 ${currentFilter.enabled ? "bg-[#232f48]" : "bg-[#1a2333] opacity-50"}

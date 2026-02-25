@@ -296,9 +296,14 @@ export default function Inspector({
         );
 
         const dn = data.dn.flat() as number[];
+        if (dn.length === 0) {
+          setStats(null);
+          return;
+        }
+
         const mean = dn.reduce((a, b) => a + b, 0) / dn.length;
         const sorted = [...dn].sort((a, b) => a - b);
-        const median = sorted[Math.floor(sorted.length / 2)];
+        const median = sorted[Math.floor(sorted.length / 2)]!;
         const std = Math.sqrt(
           dn.reduce((acc, v) => acc + (v - mean) ** 2, 0) / dn.length
         );
@@ -1691,11 +1696,11 @@ function Histogram({
       </div>
 
       <div className="mt-2 flex justify-between font-mono text-[8px] text-slate-600">
-        <span>{Math.round(binEdges[0])}</span>
-        <span>{Math.round(binEdges[Math.floor(binEdges.length / 4)])}</span>
-        <span>{Math.round(binEdges[Math.floor(binEdges.length / 2)])}</span>
-        <span>{Math.round(binEdges[Math.floor((binEdges.length * 3) / 4)])}</span>
-        <span>{Math.round(binEdges[binEdges.length - 1])}</span>
+        <span>{Math.round(binEdges[0]!)}</span>
+        <span>{Math.round(binEdges[Math.floor(binEdges.length / 4)]!)}</span>
+        <span>{Math.round(binEdges[Math.floor(binEdges.length / 2)]!)}</span>
+        <span>{Math.round(binEdges[Math.floor((binEdges.length * 3) / 4)]!)}</span>
+        <span>{Math.round(binEdges[binEdges.length - 1]!)}</span>
       </div>
     </div>
   );

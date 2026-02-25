@@ -163,16 +163,17 @@ export default function RegolithPanel({
     let inRange = false;
     let rangeStart = 0;
     for (let i = 0; i < chartData.length; i++) {
-      if (chartData[i].clutter_flagged && !inRange) {
-        rangeStart = chartData[i].km;
+      const point = chartData[i]!;
+      if (point.clutter_flagged && !inRange) {
+        rangeStart = point.km;
         inRange = true;
-      } else if (!chartData[i].clutter_flagged && inRange) {
-        clutterRanges.push({ start: rangeStart, end: chartData[i - 1].km });
+      } else if (!point.clutter_flagged && inRange) {
+        clutterRanges.push({ start: rangeStart, end: chartData[i - 1]!.km });
         inRange = false;
       }
     }
     if (inRange && chartData.length > 0) {
-      clutterRanges.push({ start: rangeStart, end: chartData[chartData.length - 1].km });
+      clutterRanges.push({ start: rangeStart, end: chartData[chartData.length - 1]!.km });
     }
   }
 

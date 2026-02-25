@@ -115,7 +115,7 @@ function TerrainMesh({
         const vi = row * cols + col;
         const x = -meshWidth / 2 + col * stepX;
         const z = meshHeight / 2 - row * stepZ;
-        const elev = elevations[vi];
+        const elev = elevations[vi]!;
         const y = (elev - centerElev) * verticalExaggeration;
 
         positions[vi * 3] = x;

@@ -16,6 +16,7 @@ import { computeOverlapFilter, type OverlapResult, type OverlapStats } from "../
 import type { InstrumentType as FPInstrumentType } from "../utils/FootprintManager";
 import { getInstrumentCesiumColor } from "../config/instrumentRegistry";
 import useDTMHover from "../hooks/useDTMHover";
+import useMapViewer from "../hooks/useMapViewer";
 
 
 /* ==================================================

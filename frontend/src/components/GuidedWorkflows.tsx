@@ -97,7 +97,7 @@ function reducer(state: State, action: Action): State {
       // Mark current step completed if not already
       if (updatedSteps[currentStep.id]?.status !== "completed") {
         updatedSteps[currentStep.id] = {
-          ...updatedSteps[currentStep.id],
+          ...updatedSteps[currentStep.id]!,
           status: "completed",
         };
       }
@@ -105,7 +105,7 @@ function reducer(state: State, action: Action): State {
       // Mark next step active if it exists
       if (nextStep) {
         updatedSteps[nextStep.id] = {
-          ...updatedSteps[nextStep.id],
+          ...updatedSteps[nextStep.id]!,
           status: "active",
         };
       }
@@ -129,13 +129,13 @@ function reducer(state: State, action: Action): State {
 
       const updatedSteps = { ...state.steps };
       updatedSteps[currentStep.id] = {
-        ...updatedSteps[currentStep.id],
+        ...updatedSteps[currentStep.id]!,
         status: "skipped",
       };
 
       if (nextStep) {
         updatedSteps[nextStep.id] = {
-          ...updatedSteps[nextStep.id],
+          ...updatedSteps[nextStep.id]!,
           status: "active",
         };
       }
@@ -261,7 +261,7 @@ const ACCENT_CLASSES: Record<
 
 /** Single step status indicator (the circle in the stepper line) */
 function StepIndicator({ status, accent }: { status: StepStatus; accent: string }) {
-  const a = ACCENT_CLASSES[accent] ?? ACCENT_CLASSES.sky;
+  const a = (ACCENT_CLASSES[accent] ?? ACCENT_CLASSES.sky)!;
 
   const base =
     "w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-200";
@@ -314,7 +314,7 @@ function WorkflowCard({
   workflow: WorkflowDef;
   onSelect: (wf: WorkflowDef) => void;
 }) {
-  const a = ACCENT_CLASSES[workflow.accent] ?? ACCENT_CLASSES.sky;
+  const a = (ACCENT_CLASSES[workflow.accent] ?? ACCENT_CLASSES.sky)!;
 
   return (
     <button
@@ -404,7 +404,7 @@ export default function GuidedWorkflows({
   );
 
   const accent = selectedWorkflow?.accent ?? "sky";
-  const a = ACCENT_CLASSES[accent] ?? ACCENT_CLASSES.sky;
+  const a = (ACCENT_CLASSES[accent] ?? ACCENT_CLASSES.sky)!;
 
   const totalSteps = selectedWorkflow?.steps.length ?? 0;
   const completedOrSkipped = useMemo(() => {

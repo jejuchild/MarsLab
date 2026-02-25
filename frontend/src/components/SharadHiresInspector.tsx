@@ -162,11 +162,12 @@ export default function SharadHiresInspector({
       for (let d = -R; d <= R; d++) {
         const j = i + d;
         if (j < 0 || j >= pts.length) continue;
+        const neighbor = pts[j]!;
         // Skip if there's a gap (non-consecutive traces)
-        if (Math.abs(pts[j].x - pt.x) > R + 2) continue;
+        if (Math.abs(neighbor.x - pt.x) > R + 2) continue;
         const w = R + 1 - Math.abs(d);
         wSum += w;
-        ySum += pts[j].y * w;
+        ySum += neighbor.y * w;
       }
       return { x: pt.x, y: wSum > 0 ? ySum / wSum : pt.y };
     });
@@ -477,7 +478,7 @@ export default function SharadHiresInspector({
       let prevX = -Infinity;
       let moved = false;
       for (let i = 0; i < lineToDraw.length; i++) {
-        const pt = lineToDraw[i];
+        const pt = lineToDraw[i]!;
         const x = traceToX(pt.x);
         const y = binToY(pt.y);
         if (x < -50 || x > W + 50) { prevX = pt.x; continue; }
@@ -495,7 +496,7 @@ export default function SharadHiresInspector({
       // Adjustment handles (drawn at raw effectiveSurface positions)
       if (adjustMode) {
         for (let i = 0; i < handlePts.length; i++) {
-          const pt = handlePts[i];
+          const pt = handlePts[i]!;
           const x = traceToX(pt.x);
           const y = binToY(pt.y);
           if (x < -2 || x > W + 2 || y < -2 || y > H + 2) continue;
@@ -523,7 +524,7 @@ export default function SharadHiresInspector({
         let bMoved = false;
         let bPrevX = -Infinity;
         for (let i = 0; i < lineToDraw.length; i++) {
-          const pt = lineToDraw[i];
+          const pt = lineToDraw[i]!;
           const x = traceToX(pt.x);
           const y = binToY(pt.y + boundaryBinOffset);
           if (x < -50 || x > W + 50) { bPrevX = pt.x; continue; }
@@ -541,8 +542,9 @@ export default function SharadHiresInspector({
 
         // Label
         const midIdx = Math.floor(lineToDraw.length / 2);
-        const labelX = traceToX(lineToDraw[midIdx].x);
-        const labelY = binToY(lineToDraw[midIdx].y + boundaryBinOffset);
+        const midPt = lineToDraw[midIdx]!;
+        const labelX = traceToX(midPt.x);
+        const labelY = binToY(midPt.y + boundaryBinOffset);
         if (labelX > 40 && labelX < W - 120 && labelY > 10 && labelY < H - 10) {
           ctx.font = "bold 9px monospace";
           ctx.fillStyle = "rgba(103, 232, 249, 0.85)";
@@ -613,7 +615,7 @@ export default function SharadHiresInspector({
         }
         // Lower edge (reverse)
         for (let i = hyperbolaFit.overlay_ci_band.length - 1; i >= 0; i--) {
-          const pt = hyperbolaFit.overlay_ci_band[i];
+          const pt = hyperbolaFit.overlay_ci_band[i]!;
           ctx.lineTo(traceToX(pt.trace), binToY(pt.bin_hi));
         }
         ctx.closePath();
@@ -721,15 +723,17 @@ export default function SharadHiresInspector({
     for (let i = iStart; i < iEnd && i < n; i++) {
       const si = i + molaXOffset;
       if (si < 0 || si >= n) continue;
-      const e = molaProfile.elevation_m[si];
+      const e = molaProfile.elevation_m[si]!;
       if (e !== null) visibleElevs.push(e);
     }
     if (visibleElevs.length === 0) return;
 
-    let eMin = visibleElevs[0], eMax = visibleElevs[0];
+    let eMin = visibleElevs[0]!;
+    let eMax = visibleElevs[0]!;
     for (let k = 1; k < visibleElevs.length; k++) {
-      if (visibleElevs[k] < eMin) eMin = visibleElevs[k];
-      if (visibleElevs[k] > eMax) eMax = visibleElevs[k];
+      const e = visibleElevs[k]!;
+      if (e < eMin) eMin = e;
+      if (e > eMax) eMax = e;
     }
     const ePad = Math.max((eMax - eMin) * 0.1, 50);
     const yMin = eMin - ePad;
@@ -789,7 +793,7 @@ export default function SharadHiresInspector({
     for (let i = Math.max(0, iStart - 1); i <= Math.min(n - 1, iEnd + 1); i++) {
       const si = i + molaXOffset;
       if (si < 0 || si >= n) { started = false; continue; }
-      const e = molaProfile.elevation_m[si];
+      const e = molaProfile.elevation_m[si]!;
       if (e === null) { started = false; continue; }
       const x = xOf(i); // x position is SHARAD-aligned (no offset)
       const y = yOf(e);
@@ -814,7 +818,7 @@ export default function SharadHiresInspector({
         // Show elevation at cursor, accounting for offset
         const idx = Math.round(cursor.normX * (n - 1)) + molaXOffset;
         if (idx >= 0 && idx < n) {
-          const e = molaProfile.elevation_m[idx];
+          const e = molaProfile.elevation_m[idx]!;
           if (e !== null) {
             ctx.fillStyle = "#38bdf8";
             ctx.font = "bold 9px monospace";
@@ -919,7 +923,7 @@ export default function SharadHiresInspector({
     let bestIdx = -1;
     let bestDist = Infinity;
     for (let i = 0; i < effectiveSurface.length; i++) {
-      const pt = effectiveSurface[i];
+      const pt = effectiveSurface[i]!;
       const px = ((pt.x / nTraces - viewX.start) / (viewX.end - viewX.start)) * W;
       const py = ((pt.y / nBins - viewY.start) / (viewY.end - viewY.start)) * H;
       const cx = ((normX - viewX.start) / (viewX.end - viewX.start)) * W;
@@ -990,7 +994,7 @@ export default function SharadHiresInspector({
 
       const vertIdx = findNearestSurfaceVertex(normX, normY);
       if (vertIdx !== null) {
-        const pt = effectiveSurface[vertIdx];
+        const pt = effectiveSurface[vertIdx]!;
         adjustDragRef.current = {
           traceX: pt.x,
           origBin: pt.y,
