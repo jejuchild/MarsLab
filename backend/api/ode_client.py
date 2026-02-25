@@ -1000,26 +1000,72 @@ async def resolve_hirise_bundle(
     bundle = HiRISEBundle(product_id=product_id)
 
     try:
-        # Search for the RDR product
-        # HiRISE RDR products have _RED suffix
-        rdr_id = f"{product_id}_RED"
+        # Use ODE REST API with results=pmf to get product files
+        # pt=RDRV11 filters to RDR (Reduced Data Record) products with JP2
+        url = (
+            f"{ODE_REST_BASE}?"
+            f"target=mars&"
+            f"ihid=mro&"
+            f"iid=hirise&"
+            f"productid={product_id}*&"
+            f"pt=RDRV11&"
+            f"output=json&"
+            f"results=pmf&"
+            f"limit=5"
+        )
 
-        files = await discover_product_files(rdr_id, Instrument.HIRISE, session)
+        resp = await _fetch_with_retry(session, url, timeout=30)
+        if resp and resp.status == 200:
+            data = await resp.json()
+            await resp.release()
 
-        # If no files found, try without the _RED suffix
-        if not files:
-            files = await discover_product_files(product_id, Instrument.HIRISE, session)
+            products = data.get('ODEResults', {}).get('Products', {}).get('Product', [])
+            if isinstance(products, dict):
+                products = [products]
 
-        for f in files:
-            fname_lower = f.filename.lower()
+            # Find the RED product (main science product)
+            for p in products:
+                pdsid = p.get('pdsid', '')
+                if not pdsid.upper().endswith('_RED'):
+                    continue
 
-            # Look for RED JP2 file
-            if "red" in fname_lower and fname_lower.endswith(".jp2"):
-                bundle.jp2_file = f
+                product_files = p.get('Product_files', {}).get('Product_file', [])
+                if isinstance(product_files, dict):
+                    product_files = [product_files]
 
-            # Look for RED label
-            elif "red" in fname_lower and fname_lower.endswith(".lbl"):
-                bundle.lbl_file = f
+                for pf in product_files:
+                    fname = pf.get('FileName', '')
+                    fname_lower = fname.lower()
+                    file_url = pf.get('URL', '')
+                    size_kb_str = pf.get('KBytes', '0')
+                    try:
+                        size_bytes = int(size_kb_str) * 1024
+                    except (ValueError, TypeError):
+                        size_bytes = None
+
+                    # RED JP2 file (map-projected, main product)
+                    if 'red' in fname_lower and fname_lower.endswith('.jp2') and 'nomap' not in fname_lower and 'qlook' not in fname_lower:
+                        bundle.jp2_file = ODEFile(
+                            filename=fname,
+                            url=file_url,
+                            file_type='Product',
+                            description='RED JP2 Image',
+                            size_bytes=size_bytes,
+                        )
+
+                    # RED label file
+                    elif fname_lower.endswith('.lbl') and 'red' in fname_lower:
+                        bundle.lbl_file = ODEFile(
+                            filename=fname,
+                            url=file_url,
+                            file_type='Product',
+                            description='RED Label',
+                            size_bytes=size_bytes,
+                        )
+
+                # Found the RED product, stop searching
+                if bundle.jp2_file:
+                    break
 
     except Exception as e:
         logger.error(f"Error resolving HiRISE bundle: {e}")

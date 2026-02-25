@@ -1258,6 +1258,9 @@ export default function MapView({
         lon: selectLon,
         title,
       });
+
+      // Auto-activate quickview overlay for deep-link products
+      onToggleOverlay?.(pid, "quickview");
     }
 
     // Save original material
@@ -1307,7 +1310,7 @@ export default function MapView({
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [highlightProductId, onHighlightComplete, onSelect]);
+  }, [highlightProductId, onHighlightComplete, onSelect, onToggleOverlay]);
 
   // Bring high-res overlay to front when bringToFrontId changes
   useEffect(() => {

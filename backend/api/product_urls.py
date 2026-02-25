@@ -113,11 +113,11 @@ async def get_crism_urls(request: Request, product_id: str):
             # e.g. "frt0001fd76_07_brhydj_mtr3.png" -> "hyd"
             parts = fname.split("_br")
             if len(parts) >= 2:
-                type_part = parts[1]  # "hydj_mtr3.png"
-                # Remove variant suffix letter + rest
+                type_part = parts[1]  # "hydj_mtr3.png" or "ic2j_mtr3.png"
+                # Extract browse type: letters/digits up to 3 chars, stop at variant suffix + _
                 br_type = ""
                 for ch in type_part:
-                    if ch.isalpha() and len(br_type) < 3:
+                    if (ch.isalpha() or ch.isdigit()) and len(br_type) < 3:
                         br_type += ch
                     else:
                         break
