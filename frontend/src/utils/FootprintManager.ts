@@ -337,7 +337,11 @@ export class FootprintManager {
    * Passes ALL feature properties to entity for popup access
    */
   private renderFeatures(instrument: InstrumentType, features: FootprintFeature[]): void {
-    const ids = this.entityIds.get(instrument)!;
+    let ids = this.entityIds.get(instrument);
+    if (!ids) {
+      ids = new Set<string>();
+      this.entityIds.set(instrument, ids);
+    }
     const color = this.getColor(instrument);
 
     this.viewer.entities.suspendEvents();
