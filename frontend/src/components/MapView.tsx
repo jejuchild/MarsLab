@@ -1220,15 +1220,44 @@ export default function MapView({
     const pid = highlightProductId;
     const instruments = ["HIRISE", "CRISM", "CTX", "SHARAD", "SHARAD_HIGHRES", "HIRISE_DTM", "CRISM_TRR3", "CUSTOM"];
     let entity: Cesium.Entity | null = null;
+    let foundInst = "";
 
     for (const inst of instruments) {
       const e = viewer.entities.getById(`${inst}_FP_${pid}`);
-      if (e) { entity = e; break; }
+      if (e) { entity = e; foundInst = inst; break; }
     }
 
     if (!entity) {
       onHighlightComplete?.();
       return;
+    }
+
+    // Auto-select the product so the Inspector opens (deep-link UX)
+    if (foundInst) {
+      let selectLat = 0;
+      let selectLon = 0;
+      if (entity.rectangle?.coordinates) {
+        const rect = entity.rectangle.coordinates.getValue(Cesium.JulianDate.now());
+        if (rect) {
+          selectLat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
+          selectLon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
+        }
+      } else if (entity.position) {
+        const pos = entity.position.getValue(Cesium.JulianDate.now());
+        if (pos) {
+          const carto = Cesium.Cartographic.fromCartesian(pos, MARS_ELLIPSOID);
+          selectLat = Cesium.Math.toDegrees(carto.latitude);
+          selectLon = Cesium.Math.toDegrees(carto.longitude);
+        }
+      }
+      const title = entity.properties?.title?.getValue?.() as string | undefined;
+      onSelect({
+        instrument: foundInst as InspectorContext["instrument"],
+        productId: pid,
+        lat: selectLat,
+        lon: selectLon,
+        title,
+      });
     }
 
     // Save original material
@@ -1278,7 +1307,7 @@ export default function MapView({
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [highlightProductId, onHighlightComplete]);
+  }, [highlightProductId, onHighlightComplete, onSelect]);
 
   // Bring high-res overlay to front when bringToFrontId changes
   useEffect(() => {
