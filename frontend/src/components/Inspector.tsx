@@ -557,7 +557,7 @@ export default function Inspector({
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-4 scrollbar-dark">
         {/* HiRISE Tabs */}
-        {isHiRISE && hiriseTab === "Metadata" && <MetadataTab selected={selected} />}
+        {isHiRISE && hiriseTab === "Metadata" && <MetadataTab selected={selected} hasHighResData={hasHighResData} />}
 
         {isHiRISE && hiriseTab === "Pixel" && (
           <PixelTab
@@ -570,7 +570,7 @@ export default function Inspector({
         )}
 
         {/* CRISM Tabs */}
-        {isCRISM && crismTab === "Metadata" && <MetadataTab selected={selected} onOpenMineralSequence={onOpenMineralSequence} />}
+        {isCRISM && crismTab === "Metadata" && <MetadataTab selected={selected} hasHighResData={hasHighResData} onOpenMineralSequence={onOpenMineralSequence} />}
 
         {isCRISM && crismTab === "Spectrum" && (
           <SpectrumTab
@@ -594,7 +594,7 @@ export default function Inspector({
           <CustomMetadataTab dataset={customDataset} />
         )}
 
-        {isDTM && <MetadataTab selected={selected} />}
+        {isDTM && <MetadataTab selected={selected} hasHighResData={hasHighResData} />}
       </div>
 
       {/* Footer - Overlay Controls */}
@@ -1493,9 +1493,147 @@ function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; o
 }
 
 /* =========================================================
+ * Product Download Links Component
+ * Fetches PDS download URLs from backend and displays them
+ * =======================================================*/
+function ProductDownloadLinks({ productId, instrument }: { productId: string; instrument: InstrumentType }) {
+  const [urls, setUrls] = useState<{
+    jp2_url?: string;
+    jp2_size_bytes?: number;
+    jp2_filename?: string;
+    lbl_url?: string;
+    img_url?: string;
+    img_filename?: string;
+    browse_urls?: Record<string, string>;
+    product_type?: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const isHiRISE = instrument === "HIRISE";
+  const isCRISM = instrument === "CRISM" || instrument === "CRISM_TRR3";
+
+  useEffect(() => {
+    if (!isHiRISE && !isCRISM) return;
+    setLoading(true);
+    setError(false);
+    setUrls(null);
+
+    const endpoint = isHiRISE
+      ? `/api/product-urls/hirise/${productId}`
+      : `/api/product-urls/crism/${productId}`;
+
+    fetch(endpoint)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => setUrls(data))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, [productId, instrument, isHiRISE, isCRISM]);
+
+  if (!isHiRISE && !isCRISM) return null;
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-slate-500 text-[11px]">
+        <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>
+        Resolving PDS download URLs…
+      </div>
+    );
+  }
+
+  if (error || !urls) {
+    return (
+      <div className="text-[11px] text-slate-500">
+        Could not resolve download URLs from ODE.
+      </div>
+    );
+  }
+
+  // CRISM browse labels — use full Tailwind class names (no dynamic interpolation for JIT)
+  const CRISM_BROWSE_LABELS: Record<string, { label: string; className: string }> = {
+    vna: { label: "VNIR", className: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30" },
+    hyd: { label: "HYD", className: "bg-fuchsia-500/20 border-fuchsia-500/50 text-fuchsia-400 hover:bg-fuchsia-500/30" },
+    ice: { label: "ICE", className: "bg-blue-500/20 border-blue-500/50 text-blue-400 hover:bg-blue-500/30" },
+    ic2: { label: "CO\u2082", className: "bg-cyan-500/20 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/30" },
+  };
+
+  const browseUrls = urls.browse_urls;
+
+  return (
+    <div className="space-y-2">
+      {/* HiRISE JP2 download */}
+      {isHiRISE && urls.jp2_url && (
+        <a
+          href={urls.jp2_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 w-full rounded-lg py-2.5 px-3 text-[10px] font-bold uppercase tracking-widest bg-sky-500/20 border border-sky-500/50 text-sky-400 hover:bg-sky-500/30 transition-all active:scale-[0.98] no-underline"
+        >
+          <span className="material-symbols-outlined text-sm">cloud_download</span>
+          <span className="flex-1">Download RED JP2 from PDS</span>
+          {urls.jp2_size_bytes && (
+            <span className="text-[9px] font-normal text-sky-400/70">
+              {formatBytes(urls.jp2_size_bytes)}
+            </span>
+          )}
+        </a>
+      )}
+
+      {/* CRISM browse product downloads */}
+      {isCRISM && browseUrls && Object.keys(browseUrls).length > 0 && (
+        <div className="grid grid-cols-2 gap-1.5">
+          {Object.entries(CRISM_BROWSE_LABELS).map(([key, cfg]) => {
+            const url = browseUrls[key];
+            if (!url) return null;
+            return (
+              <a
+                key={key}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center justify-center gap-1 rounded-lg py-2 px-2 text-[10px] font-bold uppercase tracking-widest no-underline border transition-all active:scale-[0.98] ${cfg.className}`}
+              >
+                <span className="material-symbols-outlined text-xs">cloud_download</span>
+                {cfg.label}
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {/* CRISM core product download */}
+      {isCRISM && urls.img_url && (
+        <a
+          href={urls.img_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 w-full rounded-lg py-2 px-3 text-[10px] font-bold uppercase tracking-widest bg-violet-500/20 border border-violet-500/50 text-violet-400 hover:bg-violet-500/30 transition-all active:scale-[0.98] no-underline"
+        >
+          <span className="material-symbols-outlined text-sm">cloud_download</span>
+          <span className="flex-1">Download IMG from PDS</span>
+        </a>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/* =========================================================
  * Metadata Tab
  * =======================================================*/
-function MetadataTab({ selected, onOpenMineralSequence }: { selected: InspectorContext; onOpenMineralSequence?: (obsId: string) => void }) {
+function MetadataTab({ selected, hasHighResData, onOpenMineralSequence }: { selected: InspectorContext; hasHighResData?: boolean; onOpenMineralSequence?: (obsId: string) => void }) {
+  const isHiRISE = selected.instrument === "HIRISE";
+  const isCRISM = selected.instrument === "CRISM" || selected.instrument === "CRISM_TRR3";
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -1503,6 +1641,20 @@ function MetadataTab({ selected, onOpenMineralSequence }: { selected: InspectorC
           {selected.instrument === "CRISM" || selected.instrument === "CRISM_TRR3" ? "spectrum" : "satellite_alt"}
         </span>
         <span className="text-sm font-bold">{selected.instrument}</span>
+        {/* Status badge */}
+        {isHiRISE && (
+          hasHighResData ? (
+            <span className="ml-auto flex items-center gap-1 rounded-full bg-green-500/20 border border-green-500/40 px-2 py-0.5 text-[9px] font-bold uppercase text-green-400">
+              <span className="material-symbols-outlined" style={{ fontSize: 10 }}>check_circle</span>
+              Full Res
+            </span>
+          ) : (
+            <span className="ml-auto flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 text-[9px] font-bold uppercase text-amber-400">
+              <span className="material-symbols-outlined" style={{ fontSize: 10 }}>photo_camera</span>
+              Quickview Only
+            </span>
+          )
+        )}
       </div>
 
       {/* Title (if available) */}
@@ -1536,6 +1688,16 @@ function MetadataTab({ selected, onOpenMineralSequence }: { selected: InspectorC
           <CRISMQuickviewImage productId={selected.productId} instrument={selected.instrument} />
         </div>
       </div>
+
+      {/* PDS Download Links */}
+      {(isHiRISE || isCRISM) && (
+        <div>
+          <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-primary">
+            PDS Downloads
+          </h4>
+          <ProductDownloadLinks productId={selected.productId} instrument={selected.instrument} />
+        </div>
+      )}
 
       {/* TRR3 Mineral Classification */}
       {selected.instrument === "CRISM_TRR3" && (

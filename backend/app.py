@@ -544,6 +544,8 @@ app.include_router(mineral_sequence_router)  # /api/mineral-sequence/* — Miner
 from api.strat_column_router import router as strat_column_router
 app.include_router(strat_column_router)  # /api/strat-column/* — Stratigraphic Column
 
+from api.product_urls import router as product_urls_router
+app.include_router(product_urls_router)  # /api/product-urls/* — PDS Download URL Resolver
 @app.get("/hirise/quickview/{product_id}.png")
 @limiter.limit("20/minute")
 def get_hirise_quickview_transparent(request: Request, product_id: str):

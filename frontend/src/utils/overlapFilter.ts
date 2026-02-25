@@ -47,7 +47,10 @@ export function getBoundingBox(feature: OverlapFeature): BBox | null {
     const ring: number[][] = geom.coordinates[0];
     if (!ring || ring.length === 0) return null;
     let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
-    for (const [lon, lat] of ring) {
+    for (const coord of ring) {
+      if (coord.length < 2) continue;
+      const lon = coord[0]!;
+      const lat = coord[1]!;
       if (lon < west) west = lon;
       if (lon > east) east = lon;
       if (lat < south) south = lat;
@@ -60,7 +63,10 @@ export function getBoundingBox(feature: OverlapFeature): BBox | null {
     const coords: number[][] = geom.coordinates;
     if (!coords || coords.length === 0) return null;
     let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
-    for (const [lon, lat] of coords) {
+    for (const coord of coords) {
+      if (coord.length < 2) continue;
+      const lon = coord[0]!;
+      const lat = coord[1]!;
       if (lon < west) west = lon;
       if (lon > east) east = lon;
       if (lat < south) south = lat;
@@ -70,7 +76,9 @@ export function getBoundingBox(feature: OverlapFeature): BBox | null {
   }
 
   if (geom.type === "Point") {
-    const [lon, lat] = geom.coordinates;
+    if (!Array.isArray(geom.coordinates) || geom.coordinates.length < 2) return null;
+    const lon = geom.coordinates[0]!;
+    const lat = geom.coordinates[1]!;
     return {
       west: lon - POINT_BUFFER_DEG,
       south: lat - POINT_BUFFER_DEG,
@@ -154,8 +162,10 @@ function liangBarskyClip(
 function lineIntersectsBBox(coords: number[][], bbox: BBox): boolean {
   const { west: xmin, south: ymin, east: xmax, north: ymax } = bbox;
   for (let i = 0; i < coords.length - 1; i++) {
-    const [x1, y1] = coords[i];
-    const [x2, y2] = coords[i + 1];
+    const x1 = coords[i]![0]!;
+    const y1 = coords[i]![1]!;
+    const x2 = coords[i + 1]![0]!;
+    const y2 = coords[i + 1]![1]!;
     // Skip antimeridian-crossing segments (large longitude jump).
     // These are orbital track dateline transitions, not real ground coverage.
     if (Math.abs(x2 - x1) > 180) continue;

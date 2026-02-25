@@ -118,7 +118,7 @@ export function getElevationFromGrid(
 
   // Get elevation (row-major order)
   const index = clampedRow * cols + clampedCol;
-  return elevations[index];
+  return elevations[index] ?? null;
 }
 
 /**

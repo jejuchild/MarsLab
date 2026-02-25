@@ -19,7 +19,7 @@ export function useUndoRedo(maxHistory: number = 20) {
   const undo = useCallback(() => {
     setUndoStack(prev => {
       if (prev.length === 0) return prev;
-      const action = prev[prev.length - 1];
+      const action = prev[prev.length - 1]!;
       action.undo();
       setRedoStack(r => [...r, action]);
       return prev.slice(0, -1);
@@ -29,7 +29,7 @@ export function useUndoRedo(maxHistory: number = 20) {
   const redo = useCallback(() => {
     setRedoStack(prev => {
       if (prev.length === 0) return prev;
-      const action = prev[prev.length - 1];
+      const action = prev[prev.length - 1]!;
       action.redo();
       setUndoStack(u => [...u, action]);
       return prev.slice(0, -1);
