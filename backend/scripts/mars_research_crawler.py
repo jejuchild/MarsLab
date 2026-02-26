@@ -325,11 +325,16 @@ def main() -> None:
         logger.error("Invalid --date value. Use YYYY-MM-DD.")
         sys.exit(1)
 
-    topic_arg = args.topic
-    topic_value = topic_arg if isinstance(topic_arg, str) else ""
+    topic_value: str = ""
+    if isinstance(args.topic, str):
+        topic_value = args.topic
 
     if topic_value:
-        matches = [t for t in RESEARCH_TOPICS if t["focus"].lower() == topic_value.lower()]
+        matches = []
+        for t in RESEARCH_TOPICS:
+            focus_value = t.get("focus")
+            if isinstance(focus_value, str) and focus_value.lower() == topic_value.lower():
+                matches.append(t)
         if not matches:
             logger.error("Topic '%s' not found. Use --list-topics to inspect options.", topic_value)
             sys.exit(1)

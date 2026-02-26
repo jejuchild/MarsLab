@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Cron setup (daily at 7:10am KST):
+#   10 7 * * * /disk1/cspark/MarsLab/backend/scripts/mars_research_cron.sh >> /disk1/cspark/MarsLab/backend/mars_research/cron.log 2>&1
 
 set -euo pipefail
 

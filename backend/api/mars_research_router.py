@@ -25,7 +25,7 @@ def _list_research_files() -> list[Path]:
     return files
 
 
-def _load_research_file(fpath: Path) -> dict:
+def _load_research_file(fpath: Path) -> dict[str, object]:
     try:
         return json.loads(fpath.read_text(encoding="utf-8"))
     except Exception as exc:
@@ -33,12 +33,21 @@ def _load_research_file(fpath: Path) -> dict:
         return {}
 
 
+def _topic_focus(data: dict[str, object]) -> str:
+    topic = data.get("topic")
+    if isinstance(topic, dict):
+        focus = topic.get("focus")
+        if isinstance(focus, str):
+            return focus
+    return ""
+
+
 @router.get("")
 def list_mars_research():
     entries = []
     for fpath in _list_research_files():
         data = _load_research_file(fpath)
-        topic = data.get("topic", {}).get("focus", "")
+        topic = _topic_focus(data)
         papers = data.get("papers", [])
         entries.append(
             {
@@ -113,7 +122,7 @@ def search_mars_research(q: str):
             results.append(
                 {
                     "date": data.get("date", fpath.stem),
-                    "topic": data.get("topic", {}).get("focus", ""),
+                    "topic": _topic_focus(data),
                     "match_count": total_matches,
                     "papers": matched_papers,
                 }
@@ -127,7 +136,7 @@ def list_mars_research_topics():
     topic_counts: dict[str, int] = {}
     for fpath in _list_research_files():
         data = _load_research_file(fpath)
-        focus = data.get("topic", {}).get("focus", "")
+        focus = _topic_focus(data)
         if not isinstance(focus, str) or not focus:
             continue
         topic_counts[focus] = topic_counts.get(focus, 0) + 1
