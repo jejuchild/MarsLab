@@ -10,6 +10,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote_plus
 
 import requests
 
@@ -39,6 +40,15 @@ logger = logging.getLogger("mars_news_crawler")
 
 def _date_seed(date: datetime.date) -> int:
     return int(hashlib.sha256(date.isoformat().encode()).hexdigest()[:8], 16)
+
+
+def _make_search_url(title: str, source: str) -> str | None:
+    """Generate a Google search URL from a news item's title and source."""
+    title = title.strip()
+    if not title:
+        return None
+    query = f"{title} {source} Mars".strip()
+    return f"https://www.google.com/search?q={quote_plus(query)}"
 
 
 def build_prompt(date: datetime.date) -> str:
@@ -89,7 +99,7 @@ Return ONLY valid JSON (no markdown fences, no prose before/after) with exactly 
       "summary": "2-4 sentences",
       "category": "one of allowed categories",
       "significance": "why this matters for Mars exploration",
-      "url": "https://... or null"
+      "url": null
     }}
   ],
   "trend_summary": "multi-sentence synthesis across all categories"
@@ -98,7 +108,7 @@ Return ONLY valid JSON (no markdown fences, no prose before/after) with exactly 
 Constraints:
 - Include 10-20 items total.
 - Ensure category values are exactly one of the allowed categories.
-- Use null for unknown URLs.
+- Always set url to null. Do not generate URLs — they will be added programmatically.
 - Prefer factual updates over speculation.
 """
 
@@ -173,7 +183,7 @@ def normalize_payload(date: datetime.date, payload: dict[str, Any]) -> dict[str,
             "summary": str(item.get("summary", "")).strip(),
             "category": category,
             "significance": str(item.get("significance", "")).strip(),
-            "url": item.get("url") if item.get("url") else None,
+            "url": _make_search_url(str(item.get("title", "")), str(item.get("source", ""))),
         })
 
     incoming_categories = payload.get("categories", {})

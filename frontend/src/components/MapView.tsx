@@ -1551,21 +1551,22 @@ export default function MapView({
     const tileUrl = layerMap[swimLayer];
     if (!tileUrl) return;
 
-    try {
-      const provider = new Cesium.SingleTileImageryProvider({
-        url: tileUrl,
-        rectangle: Cesium.Rectangle.fromDegrees(-180, -60, 180, 60),
-      });
-
+    // Use async fromUrl (constructor deprecated in Cesium 1.104+)
+    let cancelled = false;
+    Cesium.SingleTileImageryProvider.fromUrl(tileUrl, {
+      rectangle: Cesium.Rectangle.fromDegrees(-180, -60, 180, 60),
+    }).then((provider) => {
+      if (cancelled || !viewer || viewer.isDestroyed()) return;
       const layer = viewer.imageryLayers.addImageryProvider(provider);
       layer.alpha = 0.75;
       swimLayerRef.current = layer;
       viewer.scene.requestRender();
-    } catch (err) {
+    }).catch((err) => {
       console.warn("Failed to load SWIM overlay:", err);
-    }
+    });
 
     return () => {
+      cancelled = true;
       if (!viewer || viewer.isDestroyed()) return;
       if (swimLayerRef.current) {
         viewer.imageryLayers.remove(swimLayerRef.current, false);

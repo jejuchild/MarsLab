@@ -23,6 +23,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import quote_plus
 
 import requests
 from dotenv import load_dotenv
@@ -106,6 +107,18 @@ def select_topic(date: datetime.date) -> dict[str, Any]:
     return candidates[seed % len(candidates)]
 
 
+def _make_scholar_url(title: str, authors: str) -> str | None:
+    """Generate a Google Scholar search URL from a paper's title."""
+    title = title.strip()
+    if not title:
+        return None
+    query = title
+    first_author = authors.split(",")[0].split(" et ")[0].strip() if authors else ""
+    if first_author:
+        query = f"{first_author} {title}"
+    return f"https://scholar.google.com/scholar?q={quote_plus(query)}"
+
+
 def build_prompt(date: datetime.date, topic: dict[str, Any]) -> str:
     return f"""You are a Mars research librarian preparing a daily research digest for MarsLab.
 
@@ -132,7 +145,7 @@ Return only valid JSON with this exact shape:
       "methodology": "string",
       "relevance": "string",
       "category": "string",
-      "url": "https://doi.org/... or https://arxiv.org/... or null"
+      "url": null
     }}
   ],
   "trend_analysis": "string",
@@ -142,7 +155,7 @@ Return only valid JSON with this exact shape:
 Rules:
 - Output JSON only. Do not include markdown, comments, or code fences.
 - Provide 5-10 paper entries.
-- Include DOI or arXiv URLs where known. Use null if URL is uncertain.
+- Always set url to null. Do not generate URLs — they will be added programmatically.
 - If exact citation details are uncertain, state uncertainty clearly inside the relevant fields.
 """
 
@@ -170,7 +183,7 @@ def _normalize_paper(paper: dict[str, Any]) -> dict[str, Any]:
         "methodology": str(paper.get("methodology", "")).strip(),
         "relevance": str(paper.get("relevance", "")).strip(),
         "category": str(paper.get("category", "")).strip(),
-        "url": paper.get("url") if paper.get("url") else None,
+        "url": _make_scholar_url(str(paper.get("title", "")), str(paper.get("authors", ""))),
     }
 
 

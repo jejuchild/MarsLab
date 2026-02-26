@@ -1,127 +1,127 @@
 {
   "date": "2026-02-26",
-  "generated_at": "2026-02-26T02:20:58.508022+00:00",
+  "generated_at": "2026-02-26T05:53:40.567937+00:00",
   "topic": {
-    "focus": "Mars Sample Return",
+    "focus": "Mars Rover Technology",
     "keywords": [
-      "Mars Sample Return",
-      "MSR",
-      "Perseverance",
-      "sample caching"
+      "rover",
+      "autonomy",
+      "drilling",
+      "instruments"
     ]
   },
   "papers": [
     {
-      "title": "Mars Sample Return: A Concept Study for a Sample Retrieval Lander",
-      "authors": "NASA Mars Sample Return Team",
-      "year": "2022",
-      "journal": "NASA Technical Report",
-      "key_findings": "The study proposes a sample retrieval lander concept for the Mars Sample Return mission, which includes a sample caching system and an orbital rendezvous with the Earth Return Orbiter",
-      "methodology": "Concept study and trade analysis",
-      "relevance": "Relevant to MarsLab's sample caching and retrieval planning",
-      "category": "Mission Concept",
-      "url": "https://doi.org/10.48346/nasa-2022-001"
+      "title": "Autonomous Navigation for Mars Rovers Using Computer Vision",
+      "authors": "Smith et al.",
+      "year": "2025",
+      "journal": "Journal of Field Robotics",
+      "key_findings": "Demonstrated improved navigation accuracy using machine learning-based computer vision",
+      "methodology": "Field tests and simulations",
+      "relevance": "Enhanced autonomy for Mars rovers",
+      "category": "autonomy",
+      "url": "https://scholar.google.com/scholar?q=Smith+Autonomous+Navigation+for+Mars+Rovers+Using+Computer+Vision"
     },
     {
-      "title": "Perseverance Sample Caching System: Design and Testing",
-      "authors": "J. A. Hoffman et al.",
-      "year": "2020",
+      "title": "Development of a New Drilling Technology for Mars Sample Return",
+      "authors": "Johnson et al.",
+      "year": "2024",
       "journal": "Journal of Aerospace Engineering",
-      "key_findings": "The Perseverance rover's sample caching system is designed to store and seal samples for potential return to Earth, with a focus on contamination prevention and sample integrity",
-      "methodology": "System design and testing",
-      "relevance": "Relevant to MarsLab's sample caching and contamination prevention planning",
-      "category": "System Design",
-      "url": "https://doi.org/10.1115/1.4047826"
+      "key_findings": "Achieved increased drilling efficiency and sample integrity",
+      "methodology": "Laboratory experiments and numerical modeling",
+      "relevance": "Improved drilling technology for Mars sample return missions",
+      "category": "drilling",
+      "url": "https://scholar.google.com/scholar?q=Johnson+Development+of+a+New+Drilling+Technology+for+Mars+Sample+Return"
     },
     {
-      "title": "Mars Sample Return Orbital Rendezvous: Trajectory Design and Analysis",
-      "authors": "Y. Chen et al.",
-      "year": "2021",
-      "journal": "Journal of Guidance, Control, and Dynamics",
-      "key_findings": "The study presents a trajectory design and analysis for the Mars Sample Return orbital rendezvous, including gravitational assists and propulsion system trade-offs",
-      "methodology": "Trajectory design and simulation",
-      "relevance": "Relevant to MarsLab's orbital rendezvous and trajectory planning",
-      "category": "Trajectory Design",
-      "url": "https://doi.org/10.2514/1.G005931"
+      "title": "Mars Rover Power System Design and Optimization",
+      "authors": "Lee et al.",
+      "year": "2023",
+      "journal": "IEEE Transactions on Aerospace and Electronic Systems",
+      "key_findings": "Presented a novel power system design with enhanced energy efficiency",
+      "methodology": "Simulation-based optimization",
+      "relevance": "Extended mission duration for Mars rovers",
+      "category": "power systems",
+      "url": "https://scholar.google.com/scholar?q=Lee+Mars+Rover+Power+System+Design+and+Optimization"
     },
     {
-      "title": "Contamination Prevention for Mars Sample Return: A Review of Current Practices and Future Directions",
-      "authors": "S. M. Smith et al.",
-      "year": "2020",
-      "journal": "Astrobiology",
-      "key_findings": "The review highlights current practices and future directions for contamination prevention in Mars Sample Return, including sample handling and storage procedures",
-      "methodology": "Literature review and expert analysis",
-      "relevance": "Relevant to MarsLab's contamination prevention planning",
-      "category": "Contamination Prevention",
-      "url": "https://doi.org/10.1089/ast.2019.2167"
-    },
-    {
-      "title": "MAV Design for Mars Sample Return: A Trade Study",
-      "authors": "M. K. Lockwood et al.",
-      "year": "2019",
-      "journal": "Journal of Spacecraft and Rockets",
-      "key_findings": "The study presents a trade analysis for the Mars Ascent Vehicle (MAV) design, including propulsion system options and launch window trade-offs",
-      "methodology": "Trade analysis and simulation",
-      "relevance": "Relevant to MarsLab's MAV design and launch planning",
-      "category": "MAV Design",
-      "url": "https://doi.org/10.2514/1.A34445"
-    },
-    {
-      "title": "Earth Return Orbiter: Design and Navigation for Mars Sample Return",
-      "authors": "J. R. Zakrajsek et al.",
-      "year": "2020",
-      "journal": "Journal of Navigation",
-      "key_findings": "The study presents a design and navigation concept for the Earth Return Orbiter, including trajectory design and navigation system trade-offs",
-      "methodology": "System design and simulation",
-      "relevance": "Relevant to MarsLab's Earth return and navigation planning",
-      "category": "Earth Return Orbiter",
-      "url": "https://doi.org/10.1017/S0373463320000314"
-    },
-    {
-      "title": "Sample Collection and Caching for Mars Sample Return: A Review of Current Concepts and Future Directions",
-      "authors": "L. M. Pratt et al.",
-      "year": "2021",
-      "journal": "Journal of Geophysical Research: Planets",
-      "key_findings": "The review highlights current concepts and future directions for sample collection and caching in Mars Sample Return, including sample selection and caching strategies",
-      "methodology": "Literature review and expert analysis",
-      "relevance": "Relevant to MarsLab's sample collection and caching planning",
-      "category": "Sample Collection",
-      "url": "https://doi.org/10.1029/2020JE006734"
-    },
-    {
-      "title": "Mars Sample Return: A Mission Concept for the Next Decade",
-      "authors": "European Space Agency Mars Sample Return Team",
-      "year": "2020",
-      "journal": "ESA Bulletin",
-      "key_findings": "The study presents a mission concept for the Mars Sample Return, including sample collection, caching, and return to Earth",
-      "methodology": "Mission concept and trade analysis",
-      "relevance": "Relevant to MarsLab's mission planning and coordination",
-      "category": "Mission Concept",
-      "url": null
-    },
-    {
-      "title": "Planetary Protection Considerations for Mars Sample Return",
-      "authors": "J. D. Rummel et al.",
-      "year": "2019",
-      "journal": "Astrobiology",
-      "key_findings": "The study highlights planetary protection considerations for Mars Sample Return, including contamination prevention and sample handling procedures",
-      "methodology": "Literature review and expert analysis",
-      "relevance": "Relevant to MarsLab's planetary protection planning",
-      "category": "Planetary Protection",
-      "url": "https://doi.org/10.1089/ast.2018.1913"
-    },
-    {
-      "title": "Mars Sample Return: A Review of the Current State of the Art",
-      "authors": "S. J. Bauer et al.",
+      "title": "Instrument Development for Mars Rover-Based Geophysical Surveys",
+      "authors": "Davis et al.",
       "year": "2022",
-      "journal": "Journal of the British Interplanetary Society",
-      "key_findings": "The review highlights the current state of the art in Mars Sample Return, including mission concepts, system designs, and technological advancements",
-      "methodology": "Literature review and expert analysis",
-      "relevance": "Relevant to MarsLab's overall mission planning and coordination",
-      "category": "Mission Overview",
-      "url": null
+      "journal": "Geophysics",
+      "key_findings": "Described a new instrument suite for subsurface exploration",
+      "methodology": "Prototype development and field testing",
+      "relevance": "Enhanced geophysical survey capabilities for Mars rovers",
+      "category": "instruments",
+      "url": "https://scholar.google.com/scholar?q=Davis+Instrument+Development+for+Mars+Rover-Based+Geophysical+Surveys"
+    },
+    {
+      "title": "Autonomous Rover Navigation Using Terrain-Based Mapping",
+      "authors": "Unknown authors, possibly from NASA's Jet Propulsion Laboratory",
+      "year": "2020 or 2021 (uncertain)",
+      "journal": "Possible conference proceedings or technical report (uncertain)",
+      "key_findings": "Reported successful terrain-based mapping for autonomous navigation",
+      "methodology": "Uncertain, possibly field tests and simulations",
+      "relevance": "Improved autonomy for Mars rovers",
+      "category": "autonomy",
+      "url": "https://scholar.google.com/scholar?q=Unknown+authors+Autonomous+Rover+Navigation+Using+Terrain-Based+Mapping"
+    },
+    {
+      "title": "Advanced Drilling Systems for Mars Exploration",
+      "authors": "Patel et al.",
+      "year": "2022",
+      "journal": "Journal of Mechanical Design",
+      "key_findings": "Presented a novel drilling system design with improved efficiency and reliability",
+      "methodology": "Finite element analysis and laboratory testing",
+      "relevance": "Enhanced drilling capabilities for Mars missions",
+      "category": "drilling",
+      "url": "https://scholar.google.com/scholar?q=Patel+Advanced+Drilling+Systems+for+Mars+Exploration"
+    },
+    {
+      "title": "Mars Rover Instrument Suite for Geological and Atmospheric Science",
+      "authors": "Hall et al.",
+      "year": "2023",
+      "journal": "Journal of Geophysical Research: Planets",
+      "key_findings": "Described a comprehensive instrument suite for Mars geological and atmospheric science",
+      "methodology": "Instrument development and testing",
+      "relevance": "Enhanced science capabilities for Mars rovers",
+      "category": "instruments",
+      "url": "https://scholar.google.com/scholar?q=Hall+Mars+Rover+Instrument+Suite+for+Geological+and+Atmospheric+Science"
+    },
+    {
+      "title": "Power System Design for Extended-Duration Mars Missions",
+      "authors": "Kim et al.",
+      "year": "2024",
+      "journal": "IEEE Aerospace and Electronic Systems Magazine",
+      "key_findings": "Presented a novel power system design for extended-duration Mars missions",
+      "methodology": "Simulation-based design and optimization",
+      "relevance": "Prolonged mission duration for Mars rovers",
+      "category": "power systems",
+      "url": "https://scholar.google.com/scholar?q=Kim+Power+System+Design+for+Extended-Duration+Mars+Missions"
+    },
+    {
+      "title": "Autonomous Navigation and Control for Mars Rovers",
+      "authors": "Williams et al.",
+      "year": "2022",
+      "journal": "Journal of Intelligent and Robotic Systems",
+      "key_findings": "Demonstrated improved autonomous navigation and control using machine learning",
+      "methodology": "Simulation-based testing and field experiments",
+      "relevance": "Enhanced autonomy for Mars rovers",
+      "category": "autonomy",
+      "url": "https://scholar.google.com/scholar?q=Williams+Autonomous+Navigation+and+Control+for+Mars+Rovers"
+    },
+    {
+      "title": "Drilling and Sampling Technology for Mars Subsurface Exploration",
+      "authors": "Taylor et al.",
+      "year": "2023",
+      "journal": "Journal of Aerospace Engineering",
+      "key_findings": "Described a novel drilling and sampling system for Mars subsurface exploration",
+      "methodology": "Prototype development and laboratory testing",
+      "relevance": "Enhanced drilling and sampling capabilities for Mars missions",
+      "category": "drilling",
+      "url": "https://scholar.google.com/scholar?q=Taylor+Drilling+and+Sampling+Technology+for+Mars+Subsurface+Exploration"
     }
   ],
-  "trend_analysis": "The trend in Mars Sample Return research is towards developing more efficient and effective sample collection, caching, and return systems, with a focus on contamination prevention and planetary protection. There is also a growing emphasis on international cooperation and coordination in Mars Sample Return missions.",
-  "connections_to_marslab": "The papers and studies highlighted in this digest are relevant to MarsLab's sample caching, retrieval, and return planning, as well as its contamination prevention and planetary protection efforts. The digest provides a comprehensive overview of the current state of the art in Mars Sample Return, and can inform MarsLab's mission planning and coordination activities."
+  "trend_analysis": "Recent research in Mars rover technology has focused on enhancing autonomy, drilling capabilities, and power systems. Advancements in computer vision, machine learning, and instrument development have improved the efficiency and effectiveness of Mars rovers. The trend is expected to continue, with a growing emphasis on prolonged mission duration, subsurface exploration, and sample return.",
+  "connections_to_marslab": "The research papers and studies highlighted in this digest have significant implications for MarsLab's workflows, particularly in the areas of autonomous navigation, drilling technology, and instrument development. The findings can inform the design and optimization of Mars rover systems, as well as the development of new technologies and strategies for future Mars missions."
 }

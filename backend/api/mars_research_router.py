@@ -62,6 +62,7 @@ def list_mars_research():
                 "paper_count": len(papers) if isinstance(papers, list) else 0,
             }
         )
+    return JSONResponse(content={"research": entries})
 
 
 @router.get("/latest")
