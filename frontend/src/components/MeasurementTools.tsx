@@ -466,6 +466,7 @@ export default function MeasurementTools({
       cursorStyleRef.current = originalCursor;
       canvas.style.cursor = "crosshair";
       return () => {
+        if (viewer.isDestroyed()) return;
         canvas.style.cursor = originalCursor;
       };
     }
@@ -974,7 +975,7 @@ export default function MeasurementTools({
         handlerRef.current = null;
       }
       // Remove all measurement entities from the viewer
-      if (viewer) {
+      if (viewer && !viewer.isDestroyed()) {
         for (const m of measurementsRef.current) {
           for (const eid of m.cesiumEntities) {
             const ent = viewer.entities.getById(eid);

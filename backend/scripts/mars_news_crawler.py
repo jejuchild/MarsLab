@@ -66,13 +66,32 @@ logger = logging.getLogger("mars_news_crawler")
 HTTP_HEADERS = {"User-Agent": "MarsLab/1.0 (Mars exploration research platform)"}
 HTTP_TIMEOUT = 20
 
+# Generic catch-all pages — if a redirect lands here, keep original URL
+GENERIC_CATCH_ALL = {
+    "https://science.nasa.gov/mars/stories",
+    "https://science.nasa.gov/mars/stories/",
+    "https://science.nasa.gov/mars",
+    "https://science.nasa.gov/mars/",
+}
 
 # ======================================================================
 # Feed fetchers — return real news items with real URLs
 # ======================================================================
 
+def _resolve_redirect(url: str) -> str:
+    """Follow redirects and return the final URL. If it's a generic catch-all, keep the original."""
+    try:
+        resp = requests.head(url, headers=HTTP_HEADERS, timeout=10, allow_redirects=True)
+        final = resp.url.rstrip("/")
+        if final.rstrip("/") in {u.rstrip("/") for u in GENERIC_CATCH_ALL}:
+            return url  # keep original — it at least identifies the specific article
+        return resp.url
+    except Exception:
+        return url
+
+
 def fetch_nasa_mars_api() -> list[dict[str, str]]:
-    """Fetch from NASA Mars Exploration Program JSON API."""
+    """Fetch from NASA Mars Exploration Program JSON API, resolve redirects to get real URLs."""
     url = "https://mars.nasa.gov/rss/api/?feed=news&category=all&feedtype=json"
     items = []
     try:
@@ -85,9 +104,11 @@ def fetch_nasa_mars_api() -> list[dict[str, str]]:
             desc = entry.get("DESCRIPTION", "").strip()
             posted = entry.get("POSTED", "").strip()
             if title and link:
+                # Resolve NASA redirect to get the real article URL
+                resolved = _resolve_redirect(link)
                 items.append({
                     "title": title,
-                    "url": link,
+                    "url": resolved,
                     "summary": desc,
                     "date": posted,
                     "source": "NASA Mars Exploration Program",
@@ -162,12 +183,78 @@ def fetch_spacenews_rss() -> list[dict[str, str]]:
         return []
 
 
+def fetch_esa_mars_rss() -> list[dict[str, str]]:
+    """Fetch ESA Mars Express RSS, filter for Mars content."""
+    url = "https://www.esa.int/rssfeed/Our_Activities/Space_Science/Mars_Express"
+    try:
+        resp = requests.get(url, headers=HTTP_HEADERS, timeout=HTTP_TIMEOUT)
+        resp.raise_for_status()
+        items = _parse_rss_items(resp.content, "ESA", filter_mars=False)  # already Mars-specific
+        logger.info("ESA Mars Express RSS: %d items", len(items))
+        return items
+    except Exception as exc:
+        logger.warning("ESA Mars RSS failed: %s", exc)
+        return []
+
+
+def fetch_arxiv_mars() -> list[dict[str, str]]:
+    """Fetch recent Mars papers from arXiv astro-ph via Atom feed."""
+    # arXiv API: search for Mars-related papers in astro-ph.EP (Earth and Planetary Astrophysics)
+    url = (
+        "https://export.arxiv.org/api/query"
+        "?search_query=all:Mars+AND+(cat:astro-ph.EP+OR+cat:physics.geo-ph)"
+        "&sortBy=submittedDate&sortOrder=descending&max_results=15"
+    )
+    items = []
+    try:
+        resp = requests.get(url, headers=HTTP_HEADERS, timeout=HTTP_TIMEOUT)
+        resp.raise_for_status()
+        # arXiv uses Atom namespace
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        root = ET.fromstring(resp.content)
+        for entry in root.findall("atom:entry", ns):
+            title = (entry.findtext("atom:title", "", ns) or "").strip().replace("\n", " ")
+            summary = (entry.findtext("atom:summary", "", ns) or "").strip().replace("\n", " ")
+            published = (entry.findtext("atom:published", "", ns) or "").strip()
+            # Get the abstract page link (not PDF)
+            link = ""
+            for link_el in entry.findall("atom:link", ns):
+                if link_el.get("type") == "text/html":
+                    link = link_el.get("href", "")
+                    break
+            if not link:
+                link = (entry.findtext("atom:id", "", ns) or "").strip()
+            if not title or not link:
+                continue
+            # Check it's actually Mars-related (not just mentions Mars in passing)
+            combined = (title + " " + summary).lower()
+            mars_score = sum(1 for kw in ["mars", "martian", "jezero", "gale crater",
+                                          "perseverance", "curiosity", "arcadia"]
+                            if kw in combined)
+            if mars_score < 1:
+                continue
+            if len(summary) > 300:
+                summary = summary[:297] + "..."
+            items.append({
+                "title": title,
+                "url": link,
+                "summary": summary,
+                "date": published[:10] if published else "",
+                "source": "arXiv",
+            })
+        logger.info("arXiv Mars: %d items", len(items))
+    except Exception as exc:
+        logger.warning("arXiv Mars failed: %s", exc)
+    return items
+
 def fetch_all_news() -> list[dict[str, str]]:
     """Fetch from all sources, deduplicate by title similarity."""
     all_items: list[dict[str, str]] = []
     all_items.extend(fetch_nasa_mars_api())
     all_items.extend(fetch_nasa_general_rss())
     all_items.extend(fetch_spacenews_rss())
+    all_items.extend(fetch_esa_mars_rss())
+    all_items.extend(fetch_arxiv_mars())
 
     # Deduplicate by normalized title
     seen_titles: set[str] = set()
@@ -180,7 +267,6 @@ def fetch_all_news() -> list[dict[str, str]]:
 
     logger.info("Total unique news items: %d", len(unique))
     return unique
-
 
 # ======================================================================
 # LLM — categorization and trend analysis ONLY (not content generation)
@@ -195,8 +281,11 @@ def _extract_json_object(content: str) -> str:
             if stripped.startswith("json"):
                 stripped = stripped[4:].strip()
     match = re.search(r"\{[\s\S]*\}", stripped)
-    return match.group(0) if match else stripped
-
+    result = match.group(0) if match else stripped
+    # Fix trailing commas before ] or } (common LLM JSON error)
+    result = re.sub(r",\s*]", "]", result)
+    result = re.sub(r",\s*}", "}", result)
+    return result
 
 def categorize_with_llm(items: list[dict[str, str]]) -> dict[str, Any] | None:
     """Send real news items to LLM for categorization and trend analysis."""

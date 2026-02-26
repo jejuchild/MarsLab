@@ -901,6 +901,7 @@ export default function MapView({
 
     // Cleanup
     return () => {
+      if (!viewer || viewer.isDestroyed()) return;
       handler.destroy();
 
       // Re-enable camera controls
@@ -1514,6 +1515,7 @@ export default function MapView({
     }
 
     return () => {
+      if (!viewer || viewer.isDestroyed()) return;
       const ent = viewer.entities.getById(TERRAFORM_ID);
       if (ent) viewer.entities.remove(ent);
     };
@@ -1664,6 +1666,7 @@ export default function MapView({
 
     // Cleanup function to restore original appearance
     return () => {
+      if (!viewer || viewer.isDestroyed()) return;
       for (const id of entityIds) {
         const entity = viewer.entities.getById(id);
         if (entity) {
@@ -2255,6 +2258,8 @@ export default function MapView({
     const removeListener = viewer.camera.moveEnd.addEventListener(throttledRebuild);
 
     return () => {
+      if (!viewer || viewer.isDestroyed()) return;
+      removeListener();
       removeListener();
       removeAllGrid();
       gridSpacingRef.current = null;
