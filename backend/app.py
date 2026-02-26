@@ -553,6 +553,12 @@ app.include_router(discussions_router)  # /api/discussions — Daily AI Discussi
 from api.swim_router import router as swim_router
 app.include_router(swim_router)  # /api/swim/* — SWIM Ice Data
 
+from api.mars_news_router import router as mars_news_router
+app.include_router(mars_news_router)  # /api/mars-news — Mars News Digest
+
+from api.mars_research_router import router as mars_research_router
+app.include_router(mars_research_router)  # /api/mars-research — Mars Research Digest
+
 @app.get("/hirise/quickview/{product_id}.png")
 @limiter.limit("20/minute")
 def get_hirise_quickview_transparent(request: Request, product_id: str):

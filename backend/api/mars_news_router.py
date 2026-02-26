@@ -57,8 +57,8 @@ def list_mars_news():
         news_entries.append({
             "date": date,
             "item_count": len(payload.get("items", [])) if isinstance(payload.get("items", []), list) else 0,
-            "categories": categories if isinstance(categories, dict) else {},
-            "trend_summary_preview": trend_summary[:240],
+            "categories": list(categories.keys()) if isinstance(categories, dict) else [],
+            "trend_summary": trend_summary[:240],
         })
 
     return JSONResponse(content={"news": news_entries})
@@ -76,7 +76,16 @@ def get_latest_mars_news():
     latest_date = candidates[0]
     payload = _load_news_json(latest_date)
     summary_md = _load_summary_md(latest_date)
-    return JSONResponse(content={"date": latest_date, "data": payload, "summary_markdown": summary_md})
+    items = payload.get("items", [])
+    categories_obj = payload.get("categories", {})
+    categories_list = list(categories_obj.keys()) if isinstance(categories_obj, dict) else []
+    return JSONResponse(content={
+        "date": latest_date,
+        "items": items if isinstance(items, list) else [],
+        "trend_summary": str(payload.get("trend_summary", "")).strip(),
+        "summary_md": summary_md,
+        "categories": categories_list,
+    })
 
 
 @router.get("/search")
@@ -137,8 +146,13 @@ def get_mars_news(date: str):
 
     payload = _load_news_json(date)
     summary_md = _load_summary_md(date)
+    items = payload.get("items", [])
+    categories_obj = payload.get("categories", {})
+    categories_list = list(categories_obj.keys()) if isinstance(categories_obj, dict) else []
     return JSONResponse(content={
         "date": date,
-        "data": payload,
-        "summary_markdown": summary_md,
+        "items": items if isinstance(items, list) else [],
+        "trend_summary": str(payload.get("trend_summary", "")).strip(),
+        "summary_md": summary_md,
+        "categories": categories_list,
     })

@@ -11,6 +11,8 @@ const DataDownloadPage = lazy(() => import("./pages/DataDownloadPage"));
 const DataUploadPage = lazy(() => import("./pages/DataUploadPage"));
 const FeatureSuggestionsPage = lazy(() => import("./pages/FeatureSuggestionsPage"));
 const DailyDiscussionsPage = lazy(() => import("./pages/DailyDiscussionsPage"));
+const MarsNewsPage = lazy(() => import("./pages/MarsNewsPage"));
+const MarsResearchPage = lazy(() => import("./pages/MarsResearchPage"));
 
 export default function App() {
   const { isOnline, isUpdateAvailable, cacheStats, updateApp } = useServiceWorker();
@@ -47,6 +49,8 @@ export default function App() {
           <Route path="/upload" element={<DataUploadPage />} />
           <Route path="/suggestions" element={<FeatureSuggestionsPage />} />
           <Route path="/discussions" element={<DailyDiscussionsPage />} />
+          <Route path="/news" element={<MarsNewsPage />} />
+          <Route path="/research" element={<MarsResearchPage />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

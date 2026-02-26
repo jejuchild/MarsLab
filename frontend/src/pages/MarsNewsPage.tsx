@@ -20,6 +20,7 @@ interface NewsItem {
   summary: string;
   significance: string;
   category: string;
+  url: string | null;
 }
 
 interface NewsDetail {
@@ -95,7 +96,14 @@ async function fetchNewsList(): Promise<NewsSummary[]> {
 async function fetchNewsDetail(date: string): Promise<NewsDetail | null> {
   const resp = await fetch(`/api/mars-news/${date}`);
   if (!resp.ok) return null;
-  return resp.json();
+  const data = await resp.json();
+  return {
+    date: data.date ?? date,
+    items: data.items ?? [],
+    trend_summary: data.trend_summary ?? "",
+    summary_md: data.summary_md ?? "",
+    categories: data.categories ?? [],
+  };
 }
 
 /* =========================================================
@@ -438,7 +446,14 @@ export default function MarsNewsPage() {
                 <div className="space-y-4 mb-8">
                   {detail.items.map((item, idx) => (
                     <div key={idx} className="rounded-xl border border-border-dark bg-white/[0.02] p-5">
-                      <h3 className="text-base font-bold text-white mb-2">{item.title}</h3>
+                      <h3 className="text-base font-bold text-white mb-2">
+                        {item.url ? (
+                          <a href={item.url} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                            {item.title}
+                            <span className="material-symbols-outlined text-xs ml-1 align-middle text-slate-500">open_in_new</span>
+                          </a>
+                        ) : item.title}
+                      </h3>
                       <div className="flex items-center gap-2 mb-3 text-xs text-slate-500">
                         <span>{item.source}</span>
                         <span className="w-1 h-1 rounded-full bg-slate-600" />

@@ -19,12 +19,13 @@ interface ResearchSummary {
 
 interface ResearchPaper {
   title: string;
-  authors: string[];
+  authors: string;
   year: number;
   journal: string;
   key_findings: string;
   methodology: string;
   relevance: string;
+  url: string | null;
 }
 
 interface ResearchDetail {
@@ -434,9 +435,16 @@ export default function MarsResearchPage() {
                 <div className="space-y-4 mb-8">
                   {detail.papers.map((paper, idx) => (
                     <div key={idx} className="rounded-xl border border-border-dark bg-white/[0.02] p-5">
-                      <h3 className="text-base font-bold text-white mb-2">{paper.title}</h3>
-                      {paper.authors && paper.authors.length > 0 && (
-                        <div className="text-xs text-slate-400 mb-2">{paper.authors.join(", ")}</div>
+                      <h3 className="text-base font-bold text-white mb-2">
+                        {paper.url ? (
+                          <a href={paper.url} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                            {paper.title}
+                            <span className="material-symbols-outlined text-xs ml-1 align-middle text-slate-500">open_in_new</span>
+                          </a>
+                        ) : paper.title}
+                      </h3>
+                      {paper.authors && (
+                        <div className="text-xs text-slate-400 mb-2">{paper.authors}</div>
                       )}
                       <div className="flex items-center gap-2 mb-3 text-xs text-slate-500">
                         <span>{paper.year}</span>

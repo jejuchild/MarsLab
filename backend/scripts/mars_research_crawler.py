@@ -131,7 +131,8 @@ Return only valid JSON with this exact shape:
       "key_findings": "string",
       "methodology": "string",
       "relevance": "string",
-      "category": "string"
+      "category": "string",
+      "url": "https://doi.org/... or https://arxiv.org/... or null"
     }}
   ],
   "trend_analysis": "string",
@@ -141,6 +142,7 @@ Return only valid JSON with this exact shape:
 Rules:
 - Output JSON only. Do not include markdown, comments, or code fences.
 - Provide 5-10 paper entries.
+- Include DOI or arXiv URLs where known. Use null if URL is uncertain.
 - If exact citation details are uncertain, state uncertainty clearly inside the relevant fields.
 """
 
@@ -168,6 +170,7 @@ def _normalize_paper(paper: dict[str, Any]) -> dict[str, Any]:
         "methodology": str(paper.get("methodology", "")).strip(),
         "relevance": str(paper.get("relevance", "")).strip(),
         "category": str(paper.get("category", "")).strip(),
+        "url": paper.get("url") if paper.get("url") else None,
     }
 
 

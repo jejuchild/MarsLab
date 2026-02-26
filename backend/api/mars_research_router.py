@@ -47,16 +47,21 @@ def list_mars_research():
     entries = []
     for fpath in _list_research_files():
         data = _load_research_file(fpath)
-        topic = _topic_focus(data)
+        topic_obj = data.get("topic", {})
+        topic_result = {}
+        if isinstance(topic_obj, dict):
+            topic_result = {
+                "focus": str(topic_obj.get("focus", "")).strip(),
+                "keywords": topic_obj.get("keywords", []) if isinstance(topic_obj.get("keywords"), list) else [],
+            }
         papers = data.get("papers", [])
         entries.append(
             {
                 "date": fpath.stem,
-                "topic": topic,
+                "topic": topic_result,
                 "paper_count": len(papers) if isinstance(papers, list) else 0,
             }
         )
-    return JSONResponse(content={"research": entries})
 
 
 @router.get("/latest")
@@ -68,6 +73,9 @@ def get_latest_mars_research():
     data = _load_research_file(files[0])
     if not data:
         raise HTTPException(status_code=404, detail="Latest Mars research entry is unreadable")
+    summary_path = RESEARCH_DIR / f"{files[0].stem}_summary.md"
+    summary_md = summary_path.read_text(encoding="utf-8") if summary_path.is_file() else ""
+    data["summary_md"] = summary_md
     return JSONResponse(content=data)
 
 
@@ -160,4 +168,7 @@ def get_mars_research_by_date(date: str):
     data = _load_research_file(fpath)
     if not data:
         raise HTTPException(status_code=404, detail=f"Mars research file unreadable for {date}")
+    summary_path = RESEARCH_DIR / f"{date}_summary.md"
+    summary_md = summary_path.read_text(encoding="utf-8") if summary_path.is_file() else ""
+    data["summary_md"] = summary_md
     return JSONResponse(content=data)
