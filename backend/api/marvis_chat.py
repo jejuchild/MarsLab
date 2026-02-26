@@ -496,13 +496,43 @@ INSTRUMENT_LIST = ["CRISM", "HIRISE", "SHARAD", "CTX", "SHARAD_HIGHRES", "HIRISE
 
 _BASE_SYSTEM = """You are MARVIS, a terse Mars science research assistant embedded in a map-based analysis tool.
 
-WHEN TO USE TOOLS vs TEXT:
-- ONLY call fly_to_location when the user explicitly asks to GO TO, NAVIGATE, ZOOM, or CENTER ON a NEW, DIFFERENT location.
-- ONLY call load_instrument when the user explicitly asks to LOAD, SHOW, or ENABLE a specific instrument dataset.
-- ONLY call select_product when the user asks to PICK, SELECT, OPEN, INSPECT, or SHOW a specific product or a product from a specific instrument (e.g. "pick one SHARAD", "open a HiRISE product", "select that product").
-- ONLY call search when the user asks to FIND, SEARCH, or LOCATE products with any combination of: (a) a specific instrument, (b) mineral/ice/hydration content threshold, (c) proximity to landforms (crater, terraced crater, volcano, channel, graben, ridge, LDA), (d) intersection/overlap with another instrument. Do NOT call search for general science questions or selecting visible products.
-- For ALL other messages (general science questions, "what products", etc.) → answer with TEXT only. Do NOT call any tool.
-- If unsure whether the user wants navigation or information, answer with text.
+CRITICAL — INTENT CLASSIFICATION (follow this EXACTLY):
+
+STEP 1: Classify the user's intent into one of these categories:
+  (A) KNOWLEDGE QUESTION — user wants to LEARN something. Phrases like: "what is", "tell me about",
+      "explain", "how does", "info", "information", "wavelength", "specs", "details",
+      "characteristics", "capabilities", "resolution", "how many", "what does X measure",
+      "describe", "compare", "difference between", "why", "when was", "history of",
+      or any question about an instrument's properties, science, or design.
+      → Answer with TEXT only. Do NOT call any tool. Even if an instrument name appears.
+
+  (B) ACTION REQUEST — user wants you to DO something on the map. Phrases like:
+      "go to", "fly to", "zoom", "navigate", "load", "enable", "activate",
+      "turn on", "pick", "select", "open", "find", "search", "locate".
+      → Use the appropriate tool.
+
+  (C) ANALYSIS QUESTION — user asks about what's visible, what products exist, what do you see.
+      → Answer with TEXT only. Do NOT call any tool.
+
+EXAMPLES OF KNOWLEDGE QUESTIONS (NEVER use tools for these):
+  - "CRISM wavelength info" → text answer about CRISM wavelengths
+  - "tell me about SHARAD" → text answer about SHARAD instrument
+  - "what resolution does HiRISE have" → text answer
+  - "how does CRISM detect minerals" → text answer
+  - "SHARAD depth penetration" → text answer
+  - "what instruments are on MRO" → text answer
+
+EXAMPLES OF ACTION REQUESTS (use tools):
+  - "load CRISM" → call load_instrument
+  - "show me CRISM footprints" → call load_instrument
+  - "go to Jezero Crater" → call fly_to_location
+  - "find SHARAD near craters" → call search
+
+WHEN TO USE EACH TOOL:
+- fly_to_location: ONLY when user explicitly asks to GO TO, NAVIGATE, ZOOM, or CENTER ON a NEW, DIFFERENT location.
+- load_instrument: ONLY when user explicitly asks to LOAD, ENABLE, ACTIVATE, or TURN ON an instrument's footprint data on the map, or says "show me [instrument] footprints/data".
+- select_product: ONLY when user asks to PICK, SELECT, OPEN, INSPECT a specific product.
+- search: ONLY when user asks to FIND, SEARCH, or LOCATE products with filters (instrument, mineral, landform, intersection).
 
 CRITICAL — DO NOT RE-NAVIGATE:
 - The user's CURRENT VIEWPORT is shown below. If the user is already viewing a region, do NOT call fly_to_location to that same region again.
@@ -515,6 +545,7 @@ STRICT RULES:
 3. Answer text questions in 1-3 sentences. Be brief, precise, and scientific.
 4. Never say "feel free to ask" or similar filler. Never reintroduce yourself.
 5. Always respond in English.
+6. If the user's message contains an instrument name but is asking ABOUT the instrument (not asking to load/enable it), respond with TEXT. The presence of an instrument name does NOT mean you should call load_instrument.
 
 SESSION CONTEXT:
 {context_block}"""
@@ -679,7 +710,7 @@ _GROQ_TOOLS = [
         "type": "function",
         "function": {
             "name": "fly_to_location",
-            "description": "Navigate/zoom/pan the map to a Mars region or coordinates. Use this for ANY request to go to, zoom into, center on, explore, or look at a location.",
+            "description": "Navigate/zoom/pan the map to a Mars region or coordinates. Use ONLY when user explicitly says 'go to', 'fly to', 'zoom to', 'navigate to', 'center on', 'take me to', or 'move to'. Do NOT use for questions about a location.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -694,7 +725,7 @@ _GROQ_TOOLS = [
         "type": "function",
         "function": {
             "name": "load_instrument",
-            "description": "Load footprint data for an orbital instrument onto the map. Use this when the user asks to see, load, show, or check data from an instrument.",
+            "description": "Load and display footprint outlines for an orbital instrument on the map. Use ONLY when user explicitly asks to LOAD, ENABLE, ACTIVATE, or TURN ON an instrument's data layer. Do NOT use for questions ABOUT an instrument (e.g. 'what is CRISM', 'CRISM wavelength info', 'tell me about SHARAD'). The presence of an instrument name alone does NOT mean you should call this tool.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -786,6 +817,48 @@ def _normalize_instrument_names(text: str) -> str:
     text = _re.sub(r"(?i)\bmtrdr\b", "CRISM_TRR3", text)
     return text
 
+# ── Intent pre-classifier (server-side guard against spurious tool calls) ────
+
+# Patterns that indicate INFORMATIONAL intent (user asking ABOUT something, not requesting action)
+_INFO_PATTERNS = re.compile(
+    r"(?i)"
+    r"(?:"
+    r"\b(?:what|how|why|when|where|which|who|describe|explain|tell\s+me|info(?:rmation)?|detail|spec|characteristics?)\b"
+    r"|\b(?:wavelength|resolution|bandwidth|frequency|penetration|depth|accuracy|precision|spectral|spatial|temporal)\b"
+    r"|\b(?:history|design|purpose|capability|capabilities|sensor|detector|optics|antenna|instrument)\s+(?:of|about|info|details|specs|description)"
+    r"|(?:about|regarding)\s+(?:" + "|".join(INSTRUMENT_LIST) + r")"
+    r"|(?:" + "|".join(INSTRUMENT_LIST) + r")\s+(?:info|information|details|specs|specification|wavelength|resolution|bands?|channels?|description|overview|capabilities|instrument|sensor|science|measure|detect|work)"
+    r")"
+)
+
+# Patterns that indicate ACTION intent (user wants to DO something)
+_ACTION_PATTERNS = re.compile(
+    r"(?i)"
+    r"\b(?:load|enable|activate|turn\s+on|go\s+to|fly\s+to|zoom|navigate|pick|select|open|find|search|locate)\b"
+)
+
+
+def _is_informational(message: str) -> bool:
+    """Return True if the message is a knowledge/informational question, not an action request.
+    
+    This is a server-side guard: if the user asks 'CRISM wavelength info',
+    we force tool_choice='none' so the LLM can only respond with text.
+    """
+    has_info = bool(_INFO_PATTERNS.search(message))
+    has_action = bool(_ACTION_PATTERNS.search(message))
+    # If it has info markers and no action verbs, it's informational
+    if has_info and not has_action:
+        return True
+    # Special case: bare "<INSTRUMENT> <info-word>" without action verb
+    # e.g. "CRISM wavelength info", "SHARAD depth penetration"
+    for inst in INSTRUMENT_LIST:
+        pattern = re.compile(
+            rf"(?i)^\s*{re.escape(inst)}\s+(?:wavelength|resolution|info|details|specs?|bands?|science|overview|description|capabilities)\b"
+        )
+        if pattern.search(message):
+            return True
+    return False
+
 
 async def _stream_groq(
     message: str,
@@ -810,14 +883,20 @@ async def _stream_groq(
         messages.append({"role": role, "content": entry.content})
     messages.append({"role": "user", "content": normalized_msg})
 
+    # Server-side intent guard: force text-only response for informational queries
+    info_mode = _is_informational(normalized_msg)
+    if info_mode:
+        logger.info(f"Detected informational query, forcing text-only: {normalized_msg[:80]}")
+
     payload = {
         "model": GROQ_MODEL,
         "messages": messages,
-        "tools": _GROQ_TOOLS,
-        "tool_choice": "auto",
         "temperature": 0.3,
         "max_tokens": 400,
     }
+    if not info_mode:
+        payload["tools"] = _GROQ_TOOLS
+        payload["tool_choice"] = "auto"
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -935,7 +1014,7 @@ _NAV_RE = re.compile(
     r"(?i)\b(?:go to|fly to|zoom (?:to|into)|navigate to|show me|explore|take me to|center on|look at|move to)\b"
 )
 _LOAD_RE = re.compile(
-    r"(?i)\b(?:load|show|enable|activate|turn on)\s+(?:the\s+)?("
+    r"(?i)\b(?:load|enable|activate|turn on)\s+(?:the\s+)?("
     + "|".join(INSTRUMENT_LIST)
     + r")\b",
 )
@@ -977,10 +1056,17 @@ async def _stream_llama(
     """LLaMA fallback with regex-based tool dispatch for navigation/instrument loading."""
     import aiohttp
 
-    # ── Check for tool-like intents via regex (since LLaMA lacks function calling)
-    nav_match = _NAV_RE.search(message)
-    load_match = _LOAD_RE.search(message)
-    search_match = _SEARCH_RE.search(message)
+    # ── Server-side intent guard: skip regex tool dispatch for informational queries
+    if _is_informational(message):
+        logger.info(f"LLaMA: informational query detected, skipping tool dispatch: {message[:80]}")
+        nav_match = None
+        load_match = None
+        search_match = None
+    else:
+        # Check for tool-like intents via regex (since LLaMA lacks function calling)
+        nav_match = _NAV_RE.search(message)
+        load_match = _LOAD_RE.search(message)
+        search_match = _SEARCH_RE.search(message)
 
     # Unified search: handles mineral, landform, intersection, and compound queries
     if search_match:
