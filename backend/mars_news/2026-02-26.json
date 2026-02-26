@@ -1,115 +1,259 @@
 {
   "date": "2026-02-26",
-  "generated_at": "2026-02-26T14:30:00Z",
+  "generated_at": "2026-02-26T06:48:55.971834+00:00",
   "categories": {
-    "missions": "Ongoing Mars exploration with updates from Perseverance and Curiosity, while new missions are being planned",
-    "discoveries": "Recent findings on Martian geology and potential biosignatures, with a focus on ice and water discoveries",
-    "technology": "Advancements in Mars surface and orbital technology, including new landing systems and propulsion methods",
-    "human_exploration": "Planning and development for future human missions to Mars, with a focus on sustainability and safety",
-    "sample_return": "Progress on the Mars Sample Return mission, with international collaboration and technical developments",
-    "international": "Global cooperation on Mars exploration, with multiple agencies and countries involved in missions and research",
-    "commercial": "Private companies like SpaceX and Blue Origin contributing to Mars exploration, with innovative technologies and approaches"
+    "missions": "Focus on ongoing and past Mars missions, including Ingenuity Helicopter and Curiosity rover",
+    "discoveries": "Various discoveries about Mars, including evidence of liquid water and ancient lakes",
+    "technology": "Development and testing of new technologies, such as MOXIE and Mars Ascent Vehicle rocket",
+    "human_exploration": "Preparation for future human exploration of Mars, including locating ice and analyzing food samples",
+    "sample_return": "Efforts to return samples from Mars, including seeking innovative designs and releasing independent review reports",
+    "international": "Collaboration with international partners to study ancient life and prepare for Mars exploration",
+    "commercial": "No significant commercial trends observed in the given news items"
   },
   "items": [
     {
-      "title": "Perseverance Rover Discovers Evidence of Ancient Lake on Mars",
-      "date": "2026-02-20",
-      "source": "NASA",
-      "summary": "The Perseverance rover has found evidence of an ancient lake on Mars, which could have supported life in the past. The discovery was made in the Jezero crater, where the rover has been exploring since February 2021. The findings suggest that the lake was present on Mars around 3.5 billion years ago, and could have been a potential habitat for life. The discovery is significant for the search for life on Mars and the understanding of the planet's history.",
+      "title": "NASA's Ingenuity Mars Helicopter Team Says Goodbye ... for Now",
+      "date": "4/17/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The final downlink shift by the Ingenuity team was a time to reflect on a highly successful mission - and to prepare the first aircraft on another world for its new role.",
       "category": "missions",
-      "significance": "The discovery of an ancient lake on Mars provides new insights into the planet's history and the potential for life to have existed there in the past.",
-      "url": "https://www.google.com/search?q=Perseverance+Rover+Discovers+Evidence+of+Ancient+Lake+on+Mars+NASA+Mars"
+      "significance": "Ingenuity Mars Helicopter mission conclusion",
+      "url": "https://mars.nasa.gov/news/9582/"
     },
     {
-      "title": "Mars Sample Return Mission Progresses with NASA and ESA Collaboration",
-      "date": "2026-02-15",
-      "source": "NASA",
-      "summary": "The Mars Sample Return mission is progressing with international collaboration between NASA and the European Space Agency (ESA). The mission aims to return samples from Mars to Earth, which could provide valuable insights into the planet's geology and potential biosignatures. The collaboration includes the development of a new landing system and a sample retrieval mechanism. The mission is scheduled to launch in 2028 and return samples to Earth in the 2030s.",
+      "title": "NASA Sets Path to Return Mars Samples, Seeks Innovative Designs",
+      "date": "4/15/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The agency is asking the NASA community to work together to develop a revised plan that leverages innovation and proven technology.",
       "category": "sample_return",
-      "significance": "The Mars Sample Return mission has the potential to revolutionize our understanding of Mars and the search for life on the planet.",
-      "url": "https://www.google.com/search?q=Mars+Sample+Return+Mission+Progresses+with+NASA+and+ESA+Collaboration+NASA+Mars"
+      "significance": "Seeking innovative designs for Mars sample return",
+      "url": "https://mars.nasa.gov/news/9580/"
     },
     {
-      "title": "SpaceX Starship Mars Plans Advance with Successful Test Flights",
-      "date": "2026-02-10",
-      "source": "SpaceX",
-      "summary": "SpaceX has made significant progress with its Starship program, with successful test flights of the spacecraft. The company aims to use Starship to send both crew and cargo to Mars, with the goal of establishing a permanent human presence on the planet. The test flights have demonstrated the spacecraft's ability to reach orbit and return to Earth, and have paved the way for further development and testing.",
-      "category": "commercial",
-      "significance": "SpaceX's Starship program has the potential to significantly advance human exploration of Mars, with the goal of establishing a permanent human presence on the planet.",
-      "url": "https://www.google.com/search?q=SpaceX+Starship+Mars+Plans+Advance+with+Successful+Test+Flights+SpaceX+Mars"
+      "title": "NASA Invites Media to Mars Sample Return Update",
+      "date": "4/12/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Mars Sample Return has been a major long-term goal of international planetary exploration for the past two decades.",
+      "category": "sample_return",
+      "significance": "Mars Sample Return update for media",
+      "url": "https://mars.nasa.gov/news/9578/"
     },
     {
-      "title": "ESA and JAXA Collaborate on Martian Moons eXploration Mission",
-      "date": "2026-02-05",
-      "source": "ESA",
-      "summary": "The European Space Agency (ESA) and the Japan Aerospace Exploration Agency (JAXA) are collaborating on a new mission to explore the Martian moons, Phobos and Deimos. The mission aims to study the moons' composition, geology, and potential biosignatures. The collaboration includes the development of a new spacecraft and a sample retrieval mechanism. The mission is scheduled to launch in the late 2020s and arrive at Mars in the early 2030s.",
-      "category": "international",
-      "significance": "The Martian Moons eXploration mission has the potential to provide new insights into the Martian system and the search for life beyond Earth.",
-      "url": "https://www.google.com/search?q=ESA+and+JAXA+Collaborate+on+Martian+Moons+eXploration+Mission+ESA+Mars"
-    },
-    {
-      "title": "Curiosity Rover Discovers Evidence of Ancient Volcanic Activity on Mars",
-      "date": "2026-02-01",
-      "source": "NASA",
-      "summary": "The Curiosity rover has discovered evidence of ancient volcanic activity on Mars, which could have supported life in the past. The discovery was made in the Gale crater, where the rover has been exploring since 2012. The findings suggest that the volcanic activity occurred around 3.5 billion years ago, and could have created a habitable environment for life to exist.",
-      "category": "missions",
-      "significance": "The discovery of ancient volcanic activity on Mars provides new insights into the planet's history and the potential for life to have existed there in the past.",
-      "url": "https://www.google.com/search?q=Curiosity+Rover+Discovers+Evidence+of+Ancient+Volcanic+Activity+on+Mars+NASA+Mars"
-    },
-    {
-      "title": "NASA and CNSA Collaborate on Mars Exploration and Sample Return",
-      "date": "2026-01-25",
-      "source": "NASA",
-      "summary": "NASA and the China National Space Administration (CNSA) are collaborating on Mars exploration and sample return. The collaboration includes the development of a new landing system and a sample retrieval mechanism. The mission aims to return samples from Mars to Earth, which could provide valuable insights into the planet's geology and potential biosignatures.",
-      "category": "international",
-      "significance": "The collaboration between NASA and CNSA has the potential to advance the search for life on Mars and the understanding of the planet's history.",
-      "url": "https://www.google.com/search?q=NASA+and+CNSA+Collaborate+on+Mars+Exploration+and+Sample+Return+NASA+Mars"
-    },
-    {
-      "title": "Mars 2022 Orbiter Discovers Evidence of Recurring Slope Lineae on Mars",
-      "date": "2026-01-20",
-      "source": "NASA",
-      "summary": "The Mars 2022 orbiter has discovered evidence of recurring slope lineae (RSL) on Mars, which are dark streaks that appear on the planet's surface during the warmest months of the year. The discovery was made using the orbiter's high-resolution camera, and suggests that RSL are more widespread on Mars than previously thought. The findings have implications for the search for life on Mars and the understanding of the planet's geology.",
+      "title": "Rock Sampled by NASA's Perseverance Embodies Why Rover Came to Mars",
+      "date": "4/03/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The 24th sample taken by the six-wheeled scientist offers new clues about Jezero Crater and the lake it may have once held.",
       "category": "discoveries",
-      "significance": "The discovery of RSL on Mars provides new insights into the planet's geology and the potential for life to exist there.",
-      "url": "https://www.google.com/search?q=Mars+2022+Orbiter+Discovers+Evidence+of+Recurring+Slope+Lineae+on+Mars+NASA+Mars"
+      "significance": "New clues about Jezero Crater and its lake",
+      "url": "https://mars.nasa.gov/news/9572/"
     },
     {
-      "title": "Blue Origin Advances New Glenn Rocket Development for Mars Missions",
-      "date": "2026-01-15",
-      "source": "Blue Origin",
-      "summary": "Blue Origin is advancing the development of its New Glenn rocket, which is intended for use on Mars missions. The rocket is designed to be reusable and has the capability to carry both crew and cargo to the Red Planet. The development of the New Glenn rocket is a significant step towards establishing a human presence on Mars.",
-      "category": "commercial",
-      "significance": "The development of the New Glenn rocket has the potential to significantly advance human exploration of Mars, with the goal of establishing a permanent human presence on the planet.",
-      "url": "https://www.google.com/search?q=Blue+Origin+Advances+New+Glenn+Rocket+Development+for+Mars+Missions+Blue+Origin+Mars"
+      "title": "NASA's Curiosity Searches for New Clues About Mars' Ancient Water",
+      "date": "3/29/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The rover has arrived at an area that may show evidence liquid water flowed on this part of Mars for much longer than previously thought.",
+      "category": "discoveries",
+      "significance": "Evidence of liquid water on Mars",
+      "url": "https://mars.nasa.gov/news/9569/"
     },
     {
-      "title": "NASA and ESA Collaborate on Martian Geology and Potential Biosignatures",
-      "date": "2026-01-10",
-      "source": "NASA",
-      "summary": "NASA and the European Space Agency (ESA) are collaborating on the study of Martian geology and potential biosignatures. The collaboration includes the development of new instruments and techniques for detecting signs of life on Mars. The mission aims to provide new insights into the planet's history and the potential for life to have existed there in the past.",
+      "title": "Team Assessing SHERLOC Instrument on NASA's Perseverance Rover",
+      "date": "2/13/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Engineers are working to stabilize a dust cover on one of the science instrument's cameras.",
+      "category": "technology",
+      "significance": "SHERLOC instrument issue on Perseverance rover",
+      "url": "https://mars.nasa.gov/news/9549/"
+    },
+    {
+      "title": "After Three Years on Mars, NASA's Ingenuity Helicopter Mission Ends",
+      "date": "1/25/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "NASA has proven powered, controlled flight is possible on other worlds, just as the Wright brothers proved it was possible on Earth.",
+      "category": "missions",
+      "significance": "Ingenuity Helicopter mission conclusion",
+      "url": "https://mars.nasa.gov/news/9540/"
+    },
+    {
+      "title": "20 Years After Landing: How NASA's Twin Rovers Changed Mars Science",
+      "date": "1/17/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "This month marks the 20th anniversary of Spirit and Opportunity's landing on Mars, part of a mission whose legacy will extend far into the future.",
+      "category": "missions",
+      "significance": "20th anniversary of Spirit and Opportunity landing",
+      "url": "https://mars.nasa.gov/news/9535/"
+    },
+    {
+      "title": "NASA's Curiosity Rover Captures a Martian Day, From Dawn to Dusk",
+      "date": "12/28/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Videos from the rover show its shadow moving across the Martian surface during a 12-hour sequence while Curiosity remained parked.",
+      "category": "discoveries",
+      "significance": "Martian day captured by Curiosity rover",
+      "url": "https://mars.nasa.gov/news/9529/"
+    },
+    {
+      "title": "NASA's Perseverance Rover Deciphers Ancient History of Martian Lake",
+      "date": "12/12/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Now at 1,000 days on Mars, the mission has traversed an ancient river and lake system, collecting valuable samples along the way.",
+      "category": "discoveries",
+      "significance": "Ancient history of Martian lake deciphered",
+      "url": "https://mars.nasa.gov/news/9520/"
+    },
+    {
+      "title": "NASA's MAVEN Observes the Disappearing Solar Wind",
+      "date": "12/11/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "NASA's MAVEN (Mars Atmosphere and Volatile EvolutioN) mission observed the dramatic and unexpected \"disappearance\" of a stream of charged particles constantly emanating off the Sun, known as the solar wind.",
+      "category": "discoveries",
+      "significance": "Disappearance of solar wind observed by MAVEN",
+      "url": "https://mars.nasa.gov/news/9519/"
+    },
+    {
+      "title": "NASA Orbiter Snaps Stunning Views of Mars Horizon",
+      "date": "11/28/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The Odyssey orbiter captured clouds and dust in the Red Planet's skies, along with one of its two tiny moons.",
+      "category": "discoveries",
+      "significance": "Stunning views of Mars horizon captured by Odyssey orbiter",
+      "url": "https://mars.nasa.gov/news/9514/"
+    },
+    {
+      "title": "NASA Uses Two Worlds to Test Future Mars Helicopter Designs",
+      "date": "11/22/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Engineers will go beyond the ends of the Earth to find more performance for future Mars helicopters.",
+      "category": "technology",
+      "significance": "Testing future Mars helicopter designs",
+      "url": "https://mars.nasa.gov/news/9513/"
+    },
+    {
+      "title": "NASA's Mars Fleet Will Still Conduct Science While Lying Low",
+      "date": "11/10/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Rovers and orbiters will continue collecting limited data during a two-week communications pause due to the position of Earth, the Sun, and the Red Planet.",
+      "category": "missions",
+      "significance": "Mars fleet conducting science during communications pause",
+      "url": "https://mars.nasa.gov/news/9512/"
+    },
+    {
+      "title": "NASA's Curiosity Rover Clocks 4,000 Days on Mars",
+      "date": "11/06/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The mission team is making sure the robotic scientist is staying strong, despite wear and tear from its 11-year journey.",
+      "category": "missions",
+      "significance": "Curiosity rover clocks 4,000 days on Mars",
+      "url": "https://mars.nasa.gov/news/9508/"
+    },
+    {
+      "title": "NASA Technologies Receive Multiple Nods in TIME Inventions of 2023",
+      "date": "10/27/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "MOXIE, the oxygen-generating experiment aboard NASA's Perseverance Mars rover, is among the technologies honored by the magazine.",
+      "category": "technology",
+      "significance": "MOXIE honored as one of TIME's Inventions of 2023",
+      "url": "https://mars.nasa.gov/news/9505/"
+    },
+    {
+      "title": "NASA Is Locating Ice on Mars With This New Map",
+      "date": "10/26/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The map could help the agency decide where the first astronauts to the Red Planet should land. The more available water, the less missions will need to bring.",
+      "category": "human_exploration",
+      "significance": "Locating ice on Mars for future astronaut landing",
+      "url": "https://mars.nasa.gov/news/9502/"
+    },
+    {
+      "title": "NASA's Perseverance Captures Dust-Filled Martian Whirlwind",
+      "date": "9/29/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The six-wheeled geologist spotted the twister as part of an atmospheric exploration of Jezero Crater.",
+      "category": "discoveries",
+      "significance": "Dust-filled Martian whirlwind captured by Perseverance",
+      "url": "https://mars.nasa.gov/news/9490/"
+    },
+    {
+      "title": "Historic Wind Tunnel Facility Testing NASA's Mars Ascent Vehicle Rocket",
+      "date": "9/25/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The same facility that provided valuable testing for NASA missions to low-Earth orbit and the Moon is now helping the agency prepare to launch the first rocket from Mars.",
+      "category": "technology",
+      "significance": "Testing Mars Ascent Vehicle rocket",
+      "url": "https://mars.nasa.gov/news/9485/"
+    },
+    {
+      "title": "NASA Releases Independent Review's Mars Sample Return Report",
+      "date": "9/21/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The agency established the board in May 2023 to evaluate the technical, cost, and schedule plans prior to confirmation of the mission's design.",
+      "category": "sample_return",
+      "significance": "Independent review's Mars Sample Return report released",
+      "url": "https://mars.nasa.gov/news/9483/"
+    },
+    {
+      "title": "Autonomous Systems Help NASA's Perseverance Do More Science on Mars",
+      "date": "9/21/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "A computer pilot helps NASA's six-wheeled geologist as it searches for rock samples that could be brought to Earth for deeper investigation.",
+      "category": "technology",
+      "significance": "Autonomous systems helping Perseverance rover",
+      "url": "https://mars.nasa.gov/news/9482/"
+    },
+    {
+      "title": "NASA's Curiosity Reaches Mars Ridge Where Water Left Debris Pileup",
+      "date": "9/18/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Believed to be a remnant of powerful ancient debris flows, Gediz Vallis Ridge is a destination long sought by the rover's science team.",
+      "category": "discoveries",
+      "significance": "Curiosity rover reaches Mars ridge with ancient debris flows",
+      "url": "https://mars.nasa.gov/news/9480/"
+    },
+    {
+      "title": "NASA's Oxygen-Generating Experiment MOXIE Completes Mars Mission",
+      "date": "9/06/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Riding with the Perseverance rover, the instrument has proved to be a viable technology for astronauts on Mars to produce oxygen for fuel and breathing.",
+      "category": "technology",
+      "significance": "MOXIE completes Mars mission",
+      "url": "https://mars.nasa.gov/news/9474/"
+    },
+    {
+      "title": "NASA, Partners Study Ancient Life in Australia to Inform Mars Search",
+      "date": "8/24/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "NASA is working with its international partners to study the ancient Earth as it relates to Mars",
       "category": "international",
-      "significance": "The collaboration between NASA and ESA has the potential to advance the search for life on Mars and the understanding of the planet's geology.",
-      "url": "https://www.google.com/search?q=NASA+and+ESA+Collaborate+on+Martian+Geology+and+Potential+Biosignatures+NASA+Mars"
+      "significance": "NASA studying ancient life in Australia with international partners",
+      "url": "https://mars.nasa.gov/news/9468/"
     },
     {
-      "title": "Mars Odyssey Orbiter Celebrates 20 Years of Mars Exploration",
-      "date": "2026-01-05",
-      "source": "NASA",
-      "summary": "The Mars Odyssey orbiter has celebrated 20 years of Mars exploration, with a wide range of discoveries and achievements. The orbiter has provided valuable insights into the planet's geology, climate, and potential biosignatures. The mission has also demonstrated the feasibility of long-term exploration of Mars and has paved the way for future missions.",
-      "category": "missions",
-      "significance": "The Mars Odyssey orbiter has made significant contributions to our understanding of Mars and has paved the way for future missions to the planet.",
-      "url": "https://www.google.com/search?q=Mars+Odyssey+Orbiter+Celebrates+20+Years+of+Mars+Exploration+NASA+Mars"
+      "title": "Watch NASA Engineers Put a Mars Lander's Legs to the Test",
+      "date": "8/10/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Sturdy legs are needed to absorb the impact of the heaviest spacecraft to ever touch down on the Red Planet.",
+      "category": "technology",
+      "significance": "Testing Mars lander's legs",
+      "url": "https://mars.nasa.gov/news/9460/"
     },
     {
-      "title": "MAVEN Spacecraft Discovers New Insights into Martian Atmosphere",
-      "date": "2026-01-01",
+      "title": "NASA Study to Analyze Fermented Food Samples from Space",
+      "date": "Wed, 25 Feb 2026 15:58:57 +0000",
       "source": "NASA",
-      "summary": "The MAVEN spacecraft has discovered new insights into the Martian atmosphere, including the detection of a new type of aurora. The findings suggest that the Martian atmosphere is more complex and dynamic than previously thought, and have implications for the search for life on Mars. The mission has also provided valuable insights into the planet's climate and geology.",
+      "summary": "Certain nutrients critical for human health lack the shelf life needed to span multi-year missions to the Moon, Mars, and beyond. NASA’s BioNutrients-3 is part of an experiment series testing ways to use microorganisms to produce these nutrients in space and on demand. The on-demand nature of this experiment is similar to making nutrient-dense fermented [&#8230;]",
+      "category": "human_exploration",
+      "significance": "Analyzing fermented food samples for long-term space missions",
+      "url": "https://www.nasa.gov/general/nasa-study-to-analyze-fermented-food-samples-from-space/"
+    },
+    {
+      "title": "Curiosity Blog, Sols 4812-4819: Back Into the Hollows",
+      "date": "Tue, 24 Feb 2026 21:21:38 +0000",
+      "source": "NASA",
+      "summary": "Written by Diana Hayes, Graduate student at York University, Toronto Earth planning date: Friday, Feb. 20, 2026 This has been a pretty routine week for Curiosity. As was mentioned last week, we’re now in the final phase of the boxwork exploration campaign. We’re currently making our way toward the eastern contact of the boxwork formation […]",
       "category": "missions",
-      "significance": "The MAVEN spacecraft has made significant contributions to our understanding of the Martian atmosphere and has paved the way for future missions to the planet.",
-      "url": "https://www.google.com/search?q=MAVEN+Spacecraft+Discovers+New+Insights+into+Martian+Atmosphere+NASA+Mars"
+      "significance": "Curiosity rover's routine week",
+      "url": "https://science.nasa.gov/blog/curiosity-blog-sols-4812-4819-back-into-the-hollows/"
     }
   ],
-  "trend_summary": "Mars exploration is advancing rapidly, with ongoing missions like Perseverance and Curiosity providing new insights into the planet's geology and potential biosignatures. The Mars Sample Return mission is progressing, with international collaboration and technical developments. SpaceX's Starship program is also advancing, with successful test flights and plans for human missions to Mars. The European Space Agency and Japan Aerospace Exploration Agency are collaborating on a new mission to explore the Martian moons, and NASA and the China National Space Administration are collaborating on Mars exploration and sample return. Blue Origin is advancing the development of its New Glenn rocket for Mars missions, and NASA and the European Space Agency are collaborating on the study of Martian geology and potential biosignatures. The Mars Odyssey orbiter has celebrated 20 years of Mars exploration, and the MAVEN spacecraft has discovered new insights into the Martian atmosphere. Overall, the trend is towards increased international cooperation, technological advancements, and a growing understanding of the Martian environment, which will ultimately pave the way for human exploration and potential settlement of the Red Planet."
+  "trend_summary": "The recent Mars news items show a focus on ongoing and past missions, such as the Ingenuity Helicopter and Curiosity rover, as well as efforts to return samples from Mars. There is also a strong emphasis on developing and testing new technologies, including those that will support future human exploration of the planet. Additionally, international collaboration and preparation for long-term space missions are emerging trends. Overall, these trends demonstrate a continued commitment to exploring Mars and pushing the boundaries of space technology."
 }
