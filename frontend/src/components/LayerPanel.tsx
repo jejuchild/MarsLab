@@ -344,8 +344,8 @@ interface LayerPanelProps {
   onToggleRegionLayer?: (v: boolean) => void;
 
   // SWIM ice overlay
-  showSWIMOverlay?: boolean;
-  onToggleSWIMOverlay?: (v: boolean) => void;
+  swimLayer?: string | false;
+  onSwimLayerChange?: (layer: string | false) => void;
 
   // Field Notes
   fieldNotes?: FieldNote[];
@@ -641,8 +641,8 @@ export default function LayerPanel({
   showRegionLayer = false,
   onToggleRegionLayer,
   // SWIM ice overlay
-  showSWIMOverlay = false,
-  onToggleSWIMOverlay,
+  swimLayer = false,
+  onSwimLayerChange,
   // Field Notes
   fieldNotes = [],
   showFieldNotesOnMap = true,
@@ -919,25 +919,35 @@ export default function LayerPanel({
             </span>
           </label>
 
-          {/* SWIM Ice Overlay */}
-          <label
-            className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-              showSWIMOverlay
-                ? "bg-blue-500/20 border border-blue-400/50"
-                : "bg-[#1a2333] border border-[#232f48] hover:border-blue-400/30"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={showSWIMOverlay}
-              onChange={(e) => onToggleSWIMOverlay?.(e.target.checked)}
-              className="rounded bg-[#0a0f18] border-[#232f48] text-blue-400 focus:ring-0 focus:ring-offset-0"
-            />
-            <span className="material-symbols-outlined text-xs text-blue-400">water_drop</span>
-            <span className={`text-[11px] font-medium ${showSWIMOverlay ? "text-blue-300" : "text-[#92a4c9]"}`}>
-              SWIM Ice Overlay
-            </span>
-          </label>
+          {/* SWIM Ice Overlay - Layer Selector */}
+          <div className={`p-2 rounded transition-colors ${
+            swimLayer
+              ? "bg-blue-500/20 border border-blue-400/50"
+              : "bg-[#1a2333] border border-[#232f48] hover:border-blue-400/30"
+          }`}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="material-symbols-outlined text-xs text-blue-400">water_drop</span>
+              <span className={`text-[11px] font-medium ${swimLayer ? "text-blue-300" : "text-[#92a4c9]"}`}>
+                SWIM Ice Map
+              </span>
+              <span className="text-[9px] text-slate-500 ml-auto">3 km/px</span>
+            </div>
+            <select
+              value={swimLayer || ""}
+              onChange={(e) => onSwimLayerChange?.(e.target.value || false)}
+              className="w-full bg-[#0a0f18] border border-[#232f48] rounded px-2 py-1 text-[10px] text-slate-300 focus:outline-none focus:border-blue-400/50"
+            >
+              <option value="">Off</option>
+              <option value="0-1m">Shallow (0-1 m)</option>
+              <option value="1-5m">Mid-depth (1-5 m)</option>
+              <option value=">5m">Deep (&gt;5 m)</option>
+            </select>
+            {swimLayer && (
+              <p className="text-[9px] text-slate-500 mt-1">
+                Source: SWIM4MIM (Morgan & Putzig et al. 2025)
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Footprints Section — Hierarchical instrument tree */}

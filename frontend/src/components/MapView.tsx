@@ -183,8 +183,8 @@ type MapViewProps = {
 
   // Easter eggs
   terraformMode?: boolean;
-  // SWIM regional ice overlay
-  showSWIMOverlay?: boolean;
+  /** SWIM layer: "0-1m" | "1-5m" | ">5m" | false */
+  swimLayer?: string | false;
   onOlympusMonsTripleClick?: () => void;
   onOlympusMonsClimber?: () => void;
 };
@@ -602,20 +602,6 @@ function paddedRectangle(rect: Cesium.Rectangle, padRatio = 0.6): Cesium.Rectang
   );
 }
 
-const SWIM_REGIONS: Array<{
-  id: string;
-  name: string;
-  bounds: { west: number; south: number; east: number; north: number };
-  iceConsistency: number;
-  depthM: number;
-  confidence: string;
-}> = [
-  { id: "arcadia", name: "Arcadia Planitia", bounds: { west: -180, south: 38, east: -140, north: 55 }, iceConsistency: 0.88, depthM: 2.5, confidence: "high" },
-  { id: "utopia", name: "Utopia Planitia", bounds: { west: 100, south: 30, east: 140, north: 50 }, iceConsistency: 0.92, depthM: 1.8, confidence: "high" },
-  { id: "hellas", name: "Hellas Planitia", bounds: { west: 55, south: -55, east: 85, north: -30 }, iceConsistency: 0.45, depthM: 15, confidence: "medium" },
-  { id: "argyre", name: "Argyre Planitia", bounds: { west: -65, south: -55, east: -30, north: -35 }, iceConsistency: 0.52, depthM: 8, confidence: "medium" },
-];
-
 /* ==================================================
  * Component
  * ==================================================*/
@@ -679,7 +665,7 @@ export default function MapView({
   craterDetectFeatures,
   cameraViewportRef,
   terraformMode = false,
-  showSWIMOverlay = false,
+  swimLayer = false,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
 }: MapViewProps) {
@@ -786,6 +772,7 @@ export default function MapView({
 
   // View bound selection refs
   const onViewBoundSelectedRef = useRef(onViewBoundSelected);
+  const swimLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   useEffect(() => {
     onViewBoundSelectedRef.current = onViewBoundSelected;
   }, [onViewBoundSelected]);
@@ -1532,79 +1519,60 @@ export default function MapView({
     };
   }, [terraformMode]);
 
-  // SWIM regional ice overlay
+  // SWIM real data imagery overlay
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    // Remove old SWIM entities
-    const toRemove = viewer.entities.values.filter(
+    // Remove previous SWIM imagery layer
+    if (swimLayerRef.current) {
+      viewer.imageryLayers.remove(swimLayerRef.current, false);
+      swimLayerRef.current = null;
+    }
+
+    // Also clean up old entity-based SWIM (migration cleanup)
+    const oldEntities = viewer.entities.values.filter(
       (e: Cesium.Entity) => e.id?.startsWith("SWIM_")
     );
-    for (const e of toRemove) viewer.entities.remove(e);
+    for (const e of oldEntities) viewer.entities.remove(e);
 
-    if (!showSWIMOverlay) {
+    if (!swimLayer) {
       viewer.scene.requestRender();
       return;
     }
 
-    viewer.entities.suspendEvents();
+    // Map layer ID to backend tile URL
+    const layerMap: Record<string, string> = {
+      "0-1m": "/api/swim/tile/0-1m",
+      "1-5m": "/api/swim/tile/1-5m",
+      ">5m": "/api/swim/tile/%3E5m",
+    };
 
-    for (const region of SWIM_REGIONS) {
-      const { bounds, iceConsistency, name, depthM, confidence, id } = region;
+    const tileUrl = layerMap[swimLayer];
+    if (!tileUrl) return;
 
-      // Color: high consistency = blue, low = amber
-      const color = iceConsistency >= 0.7
-        ? Cesium.Color.fromCssColorString("#3b82f6").withAlpha(0.15 + iceConsistency * 0.15)
-        : Cesium.Color.fromCssColorString("#f59e42").withAlpha(0.1 + iceConsistency * 0.15);
-
-      const outlineColor = iceConsistency >= 0.7
-        ? Cesium.Color.fromCssColorString("#3b82f6").withAlpha(0.6)
-        : Cesium.Color.fromCssColorString("#f59e42").withAlpha(0.6);
-
-      // Rectangle entity
-      viewer.entities.add({
-        id: `SWIM_RECT_${id}`,
-        rectangle: {
-          coordinates: Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north),
-          material: new Cesium.ColorMaterialProperty(color),
-          outline: true,
-          outlineColor: new Cesium.ConstantProperty(outlineColor),
-          outlineWidth: new Cesium.ConstantProperty(2),
-          height: 0,
-        },
+    try {
+      const provider = new Cesium.SingleTileImageryProvider({
+        url: tileUrl,
+        rectangle: Cesium.Rectangle.fromDegrees(-180, -60, 180, 60),
       });
 
-      // Label at center
-      const centerLon = (bounds.west + bounds.east) / 2;
-      const centerLat = (bounds.south + bounds.north) / 2;
-      viewer.entities.add({
-        id: `SWIM_LABEL_${id}`,
-        position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 0, MARS_ELLIPSOID),
-        label: {
-          text: `${name}\nSWIM: ${(iceConsistency * 100).toFixed(0)}% | ${depthM}m | ${confidence}`,
-          font: "bold 11px sans-serif",
-          fillColor: iceConsistency >= 0.7 ? Cesium.Color.fromCssColorString("#60a5fa") : Cesium.Color.fromCssColorString("#fbbf24"),
-          outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 2,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY,
-          scaleByDistance: new Cesium.NearFarScalar(1e5, 1.0, 5e6, 0.4),
-        },
-      });
+      const layer = viewer.imageryLayers.addImageryProvider(provider);
+      layer.alpha = 0.75;
+      swimLayerRef.current = layer;
+      viewer.scene.requestRender();
+    } catch (err) {
+      console.warn("Failed to load SWIM overlay:", err);
     }
-
-    viewer.entities.resumeEvents();
-    viewer.scene.requestRender();
 
     return () => {
       if (!viewer || viewer.isDestroyed()) return;
-      const ents = viewer.entities.values.filter(
-        (e: Cesium.Entity) => e.id?.startsWith("SWIM_")
-      );
-      for (const e of ents) viewer.entities.remove(e);
+      if (swimLayerRef.current) {
+        viewer.imageryLayers.remove(swimLayerRef.current, false);
+        swimLayerRef.current = null;
+      }
     };
-  }, [showSWIMOverlay]);
+  }, [swimLayer]);
 
   // Store onHoverProduct in ref to access in hover handler
   const onHoverProductRef = useRef(onHoverProduct);
