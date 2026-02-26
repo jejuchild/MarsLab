@@ -343,6 +343,10 @@ interface LayerPanelProps {
   showRegionLayer?: boolean;
   onToggleRegionLayer?: (v: boolean) => void;
 
+  // SWIM ice overlay
+  showSWIMOverlay?: boolean;
+  onToggleSWIMOverlay?: (v: boolean) => void;
+
   // Field Notes
   fieldNotes?: FieldNote[];
   showFieldNotesOnMap?: boolean;
@@ -636,6 +640,9 @@ export default function LayerPanel({
   // Region layer
   showRegionLayer = false,
   onToggleRegionLayer,
+  // SWIM ice overlay
+  showSWIMOverlay = false,
+  onToggleSWIMOverlay,
   // Field Notes
   fieldNotes = [],
   showFieldNotesOnMap = true,
@@ -909,6 +916,26 @@ export default function LayerPanel({
             <span className="material-symbols-outlined text-xs text-amber-400">map</span>
             <span className={`text-[11px] font-medium ${showRegionLayer ? "text-amber-300" : "text-[#92a4c9]"}`}>
               Named Regions
+            </span>
+          </label>
+
+          {/* SWIM Ice Overlay */}
+          <label
+            className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+              showSWIMOverlay
+                ? "bg-blue-500/20 border border-blue-400/50"
+                : "bg-[#1a2333] border border-[#232f48] hover:border-blue-400/30"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={showSWIMOverlay}
+              onChange={(e) => onToggleSWIMOverlay?.(e.target.checked)}
+              className="rounded bg-[#0a0f18] border-[#232f48] text-blue-400 focus:ring-0 focus:ring-offset-0"
+            />
+            <span className="material-symbols-outlined text-xs text-blue-400">water_drop</span>
+            <span className={`text-[11px] font-medium ${showSWIMOverlay ? "text-blue-300" : "text-[#92a4c9]"}`}>
+              SWIM Ice Overlay
             </span>
           </label>
         </div>

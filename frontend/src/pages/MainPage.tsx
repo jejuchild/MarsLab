@@ -414,6 +414,7 @@ export default function MainPage() {
   // Coordinate grid
   const [showGrid, setShowGrid] = useState(false);
   const [showRegionLayer, setShowRegionLayer] = useState(false);
+  const [showSWIMOverlay, setShowSWIMOverlay] = useState(false);
 
   // Region Dashboard overlay
   const [showRegionDashboard, setShowRegionDashboard] = useState(false);
@@ -1622,6 +1623,8 @@ export default function MainPage() {
       onToggleGrid={setShowGrid}
       showRegionLayer={showRegionLayer}
       onToggleRegionLayer={setShowRegionLayer}
+      showSWIMOverlay={showSWIMOverlay}
+      onToggleSWIMOverlay={setShowSWIMOverlay}
       // Field Notes
       fieldNotes={fieldNotes}
       showFieldNotesOnMap={showFieldNotesOnMap}
@@ -1939,6 +1942,7 @@ export default function MainPage() {
         activeDTMProductId={activeDTMProduct}
         showGrid={showGrid}
         showRegionLayer={showRegionLayer}
+        showSWIMOverlay={showSWIMOverlay}
         aiAnalysisPin={aiAnalysisPin}
         overlapFilter={overlapFilter}
         onOverlapStatsChange={handleOverlapStatsChange}

@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import UncertaintyBadge from "./UncertaintyBadge";
 import {
   fetchStratigraphyAnalysis,
   getStratigraphyCsvUrl,
@@ -271,9 +272,16 @@ export default function StratigraphyPanel({
                 <p className="text-[11px] text-slate-400 leading-relaxed">
                   {bestEst.interpretation}
                 </p>
+                <UncertaintyBadge
+                  label="True Depth"
+                  value={bestEst.depth_m}
+                  low={Math.max(0, bestEst.depth_m - bestEst.depth_unc_m)}
+                  high={bestEst.depth_m + bestEst.depth_unc_m}
+                  unit="m"
+                />
                 <div className="grid grid-cols-2 gap-2">
-                  <StatCard label="True Depth" value={bestEst.depth_m} unit="m" small />
                   <StatCard label="TWT" value={bestEst.twt_us} unit="µs" small />
+                  <StatCard label="Depth ±" value={bestEst.depth_unc_m} unit="m" small />
                 </div>
               </div>
             )}
@@ -643,6 +651,26 @@ function EpsilonRow({ est }: { est: EpsilonEstimateInfo }) {
       <p className="text-[10px] text-slate-500 mt-0.5">
         {est.depth_metric.replace(/_/g, " ")} | depth: {est.depth_m.toFixed(0)}m | TWT: {est.twt_us.toFixed(3)}µs
       </p>
+      {est.depth_unc_m > 0 && (
+        <div className="mt-1 flex items-center gap-2">
+          <div className="flex-1 h-1 bg-slate-700 rounded-full overflow-hidden relative">
+            <div
+              className="absolute inset-y-0 bg-primary/30 rounded-full"
+              style={{
+                left: `${Math.max(0, ((est.depth_m - est.depth_unc_m) / (est.depth_m + est.depth_unc_m)) * 100)}%`,
+                right: `${Math.max(0, 100 - ((est.depth_m + est.depth_unc_m) / (est.depth_m + est.depth_unc_m)) * 100)}%`,
+              }}
+            />
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-primary rounded-full"
+              style={{ left: "50%" }}
+            />
+          </div>
+          <span className="text-[9px] text-slate-500 font-mono whitespace-nowrap">
+            ±{est.depth_unc_m.toFixed(1)}m
+          </span>
+        </div>
+      )}
     </div>
   );
 }
