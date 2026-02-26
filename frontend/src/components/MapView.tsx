@@ -183,6 +183,8 @@ type MapViewProps = {
 
   // Easter eggs
   terraformMode?: boolean;
+  // SWIM regional ice overlay
+  showSWIMOverlay?: boolean;
   onOlympusMonsTripleClick?: () => void;
   onOlympusMonsClimber?: () => void;
 };
@@ -663,6 +665,7 @@ export default function MapView({
   craterDetectFeatures,
   cameraViewportRef,
   terraformMode = false,
+  showSWIMOverlay = false,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
 }: MapViewProps) {

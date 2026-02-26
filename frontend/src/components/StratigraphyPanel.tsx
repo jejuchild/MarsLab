@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -16,6 +18,23 @@ import {
   type EpsilonEstimateInfo,
 } from "../api/stratigraphy";
 
+interface SWIMRegion {
+  region: string;
+  region_id: string;
+  ice_consistency: number;
+  depth_to_ice_m: number;
+  thermal_inertia: number;
+  neutron_h2o_pct: number;
+  radar_dielectric: number;
+  confidence: string;
+}
+
+async function fetchSWIMComparison(): Promise<SWIMRegion[]> {
+  const res = await fetch("/api/swim/comparison");
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.comparison ?? [];
+}
 /* =========================================================
  * Props
  * =======================================================*/
@@ -62,6 +81,10 @@ export default function StratigraphyPanel({
   const [minSnr, setMinSnr] = useState(3.5);
   const [maxRadiusM, setMaxRadiusM] = useState(3000);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const [swimData, setSwimData] = useState<SWIMRegion[]>([]);
+  const [swimLoading, setSwimLoading] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
 
   // Panel width
   const [panelWidth, setPanelWidth] = useState(440);
@@ -128,6 +151,12 @@ export default function StratigraphyPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [craterFeature.id]);
 
+  useEffect(() => {
+    setSwimLoading(true);
+    fetchSWIMComparison()
+      .then(setSwimData)
+      .finally(() => setSwimLoading(false));
+  }, []);
   /* ── Chart data ─────────────────────────────────────── */
   const chartData = result?.radial_profile.map((p) => ({
     r: p.radius_m,
@@ -396,6 +425,83 @@ export default function StratigraphyPanel({
                 </div>
               </div>
             )}
+
+            {/* ── Regional Ice Depth Comparison ────── */}
+            <div>
+              <button
+                onClick={() => setShowComparison(!showComparison)}
+                className="flex items-center gap-2 w-full text-left"
+              >
+                <span className="material-symbols-outlined text-[14px] text-slate-500">
+                  {showComparison ? "expand_less" : "expand_more"}
+                </span>
+                <h3 className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+                  Regional Ice Depth Comparison
+                </h3>
+                <span className="text-[9px] text-slate-600 ml-auto">SWIM v2.1</span>
+              </button>
+
+              {showComparison && (
+                <div className="mt-2 space-y-3">
+                  {swimLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <span className="material-symbols-outlined animate-spin text-lg text-primary">progress_activity</span>
+                    </div>
+                  ) : swimData.length === 0 ? (
+                    <p className="text-[10px] text-slate-500">No SWIM data available</p>
+                  ) : (
+                    <>
+                      {/* Bar chart */}
+                      <div className="bg-[#101622] rounded-lg border border-slate-700/50 p-2">
+                        <p className="text-[9px] text-slate-500 mb-1">Ice Consistency Score by Region</p>
+                        <ResponsiveContainer width="100%" height={120}>
+                          <BarChart data={swimData} layout="vertical" margin={{ top: 4, right: 8, left: 60, bottom: 4 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#1e2a40" />
+                            <XAxis type="number" domain={[0, 1]} stroke="#4a5568" tick={{ fontSize: 9, fill: "#6b7c9c" }} />
+                            <YAxis type="category" dataKey="region" stroke="#4a5568" tick={{ fontSize: 9, fill: "#6b7c9c" }} width={55} />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: "#101622", border: "1px solid #232f48", fontSize: 11, borderRadius: 6 }}
+                              formatter={(value: number | string | undefined) => [Number(value ?? 0).toFixed(2), "SWIM Score"]}
+                            />
+                            <Bar dataKey="ice_consistency" fill="#4f9cf7" radius={[0, 3, 3, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Depth comparison cards */}
+                      <div className="space-y-1.5">
+                        {swimData.map((r) => (
+                          <div key={r.region_id} className="bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/50">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-medium text-white">{r.region}</span>
+                              <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ${
+                                r.confidence === "high"
+                                  ? "bg-green-500/10 text-green-400"
+                                  : "bg-yellow-500/10 text-yellow-400"
+                              }`}>
+                                {r.confidence}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
+                              <span>Depth: {r.depth_to_ice_m}m</span>
+                              <span>\u03b5\u2019: {r.radar_dielectric}</span>
+                              <span>H\u2082O: {r.neutron_h2o_pct}%</span>
+                            </div>
+                            {/* Mini bar for ice consistency */}
+                            <div className="mt-1.5 h-1 bg-slate-700 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary rounded-full transition-all"
+                                style={{ width: `${r.ice_consistency * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* ── Parameters / Controls ─────────────────── */}
             <div>

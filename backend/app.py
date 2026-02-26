@@ -549,6 +549,10 @@ app.include_router(product_urls_router)  # /api/product-urls/* — PDS Download 
 
 from api.discussions_router import router as discussions_router
 app.include_router(discussions_router)  # /api/discussions — Daily AI Discussions
+
+from api.swim_router import router as swim_router
+app.include_router(swim_router)  # /api/swim/* — SWIM Ice Data
+
 @app.get("/hirise/quickview/{product_id}.png")
 @limiter.limit("20/minute")
 def get_hirise_quickview_transparent(request: Request, product_id: str):
