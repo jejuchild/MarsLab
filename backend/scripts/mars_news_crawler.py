@@ -78,17 +78,44 @@ GENERIC_CATCH_ALL = {
 # Feed fetchers — return real news items with real URLs
 # ======================================================================
 
-def _resolve_redirect(url: str) -> str:
-    """Follow redirects and return the final URL. If it's a generic catch-all, keep the original."""
+def _resolve_redirect(url: str, title: str = "") -> str:
+    """Follow redirects. If catch-all, try to find article via slug on nasa.gov/jpl.nasa.gov."""
+    # Step 1: Follow redirect
     try:
         resp = requests.head(url, headers=HTTP_HEADERS, timeout=10, allow_redirects=True)
         final = resp.url.rstrip("/")
-        if final.rstrip("/") in {u.rstrip("/") for u in GENERIC_CATCH_ALL}:
-            return url  # keep original — it at least identifies the specific article
-        return resp.url
+        if final.rstrip("/") not in {u.rstrip("/") for u in GENERIC_CATCH_ALL}:
+            return resp.url  # resolved to a specific page
     except Exception:
+        pass
+
+    if not title:
         return url
 
+    # Step 2: Construct slug from title and probe known NASA URL patterns
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    candidate_prefixes = [
+        "https://www.nasa.gov/news-release/",
+        "https://www.nasa.gov/missions/mars-2020-perseverance/ingenuity-helicopter/",
+        "https://www.nasa.gov/missions/mars-2020-perseverance/perseverance-rover/",
+        "https://www.nasa.gov/missions/mars-science-laboratory/curiosity-rover/",
+        "https://www.nasa.gov/missions/mars-sample-return/",
+        "https://www.nasa.gov/solar-system/planets/mars/",
+        "https://www.nasa.gov/general/",
+        "https://www.jpl.nasa.gov/news/",
+    ]
+    for prefix in candidate_prefixes:
+        candidate = f"{prefix}{slug}/"
+        try:
+            r = requests.head(candidate, headers=HTTP_HEADERS, timeout=6, allow_redirects=True)
+            resolved = r.url.rstrip("/")
+            if r.status_code == 200 and resolved not in {u.rstrip("/") for u in GENERIC_CATCH_ALL}:
+                logger.debug("Resolved %s -> %s", url, r.url)
+                return r.url
+        except Exception:
+            continue
+
+    return url  # fallback: keep original
 
 def fetch_nasa_mars_api() -> list[dict[str, str]]:
     """Fetch from NASA Mars Exploration Program JSON API, resolve redirects to get real URLs."""
@@ -105,7 +132,7 @@ def fetch_nasa_mars_api() -> list[dict[str, str]]:
             posted = entry.get("POSTED", "").strip()
             if title and link:
                 # Resolve NASA redirect to get the real article URL
-                resolved = _resolve_redirect(link)
+                resolved = _resolve_redirect(link, title)
                 items.append({
                     "title": title,
                     "url": resolved,
