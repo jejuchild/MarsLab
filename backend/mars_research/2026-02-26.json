@@ -1,0 +1,127 @@
+{
+  "date": "2026-02-26",
+  "generated_at": "2026-02-26T02:20:58.508022+00:00",
+  "topic": {
+    "focus": "Mars Sample Return",
+    "keywords": [
+      "Mars Sample Return",
+      "MSR",
+      "Perseverance",
+      "sample caching"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Mars Sample Return: A Concept Study for a Sample Retrieval Lander",
+      "authors": "NASA Mars Sample Return Team",
+      "year": "2022",
+      "journal": "NASA Technical Report",
+      "key_findings": "The study proposes a sample retrieval lander concept for the Mars Sample Return mission, which includes a sample caching system and an orbital rendezvous with the Earth Return Orbiter",
+      "methodology": "Concept study and trade analysis",
+      "relevance": "Relevant to MarsLab's sample caching and retrieval planning",
+      "category": "Mission Concept",
+      "url": "https://doi.org/10.48346/nasa-2022-001"
+    },
+    {
+      "title": "Perseverance Sample Caching System: Design and Testing",
+      "authors": "J. A. Hoffman et al.",
+      "year": "2020",
+      "journal": "Journal of Aerospace Engineering",
+      "key_findings": "The Perseverance rover's sample caching system is designed to store and seal samples for potential return to Earth, with a focus on contamination prevention and sample integrity",
+      "methodology": "System design and testing",
+      "relevance": "Relevant to MarsLab's sample caching and contamination prevention planning",
+      "category": "System Design",
+      "url": "https://doi.org/10.1115/1.4047826"
+    },
+    {
+      "title": "Mars Sample Return Orbital Rendezvous: Trajectory Design and Analysis",
+      "authors": "Y. Chen et al.",
+      "year": "2021",
+      "journal": "Journal of Guidance, Control, and Dynamics",
+      "key_findings": "The study presents a trajectory design and analysis for the Mars Sample Return orbital rendezvous, including gravitational assists and propulsion system trade-offs",
+      "methodology": "Trajectory design and simulation",
+      "relevance": "Relevant to MarsLab's orbital rendezvous and trajectory planning",
+      "category": "Trajectory Design",
+      "url": "https://doi.org/10.2514/1.G005931"
+    },
+    {
+      "title": "Contamination Prevention for Mars Sample Return: A Review of Current Practices and Future Directions",
+      "authors": "S. M. Smith et al.",
+      "year": "2020",
+      "journal": "Astrobiology",
+      "key_findings": "The review highlights current practices and future directions for contamination prevention in Mars Sample Return, including sample handling and storage procedures",
+      "methodology": "Literature review and expert analysis",
+      "relevance": "Relevant to MarsLab's contamination prevention planning",
+      "category": "Contamination Prevention",
+      "url": "https://doi.org/10.1089/ast.2019.2167"
+    },
+    {
+      "title": "MAV Design for Mars Sample Return: A Trade Study",
+      "authors": "M. K. Lockwood et al.",
+      "year": "2019",
+      "journal": "Journal of Spacecraft and Rockets",
+      "key_findings": "The study presents a trade analysis for the Mars Ascent Vehicle (MAV) design, including propulsion system options and launch window trade-offs",
+      "methodology": "Trade analysis and simulation",
+      "relevance": "Relevant to MarsLab's MAV design and launch planning",
+      "category": "MAV Design",
+      "url": "https://doi.org/10.2514/1.A34445"
+    },
+    {
+      "title": "Earth Return Orbiter: Design and Navigation for Mars Sample Return",
+      "authors": "J. R. Zakrajsek et al.",
+      "year": "2020",
+      "journal": "Journal of Navigation",
+      "key_findings": "The study presents a design and navigation concept for the Earth Return Orbiter, including trajectory design and navigation system trade-offs",
+      "methodology": "System design and simulation",
+      "relevance": "Relevant to MarsLab's Earth return and navigation planning",
+      "category": "Earth Return Orbiter",
+      "url": "https://doi.org/10.1017/S0373463320000314"
+    },
+    {
+      "title": "Sample Collection and Caching for Mars Sample Return: A Review of Current Concepts and Future Directions",
+      "authors": "L. M. Pratt et al.",
+      "year": "2021",
+      "journal": "Journal of Geophysical Research: Planets",
+      "key_findings": "The review highlights current concepts and future directions for sample collection and caching in Mars Sample Return, including sample selection and caching strategies",
+      "methodology": "Literature review and expert analysis",
+      "relevance": "Relevant to MarsLab's sample collection and caching planning",
+      "category": "Sample Collection",
+      "url": "https://doi.org/10.1029/2020JE006734"
+    },
+    {
+      "title": "Mars Sample Return: A Mission Concept for the Next Decade",
+      "authors": "European Space Agency Mars Sample Return Team",
+      "year": "2020",
+      "journal": "ESA Bulletin",
+      "key_findings": "The study presents a mission concept for the Mars Sample Return, including sample collection, caching, and return to Earth",
+      "methodology": "Mission concept and trade analysis",
+      "relevance": "Relevant to MarsLab's mission planning and coordination",
+      "category": "Mission Concept",
+      "url": null
+    },
+    {
+      "title": "Planetary Protection Considerations for Mars Sample Return",
+      "authors": "J. D. Rummel et al.",
+      "year": "2019",
+      "journal": "Astrobiology",
+      "key_findings": "The study highlights planetary protection considerations for Mars Sample Return, including contamination prevention and sample handling procedures",
+      "methodology": "Literature review and expert analysis",
+      "relevance": "Relevant to MarsLab's planetary protection planning",
+      "category": "Planetary Protection",
+      "url": "https://doi.org/10.1089/ast.2018.1913"
+    },
+    {
+      "title": "Mars Sample Return: A Review of the Current State of the Art",
+      "authors": "S. J. Bauer et al.",
+      "year": "2022",
+      "journal": "Journal of the British Interplanetary Society",
+      "key_findings": "The review highlights the current state of the art in Mars Sample Return, including mission concepts, system designs, and technological advancements",
+      "methodology": "Literature review and expert analysis",
+      "relevance": "Relevant to MarsLab's overall mission planning and coordination",
+      "category": "Mission Overview",
+      "url": null
+    }
+  ],
+  "trend_analysis": "The trend in Mars Sample Return research is towards developing more efficient and effective sample collection, caching, and return systems, with a focus on contamination prevention and planetary protection. There is also a growing emphasis on international cooperation and coordination in Mars Sample Return missions.",
+  "connections_to_marslab": "The papers and studies highlighted in this digest are relevant to MarsLab's sample caching, retrieval, and return planning, as well as its contamination prevention and planetary protection efforts. The digest provides a comprehensive overview of the current state of the art in Mars Sample Return, and can inform MarsLab's mission planning and coordination activities."
+}

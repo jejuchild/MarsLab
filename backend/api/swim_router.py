@@ -1,17 +1,19 @@
 """
-SWIM (Subsurface Water Ice Mapping) API — serves regional ice data for visualization.
+SWIM (Subsurface Water Ice Mapping) API — serves regional ice data and map tiles.
 
 Endpoints:
-  GET /api/swim/regions     — Return SWIM data for all regions
-  GET /api/swim/comparison  — Return formatted comparison data for charts
+  GET /api/swim/regions        — Return SWIM data for all regions
+  GET /api/swim/comparison     — Return formatted comparison data for charts
+  GET /api/swim/tile/{layer}   — Serve pre-rendered SWIM PNG map tile
+  GET /api/swim/layers         — List available SWIM tile layers
 """
 
 import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse, FileResponse
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,7 @@ router = APIRouter(prefix="/api/swim", tags=["SWIM Data"])
 
 BASE_DIR = Path(__file__).parent.parent
 SCIENCE_CONTEXT_PATH = BASE_DIR / "data" / "mars_science_context.json"
+SWIM_TILES_DIR = BASE_DIR / "data" / "swim" / "tiles"
 
 
 def _load_science_context() -> dict:
@@ -101,3 +104,76 @@ def get_swim_comparison():
             {"key": "radar_dielectric", "label": "Radar Dielectric (ε')", "unit": "", "range": [1, 10]},
         ],
     })
+
+
+# Available SWIM tile layers (pre-rendered PNGs from SWIM4MIM GeoTIFFs)
+SWIM_LAYERS = {
+    "0-1m": {
+        "file": "swim_0_1m.png",
+        "label": "Ice Consistency (0–1 m)",
+        "description": "Shallow ice: neutron, thermal, geomorphology, radar surface power",
+        "source": "SWIM4MIM (Morgan & Putzig et al. 2025)",
+        "resolution_m": 3000,
+    },
+    "1-5m": {
+        "file": "swim_1_5m.png",
+        "label": "Ice Consistency (1–5 m)",
+        "description": "Mid-depth: geomorphology, radar surface power, radar dielectric",
+        "source": "SWIM4MIM (Morgan & Putzig et al. 2025)",
+        "resolution_m": 3000,
+    },
+    ">5m": {
+        "file": "swim_5m.png",
+        "label": "Ice Consistency (>5 m)",
+        "description": "Deep ice: deep geomorphology, radar dielectric estimates",
+        "source": "SWIM4MIM (Morgan & Putzig et al. 2025)",
+        "resolution_m": 3000,
+    },
+}
+
+
+@router.get("/layers")
+def list_swim_layers():
+    """List available SWIM tile layers."""
+    layers = []
+    for layer_id, meta in SWIM_LAYERS.items():
+        tile_path = SWIM_TILES_DIR / meta["file"]
+        layers.append({
+            "id": layer_id,
+            "label": meta["label"],
+            "description": meta["description"],
+            "source": meta["source"],
+            "resolution_m": meta["resolution_m"],
+            "available": tile_path.is_file(),
+            "size_bytes": tile_path.stat().st_size if tile_path.is_file() else 0,
+            "bounds": {"west": -180, "south": -60, "east": 180, "north": 60},
+        })
+    return JSONResponse(content={"layers": layers})
+
+
+@router.get("/tile/{layer}")
+def get_swim_tile(layer: str):
+    """Serve a pre-rendered SWIM PNG map tile.
+
+    Tile covers -180°..180° lon, -60°..60° lat at 3km/pixel (7200×2400).
+    Projection: simple cylindrical (equirectangular), Mars 2000 sphere.
+    Source: SWIM4MIM (swim.psi.edu), Morgan & Putzig et al. 2025.
+    """
+    meta = SWIM_LAYERS.get(layer)
+    if not meta:
+        raise HTTPException(status_code=404, detail=f"Unknown layer '{layer}'. Available: {list(SWIM_LAYERS.keys())}")
+
+    tile_path = SWIM_TILES_DIR / meta["file"]
+    if not tile_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Tile file not found for layer '{layer}'")
+
+    return FileResponse(
+        tile_path,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-SWIM-Layer": layer,
+            "X-SWIM-Source": meta["source"],
+            "X-SWIM-Bounds": "-180,-60,180,60",
+        },
+    )
