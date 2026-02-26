@@ -565,6 +565,14 @@ export default function TopBar({
                 Data Upload
               </Link>
               <Link
+                to="/discussions"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-sm font-medium text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">forum</span>
+                Discussions
+              </Link>
+              <Link
                 to="/suggestions"
                 onClick={() => setMobileMenuOpen(false)}
                 className="text-sm font-medium text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2"
@@ -611,6 +619,12 @@ export default function TopBar({
             className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
           >
             Data Upload
+          </Link>
+          <Link
+            to="/discussions"
+            className="text-sm font-medium text-slate-400 hover:text-white transition-colors"
+          >
+            Discussions
           </Link>
         </nav>
       </div>

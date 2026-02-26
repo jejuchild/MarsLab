@@ -10,6 +10,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 const DataDownloadPage = lazy(() => import("./pages/DataDownloadPage"));
 const DataUploadPage = lazy(() => import("./pages/DataUploadPage"));
 const FeatureSuggestionsPage = lazy(() => import("./pages/FeatureSuggestionsPage"));
+const DailyDiscussionsPage = lazy(() => import("./pages/DailyDiscussionsPage"));
 
 export default function App() {
   const { isOnline, isUpdateAvailable, cacheStats, updateApp } = useServiceWorker();
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/download" element={<DataDownloadPage />} />
           <Route path="/upload" element={<DataUploadPage />} />
           <Route path="/suggestions" element={<FeatureSuggestionsPage />} />
+          <Route path="/discussions" element={<DailyDiscussionsPage />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

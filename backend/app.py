@@ -546,6 +546,9 @@ app.include_router(strat_column_router)  # /api/strat-column/* — Stratigraphic
 
 from api.product_urls import router as product_urls_router
 app.include_router(product_urls_router)  # /api/product-urls/* — PDS Download URL Resolver
+
+from api.discussions_router import router as discussions_router
+app.include_router(discussions_router)  # /api/discussions — Daily AI Discussions
 @app.get("/hirise/quickview/{product_id}.png")
 @limiter.limit("20/minute")
 def get_hirise_quickview_transparent(request: Request, product_id: str):

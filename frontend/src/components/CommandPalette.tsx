@@ -363,6 +363,14 @@ const ACTIONS: CommandAction[] = [
     keywords: ["upload", "import", "geotiff", "custom"],
     action: { type: "navigate_page", path: "/upload" },
   },
+  {
+    id: "page-discussions",
+    label: "Go to Daily Discussions",
+    category: "page",
+    icon: "forum",
+    keywords: ["discussion", "daily", "ai", "team", "meeting", "science", "mars"],
+    action: { type: "navigate_page", path: "/discussions" },
+  },
 ];
 
 /* =========================================================
