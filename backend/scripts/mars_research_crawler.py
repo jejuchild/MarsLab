@@ -312,10 +312,10 @@ def main() -> None:
 
     if args.list_topics:
         print("Available research topics:\n")
-        for idx, topic in enumerate(RESEARCH_TOPICS, 1):
-            print(f"  {idx}. {topic['focus']}")
-            print(f"     {topic['description']}")
-            print("     Keywords: " + ", ".join(topic["keywords"]))
+        for idx, topic_item in enumerate(RESEARCH_TOPICS, 1):
+            print(f"  {idx}. {topic_item['focus']}")
+            print(f"     {topic_item['description']}")
+            print("     Keywords: " + ", ".join(topic_item["keywords"]))
             print()
         return
 
@@ -325,10 +325,13 @@ def main() -> None:
         logger.error("Invalid --date value. Use YYYY-MM-DD.")
         sys.exit(1)
 
-    if args.topic:
-        matches = [t for t in RESEARCH_TOPICS if t["focus"].lower() == args.topic.lower()]
+    topic_arg = args.topic
+    topic_value = topic_arg if isinstance(topic_arg, str) else ""
+
+    if topic_value:
+        matches = [t for t in RESEARCH_TOPICS if t["focus"].lower() == topic_value.lower()]
         if not matches:
-            logger.error("Topic '%s' not found. Use --list-topics to inspect options.", args.topic)
+            logger.error("Topic '%s' not found. Use --list-topics to inspect options.", topic_value)
             sys.exit(1)
         topic = matches[0]
     else:

@@ -9,6 +9,7 @@ import random
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import requests
 
@@ -16,7 +17,7 @@ BACKEND_DIR = Path(__file__).parent.parent
 OUTPUT_DIR = BACKEND_DIR / "mars_news"
 
 from dotenv import load_dotenv
-load_dotenv(BACKEND_DIR / ".env")
+_ = load_dotenv(BACKEND_DIR / ".env")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -115,7 +116,7 @@ def _extract_json_object(content: str) -> str:
     return match.group(0) if match else stripped
 
 
-def generate_news_payload(prompt: str):
+def generate_news_payload(prompt: str) -> dict[str, Any] | None:
     if not GROQ_API_KEY:
         logger.error("GROQ_API_KEY not set in backend/.env or environment. Cannot generate Mars news.")
         return None
@@ -152,9 +153,10 @@ def generate_news_payload(prompt: str):
         return None
 
 
-def normalize_payload(date: datetime.date, payload: dict) -> dict:
+def normalize_payload(date: datetime.date, payload: dict[str, Any]) -> dict[str, Any]:
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    items = payload.get("items", []) if isinstance(payload.get("items", []), list) else []
+    items_obj = payload.get("items", [])
+    items = items_obj if isinstance(items_obj, list) else []
 
     normalized_items = []
     for item in items:
@@ -191,12 +193,14 @@ def normalize_payload(date: datetime.date, payload: dict) -> dict:
     }
 
 
-def build_markdown_digest(payload: dict) -> str:
-    date = payload.get("date", "")
-    generated_at = payload.get("generated_at", "")
-    categories = payload.get("categories", {})
-    items = payload.get("items", [])
-    trend_summary = payload.get("trend_summary", "")
+def build_markdown_digest(payload: dict[str, Any]) -> str:
+    date = str(payload.get("date", ""))
+    generated_at = str(payload.get("generated_at", ""))
+    categories_obj = payload.get("categories", {})
+    items_obj = payload.get("items", [])
+    trend_summary = str(payload.get("trend_summary", ""))
+    categories = categories_obj if isinstance(categories_obj, dict) else {}
+    items = items_obj if isinstance(items_obj, list) else []
 
     lines = [
         f"# Mars News Digest - {date}",
@@ -229,7 +233,7 @@ def build_markdown_digest(payload: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def save_outputs(date: datetime.date, payload: dict):
+def save_outputs(date: datetime.date, payload: dict[str, Any]) -> tuple[Path, Path]:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     json_path = OUTPUT_DIR / f"{date.isoformat()}.json"
     md_path = OUTPUT_DIR / f"{date.isoformat()}_summary.md"
@@ -294,7 +298,9 @@ def main():
 
     print(f"\n✓ Mars news digest generated: {json_path}")
     print(f"  Summary: {md_path}")
-    print(f"  Items: {len(normalized.get('items', []))}")
+    normalized_items = normalized.get("items", [])
+    item_count = len(normalized_items) if isinstance(normalized_items, list) else 0
+    print(f"  Items: {item_count}")
 
 
 if __name__ == "__main__":

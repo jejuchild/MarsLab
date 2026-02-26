@@ -18,7 +18,7 @@ def _valid_date(date: str) -> bool:
     return bool(re.match(r"^\d{4}-\d{2}-\d{2}$", date))
 
 
-def _load_news_json(date: str) -> dict:
+def _load_news_json(date: str) -> dict[str, object]:
     fpath = NEWS_DIR / f"{date}.json"
     if not fpath.is_file():
         raise HTTPException(status_code=404, detail=f"No Mars news found for {date}")
