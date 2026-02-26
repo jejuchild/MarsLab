@@ -718,6 +718,19 @@ def normalize_climate(
     return round(score, 4), breakdown
 
 
+def normalize_swim(swim_data: dict | None) -> float:
+    if not swim_data:
+        return 0.0
+    score = 0.0
+    score += swim_data.get("ice_consistency_score", 0) * 0.4
+    depth = swim_data.get("depth_to_ice_m", 100)
+    depth_score = max(0, 1.0 - depth / 20.0)
+    score += depth_score * 0.3
+    neutron = swim_data.get("neutron_h2o_wt_pct", 0) / 100.0
+    score += min(neutron, 1.0) * 0.3
+    return round(min(score, 1.0), 3)
+
+
 # =============================================================================
 # Science-Distance Penalty
 # =============================================================================

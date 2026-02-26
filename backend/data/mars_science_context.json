@@ -18,6 +18,15 @@
       ],
       "relevant_minerals": ["water ice", "dust mantle", "basaltic regolith"],
       "ice_confidence": "high",
+      "swim_data": {
+        "ice_consistency_score": 0.88,
+        "depth_to_ice_m": 2.5,
+        "thermal_inertia_Jm2Ks05": 220,
+        "neutron_h2o_wt_pct": 42,
+        "radar_dielectric": 3.1,
+        "confidence": "high",
+        "data_source": "SWIM_v2.1 (Morgan et al. 2021)"
+      },
       "landing_site_suitability": "Strong candidate for ISRU missions due to accessible shallow ice, flat terrain, and low elevation, though latitude (~47°N) limits solar power availability.",
       "references": ["Bramson+2015", "Dundas+2014", "Dundas+2018", "Levy+2009", "Feldman+2004"]
     },
@@ -45,6 +54,15 @@
       ],
       "relevant_minerals": ["water ice", "hydrated silicates", "basalt", "dust"],
       "ice_confidence": "high",
+      "swim_data": {
+        "ice_consistency_score": 0.92,
+        "depth_to_ice_m": 1.8,
+        "thermal_inertia_Jm2Ks05": 195,
+        "neutron_h2o_wt_pct": 48,
+        "radar_dielectric": 3.05,
+        "confidence": "high",
+        "data_source": "SWIM_v2.1 (Morgan et al. 2021)"
+      },
       "landing_site_suitability": "Prime candidate for ice-mining missions. Confirmed massive subsurface ice deposits, relatively flat terrain, though high latitude (~45°N) impacts solar power.",
       "references": ["Stuurman+2016", "Morgenstern+2007", "Liu+2022", "Dundas+2018"]
     },
@@ -85,6 +103,15 @@
       ],
       "relevant_minerals": ["phyllosilicates", "sulfates", "dust", "CO2 ice"],
       "ice_confidence": "medium",
+      "swim_data": {
+        "ice_consistency_score": 0.45,
+        "depth_to_ice_m": 15,
+        "thermal_inertia_Jm2Ks05": 310,
+        "neutron_h2o_wt_pct": 12,
+        "radar_dielectric": 5.2,
+        "confidence": "medium",
+        "data_source": "SWIM_v2.1 (Morgan et al. 2021)"
+      },
       "landing_site_suitability": "Highest atmospheric pressure on Mars aids EDL, but deep basin creates communication challenges and frequent dust storms reduce solar power reliability.",
       "references": ["Smith+1999", "Crown+2005", "Bernhardt+2016"]
     },
@@ -98,6 +125,15 @@
       ],
       "relevant_minerals": ["phyllosilicates", "chlorides", "basalt"],
       "ice_confidence": "medium",
+      "swim_data": {
+        "ice_consistency_score": 0.52,
+        "depth_to_ice_m": 8,
+        "thermal_inertia_Jm2Ks05": 280,
+        "neutron_h2o_wt_pct": 18,
+        "radar_dielectric": 4.8,
+        "confidence": "medium",
+        "data_source": "SWIM_v2.1 (Morgan et al. 2021)"
+      },
       "landing_site_suitability": "High southern latitude limits solar power. Scientific interest for paleoclimate studies but challenging for surface operations.",
       "references": ["Banks+2009", "Hiesinger+2002", "Parker+2000"]
     },

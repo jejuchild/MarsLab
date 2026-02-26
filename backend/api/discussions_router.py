@@ -69,6 +69,89 @@ def list_discussions():
     return JSONResponse(content={"discussions": discussions})
 
 
+@router.get("/search")
+def search_discussions(q: str):
+    """Full-text search across discussion markdown content."""
+    if not q or len(q) < 2:
+        raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
+    
+    results = []
+    if DISCUSSIONS_DIR.is_dir():
+        for fpath in sorted(DISCUSSIONS_DIR.glob("*.md"), reverse=True):
+            date = fpath.stem
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+                continue
+            content = fpath.read_text(encoding="utf-8")
+            if q.lower() in content.lower():
+                # Find matching excerpt
+                idx = content.lower().index(q.lower())
+                start = max(0, idx - 100)
+                end = min(len(content), idx + len(q) + 100)
+                excerpt = content[start:end].replace("\n", " ").strip()
+                meta = _parse_metadata(content)
+                results.append({
+                    "date": date,
+                    "topic": meta.get("topic", ""),
+                    "excerpt": f"...{excerpt}...",
+                    "match_count": content.lower().count(q.lower()),
+                })
+    return JSONResponse(content={"query": q, "results": results, "total": len(results)})
+
+
+@router.get("/stats")
+def get_discussion_stats():
+    """Return discussion metrics."""
+    if not DISCUSSIONS_DIR.is_dir():
+        return JSONResponse(content={"total": 0, "topics": {}, "date_range": None})
+    
+    topics = {}
+    dates = []
+    total_words = 0
+    
+    for fpath in DISCUSSIONS_DIR.glob("*.md"):
+        date = fpath.stem
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+            continue
+        dates.append(date)
+        content = fpath.read_text(encoding="utf-8")
+        meta = _parse_metadata(content)
+        topic = meta.get("topic", "Unknown")
+        topics[topic] = topics.get(topic, 0) + 1
+        body_start = content.find("## Focus:")
+        body = content[body_start:] if body_start > 0 else content
+        total_words += len(body.split())
+    
+    dates.sort()
+    return JSONResponse(content={
+        "total": len(dates),
+        "topics": topics,
+        "avg_word_count": total_words // max(len(dates), 1),
+        "date_range": {"first": dates[0], "last": dates[-1]} if dates else None,
+    })
+
+
+@router.get("/by-topic/{topic}")
+def get_discussions_by_topic(topic: str):
+    """Filter discussions by topic."""
+    results = []
+    if DISCUSSIONS_DIR.is_dir():
+        for fpath in sorted(DISCUSSIONS_DIR.glob("*.md"), reverse=True):
+            date = fpath.stem
+            if not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+                continue
+            content = fpath.read_text(encoding="utf-8")
+            meta = _parse_metadata(content)
+            if topic.lower() in meta.get("topic", "").lower():
+                body_start = content.find("## Focus:")
+                body = content[body_start:] if body_start > 0 else content
+                results.append({
+                    "date": date,
+                    "topic": meta.get("topic", ""),
+                    "word_count": len(body.split()),
+                })
+    return JSONResponse(content={"topic_filter": topic, "discussions": results})
+
+
 @router.get("/{date}")
 def get_discussion(date: str):
     """Get discussion content for a specific date."""

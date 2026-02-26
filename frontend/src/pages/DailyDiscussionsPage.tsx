@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import DOMPurify from "dompurify";
 
@@ -31,6 +31,16 @@ function discussionMarkdownToHtml(md: string): string {
   let html = md
     // Remove front-matter block (everything before first ## Focus:)
     .replace(/^# MarsLab Daily Discussion[\s\S]*?---\n/m, "")
+    // Product ID links — HiRISE
+    .replace(/(ESP_\d{6}_\d{4})/g, '<a href="/download?product_id=$1&instrument=HIRISE" class="text-primary hover:text-primary/80 underline">$1</a>')
+    .replace(/(PSP_\d{6}_\d{4})/g, '<a href="/download?product_id=$1&instrument=HIRISE" class="text-primary hover:text-primary/80 underline">$1</a>')
+    // Product ID links — CRISM
+    .replace(/(frt[0-9a-f]{8})/g, '<a href="/download?product_id=$1&instrument=CRISM" class="text-primary hover:text-primary/80 underline">$1</a>')
+    .replace(/(hrs[0-9a-f]{8})/g, '<a href="/download?product_id=$1&instrument=CRISM" class="text-primary hover:text-primary/80 underline">$1</a>')
+    // Product ID links — SHARAD
+    .replace(/(R_\d{7}_\d{3}_SS\d+_\d+_A)/g, '<a href="/download?product_id=$1&instrument=SHARAD" class="text-primary hover:text-primary/80 underline">$1</a>')
+    // Product ID links — DTM
+    .replace(/(DTE[A-Z]{2}_\d{6}_\d{4}_\d{6}_\d{4}_[A-Z]\d{2})/g, '<a href="/download?product_id=$1&instrument=HIRISE_DTM" class="text-primary hover:text-primary/80 underline">$1</a>')
     // Headings
     .replace(/^### (.+)$/gm, '<h3 class="text-base font-bold text-white mt-8 mb-3 flex items-center gap-2"><span class="w-1 h-5 rounded-full bg-primary inline-block"></span>$1</h3>')
     .replace(/^## Focus: (.+)$/gm, '<h2 class="text-xl font-bold text-white mb-4">$1</h2>')
@@ -226,6 +236,31 @@ export default function DailyDiscussionsPage() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [mobileListOpen, setMobileListOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [topicFilter, setTopicFilter] = useState<string | null>(null);
+
+  // Derived: unique topics from all discussions
+  const uniqueTopics = useMemo(
+    () => Array.from(new Set(discussions.map((d) => d.topic).filter(Boolean))),
+    [discussions]
+  );
+
+  // Derived: filtered discussion list
+  const filteredDiscussions = useMemo(() => {
+    let list = discussions;
+    if (topicFilter) {
+      list = list.filter((d) => d.topic === topicFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(
+        (d) =>
+          d.topic.toLowerCase().includes(q) ||
+          d.science_keywords.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [discussions, topicFilter, searchQuery]);
 
   // Load discussion list
   useEffect(() => {
@@ -309,7 +344,56 @@ export default function DailyDiscussionsPage() {
             mobileListOpen ? "block absolute inset-x-0 top-[7rem] z-40 bg-[#0a0f18] border-b border-border-dark max-h-[60vh]" : "hidden"
           } md:block md:relative md:max-h-none w-full md:w-80 shrink-0 border-r border-border-dark overflow-y-auto`}
         >
-          <div className="p-3 border-b border-border-dark">
+          {/* Search bar */}
+          <div className="p-3 border-b border-border-dark space-y-2">
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-slate-500">search</span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search discussions..."
+                className="w-full rounded-lg bg-white/5 border border-border-dark pl-8 pr-8 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              )}
+            </div>
+
+            {/* Topic filter badges */}
+            {uniqueTopics.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => setTopicFilter(null)}
+                  className={`text-[9px] rounded-full px-2 py-0.5 border transition-colors ${
+                    topicFilter === null
+                      ? "bg-primary/20 border-primary/40 text-primary font-bold"
+                      : "bg-white/5 border-white/5 text-slate-500 hover:border-slate-500"
+                  }`}
+                >
+                  All
+                </button>
+                {uniqueTopics.map((topic) => (
+                  <button
+                    key={topic}
+                    onClick={() => setTopicFilter(topicFilter === topic ? null : topic)}
+                    className={`text-[9px] rounded-full px-2 py-0.5 border transition-colors truncate max-w-[140px] ${
+                      topicFilter === topic
+                        ? "bg-primary/20 border-primary/40 text-primary font-bold"
+                        : "bg-white/5 border-white/5 text-slate-500 hover:border-slate-500"
+                    }`}
+                  >
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-slate-600 font-bold">
               <span className="material-symbols-outlined text-xs">calendar_month</span>
               Archive
@@ -318,11 +402,11 @@ export default function DailyDiscussionsPage() {
 
           {loading ? (
             <LoadingSkeleton />
-          ) : discussions.length === 0 ? (
+          ) : filteredDiscussions.length === 0 ? (
             <div className="p-4 text-sm text-slate-600">No discussions found.</div>
           ) : (
             <div className="p-2 space-y-1">
-              {discussions.map((d) => (
+              {filteredDiscussions.map((d) => (
                 <DiscussionListItem
                   key={d.date}
                   item={d}
