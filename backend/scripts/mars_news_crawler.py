@@ -1,24 +1,42 @@
 #!/usr/bin/env python3
+"""
+MarsLab Mars News Crawler
+=========================
+
+Fetches REAL Mars news from NASA and space news RSS feeds,
+then uses Groq LLM for categorization and trend analysis only.
+
+Sources:
+  - NASA Mars Exploration Program (mars.nasa.gov) — JSON API
+  - NASA News Releases (nasa.gov) — RSS
+  - SpaceNews (spacenews.com) — RSS
+
+Usage:
+  python backend/scripts/mars_news_crawler.py
+  python backend/scripts/mars_news_crawler.py --date 2026-02-26
+  python backend/scripts/mars_news_crawler.py --dry-run
+  python backend/scripts/mars_news_crawler.py --list-categories
+"""
+
 import argparse
 import datetime
-import hashlib
 import json
 import logging
 import os
-import random
 import re
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote_plus
 
 import requests
+from dotenv import load_dotenv
+
 
 BACKEND_DIR = Path(__file__).parent.parent
 OUTPUT_DIR = BACKEND_DIR / "mars_news"
 
-from dotenv import load_dotenv
-_ = load_dotenv(BACKEND_DIR / ".env")
+load_dotenv(BACKEND_DIR / ".env")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -34,84 +52,139 @@ NEWS_CATEGORIES = [
     "commercial",
 ]
 
+MARS_KEYWORDS = [
+    "mars", "martian", "perseverance", "curiosity", "ingenuity",
+    "jezero", "gale crater", "rover", "red planet", "msl",
+    "maven", "odyssey", "mro", "reconnaissance", "sample return",
+    "starship mars", "mars helicopter", "zhurong", "tianwen",
+    "exomars", "rosalind franklin",
+]
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("mars_news_crawler")
 
-
-def _date_seed(date: datetime.date) -> int:
-    return int(hashlib.sha256(date.isoformat().encode()).hexdigest()[:8], 16)
-
-
-def _make_search_url(title: str, source: str) -> str | None:
-    """Generate a Google search URL from a news item's title and source."""
-    title = title.strip()
-    if not title:
-        return None
-    query = f"{title} {source} Mars".strip()
-    return f"https://www.google.com/search?q={quote_plus(query)}"
+HTTP_HEADERS = {"User-Agent": "MarsLab/1.0 (Mars exploration research platform)"}
+HTTP_TIMEOUT = 20
 
 
-def build_prompt(date: datetime.date) -> str:
-    seed = _date_seed(date)
-    rng = random.Random(seed)
-    category_order = NEWS_CATEGORIES[:]
-    rng.shuffle(category_order)
+# ======================================================================
+# Feed fetchers — return real news items with real URLs
+# ======================================================================
 
-    return f"""You are producing a production-grade Mars exploration news digest for MarsLab.
+def fetch_nasa_mars_api() -> list[dict[str, str]]:
+    """Fetch from NASA Mars Exploration Program JSON API."""
+    url = "https://mars.nasa.gov/rss/api/?feed=news&category=all&feedtype=json"
+    items = []
+    try:
+        resp = requests.get(url, headers=HTTP_HEADERS, timeout=HTTP_TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+        for entry in data.get("newsitems", []):
+            title = entry.get("TITLE", "").strip()
+            link = entry.get("LINK", "").strip()
+            desc = entry.get("DESCRIPTION", "").strip()
+            posted = entry.get("POSTED", "").strip()
+            if title and link:
+                items.append({
+                    "title": title,
+                    "url": link,
+                    "summary": desc,
+                    "date": posted,
+                    "source": "NASA Mars Exploration Program",
+                })
+        logger.info("NASA Mars API: %d items", len(items))
+    except Exception as exc:
+        logger.warning("NASA Mars API failed: %s", exc)
+    return items
 
-Target digest date: {date.isoformat()}
-Deterministic seed hint: {seed}
 
-Collect and synthesize RECENT, HIGH-CONFIDENCE Mars exploration updates.
-Focus on events and status changes from official agencies, mission teams, or credible space reporting.
-If an item cannot be verified from reliable public reporting, exclude it.
+def _parse_rss_items(xml_content: bytes, source_name: str, filter_mars: bool = True) -> list[dict[str, str]]:
+    """Parse RSS XML and extract items, optionally filtering for Mars keywords."""
+    items = []
+    try:
+        root = ET.fromstring(xml_content)
+        for item_el in root.findall(".//item"):
+            title = (item_el.findtext("title") or "").strip()
+            link = (item_el.findtext("link") or "").strip()
+            desc = (item_el.findtext("description") or "").strip()
+            pubdate = (item_el.findtext("pubDate") or "").strip()
 
-You must cover these topic requirements:
-1) Recent Mars mission updates (Perseverance, Curiosity, MAVEN, Mars Odyssey, etc.)
-2) Mars Sample Return status
-3) SpaceX Starship Mars plans
-4) ESA/JAXA/CNSA Mars missions and plans
-5) Ice/water discoveries and subsurface findings
-6) Human Mars exploration planning
-7) Mars surface/orbital technology developments
+            if not title or not link:
+                continue
 
-Primary category order for this run: {', '.join(category_order)}
-Allowed categories: {', '.join(NEWS_CATEGORIES)}
+            if filter_mars:
+                combined = (title + " " + desc).lower()
+                if not any(kw in combined for kw in MARS_KEYWORDS):
+                    continue
 
-Return ONLY valid JSON (no markdown fences, no prose before/after) with exactly this schema:
-{{
-  "date": "YYYY-MM-DD",
-  "generated_at": "ISO-8601 timestamp",
-  "categories": {{
-    "missions": "brief category trend",
-    "discoveries": "brief category trend",
-    "technology": "brief category trend",
-    "human_exploration": "brief category trend",
-    "sample_return": "brief category trend",
-    "international": "brief category trend",
-    "commercial": "brief category trend"
-  }},
-  "items": [
-    {{
-      "title": "string",
-      "date": "YYYY-MM-DD or approximate",
-      "source": "publisher or agency",
-      "summary": "2-4 sentences",
-      "category": "one of allowed categories",
-      "significance": "why this matters for Mars exploration",
-      "url": null
-    }}
-  ],
-  "trend_summary": "multi-sentence synthesis across all categories"
-}}
+            # Clean HTML from description
+            desc_clean = re.sub(r"<[^>]+>", "", desc).strip()
+            if len(desc_clean) > 400:
+                desc_clean = desc_clean[:397] + "..."
 
-Constraints:
-- Include 10-20 items total.
-- Ensure category values are exactly one of the allowed categories.
-- Always set url to null. Do not generate URLs — they will be added programmatically.
-- Prefer factual updates over speculation.
-"""
+            items.append({
+                "title": title,
+                "url": link,
+                "summary": desc_clean,
+                "date": pubdate,
+                "source": source_name,
+            })
+    except ET.ParseError as exc:
+        logger.warning("RSS parse error for %s: %s", source_name, exc)
+    return items
 
+
+def fetch_nasa_general_rss() -> list[dict[str, str]]:
+    """Fetch NASA news releases RSS, filter for Mars content."""
+    url = "https://www.nasa.gov/news-release/feed/"
+    try:
+        resp = requests.get(url, headers=HTTP_HEADERS, timeout=HTTP_TIMEOUT)
+        resp.raise_for_status()
+        items = _parse_rss_items(resp.content, "NASA", filter_mars=True)
+        logger.info("NASA general RSS: %d Mars items", len(items))
+        return items
+    except Exception as exc:
+        logger.warning("NASA general RSS failed: %s", exc)
+        return []
+
+
+def fetch_spacenews_rss() -> list[dict[str, str]]:
+    """Fetch SpaceNews RSS, filter for Mars content."""
+    url = "https://spacenews.com/feed/"
+    try:
+        resp = requests.get(url, headers=HTTP_HEADERS, timeout=HTTP_TIMEOUT)
+        resp.raise_for_status()
+        items = _parse_rss_items(resp.content, "SpaceNews", filter_mars=True)
+        logger.info("SpaceNews RSS: %d Mars items", len(items))
+        return items
+    except Exception as exc:
+        logger.warning("SpaceNews RSS failed: %s", exc)
+        return []
+
+
+def fetch_all_news() -> list[dict[str, str]]:
+    """Fetch from all sources, deduplicate by title similarity."""
+    all_items: list[dict[str, str]] = []
+    all_items.extend(fetch_nasa_mars_api())
+    all_items.extend(fetch_nasa_general_rss())
+    all_items.extend(fetch_spacenews_rss())
+
+    # Deduplicate by normalized title
+    seen_titles: set[str] = set()
+    unique: list[dict[str, str]] = []
+    for item in all_items:
+        normalized = re.sub(r"[^a-z0-9]", "", item["title"].lower())
+        if normalized not in seen_titles:
+            seen_titles.add(normalized)
+            unique.append(item)
+
+    logger.info("Total unique news items: %d", len(unique))
+    return unique
+
+
+# ======================================================================
+# LLM — categorization and trend analysis ONLY (not content generation)
+# ======================================================================
 
 def _extract_json_object(content: str) -> str:
     stripped = content.strip()
@@ -121,15 +194,51 @@ def _extract_json_object(content: str) -> str:
             stripped = "\n".join(lines[1:-1]).strip()
             if stripped.startswith("json"):
                 stripped = stripped[4:].strip()
-
     match = re.search(r"\{[\s\S]*\}", stripped)
     return match.group(0) if match else stripped
 
 
-def generate_news_payload(prompt: str) -> dict[str, Any] | None:
+def categorize_with_llm(items: list[dict[str, str]]) -> dict[str, Any] | None:
+    """Send real news items to LLM for categorization and trend analysis."""
     if not GROQ_API_KEY:
-        logger.error("GROQ_API_KEY not set in backend/.env or environment. Cannot generate Mars news.")
+        logger.warning("No GROQ_API_KEY — skipping LLM categorization")
         return None
+    if not items:
+        return None
+
+    # Build a compact summary of items for the LLM
+    items_text = ""
+    for i, item in enumerate(items, 1):
+        items_text += f"{i}. [{item['source']}] {item['title']}\n   {item['summary'][:200]}\n\n"
+
+    prompt = f"""You are categorizing real Mars news items for MarsLab.
+
+Here are {len(items)} real news items from NASA and space news sources:
+
+{items_text}
+
+For each item (by number), assign exactly ONE category from: {', '.join(NEWS_CATEGORIES)}
+
+Also provide:
+- A brief trend for each category
+- An overall trend_summary (3-5 sentences)
+
+Return ONLY valid JSON:
+{{
+  "assignments": [
+    {{"item": 1, "category": "missions", "significance": "brief reason"}}
+  ],
+  "categories": {{
+    "missions": "brief trend",
+    "discoveries": "brief trend",
+    "technology": "brief trend",
+    "human_exploration": "brief trend",
+    "sample_return": "brief trend",
+    "international": "brief trend",
+    "commercial": "brief trend"
+  }},
+  "trend_summary": "3-5 sentence overall analysis"
+}}"""
 
     try:
         resp = requests.post(
@@ -141,76 +250,79 @@ def generate_news_payload(prompt: str) -> dict[str, Any] | None:
             json={
                 "model": GROQ_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.5,
-                "max_tokens": 8192,
+                "temperature": 0.3,
+                "max_tokens": 4096,
             },
-            timeout=180,
+            timeout=120,
         )
         resp.raise_for_status()
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-
-        parsed = json.loads(_extract_json_object(content))
-        return parsed
-    except requests.RequestException as e:
-        logger.error("Groq API request failed: %s", e)
-        return None
-    except (KeyError, IndexError) as e:
-        logger.error("Unexpected API response format: %s", e)
-        return None
-    except json.JSONDecodeError as e:
-        logger.error("Failed to parse JSON from Groq response: %s", e)
+        content = resp.json()["choices"][0]["message"]["content"]
+        return json.loads(_extract_json_object(content))
+    except Exception as exc:
+        logger.warning("LLM categorization failed: %s", exc)
         return None
 
 
-def normalize_payload(date: datetime.date, payload: dict[str, Any]) -> dict[str, Any]:
+# ======================================================================
+# Assembly — merge real items with LLM categories
+# ======================================================================
+
+def build_payload(date: datetime.date, items: list[dict[str, str]], llm_result: dict[str, Any] | None) -> dict[str, Any]:
+    """Merge real news items with LLM categorization."""
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    items_obj = payload.get("items", [])
-    items = items_obj if isinstance(items_obj, list) else []
+
+    # Build assignment lookup
+    assignments: dict[int, dict[str, str]] = {}
+    if llm_result and "assignments" in llm_result:
+        for a in llm_result["assignments"]:
+            idx = a.get("item", 0)
+            if isinstance(idx, int) and 1 <= idx <= len(items):
+                assignments[idx] = a
 
     normalized_items = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        category = str(item.get("category", "")).strip()
+    for i, item in enumerate(items, 1):
+        assignment = assignments.get(i, {})
+        category = str(assignment.get("category", "missions")).strip()
         if category not in NEWS_CATEGORIES:
             category = "missions"
+        significance = str(assignment.get("significance", "")).strip()
 
         normalized_items.append({
-            "title": str(item.get("title", "")).strip(),
-            "date": str(item.get("date", "")).strip(),
-            "source": str(item.get("source", "")).strip(),
-            "summary": str(item.get("summary", "")).strip(),
+            "title": item["title"],
+            "date": item.get("date", ""),
+            "source": item["source"],
+            "summary": item["summary"],
             "category": category,
-            "significance": str(item.get("significance", "")).strip(),
-            "url": _make_search_url(str(item.get("title", "")), str(item.get("source", ""))),
+            "significance": significance,
+            "url": item["url"],
         })
 
-    incoming_categories = payload.get("categories", {})
+    # Category trends from LLM
     category_trends = {}
+    llm_cats = (llm_result or {}).get("categories", {})
     for name in NEWS_CATEGORIES:
-        if isinstance(incoming_categories, dict):
-            category_trends[name] = str(incoming_categories.get(name, "")).strip()
+        if isinstance(llm_cats, dict):
+            category_trends[name] = str(llm_cats.get(name, "")).strip()
         else:
             category_trends[name] = ""
 
     return {
         "date": date.isoformat(),
-        "generated_at": payload.get("generated_at", now_iso),
+        "generated_at": now_iso,
         "categories": category_trends,
         "items": normalized_items,
-        "trend_summary": str(payload.get("trend_summary", "")).strip(),
+        "trend_summary": str((llm_result or {}).get("trend_summary", "")).strip(),
     }
 
 
 def build_markdown_digest(payload: dict[str, Any]) -> str:
     date = str(payload.get("date", ""))
     generated_at = str(payload.get("generated_at", ""))
-    categories_obj = payload.get("categories", {})
-    items_obj = payload.get("items", [])
+    categories = payload.get("categories", {})
+    items = payload.get("items", [])
     trend_summary = str(payload.get("trend_summary", ""))
-    categories = categories_obj if isinstance(categories_obj, dict) else {}
-    items = items_obj if isinstance(items_obj, list) else []
+    categories = categories if isinstance(categories, dict) else {}
+    items = items if isinstance(items, list) else []
 
     lines = [
         f"# Mars News Digest - {date}",
@@ -231,12 +343,16 @@ def build_markdown_digest(payload: dict[str, Any]) -> str:
     lines.append("")
 
     for idx, item in enumerate(items, 1):
-        lines.append(f"### {idx}. {item.get('title', '')}")
+        url = item.get("url", "")
+        title = item.get("title", "")
+        if url:
+            lines.append(f"### {idx}. [{title}]({url})")
+        else:
+            lines.append(f"### {idx}. {title}")
         lines.append(f"- Date: {item.get('date', '')}")
         lines.append(f"- Source: {item.get('source', '')}")
         lines.append(f"- Category: {item.get('category', '')}")
         lines.append(f"- Significance: {item.get('significance', '')}")
-        lines.append(f"- URL: {item.get('url') if item.get('url') else 'N/A'}")
         lines.append(f"- Summary: {item.get('summary', '')}")
         lines.append("")
 
@@ -255,21 +371,12 @@ def save_outputs(date: datetime.date, payload: dict[str, Any]) -> tuple[Path, Pa
 
 def main():
     parser = argparse.ArgumentParser(
-        description="MarsLab Mars News Crawler",
+        description="MarsLab Mars News Crawler — fetches real news from NASA & space news feeds",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--date", type=str, default=None,
-        help="Generate for specific date (YYYY-MM-DD). Default: today.",
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Print prompt without calling API.",
-    )
-    parser.add_argument(
-        "--list-categories", action="store_true",
-        help="List available Mars news categories.",
-    )
+    parser.add_argument("--date", type=str, default=None, help="Date label (YYYY-MM-DD). Default: today.")
+    parser.add_argument("--dry-run", action="store_true", help="Fetch feeds but skip LLM analysis.")
+    parser.add_argument("--list-categories", action="store_true", help="List available categories.")
     args = parser.parse_args()
 
     if args.list_categories:
@@ -281,36 +388,42 @@ def main():
     date = datetime.date.fromisoformat(args.date) if args.date else datetime.date.today()
     logger.info("Date: %s", date.isoformat())
 
-    prompt = build_prompt(date)
-    logger.info("Prompt length: %d chars (~%d tokens est.)", len(prompt), len(prompt) // 4)
+    # Step 1: Fetch real news from RSS feeds
+    logger.info("Fetching Mars news from RSS feeds...")
+    items = fetch_all_news()
+
+    if not items:
+        logger.error("No news items fetched from any source.")
+        sys.exit(1)
+
+    logger.info("Fetched %d unique news items with real URLs", len(items))
 
     if args.dry_run:
         print("=" * 72)
-        print("DRY RUN - Prompt that would be sent to Groq API:")
+        print(f"DRY RUN — {len(items)} items fetched:")
         print("=" * 72)
-        print(prompt)
-        print("=" * 72)
-        print(f"\nPrompt length: {len(prompt)} chars (~{len(prompt) // 4} tokens est.)")
+        for i, item in enumerate(items, 1):
+            print(f"  {i}. [{item['source']}] {item['title']}")
+            print(f"     URL: {item['url']}")
         return
 
-    logger.info("Generating Mars news digest via Groq API (%s)...", GROQ_MODEL)
-    payload = generate_news_payload(prompt)
+    # Step 2: Use LLM for categorization + trend analysis only
+    logger.info("Categorizing with Groq LLM (%s)...", GROQ_MODEL)
+    llm_result = categorize_with_llm(items)
 
-    if payload is None:
-        logger.error("Generation failed. No output produced.")
-        sys.exit(1)
-
-    normalized = normalize_payload(date, payload)
-    json_path, md_path = save_outputs(date, normalized)
+    # Step 3: Build and save
+    payload = build_payload(date, items, llm_result)
+    json_path, md_path = save_outputs(date, payload)
 
     logger.info("Mars news JSON saved to %s", json_path)
-    logger.info("Mars news markdown summary saved to %s", md_path)
+    logger.info("Mars news markdown saved to %s", md_path)
 
+    news_items = payload.get("items", [])
+    item_count = len(news_items) if isinstance(news_items, list) else 0
+    urls_count = sum(1 for it in news_items if it.get("url") and not it["url"].startswith("https://www.google.com"))
     print(f"\n✓ Mars news digest generated: {json_path}")
     print(f"  Summary: {md_path}")
-    normalized_items = normalized.get("items", [])
-    item_count = len(normalized_items) if isinstance(normalized_items, list) else 0
-    print(f"  Items: {item_count}")
+    print(f"  Items: {item_count} ({urls_count} with direct URLs)")
 
 
 if __name__ == "__main__":
