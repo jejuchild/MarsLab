@@ -93,7 +93,11 @@ def _resolve_redirect(url: str, title: str = "") -> str:
         return url
 
     # Step 2: Construct slug from title and probe known NASA URL patterns
-    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    # NASA slug rules: 's/'s -> s, remove other special chars, hyphens for spaces
+    slug_src = title.lower()
+    slug_src = slug_src.replace("\u2019s", "s").replace("'s", "s")  # possessives
+    slug_src = slug_src.replace("\u2019", "").replace("'", "")  # remaining apostrophes
+    slug = re.sub(r"[^a-z0-9]+", "-", slug_src).strip("-")
     candidate_prefixes = [
         "https://www.nasa.gov/news-release/",
         "https://www.nasa.gov/missions/mars-2020-perseverance/ingenuity-helicopter/",
