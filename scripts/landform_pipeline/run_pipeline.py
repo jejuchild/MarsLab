@@ -90,6 +90,12 @@ def main():
     parser.add_argument("--mola-weight", type=float, default=1.0, help="MOLA feature weight in clustering")
     parser.add_argument("--skip-umap", action="store_true", help="Skip UMAP/t-SNE visualization")
     parser.add_argument("--skip-mola", action="store_true", help="Skip MOLA feature extraction (DINO-only clustering)")
+    parser.add_argument("--skip-train", action="store_true", help="Skip classifier training")
+    parser.add_argument("--skip-fusion", action="store_true", help="Skip Bayesian fusion")
+    parser.add_argument("--skip-predict", action="store_true", help="Skip prediction")
+    parser.add_argument("--skip-export", action="store_true", help="Skip GeoJSON export")
+    parser.add_argument("--epochs", type=int, default=30, help="Training epochs")
+    parser.add_argument("--save-maps", action="store_true", help="Save per-image prediction maps")
 
     args = parser.parse_args()
     
@@ -143,22 +149,74 @@ def main():
     
     timings["cluster"] = run_step("K-Means clustering + visualization", cmd)
 
+    # ── Step 4: Train Classifier ─────────────────────────────────
+    if not args.skip_train:
+        cmd = [
+            sys.executable,
+            os.path.join(SCRIPT_DIR, "train_classifier.py"),
+            "--cluster-dir", os.path.join(args.output_dir, "clusters"),
+            "--embeddings", os.path.join(args.output_dir, "embeddings.npy"),
+            "--tile-metadata", os.path.join(args.output_dir, "tile_metadata.csv"),
+            "--output-dir", os.path.join(args.output_dir, "classifier"),
+            "--epochs", str(args.epochs),
+            "--batch-size", str(args.batch_size),
+        ]
+        timings["train"] = run_step("Train pseudo-label classifier", cmd)
+
+    # ── Step 5: Bayesian Fusion ───────────────────────────────────
+    if not args.skip_fusion:
+        cmd = [
+            sys.executable,
+            os.path.join(SCRIPT_DIR, "fusion.py"),
+            "--embeddings", os.path.join(args.output_dir, "embeddings.npy"),
+            "--mola-features", os.path.join(args.output_dir, "mola_features.npy"),
+            "--tile-metadata", os.path.join(args.output_dir, "tile_metadata.csv"),
+            "--classifier-model", os.path.join(args.output_dir, "classifier", "best_model.pt"),
+            "--cluster-dir", os.path.join(args.output_dir, "clusters"),
+            "--output-dir", os.path.join(args.output_dir, "fusion"),
+        ]
+        timings["fusion"] = run_step("Bayesian fusion (CNN + DEM)", cmd)
+
+    # ── Step 6: Predict ───────────────────────────────────────────
+    if not args.skip_predict:
+        cmd = [
+            sys.executable,
+            os.path.join(SCRIPT_DIR, "predict.py"),
+            "--image-dirs", args.image_dirs,
+            "--metadata-json", args.metadata_json,
+            "--classifier-model", os.path.join(args.output_dir, "classifier", "best_model.pt"),
+            "--fusion-model", os.path.join(args.output_dir, "fusion", "fusion_model.pt"),
+            "--dem-path", args.dem_path,
+            "--output-dir", os.path.join(args.output_dir, "predictions"),
+            "--batch-size", str(args.batch_size),
+        ]
+        if args.limit:
+            cmd.extend(["--limit", str(args.limit)])
+        if args.save_maps:
+            cmd.append("--save-maps")
+        timings["predict"] = run_step("Run predictions", cmd)
+
+    # ── Step 7: Export GeoJSON ─────────────────────────────────────
+    if not args.skip_export:
+        cmd = [
+            sys.executable,
+            os.path.join(SCRIPT_DIR, "export_geojson.py"),
+            "--predictions-dir", os.path.join(args.output_dir, "predictions"),
+            "--output-dir", os.path.join(args.output_dir, "geojson"),
+        ]
+        timings["export"] = run_step("Export GeoJSON", cmd)
+
     # ── Summary ───────────────────────────────────────────────────
     total_elapsed = time.time() - total_start
     
     print(f"\n{'='*60}")
-    print(f"  PIPELINE COMPLETE")
+    print(f"  PIPELINE COMPLETE (7 steps)")
     print(f"{'='*60}")
     print(f"  Total time: {total_elapsed/3600:.1f}h ({total_elapsed:.0f}s)")
     for step, t in timings.items():
         print(f"    {step}: {t:.0f}s")
     print(f"\n  Output: {os.path.join(PROJECT_ROOT, args.output_dir)}")
-    print(f"  Clusters: {os.path.join(PROJECT_ROOT, args.output_dir, 'clusters')}")
-    print(f"\n  Next steps:")
-    print(f"    1. Open clusters/cluster_*/grid.png to see tile patterns")
-    print(f"    2. Check clusters/cluster_summary.json for enrichment scores")
-    print(f"    3. Assign class labels to enriched clusters")
-    print(f"    4. Run fine-tuning with pseudo-labels")
+    print(f"  GeoJSON: {os.path.join(PROJECT_ROOT, args.output_dir, 'geojson')}")
 
 
 if __name__ == "__main__":
