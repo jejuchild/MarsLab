@@ -79,29 +79,46 @@ def _state_tensor_to_numpy(value: torch.Tensor) -> np.ndarray:
     return value.detach().cpu().numpy().astype(np.float64)
 
 
-def _pick_state_key(state_dict: dict[str, object], suffix: str) -> str:
-    candidates = [k for k in state_dict.keys() if k.endswith(suffix)]
-    if not candidates:
-        raise KeyError(f"Could not find state_dict key ending with '{suffix}'.")
-    candidates.sort(key=len)
-    return candidates[0]
+def _find_linear_keys(state_dict: dict[str, object]) -> list[tuple[str, str]]:
+    """Find (weight_key, bias_key) pairs for all linear layers, sorted by key name."""
+    weight_keys = [
+        k for k, v in state_dict.items()
+        if k.endswith(".weight") and hasattr(v, "ndim") and v.ndim == 2  # type: ignore[union-attr]
+    ]
+    weight_keys.sort()
+    pairs = []
+    for wk in weight_keys:
+        bk = wk[:-7] + ".bias"  # replace '.weight' with '.bias'
+        pairs.append((wk, bk))
+    return pairs
 
 
 def load_classifier_head(classifier_model_path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Load the 2-layer MLP head from a classifier checkpoint.
+
+    Supports any key prefix (net.X, layers.X, head.net.X) by dynamically finding
+    the first and last Linear weight tensors in the state_dict.
+    """
     checkpoint = torch.load(classifier_model_path, map_location="cpu")
     state_dict = checkpoint.get("model_state_dict", checkpoint)
     if not isinstance(state_dict, dict):
         raise ValueError("Checkpoint does not contain a valid model_state_dict.")
 
-    w0_key = _pick_state_key(state_dict, "layers.0.weight")
-    b0_key = _pick_state_key(state_dict, "layers.0.bias")
-    w1_key = _pick_state_key(state_dict, "layers.2.weight")
-    b1_key = _pick_state_key(state_dict, "layers.2.bias")
+    linear_pairs = _find_linear_keys(state_dict)
+    if len(linear_pairs) < 2:
+        raise ValueError(
+            f"Expected at least 2 linear layers in classifier, found {len(linear_pairs)}: "
+            f"{[p[0] for p in linear_pairs]}"
+        )
+
+    # First linear layer (input → hidden) and last linear layer (hidden → output)
+    w0_key, b0_key = linear_pairs[0]
+    w1_key, b1_key = linear_pairs[-1]
 
     w0 = _state_tensor_to_numpy(state_dict[w0_key])
-    b0 = _state_tensor_to_numpy(state_dict[b0_key])
+    b0 = _state_tensor_to_numpy(state_dict[b0_key]) if b0_key in state_dict else np.zeros(state_dict[w0_key].shape[0], dtype=np.float64)
     w1 = _state_tensor_to_numpy(state_dict[w1_key])
-    b1 = _state_tensor_to_numpy(state_dict[b1_key])
+    b1 = _state_tensor_to_numpy(state_dict[b1_key]) if b1_key in state_dict else np.zeros(state_dict[w1_key].shape[0], dtype=np.float64)
 
     if w1.shape[0] != len(CLASS_ORDER):
         raise ValueError(
