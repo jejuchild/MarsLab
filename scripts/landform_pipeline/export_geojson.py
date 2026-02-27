@@ -62,7 +62,15 @@ def resolve_prediction_files(predictions_dir: Path) -> list[Path]:
     if predictions_dir.is_file():
         return [predictions_dir]
 
-    csv_files = sorted(Path(p) for p in glob(str(predictions_dir / "*.csv")))
+    csv_files = sorted(
+        Path(p) for p in glob(str(predictions_dir / "*_tile_predictions.csv"))
+    )
+    if not csv_files:
+        # Fallback: all CSVs except aggregated summary
+        csv_files = sorted(
+            Path(p) for p in glob(str(predictions_dir / "*.csv"))
+            if "aggregated" not in Path(p).name
+        )
     if csv_files:
         return csv_files
 
@@ -153,14 +161,14 @@ def merge_tile_metadata(pred_df: pd.DataFrame, tile_metadata_path: Path) -> pd.D
         suffixes=("", "_meta"),
     )
 
-    if "lat" not in joined.columns:
+    if "lat" not in joined.columns and "lat_meta" in joined.columns:
         joined["lat"] = joined["lat_meta"]
-    else:
+    elif "lat_meta" in joined.columns:
         joined["lat"] = joined["lat"].where(joined["lat"].notna(), joined["lat_meta"])
 
-    if "lon" not in joined.columns:
+    if "lon" not in joined.columns and "lon_meta" in joined.columns:
         joined["lon"] = joined["lon_meta"]
-    else:
+    elif "lon_meta" in joined.columns:
         joined["lon"] = joined["lon"].where(joined["lon"].notna(), joined["lon_meta"])
 
     drop_cols = [col for col in ["lat_meta", "lon_meta"] if col in joined.columns]

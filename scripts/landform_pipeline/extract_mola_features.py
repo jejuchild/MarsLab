@@ -221,10 +221,7 @@ def main() -> None:
             win_height = int(row_max - row_min + 1)
             win_width = int(col_max - col_min + 1)
 
-            window = Window.from_slices(
-                (row_min, row_min + win_height),
-                (col_min, col_min + win_width),
-            )
+            window = Window(col_min, row_min, win_width, win_height)
             dem_patch_masked = ds.read(1, window=window, boundless=True, masked=True)
             dem_patch = dem_patch_masked.astype(np.float32).filled(np.nan)
 
