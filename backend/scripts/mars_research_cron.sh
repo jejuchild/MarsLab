@@ -20,6 +20,6 @@ if [ -f "$PROJECT_ROOT/backend/.env" ]; then
 fi
 
 cd "$PROJECT_ROOT"
-python backend/scripts/mars_research_crawler.py "$@"
+/home/cspark/miniconda3/bin/python backend/scripts/mars_research_crawler.py "$@"
 
 echo "=== Done - $(date -Iseconds) ==="
