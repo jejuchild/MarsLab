@@ -1,0 +1,538 @@
+{
+  "date": "2026-02-28",
+  "generated_at": "2026-02-27T22:05:52.083236+00:00",
+  "categories": {
+    "missions": "Focus on ongoing and past Mars missions, including Ingenuity, Perseverance, Curiosity, and Mars Express, with updates on their status and discoveries.",
+    "discoveries": "Numerous new findings about Mars, including its geology, atmosphere, and potential for life, with a focus on the planet's history and evolution.",
+    "technology": "Advancements in Mars exploration technology, such as autonomous systems, oxygen-generating experiments, and new materials, with potential applications for future missions.",
+    "human_exploration": "Preparations for future human missions to Mars, including the search for water and ice, and the development of necessary technologies and strategies.",
+    "sample_return": "Efforts to retrieve samples from Mars and return them to Earth, with a focus on the scientific value and challenges of such a mission.",
+    "international": "Collaboration and cooperation among space agencies and countries, including NASA, ESA, and China, with a focus on shared goals and resources.",
+    "commercial": "Private companies and initiatives, such as CesiumAstro, playing a growing role in Mars exploration and development, with potential implications for the future of space travel and commerce."
+  },
+  "items": [
+    {
+      "title": "NASA's Ingenuity Mars Helicopter Team Says Goodbye ... for Now",
+      "date": "4/17/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The final downlink shift by the Ingenuity team was a time to reflect on a highly successful mission - and to prepare the first aircraft on another world for its new role.",
+      "category": "missions",
+      "significance": "Ingenuity Mars Helicopter mission conclusion",
+      "url": "https://www.nasa.gov/missions/mars-2020-perseverance/ingenuity-helicopter/nasas-ingenuity-mars-helicopter-team-says-goodbye-for-now/"
+    },
+    {
+      "title": "NASA Sets Path to Return Mars Samples, Seeks Innovative Designs",
+      "date": "4/15/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The agency is asking the NASA community to work together to develop a revised plan that leverages innovation and proven technology.",
+      "category": "sample_return",
+      "significance": "NASA seeking innovative designs for Mars sample return",
+      "url": "https://www.nasa.gov/news-release/nasa-sets-path-to-return-mars-samples-seeks-innovative-designs/"
+    },
+    {
+      "title": "NASA Invites Media to Mars Sample Return Update",
+      "date": "4/12/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Mars Sample Return has been a major long-term goal of international planetary exploration for the past two decades.",
+      "category": "sample_return",
+      "significance": "Mars Sample Return update",
+      "url": "https://www.nasa.gov/news-release/nasa-invites-media-to-mars-sample-return-update/"
+    },
+    {
+      "title": "Rock Sampled by NASA's Perseverance Embodies Why Rover Came to Mars",
+      "date": "4/03/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The 24th sample taken by the six-wheeled scientist offers new clues about Jezero Crater and the lake it may have once held.",
+      "category": "discoveries",
+      "significance": "Perseverance rover's 24th sample offers new clues about Jezero Crater",
+      "url": "https://www.nasa.gov/missions/mars-2020-perseverance/perseverance-rover/rock-sampled-by-nasas-perseverance-embodies-why-rover-came-to-mars/"
+    },
+    {
+      "title": "NASA's Curiosity Searches for New Clues About Mars' Ancient Water",
+      "date": "3/29/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The rover has arrived at an area that may show evidence liquid water flowed on this part of Mars for much longer than previously thought.",
+      "category": "discoveries",
+      "significance": "Curiosity rover searching for new clues about Mars' ancient water",
+      "url": "https://www.nasa.gov/missions/mars-science-laboratory/nasas-curiosity-searches-for-new-clues-about-mars-ancient-water/"
+    },
+    {
+      "title": "Team Assessing SHERLOC Instrument on NASA's Perseverance Rover",
+      "date": "2/13/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Engineers are working to stabilize a dust cover on one of the science instrument's cameras.",
+      "category": "missions",
+      "significance": "SHERLOC instrument on Perseverance rover experiencing issues",
+      "url": "https://www.nasa.gov/missions/mars-2020-perseverance/perseverance-rover/team-assessing-sherloc-instrument-on-nasas-perseverance-rover/"
+    },
+    {
+      "title": "After Three Years on Mars, NASA's Ingenuity Helicopter Mission Ends",
+      "date": "1/25/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "NASA has proven powered, controlled flight is possible on other worlds, just as the Wright brothers proved it was possible on Earth.",
+      "category": "missions",
+      "significance": "Ingenuity Helicopter mission ends after three years on Mars",
+      "url": "https://www.nasa.gov/news-release/after-three-years-on-mars-nasas-ingenuity-helicopter-mission-ends/"
+    },
+    {
+      "title": "20 Years After Landing: How NASA's Twin Rovers Changed Mars Science",
+      "date": "1/17/2024",
+      "source": "NASA Mars Exploration Program",
+      "summary": "This month marks the 20th anniversary of Spirit and Opportunity's landing on Mars, part of a mission whose legacy will extend far into the future.",
+      "category": "missions",
+      "significance": "20th anniversary of Spirit and Opportunity's landing on Mars",
+      "url": "https://www.nasa.gov/missions/mer/20-years-after-landing-how-nasas-twin-rovers-changed-mars-science/"
+    },
+    {
+      "title": "NASA's Curiosity Rover Captures a Martian Day, From Dawn to Dusk",
+      "date": "12/28/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Videos from the rover show its shadow moving across the Martian surface during a 12-hour sequence while Curiosity remained parked.",
+      "category": "discoveries",
+      "significance": "Curiosity rover captures a Martian day",
+      "url": "https://www.nasa.gov/missions/mars-science-laboratory/curiosity-rover/nasas-curiosity-rover-captures-a-martian-day-from-dawn-to-dusk/"
+    },
+    {
+      "title": "NASA's Perseverance Rover Deciphers Ancient History of Martian Lake",
+      "date": "12/12/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Now at 1,000 days on Mars, the mission has traversed an ancient river and lake system, collecting valuable samples along the way.",
+      "category": "discoveries",
+      "significance": "Perseverance rover deciphers ancient history of Martian lake",
+      "url": "https://www.nasa.gov/missions/mars-2020-perseverance/perseverance-rover/nasas-perseverance-rover-deciphers-ancient-history-of-martian-lake/"
+    },
+    {
+      "title": "NASA's MAVEN Observes the Disappearing Solar Wind",
+      "date": "12/11/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "NASA's MAVEN (Mars Atmosphere and Volatile EvolutioN) mission observed the dramatic and unexpected \"disappearance\" of a stream of charged particles constantly emanating off the Sun, known as the solar wind.",
+      "category": "discoveries",
+      "significance": "MAVEN observes the disappearing solar wind",
+      "url": "https://www.nasa.gov/missions/maven/nasas-maven-observes-the-disappearing-solar-wind/"
+    },
+    {
+      "title": "NASA Orbiter Snaps Stunning Views of Mars Horizon",
+      "date": "11/28/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The Odyssey orbiter captured clouds and dust in the Red Planet's skies, along with one of its two tiny moons.",
+      "category": "discoveries",
+      "significance": "Odyssey orbiter captures stunning views of Mars horizon",
+      "url": "https://www.nasa.gov/missions/odyssey/nasa-orbiter-snaps-stunning-views-of-mars-horizon/"
+    },
+    {
+      "title": "NASA Uses Two Worlds to Test Future Mars Helicopter Designs",
+      "date": "11/22/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Engineers will go beyond the ends of the Earth to find more performance for future Mars helicopters.",
+      "category": "technology",
+      "significance": "NASA testing future Mars helicopter designs",
+      "url": "https://www.nasa.gov/missions/mars-2020-perseverance/ingenuity-helicopter/nasa-uses-two-worlds-to-test-future-mars-helicopter-designs/"
+    },
+    {
+      "title": "NASA's Mars Fleet Will Still Conduct Science While Lying Low",
+      "date": "11/10/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Rovers and orbiters will continue collecting limited data during a two-week communications pause due to the position of Earth, the Sun, and the Red Planet.",
+      "category": "missions",
+      "significance": "Mars fleet conducting limited science during communications pause",
+      "url": "https://www.nasa.gov/solar-system/planets/mars/nasas-mars-fleet-will-still-conduct-science-while-lying-low/"
+    },
+    {
+      "title": "NASA's Curiosity Rover Clocks 4,000 Days on Mars",
+      "date": "11/06/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The mission team is making sure the robotic scientist is staying strong, despite wear and tear from its 11-year journey.",
+      "category": "missions",
+      "significance": "Curiosity rover clocks 4,000 days on Mars",
+      "url": "https://www.nasa.gov/missions/mars-science-laboratory/curiosity-rover/nasas-curiosity-rover-clocks-4000-days-on-mars/"
+    },
+    {
+      "title": "NASA Technologies Receive Multiple Nods in TIME Inventions of 2023",
+      "date": "10/27/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "MOXIE, the oxygen-generating experiment aboard NASA's Perseverance Mars rover, is among the technologies honored by the magazine.",
+      "category": "technology",
+      "significance": "MOXIE technology honored by TIME magazine",
+      "url": "https://www.nasa.gov/general/nasa-technologies-receive-multiple-nods-in-time-inventions-of-2023/"
+    },
+    {
+      "title": "NASA Is Locating Ice on Mars With This New Map",
+      "date": "10/26/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The map could help the agency decide where the first astronauts to the Red Planet should land. The more available water, the less missions will need to bring.",
+      "category": "human_exploration",
+      "significance": "New map locating ice on Mars for future astronaut missions",
+      "url": "https://www.nasa.gov/solar-system/planets/mars/nasa-is-locating-ice-on-mars-with-this-new-map/"
+    },
+    {
+      "title": "NASA's Perseverance Captures Dust-Filled Martian Whirlwind",
+      "date": "9/29/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The six-wheeled geologist spotted the twister as part of an atmospheric exploration of Jezero Crater.",
+      "category": "discoveries",
+      "significance": "Perseverance captures dust-filled Martian whirlwind",
+      "url": "https://www.nasa.gov/missions/mars-2020-perseverance/perseverance-rover/nasas-perseverance-captures-dust-filled-martian-whirlwind/"
+    },
+    {
+      "title": "Historic Wind Tunnel Facility Testing NASA's Mars Ascent Vehicle Rocket",
+      "date": "9/25/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The same facility that provided valuable testing for NASA missions to low-Earth orbit and the Moon is now helping the agency prepare to launch the first rocket from Mars.",
+      "category": "technology",
+      "significance": "Mars Ascent Vehicle rocket testing",
+      "url": "https://www.nasa.gov/centers-and-facilities/marshall/historic-wind-tunnel-facility-testing-nasas-mars-ascent-vehicle-rocket/"
+    },
+    {
+      "title": "NASA Releases Independent Review's Mars Sample Return Report",
+      "date": "9/21/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "The agency established the board in May 2023 to evaluate the technical, cost, and schedule plans prior to confirmation of the mission's design.",
+      "category": "sample_return",
+      "significance": "Independent review's Mars Sample Return report released",
+      "url": "https://www.nasa.gov/missions/mars-sample-return/nasa-releases-independent-reviews-mars-sample-return-report/"
+    },
+    {
+      "title": "Autonomous Systems Help NASA's Perseverance Do More Science on Mars",
+      "date": "9/21/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "A computer pilot helps NASA's six-wheeled geologist as it searches for rock samples that could be brought to Earth for deeper investigation.",
+      "category": "technology",
+      "significance": "Autonomous systems helping Perseverance do more science on Mars",
+      "url": "https://www.nasa.gov/missions/mars-2020-perseverance/perseverance-rover/autonomous-systems-help-nasas-perseverance-do-more-science-on-mars-2/"
+    },
+    {
+      "title": "NASA's Curiosity Reaches Mars Ridge Where Water Left Debris Pileup",
+      "date": "9/18/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Believed to be a remnant of powerful ancient debris flows, Gediz Vallis Ridge is a destination long sought by the rover's science team.",
+      "category": "discoveries",
+      "significance": "Curiosity reaches Mars ridge where water left debris pileup",
+      "url": "https://www.nasa.gov/missions/mars-science-laboratory/curiosity-rover/nasas-curiosity-reaches-mars-ridge-where-water-left-debris-pileup-2/"
+    },
+    {
+      "title": "NASA's Oxygen-Generating Experiment MOXIE Completes Mars Mission",
+      "date": "9/06/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Riding with the Perseverance rover, the instrument has proved to be a viable technology for astronauts on Mars to produce oxygen for fuel and breathing.",
+      "category": "technology",
+      "significance": "MOXIE completes Mars mission",
+      "url": "https://www.nasa.gov/missions/mars-2020-perseverance/perseverance-rover/nasas-oxygen-generating-experiment-moxie-completes-mars-mission/"
+    },
+    {
+      "title": "NASA, Partners Study Ancient Life in Australia to Inform Mars Search",
+      "date": "8/24/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "NASA is working with its international partners to study the ancient Earth as it relates to Mars",
+      "category": "international",
+      "significance": "NASA studying ancient life in Australia to inform Mars search",
+      "url": "https://www.nasa.gov/general/nasa-partners-study-ancient-life-in-australia-to-inform-mars-search/"
+    },
+    {
+      "title": "Watch NASA Engineers Put a Mars Lander's Legs to the Test",
+      "date": "8/10/2023",
+      "source": "NASA Mars Exploration Program",
+      "summary": "Sturdy legs are needed to absorb the impact of the heaviest spacecraft to ever touch down on the Red Planet.",
+      "category": "technology",
+      "significance": "Mars lander's legs being tested",
+      "url": "https://www.nasa.gov/solar-system/watch-nasa-engineers-put-a-mars-landers-legs-to-the-test/"
+    },
+    {
+      "title": "NASA’s ESCAPADE Ready to Study Space Weather from Earth to Mars",
+      "date": "Thu, 26 Feb 2026 15:24:23 +0000",
+      "source": "NASA",
+      "summary": "Mars is not what it used to be. Once warm, watery, and blanketed by a thick atmosphere, today the Red Planet is cold, dry, and draped by a thin atmospheric veil. The main culprit is a relentless stream of particles from the Sun, known as the solar wind. Over billions of years, the solar wind has stripped away […]",
+      "category": "missions",
+      "significance": "ESCAPADE mission to study space weather from Earth to Mars",
+      "url": "https://science.nasa.gov/science-research/heliophysics/nasas-escapade-ready-to-study-space-weather-from-earth-to-mars/"
+    },
+    {
+      "title": "CesiumAstro acquires Vidrovr to embed AI in communications systems",
+      "date": "Thu, 26 Feb 2026 13:00:00 +0000",
+      "source": "SpaceNews",
+      "summary": "SAN FRANCISCO – CesiumAstro announced the acquisition Feb. 26 of Vidrovr, a startup that specializes in artificial intelligence for multimodal signals analysis. Terms of the transaction, which closed in late 2025, were not disclosed. CesiumAstro acquired Vidrovr to accelerate its campaign to embed AI in space telecommunications and intelligence, surveillance and reconnaissance infrastructure, e...",
+      "category": "commercial",
+      "significance": "CesiumAstro acquires Vidrovr",
+      "url": "https://spacenews.com/cesiumastro-acquires-vidrovr-to-embed-ai-in-communications-systems/"
+    },
+    {
+      "title": "China’s Tianwen-2 probe operating normally on approach to asteroid",
+      "date": "Thu, 26 Feb 2026 11:08:55 +0000",
+      "source": "SpaceNews",
+      "summary": "China’s Tianwen-2 spacecraft is operating normally on its way to a near-Earth asteroid ahead of sampling later this year, according to a rare official update.\nThe post China’s Tianwen-2 probe operating normally on approach to asteroid appeared first on SpaceNews.",
+      "category": "international",
+      "significance": "China's Tianwen-2 probe operating normally on approach to asteroid",
+      "url": "https://spacenews.com/chinas-tianwen-2-probe-operating-normally-on-approach-to-asteroid/"
+    },
+    {
+      "title": "Explore Mars’s Flaugergues Crater",
+      "date": "Wed, 04 Feb 2026 11:00:00 +0100",
+      "source": "ESA",
+      "summary": "ESA’s Mars Express takes us on a journey across the southern highlands of Mars, including a flight around Flaugergues Crater.",
+      "category": "discoveries",
+      "significance": "Mars Express explores Flaugergues Crater",
+      "url": "https://www.esa.int/Science_Exploration/Space_Science/Mars_Express/Explore_Mars_s_Flaugergues_Crater"
+    },
+    {
+      "title": "Sandblasting on Mars",
+      "date": "Wed, 07 Jan 2026 11:00:00 +0100",
+      "source": "ESA",
+      "summary": "Martian winds can have quite an impact.&nbsp;ESA’s Mars Express has spotted them whipping up sand grains and acting as a cosmic sandblaster, carving out intriguing grooves near Mars’s equator.",
+      "category": "discoveries",
+      "significance": "Martian winds whipping up sand grains",
+      "url": "https://www.esa.int/Science_Exploration/Space_Science/Mars_Express/Sandblasting_on_Mars"
+    },
+    {
+      "title": "A martian butterfly flaps its wings",
+      "date": "Wed, 03 Dec 2025 11:00:00 +0100",
+      "source": "ESA",
+      "summary": "Is it an insect? A strange fossil? An otherworldly eye, or even a walnut? No, it’s an intriguing kind of martian butterfly spotted by ESA’s Mars Express.",
+      "category": "discoveries",
+      "significance": "Mars Express spots martian butterfly",
+      "url": "https://www.esa.int/Science_Exploration/Space_Science/Mars_Express/A_martian_butterfly_flaps_its_wings"
+    },
+    {
+      "title": "What a martian ice age left behind",
+      "date": "Wed, 12 Nov 2025 11:00:00 +0100",
+      "source": "ESA",
+      "summary": "Travelling up from Mars’s equator towards its north pole, we find Coloe Fossae: a set of intriguing scratches within a region marked by deep valleys, speckled craters, and signs of an ancient ice age.",
+      "category": "discoveries",
+      "significance": "Coloe Fossae region shows signs of ancient ice age",
+      "url": "https://www.esa.int/Science_Exploration/Space_Science/Mars_Express/What_a_martian_ice_age_left_behind"
+    },
+    {
+      "title": "Dancing dust devils trace raging winds on Mars",
+      "date": "Wed, 08 Oct 2025 20:00:00 +0200",
+      "source": "ESA",
+      "summary": "",
+      "category": "discoveries",
+      "significance": "Dancing dust devils on Mars",
+      "url": "https://www.esa.int/Science_Exploration/Space_Science/Mars_Express/Dancing_dust_devils_trace_raging_winds_on_Mars"
+    },
+    {
+      "title": "Fly over Xanthe Terra with Mars Express",
+      "date": "Thu, 02 Oct 2025 15:00:00 +0200",
+      "source": "ESA",
+      "summary": "Video: \n\t\t\t00:03:16\n\t\t\t\tESA’s&nbsp;Mars Express&nbsp;takes us on another mesmerising flight over curving channels carved by water, islands that have resisted erosion, and a maze of hilly terrain.Central to the tour is a 1300 km-long outflow channel called Shalbatana Vallis. It cascades down from the highland region of Xanthe Terra to the smoother lowlands of Chryse Planitia.Billions of years ag...",
+      "category": "discoveries",
+      "significance": "Mars Express flies over Xanthe Terra",
+      "url": "https://www.esa.int/ESA_Multimedia/Videos/2025/10/Fly_over_Xanthe_Terra_with_Mars_Express"
+    },
+    {
+      "title": "Fly around Ares Vallis on Mars",
+      "date": "Wed, 20 Nov 2024 14:00:00 +0100",
+      "source": "ESA",
+      "summary": "Video: \n\t\t\t00:04:30\n\t\t\t\tExplore the immense power of water as ESA’s Mars Express takes us on a flight over curving channels, streamlined islands and muddled ‘chaotic terrain’ on Mars, soaking up rover landing sites along the way.This beautiful flight around the Oxia Palus region of Mars covers a total area of approximately 890 000 km², more than twice the size of Germany. Central to the tour is...",
+      "category": "discoveries",
+      "significance": "Mars Express flies around Ares Vallis",
+      "url": "https://www.esa.int/ESA_Multimedia/Videos/2024/11/Fly_around_Ares_Vallis_on_Mars"
+    },
+    {
+      "title": "Fly across Nili Fossae with ESA’s Mars Express",
+      "date": "Wed, 29 May 2024 17:00:00 +0200",
+      "source": "ESA",
+      "summary": "Video: \n\t\t\t00:03:29\n\t\t\t\tMars’s surface is covered in all manner of scratches and scars. Its many marks include the fingernail scratches of Tantalus Fossae, the colossal canyon system of Valles Marineris, the oddly orderly ridges of Angustus Labyrinthus, and the fascinating features captured in today’s video release from Mars Express: the cat scratches of Nili Fossae.Nili Fossae comprises parall...",
+      "category": "discoveries",
+      "significance": "Mars Express flies across Nili Fossae",
+      "url": "https://www.esa.int/ESA_Multimedia/Videos/2024/05/Fly_across_Nili_Fossae_with_ESA_s_Mars_Express"
+    },
+    {
+      "title": "Sand dunes meet stacked ice at Mars’s north pole",
+      "date": "Wed, 28 Feb 2024 11:00:00 +0100",
+      "source": "ESA",
+      "summary": "Image:\n\t\t\tSand dunes meet stacked ice at Mars’s north pole",
+      "category": "discoveries",
+      "significance": "Sand dunes meet stacked ice at Mars's north pole",
+      "url": "https://www.esa.int/ESA_Multimedia/Images/2024/02/Sand_dunes_meet_stacked_ice_at_Mars_s_north_pole"
+    },
+    {
+      "title": "Return to the labyrinth",
+      "date": "Wed, 24 Jan 2024 11:00:00 +0100",
+      "source": "ESA",
+      "summary": "Image:\n\t\t\tReturn to the labyrinth",
+      "category": "discoveries",
+      "significance": "Mars Express returns to the labyrinth",
+      "url": "https://www.esa.int/ESA_Multimedia/Images/2024/01/Return_to_the_labyrinth"
+    },
+    {
+      "title": "Fly across Mars’s ‘labyrinth of night’ with Mars Express",
+      "date": "Tue, 10 Oct 2023 18:11:00 +0200",
+      "source": "ESA",
+      "summary": "Video: \n\t\t\t00:03:44\n\t\t\t\tNestled between the colossal martian ‘Grand Canyon’ (Valles Marineris) and the tallest volcanoes in the Solar System (the Tharsis region) lies Noctis Labyrinthus – a vast system of deep and steep valleys that stretches out for around 1190 km (roughly the length of Italy here on Earth).This video visualises a flight over the eastern part of Noctis Labyrinthus as seen by M...",
+      "category": "discoveries",
+      "significance": "Mars Express flies across Mars's 'labyrinth of night'",
+      "url": "https://www.esa.int/ESA_Multimedia/Videos/2023/10/Fly_across_Mars_s_labyrinth_of_night_with_Mars_Express"
+    },
+    {
+      "title": "20 years and counting: Mars Express in numbers",
+      "date": "Fri, 02 Jun 2023 10:00:00 +0200",
+      "source": "ESA",
+      "summary": "Image:\n\t\t\t20 years and counting: Mars Express in numbers",
+      "category": "missions",
+      "significance": "Mars Express in numbers after 20 years",
+      "url": "https://www.esa.int/ESA_Multimedia/Images/2023/05/20_years_and_counting_Mars_Express_in_numbers"
+    },
+    {
+      "title": "Close-up of Valles Marineris from global Mars colour mosaic (annotated)",
+      "date": "Tue, 23 May 2023 12:28:00 +0200",
+      "source": "ESA",
+      "summary": "Image:\n\t\t\tClose-up of Valles Marineris from global Mars colour mosaic (annotated)",
+      "category": "discoveries",
+      "significance": "Close-up of Valles Marineris from global Mars colour mosaic",
+      "url": "https://www.esa.int/ESA_Multimedia/Images/2023/05/Close-up_of_Valles_Marineris_from_global_Mars_colour_mosaic_annotated"
+    },
+    {
+      "title": "Building a mosaic of Mars",
+      "date": "Tue, 23 May 2023 12:27:00 +0200",
+      "source": "ESA",
+      "summary": "Image:\n\t\t\tBuilding a mosaic of Mars",
+      "category": "discoveries",
+      "significance": "Building a mosaic of Mars",
+      "url": "https://www.esa.int/ESA_Multimedia/Images/2023/05/Building_a_mosaic_of_Mars"
+    },
+    {
+      "title": "Journey through Jezero",
+      "date": "Tue, 21 Mar 2023 11:00:00 +0100",
+      "source": "ESA",
+      "summary": "Video: \n\t\t\t00:03:03\n\t\t\t\tExplore the fascinating landing site of NASA’s Perseverance rover in this fly-through video, featuring new views of Jezero crater and its surroundings from ESA’s Mars Express and NASA's Mars Reconnaissance Orbiter.The video begins by panning around Jezero crater, which can be seen in the centre background surrounded by textured and cratered terrain. The crater moves into...",
+      "category": "discoveries",
+      "significance": "Journey through Jezero",
+      "url": "https://www.esa.int/ESA_Multimedia/Videos/2023/03/Journey_through_Jezero"
+    },
+    {
+      "title": "Tidal disruptions of rubble piles: The case of Phobos",
+      "date": "2026-02-25",
+      "source": "arXiv",
+      "summary": "Many small satellites in the Solar System have sub-synchronous orbits, meaning their orbits are decaying due to tidal dissipation. Unless they have substantial material strength, they will eventually tidally disrupt before reaching their planet's surface. We studied the fate of rubble-pile satell...",
+      "category": "discoveries",
+      "significance": "Tidal disruptions of rubble piles, including Phobos",
+      "url": "https://arxiv.org/abs/2602.21912v1"
+    },
+    {
+      "title": "Weak S-type asteroids compared to C-type explain the observed size distribution of the main belt",
+      "date": "2026-02-23",
+      "source": "arXiv",
+      "summary": "The main belt, the region between the orbits of Mars and Jupiter, is home to more than 1 million asteroids. These asteroids form orbital groups, (i.e., asteroid families formed by collisions) and also spectral groups (taxonomies) with different chemical compositions, in particular carbonaceous (C...",
+      "category": "discoveries",
+      "significance": "Weak S-type asteroids compared to C-type",
+      "url": "https://arxiv.org/abs/2602.19656v1"
+    },
+    {
+      "title": "The Martian mid-latitude subsurface ice is the remnant of a past ice sheet",
+      "date": "2026-02-21",
+      "source": "arXiv",
+      "summary": "On Mars, a relatively pure water ice layer lies beneath several centimeters of dry soil at mid-latitudes. Its widespread presence poleward of 60° latitude was detected by remote neutron spectroscopy and confirmed by the Phoenix lander at 68°N. Recent observations of exposed ice indicate that the ...",
+      "category": "discoveries",
+      "significance": "Martian mid-latitude subsurface ice is remnant of past ice sheet",
+      "url": "https://arxiv.org/abs/2602.18847v1"
+    },
+    {
+      "title": "Simultaneous Double Transits of Phobos and Deimos as Seen from the Martian Surface: A Millennium Catalogue",
+      "date": "2026-02-19",
+      "source": "arXiv",
+      "summary": "I present the first systematic catalogue of simultaneous solar transits of both Phobos and Deimos as observed from the surface of Mars. Using the JPL mar099 ephemeris (Brozovic et al. 2025) and SPICE toolkit, I searched the millennium 1600-2600 CE for epochs at which both Martian moons project on...",
+      "category": "discoveries",
+      "significance": "Simultaneous double transits of Phobos and Deimos",
+      "url": "https://arxiv.org/abs/2602.18513v1"
+    },
+    {
+      "title": "Terrestrial Analogs to Titan for Geophysical Research",
+      "date": "2026-02-19",
+      "source": "arXiv",
+      "summary": "Saturn's moon Titan exhibits remarkable parallels to the Earth in many geophysical and geological processes not found elsewhere in the solar system at the present day. These include a nitrogen atmosphere with a condensible gas - methane - replacing the Earth's water, leading to an active meteorol...",
+      "category": "discoveries",
+      "significance": "Terrestrial analogs to Titan for geophysical research",
+      "url": "https://arxiv.org/abs/2602.17464v1"
+    },
+    {
+      "title": "Dust measurements with the Mars Dust Counter on board Nozomi (PLANET-B)",
+      "date": "2026-02-17",
+      "source": "arXiv",
+      "summary": "Nozomi was Japan's first space mission to Mars, launched on 3 July 1998 UT. It was equipped with the Mars Dust Counter (MDC) which was an impact ionisation dust detector. MDC detected 96 dust particle impacts when the spacecraft was in Earth orbit and later in interplanetary space, before its ope...",
+      "category": "discoveries",
+      "significance": "Dust measurements with the Mars Dust Counter on Nozomi",
+      "url": "https://arxiv.org/abs/2602.15576v1"
+    },
+    {
+      "title": "The Interplanetary Habitable Zone",
+      "date": "2026-02-13",
+      "source": "arXiv",
+      "summary": "The concept of a system-wide measure of the sustainment of life (habitability) for space-faring interplanetary species is introduced and explored. Although largely agnostic to the details of how interplanetary life might operate (e.g., via technology or by utilizing organism traits that are, as o...",
+      "category": "discoveries",
+      "significance": "The Interplanetary Habitable Zone",
+      "url": "https://arxiv.org/abs/2602.13404v1"
+    },
+    {
+      "title": "What to make of the Earth's curiously intermediate land fraction?",
+      "date": "2026-02-02",
+      "source": "arXiv",
+      "summary": "Approximately two-thirds of the Earth, the only known inhabited planet, is covered in ocean. Why not 0.01% or 99.99%? It has been previously suggested that this may represent a certain degree of fine-tuning, and thus perhaps observers are a-priori more likely to develop on those rare worlds with ...",
+      "category": "discoveries",
+      "significance": "Earth's curiously intermediate land fraction",
+      "url": "https://arxiv.org/abs/2602.02392v1"
+    },
+    {
+      "title": "Sculpting of Martian brain terrain reveals the drying of ancient Mars",
+      "date": "2026-01-30",
+      "source": "arXiv",
+      "summary": "The Martian brain terrain (MBT), characterized by its unique brain-like morphology, is a potential geological archive for finding hints of paleoclimatic conditions during its formation period. The morphological similarity of MBT to self-organized patterned ground on Earth suggests a shared format...",
+      "category": "discoveries",
+      "significance": "Sculpting of Martian brain terrain reveals drying of ancient Mars",
+      "url": "https://arxiv.org/abs/2601.22606v1"
+    },
+    {
+      "title": "Exomoons and Exorings with the Habitable Worlds Observatory II: Finding Endor with Lunar Eclipses",
+      "date": "2026-01-27",
+      "source": "arXiv",
+      "summary": "Giant planets in the habitable zone may host exomoons with conditions conducive to life. In this paper we describe a method by which the Habitable Worlds Observatory (HWO) could detect such moons: broadband reflected-light lunar eclipses (e.g., the moon passing into the shadow of the planet). We ...",
+      "category": "discoveries",
+      "significance": "Exomoons and exorings with the Habitable Worlds Observatory",
+      "url": "https://arxiv.org/abs/2601.20002v1"
+    },
+    {
+      "title": "Autonomous Mars Rover Module for Soil Sampling and Life Component Analysis",
+      "date": "2026-01-23",
+      "source": "arXiv",
+      "summary": "The search for extraterrestrial life has long been a primary focus of scientific exploration, driven by rapid advancements in technology and our understanding of the universe. The discovery of water on Mars has sparked significant interest, raising the question of whether life could exist on the ...",
+      "category": "technology",
+      "significance": "Autonomous Mars rover module for soil sampling and life component analysis",
+      "url": "https://arxiv.org/abs/2601.17158v1"
+    },
+    {
+      "title": "The PAIRS project: a global formation model for planets in binaries. I. Effect of disc truncation on the growth of S-type planets",
+      "date": "2026-01-20",
+      "source": "arXiv",
+      "summary": "Binary stars are as common as single stars. The number of detected planets orbiting binaries is rapidly increasing thanks to the synergy between transit surveys, Gaia and high-resolution direct imaging campaigns. However, global planet formation models around binary stars are still underdeveloped...",
+      "category": "discoveries",
+      "significance": "Global formation model for planets in binaries",
+      "url": "https://arxiv.org/abs/2601.14214v1"
+    },
+    {
+      "title": "KMT-2025-BLG-1616Lb: First Microlensing Bound Planet From DREAMS",
+      "date": "2026-01-16",
+      "source": "arXiv",
+      "summary": "We present observations and analysis of the bound planetary microlensing event KMT-2025-BLG-1616. The planetary signal was captured by the Korea Microlensing Telescope Network (KMTNet) and the DECam Rogue Earths and Mars Survey (DREAMS). DREAMS's minute-cadence observations break the central/reso...",
+      "category": "discoveries",
+      "significance": "KMT-2025-BLG-1616Lb, first microlensing bound planet from DREAMS",
+      "url": "https://arxiv.org/abs/2601.11469v1"
+    },
+    {
+      "title": "Anatomy of Empirical Transit Spectra of Mars based on TGO/NOMAD",
+      "date": "2026-01-13",
+      "source": "arXiv",
+      "summary": "Transit spectroscopy is a powerful tool for probing atmospheric structures of exoplanets. Accurately accounting for the effects of aerosols is key to reconstructing atmospheric properties from transit spectra, yet this remains a significant challenge. To advance this effort, it is invaluable to e...",
+      "category": "discoveries",
+      "significance": "Anatomy of empirical transit spectra of Mars based on TGO/NOMAD",
+      "url": "https://arxiv.org/abs/2601.08397v1"
+    },
+    {
+      "title": "Direct detection of hydrogen reveals a new macroscopic crustal water reservoir on early Mars",
+      "date": "2026-01-13",
+      "source": "arXiv",
+      "summary": "The next great leap in Martian exploration will be the return of samples to Earth. To ensure the maximum scientific return from studying these samples, the development and utilisation of nondestructive analytical techniques are essential to enable early three-dimensional characterisation of their...",
+      "category": "discoveries",
+      "significance": "Direct detection of hydrogen reveals new macroscopic crustal water reservoir on early Mars",
+      "url": "https://arxiv.org/abs/2601.08390v1"
+    }
+  ],
+  "trend_summary": "The recent Mars news items reveal a trend towards increased focus on sample return and human exploration, with ongoing missions like Perseverance and Curiosity providing valuable insights into the planet's geology and potential for life. Technological advancements, such as autonomous systems and oxygen-generating experiments, are also being developed to support future missions. International cooperation and commercial initiatives are becoming increasingly important, with private companies and space agencies working together to achieve common goals. Overall, the field of Mars exploration is rapidly evolving, with new discoveries and innovations emerging regularly, and paving the way for a potential human presence on the Red Planet in the near future."
+}
