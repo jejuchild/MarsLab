@@ -97,6 +97,15 @@ class MOLAConfig:
     ])
     num_features: int = 23  # 7 × 3 scales + 2 global
 
+
+@dataclass
+class LabelConfig:
+    sglf_max_distance_km: float = 5.0
+    spatial_split_radius_km: float = 20.0
+    title_regex_mode: str = "weak"
+    reclassify_periglacial: bool = True
+    min_confidence_for_train: str = "weak"
+
 # ─── MIL Classifier Config ───────────────────────────────────────────────────
 @dataclass
 class MILConfig:
@@ -151,6 +160,7 @@ class AgentConfig:
 class PipelineConfig:
     dinov2: DINOv2Config = field(default_factory=DINOv2Config)
     mola: MOLAConfig = field(default_factory=MOLAConfig)
+    label: LabelConfig = field(default_factory=LabelConfig)
     mil: MILConfig = field(default_factory=MILConfig)
     rag: RAGConfig = field(default_factory=RAGConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)

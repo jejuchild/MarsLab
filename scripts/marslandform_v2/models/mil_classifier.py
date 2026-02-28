@@ -477,6 +477,31 @@ def save_confusion_matrix_png(confusion: Sequence[Sequence[int]], class_names: S
     plt.close(fig)
 
 
+class FocalLoss(nn.Module):
+    """Focal Loss for class-imbalanced classification (Lin et al. 2017)."""
+
+    def __init__(self, weight=None, gamma=2.0, label_smoothing=0.0, reduction="mean"):
+        super().__init__()
+        self.gamma = gamma
+        self.label_smoothing = label_smoothing
+        self.reduction = reduction
+        self.register_buffer("weight", weight)
+
+    def forward(self, logits, targets):
+        ce_loss = nn.functional.cross_entropy(
+            logits,
+            targets,
+            weight=self.weight,
+            reduction="none",
+            label_smoothing=self.label_smoothing,
+        )
+        pt = torch.exp(-ce_loss)
+        focal_loss = ((1 - pt) ** self.gamma) * ce_loss
+        if self.reduction == "mean":
+            return focal_loss.mean()
+        return focal_loss
+
+
 def train_mil(
     embeddings_dict: Dict[str, np.ndarray],
     mola_dict: Dict[str, np.ndarray],
@@ -506,7 +531,7 @@ def train_mil(
 
     model = AttentionMILClassifier(cfg).to(device)
     class_weights = make_class_weights((labels_dict[i] for i in train_ids), cfg.num_classes, device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    criterion = FocalLoss(weight=class_weights, gamma=2.0, label_smoothing=0.1)
     optimizer = AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     total_steps = max(1, len(train_loader) * cfg.epochs)
     scheduler = build_scheduler(optimizer, total_steps=total_steps, warmup_ratio=0.1)

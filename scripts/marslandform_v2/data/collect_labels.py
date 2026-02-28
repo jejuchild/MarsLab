@@ -137,9 +137,9 @@ def match_sglf_to_hirise(
     hirise_lons = np.array([info["lon"] for _, info in hirise_with_coords])
     hirise_ids = [img_id for img_id, _ in hirise_with_coords]
 
-    for _, sglf in sglf_df.iterrows():
-        slat = float(sglf["Latitude"])
-        slon = float(sglf["Longitude"])
+    for sglf in sglf_df.to_dict(orient="records"):
+        slat = float(sglf.get("Latitude"))
+        slon = float(sglf.get("Longitude"))
 
         # Vectorized distance computation
         dists = np.array([
@@ -150,10 +150,12 @@ def match_sglf_to_hirise(
 
         for idx in nearby_idx:
             img_id = hirise_ids[idx]
+            sglf_id_raw = sglf.get("SGLF_ID", 0)
+            sglf_id = int(sglf_id_raw) if pd.notna(sglf_id_raw) else 0
             labels[img_id]["label_sources"].append({
                 "source": "hepburn_sglf",
                 "class": "GLF",
-                "sglf_id": int(sglf.get("SGLF_ID", 0)),
+                "sglf_id": sglf_id,
                 "distance_km": float(dists[idx]),
                 "sglf_lat": slat,
                 "sglf_lon": slon,
@@ -174,10 +176,10 @@ def match_pearson_to_hirise(
 ) -> int:
     """Match Pearson brain terrain assessments to our HiRISE catalog by image ID."""
     matched = 0
-    for _, row in pearson_df.iterrows():
-        img_id = row["name"]
+    for row in pearson_df.to_dict(orient="records"):
+        img_id = str(row.get("name", ""))
         if img_id in labels:
-            bt_label = row["is_brain_terrain"]
+            bt_label = row.get("is_brain_terrain")
             if bt_label in ("yes", "partial", "maybe"):
                 # Brain terrain is associated with CCF, LDA, LVF surfaces
                 labels[img_id]["label_sources"].append({
@@ -192,42 +194,87 @@ def match_pearson_to_hirise(
     return matched
 
 
-def resolve_labels(labels: Dict[str, dict]) -> Dict[str, dict]:
-    """
-    Resolve final class for each image using priority:
-    1. Existing regex-based label (if not UNLABELED)
-    2. SGLF proximity → GLF
-    3. Brain terrain → periglacial indicator (doesn't override class)
-    4. Default: UNLABELED
-    """
+def _reclassify_brain_terrain(title: str, bt_source: dict) -> Tuple[str, str]:
+    del bt_source
+    title_lower = (title or "").lower()
+
+    crater_keywords = ["crater", "concentric", "crater fill", "ccf", "impact"]
+    apron_keywords = ["debris apron", "lobate", "lda", "apron", "scarp", "mesa"]
+    valley_keywords = ["valley fill", "lineated", "lvf", "valley"]
+
+    for kw in crater_keywords:
+        if kw in title_lower:
+            return "CCF", kw
+    for kw in apron_keywords:
+        if kw in title_lower:
+            return "LDA", kw
+    for kw in valley_keywords:
+        if kw in title_lower:
+            return "LVF", kw
+
+    return "CCF", "default_ccf"
+
+
+def resolve_labels(
+    labels: Dict[str, dict],
+    sglf_max_distance_km: float = 5.0,
+    title_regex_mode: str = "weak",
+    reclassify_periglacial: bool = True,
+) -> Dict[str, dict]:
     class_counts = Counter()
 
     for img_id, info in labels.items():
         sources = info["label_sources"]
         existing = info["existing_class"]
+        sglf_sources = [s for s in sources if s["source"] == "hepburn_sglf"]
+        bt_sources = [s for s in sources if s["source"] == "pearson_brain_terrain"]
 
-        # Priority 1: Existing regex label
-        if existing and existing != "UNLABELED":
+        min_dist = None
+        if sglf_sources:
+            min_dist = min(float(s["distance_km"]) for s in sglf_sources)
+            info["sglf_distance_km"] = min_dist
+            if min_dist < 2.0:
+                info["sglf_distance_bucket"] = "0-2km"
+            elif min_dist < 5.0:
+                info["sglf_distance_bucket"] = "2-5km"
+            elif min_dist < 10.0:
+                info["sglf_distance_bucket"] = "5-10km"
+            else:
+                info["sglf_distance_bucket"] = ">=10km"
+
+        if min_dist is not None and min_dist < sglf_max_distance_km:
+            info["final_class"] = "GLF"
+            info["label_confidence"] = "expert" if min_dist < 2.0 else "catalog"
+            info["label_method"] = "sglf_spatial_close"
+
+        elif bt_sources and any(s.get("brain_terrain") == "yes" for s in bt_sources):
+            if reclassify_periglacial:
+                cls, reason = _reclassify_brain_terrain(info.get("title", ""), bt_sources[0])
+                info["final_class"] = cls
+                info["label_confidence"] = "expert"
+                info["label_method"] = "brain_terrain_reclassified"
+                info["brain_terrain_reclassified"] = True
+                info["brain_terrain_reclass_reason"] = reason
+                logger.info(f"  Brain terrain reclassified: {img_id} -> {cls} (from title: {reason})")
+            else:
+                info["final_class"] = "PERIGLACIAL"
+                info["label_confidence"] = "uncertain"
+                info["label_method"] = "brain_terrain_indicator"
+
+        elif title_regex_mode != "exclude" and existing and existing != "UNLABELED":
             info["final_class"] = existing
-            info["label_confidence"] = "high"
+            info["label_confidence"] = "weak"
             info["label_method"] = "title_regex"
 
-        # Priority 2: SGLF spatial match → GLF
-        elif any(s["source"] == "hepburn_sglf" for s in sources):
-            sglf_sources = [s for s in sources if s["source"] == "hepburn_sglf"]
-            min_dist = min(s["distance_km"] for s in sglf_sources)
+        elif min_dist is not None and sglf_max_distance_km <= min_dist < 10.0:
             info["final_class"] = "GLF"
-            info["label_confidence"] = "medium" if min_dist < 5.0 else "low"
-            info["label_method"] = "sglf_spatial"
-            info["sglf_distance_km"] = min_dist
-
-        # Priority 3: Brain terrain (marks as periglacial, but don't assign specific class)
-        elif any(s["source"] == "pearson_brain_terrain" for s in sources):
-            # Brain terrain can be on CCF, LDA, or LVF — we can't determine which
-            # Mark as PERIGLACIAL for now (useful for filtering but not classification)
-            info["final_class"] = "PERIGLACIAL"
             info["label_confidence"] = "low"
-            info["label_method"] = "brain_terrain_indicator"
+            info["label_method"] = "sglf_spatial_far"
+
+        elif bt_sources and any(s.get("brain_terrain") in ("maybe", "partial") for s in bt_sources):
+            info["final_class"] = "BACKGROUND"
+            info["label_confidence"] = "uncertain"
+            info["label_method"] = "brain_terrain_uncertain"
 
         else:
             info["final_class"] = "UNLABELED"
@@ -241,6 +288,142 @@ def resolve_labels(labels: Dict[str, dict]) -> Dict[str, dict]:
         logger.info(f"  {cls}: {count}")
 
     return labels
+
+
+def _build_spatial_groups(
+    labels: Dict[str, dict],
+    radius_km: float = 20.0,
+) -> List[dict]:
+    candidates = [
+        (img_id, info)
+        for img_id, info in labels.items()
+        if info.get("final_class") not in (None, "UNLABELED")
+        and info.get("lat") is not None
+        and info.get("lon") is not None
+    ]
+    candidates = sorted(candidates, key=lambda x: (float(x[1]["lat"]), float(x[1]["lon"])))
+
+    groups: List[dict] = []
+    for img_id, info in candidates:
+        lat = float(info["lat"])
+        lon = float(info["lon"])
+        assigned = False
+        for group in groups:
+            dist = haversine_km(lat, lon, group["centroid_lat"], group["centroid_lon"])
+            if dist <= radius_km:
+                group["image_ids"].append(img_id)
+                group["sum_lat"] += lat
+                group["sum_lon"] += lon
+                n = len(group["image_ids"])
+                group["centroid_lat"] = group["sum_lat"] / n
+                group["centroid_lon"] = group["sum_lon"] / n
+                group["class_counts"][info["final_class"]] += 1
+                assigned = True
+                break
+        if not assigned:
+            groups.append(
+                {
+                    "image_ids": [img_id],
+                    "sum_lat": lat,
+                    "sum_lon": lon,
+                    "centroid_lat": lat,
+                    "centroid_lon": lon,
+                    "class_counts": Counter([info["final_class"]]),
+                }
+            )
+
+    return groups
+
+
+def create_spatial_splits(
+    labels: Dict[str, dict],
+    train_ratio: float = 0.70,
+    val_ratio: float = 0.15,
+    test_ratio: float = 0.15,
+    seed: int = 42,
+    radius_km: float = 20.0,
+) -> Dict[str, List[str]]:
+    del test_ratio
+    rng = np.random.RandomState(seed)
+
+    groups = _build_spatial_groups(labels, radius_km=radius_km)
+    if not groups:
+        logger.warning("No geolocated labeled images for spatial split; falling back to non-spatial split")
+        return create_splits(labels, train_ratio=train_ratio, val_ratio=val_ratio, test_ratio=0.15, seed=seed)
+
+    grouped_ids = {img_id for g in groups for img_id in g["image_ids"]}
+    for img_id, info in labels.items():
+        if info.get("final_class") in (None, "UNLABELED"):
+            continue
+        if img_id in grouped_ids:
+            continue
+        groups.append(
+            {
+                "image_ids": [img_id],
+                "sum_lat": 0.0,
+                "sum_lon": 0.0,
+                "centroid_lat": 0.0,
+                "centroid_lon": 0.0,
+                "class_counts": Counter([info["final_class"]]),
+            }
+        )
+
+    total = sum(len(g["image_ids"]) for g in groups)
+    target_sizes = {
+        "train": int(round(total * train_ratio)),
+        "val": int(round(total * val_ratio)),
+    }
+    target_sizes["test"] = max(0, total - target_sizes["train"] - target_sizes["val"])
+
+    class_totals = Counter()
+    for g in groups:
+        class_totals.update(g["class_counts"])
+
+    class_targets = {
+        "train": {cls: class_totals[cls] * train_ratio for cls in class_totals},
+        "val": {cls: class_totals[cls] * val_ratio for cls in class_totals},
+        "test": {cls: class_totals[cls] * (1.0 - train_ratio - val_ratio) for cls in class_totals},
+    }
+
+    splits = {"train": [], "val": [], "test": []}
+    split_sizes = Counter()
+    split_class_counts = {"train": Counter(), "val": Counter(), "test": Counter()}
+
+    rng.shuffle(groups)
+    groups = sorted(groups, key=lambda g: len(g["image_ids"]), reverse=True)
+
+    split_order = ["train", "val", "test"]
+    for g in groups:
+        g_size = len(g["image_ids"])
+        best_split = None
+        best_score = -1e9
+
+        for split in split_order:
+            size_need = target_sizes[split] - split_sizes[split]
+            size_penalty = 0.0
+            if size_need <= 0:
+                size_penalty = -0.25 * g_size
+
+            class_need = 0.0
+            for cls, cnt in g["class_counts"].items():
+                deficit = class_targets[split].get(cls, 0.0) - split_class_counts[split].get(cls, 0)
+                class_need += min(cnt, max(deficit, 0.0))
+
+            score = class_need + 0.10 * size_need + size_penalty
+            if score > best_score:
+                best_score = score
+                best_split = split
+
+        assert best_split is not None
+        splits[best_split].extend(g["image_ids"])
+        split_sizes[best_split] += g_size
+        split_class_counts[best_split].update(g["class_counts"])
+
+    for split_name, ids in splits.items():
+        counts = Counter(labels[i]["final_class"] for i in ids)
+        logger.info(f"  {split_name}: {len(ids)} images — {dict(counts)}")
+
+    return splits
 
 
 def create_splits(
@@ -260,7 +443,7 @@ def create_splits(
     class_images = defaultdict(list)
     for img_id, info in labels.items():
         cls = info["final_class"]
-        if cls not in ("UNLABELED", "PERIGLACIAL"):
+        if cls not in ("UNLABELED",):
             class_images[cls].append(img_id)
 
     splits = {"train": [], "val": [], "test": []}
@@ -300,10 +483,33 @@ def main():
                        default="/disk1/cspark/MarsLab/Data/external_datasets/pearson_brain_terrain/Brain Coral Assessment - Revised_Table.csv")
     parser.add_argument("--output-dir", type=str,
                        default="/disk1/cspark/MarsLab/Data/HiRISE/v2_output")
-    parser.add_argument("--sglf-radius-km", type=float, default=10.0,
-                       help="Matching radius for SGLF→HiRISE spatial join")
+    parser.add_argument("--sglf-radius-km", type=float, default=None,
+                       help="Deprecated alias for --sglf-max-distance-km")
+    parser.add_argument("--sglf-max-distance-km", type=float, default=5.0,
+                       help="Close SGLF distance threshold for GLF labeling")
+    parser.add_argument("--title-regex-mode", type=str, default="weak",
+                       choices=["primary", "weak", "exclude"],
+                       help="How to treat metadata title-regex labels")
+    parser.add_argument(
+        "--reclassify-periglacial",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Reclassify expert-confirmed brain terrain into CCF/LDA/LVF",
+    )
+    parser.add_argument(
+        "--spatial-split",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Keep nearby images in the same split",
+    )
+    parser.add_argument("--spatial-split-radius-km", type=float, default=20.0,
+                       help="Distance threshold for spatial cluster grouping")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+
+    sglf_max_distance_km = args.sglf_max_distance_km
+    if args.sglf_radius_km is not None:
+        sglf_max_distance_km = args.sglf_radius_km
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -326,7 +532,7 @@ def main():
     if hepburn_path.exists():
         sglf_df = load_hepburn_sglf(hepburn_path)
         if not sglf_df.empty:
-            match_sglf_to_hirise(labels, sglf_df, radius_km=args.sglf_radius_km)
+            match_sglf_to_hirise(labels, sglf_df, radius_km=max(10.0, sglf_max_distance_km))
     else:
         logger.warning(f"Hepburn data not found: {hepburn_path}")
 
@@ -343,12 +549,24 @@ def main():
     # Step 4: Resolve final labels
     logger.info("=" * 60)
     logger.info("Step 4: Resolving final labels...")
-    labels = resolve_labels(labels)
+    labels = resolve_labels(
+        labels,
+        sglf_max_distance_km=sglf_max_distance_km,
+        title_regex_mode=args.title_regex_mode,
+        reclassify_periglacial=args.reclassify_periglacial,
+    )
 
     # Step 5: Create splits
     logger.info("=" * 60)
     logger.info("Step 5: Creating train/val/test splits...")
-    splits = create_splits(labels, seed=args.seed)
+    if args.spatial_split:
+        splits = create_spatial_splits(
+            labels,
+            seed=args.seed,
+            radius_km=args.spatial_split_radius_km,
+        )
+    else:
+        splits = create_splits(labels, seed=args.seed)
 
     # Step 6: Save outputs
     logger.info("=" * 60)
@@ -379,6 +597,21 @@ def main():
         "label_method_distribution": dict(Counter(
             info.get("label_method", "none") for info in labeled_only.values()
         )),
+        "label_confidence_distribution": {
+            level: sum(1 for info in labeled_only.values() if info.get("label_confidence") == level)
+            for level in ["expert", "catalog", "weak", "low", "uncertain"]
+        },
+        "reclassified_brain_terrain": {
+            "count": sum(1 for info in labeled_only.values() if info.get("brain_terrain_reclassified")),
+            "by_class": dict(Counter(
+                info["final_class"] for info in labeled_only.values() if info.get("brain_terrain_reclassified")
+            )),
+        },
+        "sglf_distance_distribution": {
+            "0-2km": sum(1 for info in labeled_only.values() if 0.0 <= float(info.get("sglf_distance_km", 1e9)) < 2.0),
+            "2-5km": sum(1 for info in labeled_only.values() if 2.0 <= float(info.get("sglf_distance_km", 1e9)) < 5.0),
+            "5-10km": sum(1 for info in labeled_only.values() if 5.0 <= float(info.get("sglf_distance_km", 1e9)) < 10.0),
+        },
         "split_sizes": {k: len(v) for k, v in splits.items()},
         "split_class_distribution": {
             split: dict(Counter(labels[i]["final_class"] for i in ids))
