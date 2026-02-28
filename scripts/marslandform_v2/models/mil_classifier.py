@@ -6,7 +6,7 @@ import math
 import random
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -365,22 +365,93 @@ def print_epoch_metrics(epoch: int, metrics: Dict[str, Any]) -> None:
         print(" ".join(f"{v:4d}" for v in row))
 
 
-def split_image_ids(image_ids: Sequence[str], labels_dict: Dict[str, int], cfg: MILConfig, seed: int) -> Tuple[List[str], List[str], List[str]]:
-    labels = [labels_dict[i] for i in image_ids]
-    train_ids, temp_ids, train_labels, temp_labels = train_test_split(
-        list(image_ids),
-        labels,
-        test_size=(1.0 - cfg.train_ratio),
-        random_state=seed,
-        stratify=labels,
-    )
+def split_image_ids(
+    image_ids: Sequence[str],
+    labels_dict: Dict[str, int],
+    cfg: MILConfig,
+    seed: int,
+    spatial_groups: Optional[Dict[str, Any]] = None,
+) -> Tuple[List[str], List[str], List[str]]:
+    image_ids_list = list(image_ids)
+    if not spatial_groups:
+        labels = [labels_dict[i] for i in image_ids_list]
+        train_ids, temp_ids, _, temp_labels = train_test_split(
+            image_ids_list,
+            labels,
+            test_size=(1.0 - cfg.train_ratio),
+            random_state=seed,
+            stratify=labels,
+        )
+        val_fraction_of_temp = cfg.val_ratio / (cfg.val_ratio + cfg.test_ratio)
+        val_ids, test_ids = train_test_split(
+            temp_ids,
+            test_size=(1.0 - val_fraction_of_temp),
+            random_state=seed,
+            stratify=temp_labels,
+        )
+        return train_ids, val_ids, test_ids
+
+    group_to_ids: Dict[str, List[str]] = {}
+    for image_id in image_ids_list:
+        group_key = str(spatial_groups.get(image_id, image_id))
+        group_to_ids.setdefault(group_key, []).append(image_id)
+
+    group_ids = list(group_to_ids.keys())
+    group_labels: List[int] = []
+    for group_id in group_ids:
+        counts: Dict[int, int] = {}
+        for image_id in group_to_ids[group_id]:
+            cls = labels_dict[image_id]
+            counts[cls] = counts.get(cls, 0) + 1
+        dominant_cls = max(counts.items(), key=lambda kv: (kv[1], -kv[0]))[0]
+        group_labels.append(dominant_cls)
+
+    stratify_groups: Optional[List[int]] = group_labels
+    label_freq = np.bincount(np.asarray(group_labels, dtype=np.int64))
+    if np.any(label_freq[label_freq > 0] < 2):
+        stratify_groups = None
+
+    try:
+        train_groups, temp_groups, _, temp_group_labels = train_test_split(
+            group_ids,
+            group_labels,
+            test_size=(1.0 - cfg.train_ratio),
+            random_state=seed,
+            stratify=stratify_groups,
+        )
+    except ValueError:
+        train_groups, temp_groups, _, temp_group_labels = train_test_split(
+            group_ids,
+            group_labels,
+            test_size=(1.0 - cfg.train_ratio),
+            random_state=seed,
+            stratify=None,
+        )
+
     val_fraction_of_temp = cfg.val_ratio / (cfg.val_ratio + cfg.test_ratio)
-    val_ids, test_ids = train_test_split(
-        temp_ids,
-        test_size=(1.0 - val_fraction_of_temp),
-        random_state=seed,
-        stratify=temp_labels,
-    )
+    temp_stratify: Optional[List[int]] = temp_group_labels
+    temp_freq = np.bincount(np.asarray(temp_group_labels, dtype=np.int64)) if temp_group_labels else np.asarray([], dtype=np.int64)
+    if temp_freq.size > 0 and np.any(temp_freq[temp_freq > 0] < 2):
+        temp_stratify = None
+
+    try:
+        val_groups, test_groups = train_test_split(
+            temp_groups,
+            test_size=(1.0 - val_fraction_of_temp),
+            random_state=seed,
+            stratify=temp_stratify,
+        )
+    except ValueError:
+        val_groups, test_groups = train_test_split(
+            temp_groups,
+            test_size=(1.0 - val_fraction_of_temp),
+            random_state=seed,
+            stratify=None,
+        )
+
+    train_ids = [img for g in train_groups for img in group_to_ids[g]]
+    val_ids = [img for g in val_groups for img in group_to_ids[g]]
+    test_ids = [img for g in test_groups for img in group_to_ids[g]]
     return train_ids, val_ids, test_ids
 
 
@@ -485,13 +556,17 @@ class FocalLoss(nn.Module):
         self.gamma = gamma
         self.label_smoothing = label_smoothing
         self.reduction = reduction
-        self.register_buffer("weight", weight)
+        if weight is None:
+            weight = torch.tensor([], dtype=torch.float32)
+        self.class_weight_buffer = torch.as_tensor(weight, dtype=torch.float32)
 
     def forward(self, logits, targets):
+        weight_tensor = cast(torch.Tensor, self.class_weight_buffer).to(logits.device)
+        weight = weight_tensor if weight_tensor.numel() > 0 else None
         ce_loss = nn.functional.cross_entropy(
             logits,
             targets,
-            weight=self.weight,
+            weight=weight,
             reduction="none",
             label_smoothing=self.label_smoothing,
         )

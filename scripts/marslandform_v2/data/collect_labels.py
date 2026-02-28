@@ -16,9 +16,10 @@ Outputs:
 import json
 import argparse
 import logging
+import random
 from pathlib import Path
 from collections import Counter, defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -28,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 # Mars coordinate utils
 MARS_RADIUS_KM = 3389.5
+LabelInfo = dict[str, Any]
+SpatialGroup = dict[str, Any]
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Great-circle distance on Mars in km."""
@@ -39,7 +42,7 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return MARS_RADIUS_KM * c
 
 
-def load_existing_labels(metadata_path: Path) -> Dict[str, dict]:
+def load_existing_labels(metadata_path: Path) -> dict[str, LabelInfo]:
     """Load existing image-level labels from midlat_metadata.json."""
     with open(metadata_path) as f:
         meta = json.load(f)
@@ -115,7 +118,7 @@ def load_pearson_brain_terrain(csv_path: Path) -> pd.DataFrame:
 
 
 def match_sglf_to_hirise(
-    labels: Dict[str, dict],
+    labels: dict[str, LabelInfo],
     sglf_df: pd.DataFrame,
     radius_km: float = 10.0,
 ) -> int:
@@ -138,8 +141,12 @@ def match_sglf_to_hirise(
     hirise_ids = [img_id for img_id, _ in hirise_with_coords]
 
     for sglf in sglf_df.to_dict(orient="records"):
-        slat = float(sglf.get("Latitude"))
-        slon = float(sglf.get("Longitude"))
+        lat_raw = sglf.get("Latitude")
+        lon_raw = sglf.get("Longitude")
+        if lat_raw is None or lon_raw is None:
+            continue
+        slat = float(lat_raw)
+        slon = float(lon_raw)
 
         # Vectorized distance computation
         dists = np.array([
@@ -171,7 +178,7 @@ def match_sglf_to_hirise(
 
 
 def match_pearson_to_hirise(
-    labels: Dict[str, dict],
+    labels: dict[str, LabelInfo],
     pearson_df: pd.DataFrame,
 ) -> int:
     """Match Pearson brain terrain assessments to our HiRISE catalog by image ID."""
@@ -194,7 +201,7 @@ def match_pearson_to_hirise(
     return matched
 
 
-def _reclassify_brain_terrain(title: str, bt_source: dict) -> Tuple[str, str]:
+def _reclassify_brain_terrain(title: str, bt_source: dict[str, object]) -> Tuple[str, str]:
     del bt_source
     title_lower = (title or "").lower()
 
@@ -216,11 +223,11 @@ def _reclassify_brain_terrain(title: str, bt_source: dict) -> Tuple[str, str]:
 
 
 def resolve_labels(
-    labels: Dict[str, dict],
+    labels: dict[str, LabelInfo],
     sglf_max_distance_km: float = 5.0,
     title_regex_mode: str = "weak",
     reclassify_periglacial: bool = True,
-) -> Dict[str, dict]:
+) -> dict[str, LabelInfo]:
     class_counts = Counter()
 
     for img_id, info in labels.items():
@@ -291,9 +298,9 @@ def resolve_labels(
 
 
 def _build_spatial_groups(
-    labels: Dict[str, dict],
+    labels: dict[str, LabelInfo],
     radius_km: float = 20.0,
-) -> List[dict]:
+) -> list[SpatialGroup]:
     candidates = [
         (img_id, info)
         for img_id, info in labels.items()
@@ -303,7 +310,7 @@ def _build_spatial_groups(
     ]
     candidates = sorted(candidates, key=lambda x: (float(x[1]["lat"]), float(x[1]["lon"])))
 
-    groups: List[dict] = []
+    groups: list[SpatialGroup] = []
     for img_id, info in candidates:
         lat = float(info["lat"])
         lon = float(info["lon"])
@@ -336,15 +343,15 @@ def _build_spatial_groups(
 
 
 def create_spatial_splits(
-    labels: Dict[str, dict],
+    labels: dict[str, LabelInfo],
     train_ratio: float = 0.70,
     val_ratio: float = 0.15,
     test_ratio: float = 0.15,
     seed: int = 42,
     radius_km: float = 20.0,
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     del test_ratio
-    rng = np.random.RandomState(seed)
+    rng = random.Random(seed)
 
     groups = _build_spatial_groups(labels, radius_km=radius_km)
     if not groups:
@@ -427,12 +434,12 @@ def create_spatial_splits(
 
 
 def create_splits(
-    labels: Dict[str, dict],
+    labels: dict[str, LabelInfo],
     train_ratio: float = 0.70,
     val_ratio: float = 0.15,
     test_ratio: float = 0.15,
     seed: int = 42,
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     """
     Create stratified train/val/test splits.
     Only includes images with non-UNLABELED labels.

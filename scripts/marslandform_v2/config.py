@@ -72,7 +72,7 @@ class DINOv2Config:
     ssl_warmup_epochs: int = 5
     ssl_batch_size: int = 64
     ssl_temperature: float = 0.04  # DINO loss temperature
-    ssl_crop_scale: tuple = (0.4, 1.0)  # Mars: larger crops
+    ssl_crop_scale: tuple[float, float] = (0.4, 1.0)  # Mars: larger crops
 
     # Mars-specific augmentation (NO color jitter — Mars is grayscale/near-IR)
     aug_rotation_degrees: List[int] = field(default_factory=lambda: [0, 90, 180, 270])
