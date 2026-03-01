@@ -18,7 +18,7 @@ from scripts.marslandform_v2.config import V2_OUTPUT, get_config
 from scripts.marslandform_v2.models.dinov2_lora import DinoV2LoRA
 
 
-MAX_TILES_PER_IMAGE = 30  # Subsample for speed — 30 is enough for MIL attention
+MAX_TILES_PER_IMAGE = None  # Use ALL tiles for fair comparison with frozen
 
 
 def main():
@@ -67,8 +67,8 @@ def main():
         if not tile_paths:
             continue
 
-        # Subsample tiles
-        if len(tile_paths) > MAX_TILES_PER_IMAGE:
+        # Subsample tiles if limit set
+        if MAX_TILES_PER_IMAGE is not None and len(tile_paths) > MAX_TILES_PER_IMAGE:
             tile_paths = random.sample(tile_paths, MAX_TILES_PER_IMAGE)
 
         # Process tiles in small batches
