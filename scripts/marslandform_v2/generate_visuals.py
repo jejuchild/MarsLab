@@ -24,7 +24,7 @@ CLASS_COLORS = {
     "BACKGROUND": "#9b59b6",
 }
 
-model_dir = ROOT / "Data" / "HiRISE" / "v2_output" / "models" / "cleaned_focal"
+model_dir = ROOT / "Data" / "HiRISE" / "v2_output" / "models" / "multihead_improved"
 eval_dir = ROOT / "Data" / "HiRISE" / "v2_output" / "eval"
 tiles_dir = ROOT / "Data" / "HiRISE" / "v2_output" / "tiles"
 eval_dir.mkdir(parents=True, exist_ok=True)
@@ -308,7 +308,7 @@ try:
 
     if len(probs) > 10:
         perplexity = min(30, len(probs) - 1)
-        tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, n_iter=1000)
+        tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, max_iter=1000)
         coords = tsne.fit_transform(probs)
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
