@@ -83343,5 +83343,56 @@
     "error": null,
     "lat": 51.33358021796,
     "lon": 182.649669606105
+  },
+  {
+    "task_id": "4f21fa7c",
+    "product_id": "ESP_086712_2220",
+    "base_key": "ESP_086712_2220",
+    "instrument": "hirise",
+    "status": "completed",
+    "files": [
+      {
+        "filename": "ESP_086712_2220_RED.JP2",
+        "url": "https://hirise.lpl.arizona.edu/PDS/RDR/ESP/ORB_086700_086799/ESP_086712_2220/ESP_086712_2220_RED.JP2",
+        "status": "completed",
+        "bytes_downloaded": 278475189,
+        "bytes_total": 278475189,
+        "error": null
+      },
+      {
+        "filename": "ESP_086712_2220_RED.LBL",
+        "url": "https://hirise.lpl.arizona.edu/PDS/RDR/ESP/ORB_086700_086799/ESP_086712_2220/ESP_086712_2220_RED.LBL",
+        "status": "completed",
+        "bytes_downloaded": 8117,
+        "bytes_total": 8117,
+        "error": null
+      }
+    ],
+    "target_dir": "/disk1/cspark/MarsLab/backend/hirise_data/ESP_086712_2220",
+    "progress_percent": 100.0,
+    "total_bytes": 278483306,
+    "downloaded_bytes": 278483306,
+    "created_at": "2026-03-01T15:22:44.041631",
+    "completed_at": "2026-03-01T15:23:23.452618",
+    "error": null,
+    "lat": 41.436514014593996,
+    "lon": 182.620194242645
+  },
+  {
+    "task_id": "c9606ed8",
+    "product_id": "R_0653001_001_SS19_700_A",
+    "base_key": "R_0653001_001_SS19_700_A",
+    "instrument": "sharad_highres",
+    "status": "queued",
+    "files": [],
+    "target_dir": "/disk1/cspark/MarsLab/backend/sharad_highres",
+    "progress_percent": 0.0,
+    "total_bytes": 0,
+    "downloaded_bytes": 0,
+    "created_at": "2026-03-01T15:23:24.051914",
+    "completed_at": null,
+    "error": null,
+    "lat": 52.7071,
+    "lon": -0.0075500000000090495
   }
 ]
