@@ -83383,15 +83383,48 @@
     "product_id": "R_0653001_001_SS19_700_A",
     "base_key": "R_0653001_001_SS19_700_A",
     "instrument": "sharad_highres",
-    "status": "queued",
-    "files": [],
+    "status": "failed",
+    "files": [
+      {
+        "filename": "r_0653001_001_ss19_700_a.dat",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr06xxx/rdr0653001/r_0653001_001_ss19_700_a.dat",
+        "status": "completed",
+        "bytes_downloaded": 878458292,
+        "bytes_total": 878458292,
+        "error": null
+      },
+      {
+        "filename": "r_0653001_001_ss19_700_a.lbl",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-4-rdr-v1/MROSH_1001/data/rdr06xxx/rdr0653001/r_0653001_001_ss19_700_a.lbl",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 1"
+      },
+      {
+        "filename": "s_00653001_sim.img",
+        "url": "https://pds-geosciences.wustl.edu/mro/urn-nasa-pds-mro_sharad_simulations/data/s_0065xx/s_00653001/s_00653001_sim.img",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": 258918400,
+        "error": "Exit code 1"
+      },
+      {
+        "filename": "s_00653001_sim.xml",
+        "url": "https://pds-geosciences.wustl.edu/mro/urn-nasa-pds-mro_sharad_simulations/data/s_0065xx/s_00653001/s_00653001_sim.xml",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 1"
+      }
+    ],
     "target_dir": "/disk1/cspark/MarsLab/backend/sharad_highres",
-    "progress_percent": 0.0,
-    "total_bytes": 0,
-    "downloaded_bytes": 0,
+    "progress_percent": 77.23547512260784,
+    "total_bytes": 1137376692,
+    "downloaded_bytes": 878458292,
     "created_at": "2026-03-01T15:23:24.051914",
     "completed_at": null,
-    "error": null,
+    "error": "Failed to download core files: r_0653001_001_ss19_700_a.lbl, s_00653001_sim.img, s_00653001_sim.xml",
     "lat": 52.7071,
     "lon": -0.0075500000000090495
   }
