@@ -61,7 +61,7 @@ class DINOv2Config:
     lora_alpha: int = 32
     lora_dropout: float = 0.1
     lora_target_modules: List[str] = field(default_factory=lambda: [
-        "qkv",  # attention QKV projection
+        "query", "key", "value",  # HuggingFace DINOv2 attention projections
     ])
     unfreeze_last_n_blocks: int = 2  # unfreeze last 2 transformer blocks
 
