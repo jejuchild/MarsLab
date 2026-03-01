@@ -114,6 +114,7 @@ class MILConfig:
     mola_dim: int = 23
     hidden_dim: int = 256
     attention_dim: int = 128
+    num_attention_heads: int = 4
     num_classes: int = 5  # 4 landform + BACKGROUND
     dropout: float = 0.3
 

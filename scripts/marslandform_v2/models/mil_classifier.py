@@ -218,6 +218,144 @@ def mil_collate_fn(batch: Sequence[Tuple[torch.Tensor, torch.Tensor, int, str]])
         "image_ids": list(image_ids),
     }
 
+class StratifiedBatchSampler:
+    """Sampler that ensures approximately equal class representation per batch."""
+
+    def __init__(
+        self,
+        image_ids: Sequence[str],
+        labels_dict: Dict[str, int],
+        batch_size: int,
+        num_classes: int,
+    ) -> None:
+        self.batch_size = batch_size
+        self.num_classes = num_classes
+
+        # Group indices by class
+        self.class_indices: Dict[int, List[int]] = {c: [] for c in range(num_classes)}
+        for idx, image_id in enumerate(image_ids):
+            cls = labels_dict[image_id]
+            self.class_indices[cls].append(idx)
+
+        # Per-class sample count per batch
+        self.per_class = max(1, batch_size // num_classes)
+        self.actual_batch_size = self.per_class * num_classes
+
+        # Total batches = enough to see all samples at least once
+        max_class_size = max(len(v) for v in self.class_indices.values()) if self.class_indices else 1
+        self.num_batches = max(1, max_class_size // self.per_class)
+
+    def __iter__(self):
+        # Shuffle each class's indices and cycle if needed
+        class_pools: Dict[int, List[int]] = {}
+        for cls, indices in self.class_indices.items():
+            if len(indices) == 0:
+                class_pools[cls] = []
+                continue
+            shuffled = list(indices)
+            random.shuffle(shuffled)
+            # Repeat to ensure enough samples
+            needed = self.per_class * self.num_batches
+            while len(shuffled) < needed:
+                extra = list(indices)
+                random.shuffle(extra)
+                shuffled.extend(extra)
+            class_pools[cls] = shuffled
+
+        # Build batches
+        for batch_idx in range(self.num_batches):
+            batch: List[int] = []
+            for cls in range(self.num_classes):
+                pool = class_pools.get(cls, [])
+                if not pool:
+                    continue
+                start = batch_idx * self.per_class
+                end = start + self.per_class
+                batch.extend(pool[start:end])
+            random.shuffle(batch)
+            yield batch
+
+    def __len__(self) -> int:
+        return self.num_batches
+
+
+class MultiHeadGatedAttention(nn.Module):
+    """Multi-head gated attention for MIL (extends Ilse et al. 2018)."""
+
+    def __init__(self, hidden_dim: int, attention_dim: int, num_heads: int) -> None:
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_dim = attention_dim // num_heads
+        assert attention_dim % num_heads == 0, f"attention_dim ({attention_dim}) must be divisible by num_heads ({num_heads})"
+
+        self.attention_v = nn.ModuleList([nn.Linear(hidden_dim, self.head_dim) for _ in range(num_heads)])
+        self.attention_u = nn.ModuleList([nn.Linear(hidden_dim, self.head_dim) for _ in range(num_heads)])
+        self.attention_w = nn.ModuleList([nn.Linear(self.head_dim, 1) for _ in range(num_heads)])
+
+        # Project concatenated head outputs back to hidden_dim
+        self.head_projection = nn.Linear(hidden_dim * num_heads, hidden_dim)
+
+    def forward(
+        self, features: torch.Tensor, tile_mask: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Args:
+            features: (batch, num_tiles, hidden_dim)
+            tile_mask: (batch, num_tiles) bool
+        Returns:
+            bag_feature: (batch, hidden_dim)
+            att_weights: (batch, num_tiles) — averaged across heads for backward compat
+        """
+        batch_size, num_tiles, hidden_dim = features.shape
+        head_bags: List[torch.Tensor] = []
+        head_weights: List[torch.Tensor] = []
+
+        for h in range(self.num_heads):
+            att_v = torch.tanh(self.attention_v[h](features))
+            att_u = torch.sigmoid(self.attention_u[h](features))
+            att_logits = self.attention_w[h](att_v * att_u).squeeze(-1)  # (batch, num_tiles)
+            att_logits = att_logits.masked_fill(~tile_mask, torch.finfo(att_logits.dtype).min)
+            att_w = torch.softmax(att_logits, dim=1)  # (batch, num_tiles)
+            head_weights.append(att_w)
+
+            bag = torch.sum(att_w.unsqueeze(-1) * features, dim=1)  # (batch, hidden_dim)
+            head_bags.append(bag)
+
+        # Concatenate all head bags and project back
+        multi_bag = torch.cat(head_bags, dim=1)  # (batch, hidden_dim * num_heads)
+        bag_feature = self.head_projection(multi_bag)  # (batch, hidden_dim)
+
+        # Average attention across heads for backward compat
+        att_weights = torch.stack(head_weights, dim=0).mean(dim=0)  # (batch, num_tiles)
+
+        return bag_feature, att_weights
+
+
+class MOLACrossModalFusion(nn.Module):
+    """Learned cross-modal fusion between tile bag features and MOLA topographic features."""
+
+    def __init__(self, mola_dim: int, hidden_dim: int, dropout: float) -> None:
+        super().__init__()
+        self.mola_projection = nn.Sequential(
+            nn.Linear(mola_dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        self.gate = nn.Linear(hidden_dim, hidden_dim)
+
+    def forward(self, bag_feature: torch.Tensor, mola_features: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            bag_feature: (batch, hidden_dim)
+            mola_features: (batch, mola_dim)
+        Returns:
+            fused: (batch, hidden_dim)
+        """
+        projected_mola = self.mola_projection(mola_features)  # (batch, hidden_dim)
+        gate = torch.sigmoid(self.gate(projected_mola))  # (batch, hidden_dim)
+        fused = bag_feature * gate + bag_feature  # gated residual fusion
+        return fused
+
 
 class AttentionMILClassifier(nn.Module):
     def __init__(self, cfg: MILConfig) -> None:
@@ -230,12 +368,15 @@ class AttentionMILClassifier(nn.Module):
             nn.Dropout(cfg.dropout),
         )
 
-        self.attention_v = nn.Linear(cfg.hidden_dim, cfg.attention_dim)
-        self.attention_u = nn.Linear(cfg.hidden_dim, cfg.attention_dim)
-        self.attention_w = nn.Linear(cfg.attention_dim, 1)
+        # Multi-head gated attention
+        num_heads = getattr(cfg, 'num_attention_heads', 4)
+        self.attention = MultiHeadGatedAttention(cfg.hidden_dim, cfg.attention_dim, num_heads)
+
+        # Cross-modal MOLA fusion
+        self.mola_fusion = MOLACrossModalFusion(cfg.mola_dim, cfg.hidden_dim, cfg.dropout)
 
         self.classifier = nn.Sequential(
-            nn.Linear(cfg.hidden_dim + cfg.mola_dim, cfg.hidden_dim),
+            nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
             nn.GELU(),
             nn.Dropout(cfg.dropout),
             nn.Linear(cfg.hidden_dim, cfg.num_classes),
@@ -249,17 +390,10 @@ class AttentionMILClassifier(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         features = self.tile_transform(tile_embeddings)
 
-        att_v = torch.tanh(self.attention_v(features))
-        att_u = torch.sigmoid(self.attention_u(features))
-        att_logits = self.attention_w(att_v * att_u).squeeze(-1)
-        att_logits = att_logits.masked_fill(~tile_mask, torch.finfo(att_logits.dtype).min)
-        att_weights = torch.softmax(att_logits, dim=1)
-
-        bag_feature = torch.sum(att_weights.unsqueeze(-1) * features, dim=1)
-        fused = torch.cat([bag_feature, mola_features], dim=1)
+        bag_feature, att_weights = self.attention(features, tile_mask)
+        fused = self.mola_fusion(bag_feature, mola_features)
         logits = self.classifier(fused)
         return logits, att_weights
-
 
 def build_scheduler(optimizer: torch.optim.Optimizer, total_steps: int, warmup_ratio: float = 0.1) -> LambdaLR:
     warmup_steps = max(1, int(total_steps * warmup_ratio))
@@ -490,10 +624,16 @@ def make_loaders(
         max_tiles_per_image=cfg.max_tiles_per_image,
     )
 
+    # Use stratified batch sampling for training
+    stratified_sampler = StratifiedBatchSampler(
+        image_ids=train_ids,
+        labels_dict=labels_dict,
+        batch_size=cfg.batch_size,
+        num_classes=cfg.num_classes,
+    )
     train_loader = DataLoader(
         train_ds,
-        batch_size=cfg.batch_size,
-        shuffle=True,
+        batch_sampler=stratified_sampler,
         num_workers=num_workers,
         collate_fn=mil_collate_fn,
         pin_memory=True,
@@ -606,7 +746,7 @@ def train_mil(
 
     model = AttentionMILClassifier(cfg).to(device)
     class_weights = make_class_weights((labels_dict[i] for i in train_ids), cfg.num_classes, device)
-    criterion = FocalLoss(weight=class_weights, gamma=2.0, label_smoothing=0.1)
+    criterion = FocalLoss(weight=class_weights, gamma=1.5, label_smoothing=0.15)
     optimizer = AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     total_steps = max(1, len(train_loader) * cfg.epochs)
     scheduler = build_scheduler(optimizer, total_steps=total_steps, warmup_ratio=0.1)

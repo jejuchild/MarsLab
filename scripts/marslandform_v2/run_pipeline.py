@@ -138,46 +138,346 @@ def stage_ingest_rag(args) -> bool:
 
 def stage_predict(args) -> bool:
     """Stage 7: Run classification (fast or agent mode)."""
-    # Load test set
-    splits_path = V2_OUTPUT / "dataset_splits.json"
-    if splits_path.exists():
-        with open(splits_path) as f:
-            splits = json.load(f)
-        test_ids = splits.get("test", [])
-    else:
-        logger.warning("No splits file found, running on all labeled images")
-        labels_path = V2_OUTPUT / "unified_labels.json"
-        with open(labels_path) as f:
-            test_ids = list(json.load(f).keys())
-
-    logger.info(f"Running prediction on {len(test_ids)} images (mode={args.mode})")
-
-    # Import and run agent
-    from scripts.marslandform_v2.agent.react_agent import MarsLandformAgent
-    from scripts.marslandform_v2.config import PipelineConfig
     import asyncio
+    import numpy as np
+    import torch
+    from scripts.marslandform_v2.config import PipelineConfig, CLASS_ORDER, METADATA_JSON
+    from scripts.marslandform_v2.models.mil_classifier import (
+        AttentionMILClassifier, load_embeddings, load_mola_features,
+        load_labels, compute_metrics, MILConfig,
+    )
 
     config = PipelineConfig()
-    config.agent.mode = args.mode
+    device = torch.device(config.device)
 
-    # This is a simplified prediction loop
-    # Full implementation would load all models and run inference
-    logger.info(f"Prediction stage placeholder — requires trained models")
-    logger.info(f"Would classify {len(test_ids)} test images in '{args.mode}' mode")
+    # --- Find best model checkpoint ---
+    model_dirs = [
+        V2_OUTPUT / "models" / "multihead_improved",
+        V2_OUTPUT / "models" / "cleaned_focal",
+        V2_OUTPUT / "models",
+    ]
+    model_path = None
+    for d in model_dirs:
+        candidate = d / "best_mil_model.pt"
+        if candidate.exists():
+            model_path = candidate
+            break
+    if model_path is None:
+        logger.error("No trained model found. Run train_mil stage first.")
+        return False
+    logger.info(f"Loading model from {model_path}")
+
+    # --- Load checkpoint and reconstruct model ---
+    checkpoint = torch.load(model_path, map_location=device)
+    mil_cfg_dict = checkpoint.get("mil_config", {})
+    mil_cfg = MILConfig(**{k: v for k, v in mil_cfg_dict.items() if k in MILConfig.__dataclass_fields__})
+    model = AttentionMILClassifier(mil_cfg).to(device)
+
+    # Handle backward compat: old checkpoints have different layer names
+    state_dict = checkpoint["model_state_dict"]
+    model_keys = set(model.state_dict().keys())
+    ckpt_keys = set(state_dict.keys())
+    missing = model_keys - ckpt_keys
+    unexpected = ckpt_keys - model_keys
+    if missing or unexpected:
+        logger.warning(f"Checkpoint mismatch: {len(missing)} missing, {len(unexpected)} unexpected keys")
+        logger.warning("Old checkpoint detected. Will run inference with reinitialized layers.")
+        logger.warning("For best results, retrain with: python run_pipeline.py --stages train_mil")
+        compatible = {k: v for k, v in state_dict.items() if k in model_keys and model.state_dict()[k].shape == v.shape}
+        model.load_state_dict(compatible, strict=False)
+        logger.info(f"Loaded {len(compatible)}/{len(model_keys)} compatible weights")
+    else:
+        model.load_state_dict(state_dict)
+    model.eval()
+    logger.info(f"Model loaded (best_epoch={checkpoint.get('best_epoch', '?')}, best_f1={checkpoint.get('best_landform_macro_f1', '?')})")
+
+    # --- Load embeddings and MOLA features ---
+    emb_paths = [
+        V2_OUTPUT / "embeddings_mil" / "embeddings_by_image.npy",
+        V2_OUTPUT / "embeddings" / "embeddings.npy",
+    ]
+    embeddings_dict = None
+    for p in emb_paths:
+        if p.exists():
+            data = np.load(p, allow_pickle=True)
+            if data.dtype == object and data.shape == ():
+                embeddings_dict = data.item()
+            break
+    if embeddings_dict is None:
+        logger.error("No embeddings found.")
+        return False
+    logger.info(f"Loaded embeddings for {len(embeddings_dict)} images")
+
+    mola_paths = [
+        V2_OUTPUT / "mola_features_by_image.npy",
+        V2_OUTPUT / "mola_features.npy",
+    ]
+    mola_dict = None
+    for p in mola_paths:
+        if p.exists():
+            data = np.load(p, allow_pickle=True)
+            if data.dtype == object and data.shape == ():
+                mola_dict = data.item()
+            break
+    if mola_dict is None:
+        logger.error("No MOLA features found.")
+        return False
+    logger.info(f"Loaded MOLA features for {len(mola_dict)} images")
+
+    # --- Determine test IDs ---
+    split_paths = [
+        V2_OUTPUT / "models" / "multihead_improved" / "data_split.json",
+        V2_OUTPUT / "models" / "cleaned_focal" / "data_split.json",
+        V2_OUTPUT / "dataset_splits.json",
+    ]
+    test_ids = []
+    for sp in split_paths:
+        if sp.exists():
+            with open(sp) as f:
+                splits = json.load(f)
+            test_ids = splits.get("test_ids", splits.get("test", []))
+            if test_ids:
+                break
+    if not test_ids:
+        logger.warning("No splits file found, running on all labeled images")
+        labels_path = V2_OUTPUT / "unified_labels.json"
+        if labels_path.exists():
+            with open(labels_path) as f:
+                test_ids = list(json.load(f).keys())
+
+    # Filter to images that have embeddings and MOLA
+    test_ids = [tid for tid in test_ids if tid in embeddings_dict and tid in mola_dict]
+    logger.info(f"Running prediction on {len(test_ids)} test images (mode={args.mode})")
+
+    if not test_ids:
+        logger.error("No valid test images found.")
+        return False
+
+    # --- Load labels for metrics (if available) ---
+    labels_dict = {}
+    for lp in [V2_OUTPUT / "labels_simple.json", V2_OUTPUT / "unified_labels.json"]:
+        if lp.exists():
+            with open(lp) as f:
+                raw = json.load(f)
+            if isinstance(raw, dict):
+                # unified_labels has nested structure
+                if "labels" in raw and isinstance(raw["labels"], dict):
+                    raw = raw["labels"]
+                for k, v in raw.items():
+                    if isinstance(v, str) and v in CLASS_ORDER:
+                        labels_dict[k] = CLASS_ORDER.index(v)
+                    elif isinstance(v, int):
+                        labels_dict[k] = v
+                    elif isinstance(v, dict):
+                        cls = v.get("final_class") or v.get("class") or v.get("label")
+                        if cls and cls in CLASS_ORDER:
+                            labels_dict[k] = CLASS_ORDER.index(cls)
+            break
+
+    # --- Prediction function ---
+    @torch.no_grad()
+    def predict_image(image_id: str) -> dict:
+        tiles = np.asarray(embeddings_dict[image_id], dtype=np.float32)
+        mola = np.asarray(mola_dict[image_id], dtype=np.float32)
+        # Handle tile count
+        if tiles.shape[0] > mil_cfg.max_tiles_per_image:
+            keep = np.random.choice(tiles.shape[0], size=mil_cfg.max_tiles_per_image, replace=False)
+            tiles = tiles[keep]
+        tiles_t = torch.from_numpy(tiles).unsqueeze(0).to(device)
+        mask_t = torch.ones(1, tiles_t.shape[1], dtype=torch.bool, device=device)
+        mola_t = torch.from_numpy(mola).unsqueeze(0).to(device)
+        logits, att_weights = model(tiles_t, mask_t, mola_t)
+        probs = torch.softmax(logits, dim=1)
+        conf, pred = torch.max(probs, dim=1)
+        pred_idx = int(pred.item())
+        return {
+            "class": CLASS_ORDER[pred_idx],
+            "confidence": float(conf.item()),
+            "probabilities": probs[0].cpu().tolist(),
+            "attention_weights": att_weights[0, :tiles.shape[0]].cpu().tolist(),
+            "pred_label": pred_idx,
+            "pred_label_name": CLASS_ORDER[pred_idx],
+        }
+
+    # --- Run predictions ---
+    predictions = []
+    if args.mode == "fast":
+        logger.info("Running FAST mode (MIL classifier only)")
+        for i, image_id in enumerate(test_ids):
+            result = predict_image(image_id)
+            pred_entry = {
+                "image_id": image_id,
+                "predicted_class": result["class"],
+                "confidence": result["confidence"],
+                "probabilities": result["probabilities"],
+                "attention_weights": result["attention_weights"],
+                "mode": "fast",
+            }
+            if image_id in labels_dict:
+                pred_entry["true_label"] = labels_dict[image_id]
+                pred_entry["true_label_name"] = CLASS_ORDER[labels_dict[image_id]]
+            predictions.append(pred_entry)
+            if (i + 1) % 20 == 0 or (i + 1) == len(test_ids):
+                logger.info(f"  Predicted {i+1}/{len(test_ids)}")
+    else:
+        # Agent mode
+        logger.info("Running AGENT mode (ReACT loop)")
+        from scripts.marslandform_v2.agent.react_agent import MarsLandformAgent, MockVLM
+
+        # Create MILPredictor wrapper for ClassifyTool
+        class MILPredictor:
+            def predict_image(self, image_id: str) -> dict:
+                return predict_image(image_id)
+
+        # Convert MOLA numpy arrays to dicts for AnalyzeMOLATool
+        mola_feature_names = [
+            "slope_mean_1km", "slope_std_1km", "curvature_mean_1km",
+            "TPI_1km", "TRI_1km", "roughness_1km", "lobateness_1km",
+            "slope_mean_5km", "slope_std_5km", "curvature_mean_5km",
+            "TPI_5km", "TRI_5km", "roughness_5km", "lobateness_5km",
+            "slope_mean_20km", "slope_std_20km", "curvature_mean_20km",
+            "TPI_20km", "TRI_20km", "roughness_20km", "lobateness_20km",
+            "elevation_mean", "abs_latitude",
+        ]
+        mola_as_dicts = {}
+        for img_id, arr in mola_dict.items():
+            mola_as_dicts[img_id] = {
+                mola_feature_names[i]: float(arr[i])
+                for i in range(min(len(mola_feature_names), len(arr)))
+            }
+
+        # Load metadata for RegionalContextTool
+        metadata = None
+        if METADATA_JSON.exists():
+            with open(METADATA_JSON) as f:
+                meta_raw = json.load(f)
+            if isinstance(meta_raw, list):
+                metadata = {item["image_id"]: item for item in meta_raw if "image_id" in item}
+            else:
+                metadata = meta_raw
+
+        config.agent.mode = args.mode
+        agent = MarsLandformAgent(
+            config=config.agent,
+            classifier=MILPredictor(),
+            rag=None,
+            mola_features=mola_as_dicts,
+            metadata=metadata or {},
+            vlm=MockVLM(),  # Use mock VLM for offline; set ANTHROPIC_API_KEY for real
+        )
+
+        async def run_agent_predictions():
+            results = []
+            for i, image_id in enumerate(test_ids):
+                try:
+                    agent_result = await agent.classify_image(image_id)
+                    pred_entry = {
+                        "image_id": image_id,
+                        "predicted_class": agent_result.landform_class,
+                        "confidence": agent_result.confidence,
+                        "mode": agent_result.mode,
+                        "num_steps": agent_result.num_steps,
+                        "tools_used": agent_result.tools_used,
+                        "reasoning_chain": agent_result.reasoning_chain,
+                    }
+                    if image_id in labels_dict:
+                        pred_entry["true_label"] = labels_dict[image_id]
+                        pred_entry["true_label_name"] = CLASS_ORDER[labels_dict[image_id]]
+                    results.append(pred_entry)
+                except Exception as e:
+                    logger.error(f"Agent failed for {image_id}: {e}")
+                    results.append({
+                        "image_id": image_id,
+                        "predicted_class": "BACKGROUND",
+                        "confidence": 0.0,
+                        "mode": "agent",
+                        "error": str(e),
+                    })
+                if (i + 1) % 10 == 0 or (i + 1) == len(test_ids):
+                    logger.info(f"  Agent predicted {i+1}/{len(test_ids)}")
+            return results
+
+        predictions = asyncio.run(run_agent_predictions())
+
+    # --- Save predictions ---
+    predictions_dir = V2_OUTPUT / "predictions"
+    predictions_dir.mkdir(parents=True, exist_ok=True)
+    preds_path = predictions_dir / "predictions.json"
+    preds_path.write_text(json.dumps(predictions, indent=2))
+    logger.info(f"Predictions saved to {preds_path} ({len(predictions)} images)")
+
+    # --- Compute and save summary metrics ---
+    y_true = [p["true_label"] for p in predictions if "true_label" in p]
+    y_pred = [CLASS_ORDER.index(p["predicted_class"]) for p in predictions if "true_label" in p]
+    if y_true:
+        metrics = compute_metrics(y_true, y_pred, num_classes=mil_cfg.num_classes)
+        summary = {
+            "num_predictions": len(predictions),
+            "num_with_labels": len(y_true),
+            "mode": args.mode,
+            "macro_f1_all": metrics["macro_f1_all"],
+            "landform_macro_f1": metrics["landform_macro_f1"],
+            "per_class_f1": {CLASS_ORDER[i]: metrics["f1"][i] for i in range(len(CLASS_ORDER))},
+            "confusion_matrix": metrics["confusion_matrix"],
+        }
+        summary_path = predictions_dir / "summary.json"
+        summary_path.write_text(json.dumps(summary, indent=2))
+        logger.info(f"Macro-F1: {metrics['macro_f1_all']:.4f}, Landform F1: {metrics['landform_macro_f1']:.4f}")
+    else:
+        logger.warning("No labeled test images — cannot compute metrics")
+
     return True
 
 
 def stage_export(args) -> bool:
     """Stage 8: Export GeoJSON + evaluation report."""
-    logger.info("Export stage — requires prediction results")
     predictions_dir = V2_OUTPUT / "predictions"
-    if not predictions_dir.exists():
+    predictions_path = predictions_dir / "predictions.json"
+    if not predictions_path.exists():
         logger.warning("No predictions found. Run predict stage first.")
         return False
 
-    logger.info("Export stage placeholder — will generate GeoJSON + report")
-    return True
+    try:
+        from scripts.marslandform_v2.export.geojson import export_geojson
+        from scripts.marslandform_v2.export.report import generate_report
+        from scripts.marslandform_v2.config import GEOJSON_DIR, EVAL_DIR
 
+        # Export GeoJSON
+        geojson_out = GEOJSON_DIR / "mars_landform_predictions.geojson"
+        export_geojson(
+            predictions_path=predictions_path,
+            metadata_path=METADATA_JSON,
+            output_path=geojson_out,
+        )
+        logger.info(f"GeoJSON exported to {geojson_out}")
+
+        # Generate evaluation report
+        metrics_path = predictions_dir / "summary.json"
+        if metrics_path.exists():
+            report_path = generate_report(
+                metrics_path=metrics_path,
+                output_dir=EVAL_DIR,
+                format="html",
+            )
+            logger.info(f"Report generated at {report_path}")
+
+        # Print summary
+        with open(predictions_path) as f:
+            preds = json.load(f)
+        from collections import Counter
+        class_counts = Counter(p["predicted_class"] for p in preds)
+        avg_conf = sum(p.get("confidence", 0) for p in preds) / max(len(preds), 1)
+        logger.info(f"Export summary: {len(preds)} images, avg_confidence={avg_conf:.3f}")
+        for cls, count in sorted(class_counts.items()):
+            logger.info(f"  {cls}: {count} images")
+
+    except Exception as e:
+        logger.error(f"Export failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+    return True
 
 STAGES = {
     "labels": stage_labels,
