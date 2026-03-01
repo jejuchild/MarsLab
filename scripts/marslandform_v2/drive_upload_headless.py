@@ -24,7 +24,7 @@ import requests as req
 
 ROOT = Path("/disk1/cspark/MarsLab")
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
-REDIRECT_URI = "http://localhost:1"  # Won't load, but code appears in URL bar
+REDIRECT_URI = "http://localhost"  # Standard Desktop app redirect
 
 FILES_TO_UPLOAD = [
     ROOT / "Data/HiRISE/v2_output/tiles/mars_tiles.tar.gz",
