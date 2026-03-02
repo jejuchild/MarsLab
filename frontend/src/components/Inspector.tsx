@@ -823,16 +823,18 @@ export default function Inspector({
           <span className="material-symbols-outlined text-sm">ios_share</span>
           Export Statistics
         </button>
+
+        {/* HiRISE Landform Classification */}
+        {showLandformPanel && isHiRISE && (
+          <div className="border-t border-border-dark -mx-4 mt-4">
+            <HiriseLandformPanel
+              productId={selected.productId}
+              onClose={() => setShowLandformPanel(false)}
+            />
+          </div>
+        )}
       </div>
 
-      {showLandformPanel && isHiRISE && (
-        <div className="border-t border-border-dark">
-          <HiriseLandformPanel
-            productId={selected.productId}
-            onClose={() => setShowLandformPanel(false)}
-          />
-        </div>
-      )}
 
     </aside>
   );
