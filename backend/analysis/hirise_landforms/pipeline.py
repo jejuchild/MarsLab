@@ -372,10 +372,20 @@ class HiriseLandformPipeline:
                 mola_entry["lon"] = lon
                 mola_dict[product_id] = mola_entry
 
+            # Pick VLM backend based on available API keys
+            import os
+            if os.getenv("GROQ_API_KEY"):
+                vlm_model = "llama-3.3-70b-versatile"
+            elif os.getenv("ANTHROPIC_API_KEY"):
+                vlm_model = "claude-sonnet-4-20250514"
+            else:
+                vlm_model = ""  # MockVLM fallback
+
             agent_cfg = AgentConfig(
                 max_steps=3,  # Limit for API responsiveness
                 confidence_threshold=CONFIDENCE_THRESHOLD,
                 mode="agent",
+                vlm_model=vlm_model,
             )
 
             agent = MarsLandformAgent(
