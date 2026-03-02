@@ -4,6 +4,7 @@ import { normalizeLonForMap, clampLatitude, parseCoordinate } from "../utils/coo
 import type { FieldNote } from "../api/fieldnotes";
 import type { OverlapStats } from "../utils/overlapFilter";
 import { INSTRUMENTS, INSTRUMENT_GROUPS, type InstrumentId } from "../config/instrumentRegistry";
+import SwimIcePanel from "./SwimIcePanel";
 
 type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM" | "CRISM_TRR3";
 type InstrumentVisibility = Record<InstrumentId, boolean>;
@@ -347,6 +348,10 @@ interface LayerPanelProps {
   swimLayer?: string | false;
   onSwimLayerChange?: (layer: string | false) => void;
 
+  // SWIM Ice advanced panel
+  swimIceLat?: number | null;
+  swimIceLon?: number | null;
+
   // Field Notes
   fieldNotes?: FieldNote[];
   showFieldNotesOnMap?: boolean;
@@ -643,6 +648,9 @@ export default function LayerPanel({
   // SWIM ice overlay
   swimLayer = false,
   onSwimLayerChange,
+  // SWIM Ice advanced panel
+  swimIceLat = null,
+  swimIceLon = null,
   // Field Notes
   fieldNotes = [],
   showFieldNotesOnMap = true,
@@ -948,6 +956,13 @@ export default function LayerPanel({
               </p>
             )}
           </div>
+
+          {swimLayer && (
+            <SwimIcePanel
+              lat={swimIceLat ?? null}
+              lon={swimIceLon ?? null}
+            />
+          )}
         </div>
 
         {/* Footprints Section — Hierarchical instrument tree */}

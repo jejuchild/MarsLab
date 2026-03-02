@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
-from backend.analysis.hirise_landforms.models import ClassifyRequest
+from analysis.hirise_landforms.models import ClassifyRequest
 
 router = APIRouter(prefix="/api/hirise-landforms", tags=["HiRISE Landform Classification"])
 
@@ -28,7 +28,7 @@ def _get_pipeline() -> object:
     global _pipeline
     if _pipeline is None:
         try:
-            from backend.analysis.hirise_landforms.pipeline import HiriseLandformPipeline
+            from analysis.hirise_landforms.pipeline import HiriseLandformPipeline
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"HiRISE landform pipeline unavailable: {exc}")
         _pipeline = HiriseLandformPipeline()
@@ -39,7 +39,7 @@ def _get_job_queue() -> object:
     global _job_queue
     if _job_queue is None:
         try:
-            from backend.analysis.hirise_landforms.job_queue import LandformJobQueue
+            from analysis.hirise_landforms.job_queue import LandformJobQueue
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"HiRISE job queue unavailable: {exc}")
         _job_queue = LandformJobQueue()

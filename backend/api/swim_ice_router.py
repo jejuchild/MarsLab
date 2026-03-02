@@ -5,8 +5,8 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, Response
 
-from backend.analysis.swim_common.coord_utils import validate_region_size, validate_swim_bounds
-from backend.analysis.swim_fusion.models import CustomFusionRequest
+from analysis.swim_common.coord_utils import validate_region_size, validate_swim_bounds
+from analysis.swim_fusion.models import CustomFusionRequest
 
 router = APIRouter(prefix="/api/swim-ice", tags=["SWIM Ice Detection"])
 
@@ -60,7 +60,7 @@ def _ensure_loaded(geotiff: object | None, detail: str) -> None:
 def _get_neutron() -> object:
     global _neutron_pipeline
     if _neutron_pipeline is None:
-        from backend.analysis.swim_neutron.pipeline import SwimNeutronPipeline
+        from analysis.swim_neutron.pipeline import SwimNeutronPipeline
 
         _neutron_pipeline = SwimNeutronPipeline()
     return _neutron_pipeline
@@ -69,7 +69,7 @@ def _get_neutron() -> object:
 def _get_thermal() -> object:
     global _thermal_pipeline
     if _thermal_pipeline is None:
-        from backend.analysis.swim_thermal.pipeline import SwimThermalPipeline
+        from analysis.swim_thermal.pipeline import SwimThermalPipeline
 
         _thermal_pipeline = SwimThermalPipeline()
     return _thermal_pipeline
@@ -79,7 +79,7 @@ def _get_surface() -> object:
     global _surface_pipeline
     if _surface_pipeline is None:
         try:
-            from backend.analysis.swim_sharad_surface.pipeline import SwimSharadSurfacePipeline
+            from analysis.swim_sharad_surface.pipeline import SwimSharadSurfacePipeline
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"SWIM radar-surface module unavailable: {exc}")
         _surface_pipeline = SwimSharadSurfacePipeline()
@@ -89,7 +89,7 @@ def _get_surface() -> object:
 def _get_dielectric() -> object:
     global _dielectric_pipeline
     if _dielectric_pipeline is None:
-        from backend.analysis.swim_sharad_dielectric.pipeline import SwimSharadDielectricPipeline
+        from analysis.swim_sharad_dielectric.pipeline import SwimSharadDielectricPipeline
 
         _dielectric_pipeline = SwimSharadDielectricPipeline()
     return _dielectric_pipeline
@@ -99,7 +99,7 @@ def _get_geomorphic() -> object:
     global _geomorphic_pipeline
     if _geomorphic_pipeline is None:
         try:
-            from backend.analysis.swim_geomorphic.pipeline import SwimGeomorphicPipeline
+            from analysis.swim_geomorphic.pipeline import SwimGeomorphicPipeline
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"SWIM geomorphic module unavailable: {exc}")
         _geomorphic_pipeline = SwimGeomorphicPipeline()
@@ -110,7 +110,7 @@ def _get_fusion() -> object:
     global _fusion_pipeline
     if _fusion_pipeline is None:
         try:
-            from backend.analysis.swim_fusion.pipeline import SwimFusionPipeline
+            from analysis.swim_fusion.pipeline import SwimFusionPipeline
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"SWIM consistency module unavailable: {exc}")
         _fusion_pipeline = SwimFusionPipeline()
@@ -267,7 +267,7 @@ def get_geomorphic_point(lat: float = Query(...), lon: float = Query(...)):
     ensure_loaded = getattr(pipeline, "_ensure_loaded", None)
     if callable(ensure_loaded):
         ensure_loaded()
-    _ensure_loaded(getattr(pipeline, "_geotiff", object()), "SWIM geomorphic data not loaded")
+    _ensure_loaded(getattr(pipeline, '_geomorphology_0_1m', None), 'SWIM geomorphic data not loaded')
     return JSONResponse(content=_as_dict(_call_method(pipeline, "query_point", lat=lat, lon=lon)))
 
 

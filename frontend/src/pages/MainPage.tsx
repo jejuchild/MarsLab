@@ -1625,6 +1625,8 @@ export default function MainPage() {
       onToggleRegionLayer={setShowRegionLayer}
       swimLayer={swimLayer}
       onSwimLayerChange={setSwimLayer}
+      swimIceLat={terrainPoint?.lat ?? null}
+      swimIceLon={terrainPoint?.lon ?? null}
       // Field Notes
       fieldNotes={fieldNotes}
       showFieldNotesOnMap={showFieldNotesOnMap}

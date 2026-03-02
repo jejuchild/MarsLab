@@ -4,6 +4,7 @@ import { fetchHiRISEWindow } from "../api/hirise";
 import type { OverlayType, ProductOverlay, CustomDataset } from "../pages/MainPage";
 import type { FieldNote } from "../api/fieldnotes";
 import BandRatioCalculator from "./BandRatioCalculator";
+import HiriseLandformPanel from "./HiriseLandformPanel";
 
 /* =========================================================
  * Types
@@ -264,6 +265,7 @@ export default function Inspector({
 
   // Opacity slider expanded state
   const [showOpacity, setShowOpacity] = useState(false);
+  const [showLandformPanel, setShowLandformPanel] = useState(false);
 
   // Sync local state with props
   useEffect(() => {
@@ -768,6 +770,17 @@ export default function Inspector({
           </button>
         )}
 
+        {/* Classify Landform button (HiRISE only) */}
+        {isHiRISE && (
+          <button
+            onClick={() => setShowLandformPanel(!showLandformPanel)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-violet-500/20 border border-violet-500/50 text-violet-400 hover:bg-violet-500/30 transition-all active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined text-sm">image_search</span>
+            Classify Landform
+          </button>
+        )}
+
         {/* Quick Actions Bar */}
         {selected && selected.instrument !== "CUSTOM" && (
           <div className="grid grid-cols-2 gap-2">
@@ -811,6 +824,16 @@ export default function Inspector({
           Export Statistics
         </button>
       </div>
+
+      {showLandformPanel && isHiRISE && (
+        <div className="border-t border-border-dark">
+          <HiriseLandformPanel
+            productId={selected.productId}
+            onClose={() => setShowLandformPanel(false)}
+          />
+        </div>
+      )}
+
     </aside>
   );
 }

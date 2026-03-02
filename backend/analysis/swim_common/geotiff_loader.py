@@ -228,18 +228,36 @@ def load_swim_geotiff(filename: str, name: Optional[str] = None) -> SwimGeoTIFF:
 
             # Extract bounds from transform
             bounds = src.bounds
-            geo.lon_min = bounds.left
-            geo.lon_max = bounds.right
-            geo.lat_min = bounds.bottom
-            geo.lat_max = bounds.top
 
-            # If 0-360, convert to -180/180
-            if geo.lon_max > 180:
-                geo.lon_min = -180.0
-                geo.lon_max = 180.0
-                # Shift data: left half = 180-360, right half = 0-180
-                mid_col = geo.cols // 2
-                geo.data = np.roll(data, mid_col, axis=1)
+            # SWIM GeoTIFFs use Mars equirectangular projection (meters).
+            # Detect projected CRS: bounds will be in meters (abs > 360).
+            # Convert to geographic degrees for our sampling code.
+            _MARS_RADIUS = 3396190.0  # Mars sphere radius in meters
+            if abs(bounds.left) > 360 or abs(bounds.right) > 360:
+                # Projected CRS: convert meters to degrees
+                import math
+                _deg_factor = _MARS_RADIUS * math.pi / 180.0
+                geo.lon_min = bounds.left / _deg_factor
+                geo.lon_max = bounds.right / _deg_factor
+                geo.lat_min = bounds.bottom / _deg_factor
+                geo.lat_max = bounds.top / _deg_factor
+                logger.info(
+                    'SWIM %s: projected CRS detected, converted to degrees: lon=[%.1f,%.1f] lat=[%.1f,%.1f]',
+                    display_name, geo.lon_min, geo.lon_max, geo.lat_min, geo.lat_max,
+                )
+            else:
+                geo.lon_min = bounds.left
+                geo.lon_max = bounds.right
+                geo.lat_min = bounds.bottom
+                geo.lat_max = bounds.top
+
+                # If 0-360, convert to -180/180
+                if geo.lon_max > 180:
+                    geo.lon_min = -180.0
+                    geo.lon_max = 180.0
+                    # Shift data: left half = 180-360, right half = 0-180
+                    mid_col = geo.cols // 2
+                    geo.data = np.roll(data, mid_col, axis=1)
 
             geo.loaded = True
             logger.info(

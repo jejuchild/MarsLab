@@ -1,6 +1,6 @@
 from typing import Literal, cast
 
-from backend.analysis.swim_common import (
+from analysis.swim_common import (
     SwimGeoTIFF,
     load_swim_geotiff,
     render_consistency_tile,
