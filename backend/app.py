@@ -783,6 +783,13 @@ app.mount(
     name="crism_lbl",
 )
 
+# HiRISE landform heatmap cache
+app.mount(
+    "/cache/hirise_landforms/heatmaps",
+    StaticFiles(directory=os.path.join(BASE_DIR, "data", "hirise_landforms", "cache", "heatmaps")),
+    name="hirise_landform_heatmaps",
+)
+
 # ======================================================
 # SHARAD endpoints and static mounts
 # ======================================================
