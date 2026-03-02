@@ -153,6 +153,46 @@ class LocalTransformerVLM(BaseVLM):
         )
 
 
+class GroqVLM(BaseVLM):
+    """Groq cloud inference VLM using LLaMA 3.3 70B for Mars landform reasoning."""
+
+    def __init__(
+        self,
+        model: str = "llama-3.3-70b-versatile",
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+        api_key: Optional[str] = None,
+        timeout_seconds: float = 30.0,
+    ) -> None:
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.api_key = api_key or os.getenv("GROQ_API_KEY")
+        self.timeout_seconds = timeout_seconds
+        if not self.api_key:
+            raise RuntimeError("GROQ_API_KEY not set. Set it in environment to use GroqVLM.")
+
+    def generate(self, prompt: str, system_prompt: str) -> str:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+        }
+        response = requests.post(url, headers=headers, json=payload, timeout=self.timeout_seconds)
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"].strip()
+
+
 class MarsLandformAgent:
     def __init__(
         self,
@@ -184,8 +224,22 @@ class MarsLandformAgent:
                 temperature=agent_cfg.vlm_temperature,
                 max_tokens=agent_cfg.vlm_max_tokens,
             )
+        if "groq" in model_name or "llama" in model_name:
+            return GroqVLM(
+                model=agent_cfg.vlm_model if "llama" in model_name else "llama-3.3-70b-versatile",
+                temperature=agent_cfg.vlm_temperature,
+                max_tokens=agent_cfg.vlm_max_tokens,
+            )
         if model_name:
             return LocalTransformerVLM(model_name=agent_cfg.vlm_model)
+        # Auto-detect: prefer Groq (free) > Claude > Mock
+        if os.getenv("GROQ_API_KEY"):
+            LOGGER.info("Auto-selecting GroqVLM (GROQ_API_KEY found)")
+            return GroqVLM()
+        if os.getenv("ANTHROPIC_API_KEY"):
+            LOGGER.info("Auto-selecting ClaudeVLM (ANTHROPIC_API_KEY found)")
+            return ClaudeVLM(model="claude-sonnet-4-20250514")
+        LOGGER.warning("No API key found — falling back to MockVLM")
         return MockVLM()
 
     async def classify_image(self, image_id: str) -> AgentResult:
