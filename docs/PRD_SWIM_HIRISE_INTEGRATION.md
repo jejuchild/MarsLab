@@ -214,25 +214,53 @@ Wrap the existing MarsLandformNet V2 pipeline (in `scripts/marslandform_v2/`) as
 POST /api/hirise-landforms/classify
   Body: { product_id: str, model: "v2" | "mars-bench", include_heatmap: bool }
   Response: {
-    product_id: str,
-    model_used: str,
-    prediction: {
-      top_class: str,
-      probabilities: { class_name: float },
-      confidence: float
-    },
-    tiles: [
-      {
-        x: int, y: int,                    // tile grid position
-        attention_weight: float,            // 0-1, MIL attention
-        lat: float, lon: float             // tile center coordinates
-      }
-    ],
-    heatmap_url: str | null                // pre-rendered attention overlay PNG
+    job_id: str,                           // async job ID
+    status: "queued",
+    estimated_seconds: int                  // ~10-30s depending on image size
+  }
+
+GET /api/hirise-landforms/jobs/{job_id}
+  Response (pending): {
+    job_id: str,
+    status: "queued" | "processing",
+    progress: float,                        // 0-1, tile processing progress
+    submitted_at: str                       // ISO timestamp
+  }
+  Response (completed): {
+    job_id: str,
+    status: "completed",
+    result: {
+      product_id: str,
+      model_used: str,
+      prediction: {
+        top_class: str,
+        probabilities: { class_name: float },
+        confidence: float
+      },
+      tiles: [
+        {
+          x: int, y: int,                    // tile grid position
+          attention_weight: float,            // 0-1, MIL attention
+          lat: float, lon: float             // tile center coordinates
+        }
+      ],
+      heatmap_url: str | null               // pre-rendered attention overlay PNG
+    }
+  }
+  Response (failed): {
+    job_id: str,
+    status: "failed",
+    error: str
   }
 
 GET /api/hirise-landforms/status
-  Response: { models_loaded: [str], device: str, memory_mb: float }
+  Response: {
+    models_loaded: [str],
+    device: str,
+    memory_mb: float,
+    queue_length: int,                      // number of pending jobs
+    active_job: str | null                  // currently processing job_id
+  }
 
 GET /api/hirise-landforms/classify/{product_id}
   Response: cached result if previously classified, else 404
@@ -254,10 +282,11 @@ GET /api/hirise-landforms/classify/{product_id}
 ```
 backend/analysis/hirise_landforms/
 ├── __init__.py
-├── models.py              # Pydantic: ClassifyRequest, ClassifyResponse, TileResult
+├── models.py              # Pydantic: ClassifyRequest, ClassifyResponse, TileResult, JobStatus
 ├── pipeline.py            # Inference: load model, tile image, run MIL, return results
 ├── preprocessing.py       # Image fetch, tiling, DEM feature extraction
-└── heatmap.py             # Attention map → overlay PNG generation
+├── heatmap.py             # Attention map → overlay PNG generation
+└── job_queue.py           # Async job queue: submit, poll, cleanup
 
 backend/api/hirise_landforms_router.py   # FastAPI router
 
@@ -271,7 +300,9 @@ backend/data/hirise_landforms/
 - **Image fetch failure**: Return 502 with upstream error. Cache failures to avoid repeated retries.
 - **GPU not available**: Fall back to CPU inference (slower but functional). Log warning at startup.
 - **Image too small** (<224 px in either dimension): Return 422 with minimum size requirement.
-- **Concurrent requests**: Queue inference requests — DINOv2 uses ~2GB VRAM. Limit to 1 concurrent inference by default.
+- **Concurrent requests**: Async job queue with single-worker processing. DINOv2 uses ~2GB VRAM — only 1 inference runs at a time. Additional requests are queued (FIFO). Max queue depth: 10 — return 429 if exceeded.
+- **Job expiry**: Completed job results cached for 24h (keyed by product_id + model_version). Stale jobs cleaned up on startup.
+- **Long-running inference**: Frontend polls `GET /jobs/{job_id}` every 2s. Backend updates `progress` as tiles are processed (progress = tiles_done / total_tiles).
 
 ---
 
