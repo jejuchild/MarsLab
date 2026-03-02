@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -25,7 +25,7 @@ class TileResult(BaseModel):
 
 class PredictionResult(BaseModel):
     top_class: str
-    probabilities: Dict[str, float] = Field(default_factory=dict)
+    probabilities: dict[str, float] = Field(default_factory=dict)
     confidence: float = Field(..., ge=0.0, le=1.0)
 
 
@@ -33,8 +33,8 @@ class ClassifyResult(BaseModel):
     product_id: str
     model_used: str
     prediction: PredictionResult
-    tiles: List[TileResult] = Field(default_factory=list)
-    heatmap_url: Optional[str] = None
+    tiles: list[TileResult] = Field(default_factory=list)
+    heatmap_url: str | None = None
 
 
 class JobStatus(BaseModel):
@@ -42,5 +42,5 @@ class JobStatus(BaseModel):
     status: JobState
     progress: float = Field(default=0.0, ge=0.0, le=1.0)
     submitted_at: str
-    result: Optional[ClassifyResult] = None
-    error: Optional[str] = None
+    result: ClassifyResult | None = None
+    error: str | None = None

@@ -1,19 +1,19 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
 
-class SharadSurfacePointResponse(BaseModel):
+class PointResponse(BaseModel):
     lat: float
     lon: float
-    consistency_score: Optional[float]
-    surface_power_excess_db: Optional[float]
-    nearest_track_id: Optional[str]
+    consistency_score: float | None
+    surface_power_excess_db: float | None
+    nearest_track_id: str | None
     depth_range: str
     data_quality: Literal["nominal", "interpolated", "no_data"]
 
 
-class SharadSurfaceRegionResponse(BaseModel):
-    bounds: Dict[str, float]
-    stats: Dict[str, Any]
+class RegionResponse(BaseModel):
+    bounds: dict[str, float]
+    stats: dict[str, float | str | bool | None]
     tile_url: str

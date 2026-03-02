@@ -22,8 +22,25 @@ import logging
 from typing import Optional
 
 import numpy as np
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["Thermal Inertia"])
+
+_swim_thermal_pipeline = None
+
+
+def _get_swim_thermal_pipeline():
+    global _swim_thermal_pipeline
+    if _swim_thermal_pipeline is None:
+        try:
+            from ..analysis.swim_thermal.pipeline import SwimThermalPipeline
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"SWIM thermal module unavailable: {exc}")
+        _swim_thermal_pipeline = SwimThermalPipeline()
+    return _swim_thermal_pipeline
 
 # ---------------------------------------------------------------------------
 # Data paths
@@ -58,9 +75,10 @@ def _load_ti_grid() -> Optional[np.ndarray]:
         return None
 
     try:
-        _ti_grid = np.load(_TI_NPY_PATH)
-        logger.info(f"Loaded TES TI grid: shape={_ti_grid.shape}, dtype={_ti_grid.dtype}")
-        return _ti_grid
+        grid = np.load(_TI_NPY_PATH)
+        _ti_grid = grid
+        logger.info(f"Loaded TES TI grid: shape={grid.shape}, dtype={grid.dtype}")
+        return grid
     except Exception as e:
         logger.error(f"Failed to load TES TI data: {e}")
         return None
@@ -109,7 +127,7 @@ def get_thermal_inertia(lat: float, lon: float) -> Optional[float]:
 def sample_region_ti(
     min_lat: float, max_lat: float, min_lon: float, max_lon: float,
     max_samples: int = 100,
-) -> dict:
+) -> dict[str, object]:
     """
     Sample thermal inertia across a bounding box region.
 
@@ -219,7 +237,7 @@ def sample_region_ti(
     }
 
 
-def thermal_inertia_score(ti_stats: dict, has_ice_signal: bool = False) -> tuple:
+def thermal_inertia_score(ti_stats: dict[str, object], has_ice_signal: bool = False) -> tuple[int, str]:
     """
     Compute thermal inertia contribution to agent score (0-10).
 
@@ -233,8 +251,10 @@ def thermal_inertia_score(ti_stats: dict, has_ice_signal: bool = False) -> tuple
     if not ti_stats.get("available"):
         return 0, "Thermal inertia data unavailable"
 
-    ti_median = ti_stats.get("ti_median", 0)
-    classification = ti_stats.get("classification", "unknown")
+    ti_median_raw = ti_stats.get("ti_median", 0)
+    ti_median = float(ti_median_raw) if isinstance(ti_median_raw, (int, float)) else 0.0
+    classification_raw = ti_stats.get("classification", "unknown")
+    classification = classification_raw if isinstance(classification_raw, str) else "unknown"
 
     if ti_median >= 300 and has_ice_signal:
         # Strong corroboration: high TI + ice signals
@@ -266,7 +286,7 @@ def thermal_inertia_score(ti_stats: dict, has_ice_signal: bool = False) -> tuple
 def thermal_inertia_analysis_for_region(
     min_lat: float, max_lat: float, min_lon: float, max_lon: float,
     has_ice_signal: bool = False,
-) -> dict:
+) -> dict[str, object]:
     """
     Full thermal inertia analysis for a bounding box region.
     Returns a dict suitable for TaskResult.data.
@@ -280,3 +300,36 @@ def thermal_inertia_analysis_for_region(
         "ti_explanation": explanation,
         "has_ice_signal": has_ice_signal,
     }
+
+
+@router.get("/api/thermal-inertia/ice-score")
+async def get_thermal_ice_score(lat: float, lon: float):
+    ti_value = get_thermal_inertia(lat, lon)
+
+    pipeline = _get_swim_thermal_pipeline()
+    if hasattr(pipeline, "_ensure_loaded"):
+        pipeline._ensure_loaded()
+
+    geotiff = getattr(pipeline, "_geotiff", None)
+    if geotiff is None or not getattr(geotiff, "loaded", False):
+        raise HTTPException(status_code=503, detail="SWIM thermal consistency data not loaded")
+
+    thermal_point = pipeline.query_point(lat=lat, lon=lon)
+    if isinstance(thermal_point, dict):
+        payload: dict[str, object] = thermal_point
+    else:
+        model_dump = getattr(thermal_point, "model_dump", None)
+        dumped = model_dump() if callable(model_dump) else {}
+        payload = dumped if isinstance(dumped, dict) else {}
+
+    return JSONResponse(
+        content={
+            "lat": lat,
+            "lon": lon,
+            "thermal_inertia_tiu": ti_value,
+            "swim_consistency": payload.get("consistency_score"),
+            "interpretation": payload.get("interpretation", "ambiguous"),
+            "depth_range": payload.get("depth_range", "0-1m"),
+            "raw_thermal": payload,
+        }
+    )

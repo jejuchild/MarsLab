@@ -1,3 +1,5 @@
-"""SWIM neutron spectroscopy analysis pipeline."""
+"""Module docstring."""
 
 from .pipeline import SwimNeutronPipeline
+
+__all__ = ["SwimNeutronPipeline"]

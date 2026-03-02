@@ -1,19 +1,19 @@
-from typing import Any, Dict, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
 
-class ThermalPointResponse(BaseModel):
+class PointResponse(BaseModel):
     lat: float
     lon: float
-    consistency_score: Optional[float]
-    thermal_inertia_tiu: Optional[float]
+    consistency_score: float | None
+    thermal_inertia_tiu: float | None
     interpretation: Literal["ice_cemented", "ambiguous", "dry_fines"]
     depth_range: str
     data_quality: Literal["nominal", "interpolated", "no_data"]
 
 
-class ThermalRegionResponse(BaseModel):
-    bounds: Dict[str, float]
-    stats: Dict[str, Any]
+class RegionResponse(BaseModel):
+    bounds: dict[str, float]
+    stats: dict[str, float | str | bool | None]
     tile_url: str

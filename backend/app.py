@@ -553,6 +553,12 @@ app.include_router(discussions_router)  # /api/discussions — Daily AI Discussi
 from api.swim_router import router as swim_router
 app.include_router(swim_router)  # /api/swim/* — SWIM Ice Data
 
+from api.swim_ice_router import router as swim_ice_router
+app.include_router(swim_ice_router)  # /api/swim-ice/* — SWIM Ice Detection Methods
+
+from api.hirise_landforms_router import router as hirise_landforms_router
+app.include_router(hirise_landforms_router)  # /api/hirise-landforms/* — HiRISE Landform Classification
+
 from api.mars_news_router import router as mars_news_router
 app.include_router(mars_news_router)  # /api/mars-news — Mars News Digest
 

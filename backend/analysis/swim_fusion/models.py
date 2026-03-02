@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -6,24 +6,24 @@ from pydantic import BaseModel, Field
 class ConsistencyPointResponse(BaseModel):
     lat: float
     lon: float
-    consistency_0_1m: Optional[float] = None
-    consistency_1_5m: Optional[float] = None
-    consistency_5m_plus: Optional[float] = None
-    method_scores: Dict[str, Optional[float]] = Field(default_factory=dict)
+    consistency_0_1m: float | None = None
+    consistency_1_5m: float | None = None
+    consistency_5m_plus: float | None = None
+    method_scores: dict[str, float | None] = Field(default_factory=dict)
     mode: Literal["precomputed", "live"]
-    depth_to_ice_estimate_m: Optional[float] = None
+    depth_to_ice_estimate_m: float | None = None
 
 
 class ConsistencyRegionResponse(BaseModel):
-    bounds: Dict[str, float]
-    stats_0_1m: Dict[str, Any]
-    stats_1_5m: Dict[str, Any]
-    stats_5m_plus: Dict[str, Any]
-    tile_urls: Dict[str, str]
+    bounds: dict[str, float]
+    stats_0_1m: dict[str, object]
+    stats_1_5m: dict[str, object]
+    stats_5m_plus: dict[str, object]
+    tile_urls: dict[str, str]
 
 
 class CustomFusionRequest(BaseModel):
     lat: float
     lon: float
-    enabled_methods: List[str] = Field(default_factory=list)
-    custom_weights: Optional[Dict[str, float]] = None
+    enabled_methods: list[str] = Field(default_factory=list)
+    custom_weights: dict[str, float] | None = None
