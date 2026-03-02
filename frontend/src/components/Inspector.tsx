@@ -266,6 +266,7 @@ export default function Inspector({
   // Opacity slider expanded state
   const [showOpacity, setShowOpacity] = useState(false);
   const [showLandformPanel, setShowLandformPanel] = useState(false);
+  const [showOverlaySection, setShowOverlaySection] = useState(false);
 
   // Sync local state with props
   useEffect(() => {
@@ -615,216 +616,240 @@ export default function Inspector({
         )}
 
         {isDTM && <MetadataTab selected={selected} hasHighResData={hasHighResData} />}
-      </div>
+      {/* ── Collapsible Overlay Section ── */}
+        <div className="mt-4 border-t border-border-dark pt-3">
+          <button
+            onClick={() => setShowOverlaySection(!showOverlaySection)}
+            className="flex w-full items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-xs">layers</span>
+              Overlays
+              {activeOverlay && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] bg-green-500/20 text-green-400 normal-case font-medium">
+                  {OVERLAY_CONFIG[activeOverlay.type].label}
+                </span>
+              )}
+            </span>
+            <span className={`material-symbols-outlined text-xs transition-transform ${showOverlaySection ? 'rotate-180' : ''}`}>
+              expand_more
+            </span>
+          </button>
 
-      {/* Footer - Overlay Controls */}
-      <div className="border-t border-border-dark bg-bg-dark p-4 space-y-3">
-        {/* Custom dataset opacity control */}
-        {isCustom && customDataset && (
-          <div className="space-y-2">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              Overlay Opacity
-            </h4>
-            <div className="flex items-center gap-2 px-2 py-2 bg-[#0a0f18] rounded border border-[#232f48]">
-              <span className="text-[9px] text-[#6b7c9c] uppercase">Opacity</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={customDataset.opacity}
-                onChange={(e) => onCustomDatasetOpacity?.(customDataset.id, Number(e.target.value))}
-                className="flex-1 h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer
-                  [&::-webkit-slider-thumb]:appearance-none
-                  [&::-webkit-slider-thumb]:h-3
-                  [&::-webkit-slider-thumb]:w-3
-                  [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:bg-fuchsia-400
-                  [&::-webkit-slider-thumb]:cursor-pointer"
-              />
-              <span className="text-[10px] text-white font-mono w-8 text-right">
-                {customDataset.opacity}%
-              </span>
-            </div>
-          </div>
-        )}
+          {showOverlaySection && (
+            <div className="mt-2 space-y-2">
+              {/* Custom dataset opacity control */}
+              {isCustom && customDataset && (
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    Overlay Opacity
+                  </h4>
+                  <div className="flex items-center gap-2 px-2 py-2 bg-[#0a0f18] rounded border border-[#232f48]">
+                    <span className="text-[9px] text-[#6b7c9c] uppercase">Opacity</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={customDataset.opacity}
+                      onChange={(e) => onCustomDatasetOpacity?.(customDataset.id, Number(e.target.value))}
+                      className="flex-1 h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer
+                        [&::-webkit-slider-thumb]:appearance-none
+                        [&::-webkit-slider-thumb]:h-3
+                        [&::-webkit-slider-thumb]:w-3
+                        [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-fuchsia-400
+                        [&::-webkit-slider-thumb]:cursor-pointer"
+                    />
+                    <span className="text-[10px] text-white font-mono w-8 text-right">
+                      {customDataset.opacity}%
+                    </span>
+                  </div>
+                </div>
+              )}
 
-        {/* Standard overlay controls for non-custom instruments */}
-        {!isCustom && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-              Overlay
-            </h4>
-            {activeOverlay && (
-              <button
-                onClick={() => setShowOpacity(!showOpacity)}
-                className={`p-1 rounded transition-colors ${
-                  showOpacity ? "text-primary bg-primary/20" : "text-slate-500 hover:text-slate-300"
-                }`}
-                title="Adjust opacity"
-              >
-                <span className="material-symbols-outlined text-sm">opacity</span>
-              </button>
-            )}
-          </div>
+              {/* Standard overlay controls for non-custom instruments */}
+              {!isCustom && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                      Overlay
+                    </h4>
+                    {activeOverlay && (
+                      <button
+                        onClick={() => setShowOpacity(!showOpacity)}
+                        className={`p-1 rounded transition-colors ${
+                          showOpacity ? "text-primary bg-primary/20" : "text-slate-500 hover:text-slate-300"
+                        }`}
+                        title="Adjust opacity"
+                      >
+                        <span className="material-symbols-outlined text-sm">opacity</span>
+                      </button>
+                    )}
+                  </div>
 
-          {/* Overlay type buttons */}
-          <div className="grid grid-cols-3 gap-1.5">
-            {displayOverlays.map((type) => {
-              const config = OVERLAY_CONFIG[type];
-              const isActive = activeOverlay?.type === type;
-              const isDisabled = type === "highres" && !hasHighResData;
+                  {/* Overlay type buttons */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {displayOverlays.map((type) => {
+                      const config = OVERLAY_CONFIG[type];
+                      const isActive = activeOverlay?.type === type;
+                      const isDisabled = type === "highres" && !hasHighResData;
 
-              return (
-                <button
-                  key={type}
-                  onClick={() => {
-                    if (isDisabled) return;
-                    onSetOverlay(isActive ? null : type);
-                  }}
-                  disabled={isDisabled}
-                  className={`flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                    isDisabled
-                      ? "bg-slate-800 text-slate-600 cursor-not-allowed"
-                      : isActive
-                      ? config.activeClass
-                      : "bg-surface-dark border border-border-dark text-slate-400 hover:border-slate-500"
-                  }`}
-                  title={isDisabled ? "No high-res data available" : config.label}
-                >
-                  <span className="material-symbols-outlined text-xs">
-                    {isActive ? "check_circle" : config.icon}
-                  </span>
-                  {config.label}
-                </button>
-              );
-            })}
-          </div>
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => {
+                            if (isDisabled) return;
+                            onSetOverlay(isActive ? null : type);
+                          }}
+                          disabled={isDisabled}
+                          className={`flex items-center justify-center gap-1 px-2 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${
+                            isDisabled
+                              ? "bg-slate-800 text-slate-600 cursor-not-allowed"
+                              : isActive
+                              ? config.activeClass
+                              : "bg-surface-dark border border-border-dark text-slate-400 hover:border-slate-500"
+                          }`}
+                          title={isDisabled ? "No high-res data available" : config.label}
+                        >
+                          <span className="material-symbols-outlined text-xs">
+                            {isActive ? "check_circle" : config.icon}
+                          </span>
+                          {config.label}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-          {/* Opacity slider */}
-          {activeOverlay && showOpacity && (
-            <div className="flex items-center gap-2 px-2 py-2 bg-[#0a0f18] rounded border border-[#232f48]">
-              <span className="text-[9px] text-[#6b7c9c] uppercase">Opacity</span>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={activeOverlay.opacity}
-                onChange={(e) => onSetOpacity?.(Number(e.target.value))}
-                className="flex-1 h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer
-                  [&::-webkit-slider-thumb]:appearance-none
-                  [&::-webkit-slider-thumb]:h-3
-                  [&::-webkit-slider-thumb]:w-3
-                  [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:bg-primary
-                  [&::-webkit-slider-thumb]:cursor-pointer"
-              />
-              <span className="text-[10px] text-white font-mono w-8 text-right">
-                {activeOverlay.opacity}%
-              </span>
-            </div>
-          )}
+                  {/* Opacity slider */}
+                  {activeOverlay && showOpacity && (
+                    <div className="flex items-center gap-2 px-2 py-2 bg-[#0a0f18] rounded border border-[#232f48]">
+                      <span className="text-[9px] text-[#6b7c9c] uppercase">Opacity</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={activeOverlay.opacity}
+                        onChange={(e) => onSetOpacity?.(Number(e.target.value))}
+                        className="flex-1 h-1 bg-[#232f48] rounded-lg appearance-none cursor-pointer
+                          [&::-webkit-slider-thumb]:appearance-none
+                          [&::-webkit-slider-thumb]:h-3
+                          [&::-webkit-slider-thumb]:w-3
+                          [&::-webkit-slider-thumb]:rounded-full
+                          [&::-webkit-slider-thumb]:bg-primary
+                          [&::-webkit-slider-thumb]:cursor-pointer"
+                      />
+                      <span className="text-[10px] text-white font-mono w-8 text-right">
+                        {activeOverlay.opacity}%
+                      </span>
+                    </div>
+                  )}
 
-          {/* Current overlay status */}
-          {activeOverlay && (
-            <div className="flex items-center justify-between px-2 py-1.5 bg-green-500/10 rounded border border-green-500/30">
-              <span className="text-[10px] text-green-400">
-                {OVERLAY_CONFIG[activeOverlay.type].label} overlay active
-              </span>
-              <button
-                onClick={() => onSetOverlay(null)}
-                className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-              >
-                Turn Off
-              </button>
+                  {/* Current overlay status */}
+                  {activeOverlay && (
+                    <div className="flex items-center justify-between px-2 py-1.5 bg-green-500/10 rounded border border-green-500/30">
+                      <span className="text-[10px] text-green-400">
+                        {OVERLAY_CONFIG[activeOverlay.type].label} overlay active
+                      </span>
+                      <button
+                        onClick={() => onSetOverlay(null)}
+                        className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                      >
+                        Turn Off
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
-        )}
 
-        {/* Show 3D View button (HiRISE DTM) */}
-        {isDTM && selected && onShow3DView && (
-          <button
-            onClick={() => onShow3DView(selected.productId, selected.lat, selected.lon)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold uppercase tracking-widest bg-amber-600/20 border border-amber-600/50 text-amber-500 hover:bg-amber-600/30 shadow-lg shadow-amber-600/10 active:scale-[0.98] transition-all"
-          >
-            <span className="material-symbols-outlined text-sm">terrain</span>
-            Show 3D View
+        {/* ── Action Buttons ── */}
+        <div className="mt-3 space-y-2">
+          {/* Show 3D View button (HiRISE DTM) */}
+          {isDTM && selected && onShow3DView && (
+            <button
+              onClick={() => onShow3DView(selected.productId, selected.lat, selected.lon)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg py-3 text-xs font-bold uppercase tracking-widest bg-amber-600/20 border border-amber-600/50 text-amber-500 hover:bg-amber-600/30 shadow-lg shadow-amber-600/10 active:scale-[0.98] transition-all"
+            >
+              <span className="material-symbols-outlined text-sm">terrain</span>
+              Show 3D View
+            </button>
+          )}
+
+          {/* Field Note button */}
+          {selected && onOpenFieldNote && (
+            <button
+              onClick={() => onOpenFieldNote(selected.productId, selected.instrument, selected.lat, selected.lon)}
+              className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold uppercase tracking-widest transition-all active:scale-[0.98] ${
+                hasNote
+                  ? "bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30"
+                  : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:text-amber-400 hover:border-amber-500/30"
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">
+                {hasNote ? "description" : "note_add"}
+              </span>
+              {hasNote ? `Field Notes (${noteCount})` : "Add Field Note"}
+            </button>
+          )}
+
+          {/* Classify Landform button (HiRISE only) */}
+          {isHiRISE && (
+            <button
+              onClick={() => setShowLandformPanel(!showLandformPanel)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-violet-500/20 border border-violet-500/50 text-violet-400 hover:bg-violet-500/30 transition-all active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-sm">image_search</span>
+              Classify Landform
+            </button>
+          )}
+
+          {/* Quick Actions Bar */}
+          {selected && selected.instrument !== "CUSTOM" && (
+            <div className="grid grid-cols-2 gap-2">
+              {/* Download */}
+              {onDownloadProduct && (
+                <button
+                  onClick={() => onDownloadProduct(selected.productId, selected.instrument)}
+                  className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30 transition-all active:scale-[0.98]"
+                >
+                  <span className="material-symbols-outlined text-sm">download</span>
+                  Download
+                </button>
+              )}
+
+              {/* Find Related */}
+              {onFindRelated && (
+                <button
+                  onClick={() => onFindRelated(selected.productId, selected.instrument)}
+                  className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-purple-500/20 border border-purple-500/50 text-purple-400 hover:bg-purple-500/30 transition-all active:scale-[0.98]"
+                >
+                  <span className="material-symbols-outlined text-sm">hub</span>
+                  Related
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Find Temporal Pairs */}
+          {selected && selected.instrument !== "CUSTOM" && onFindTemporalPairs && (
+            <button
+              onClick={() => onFindTemporalPairs(selected.lat, selected.lon, selected.instrument)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30 transition-all active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-sm">compare</span>
+              Find Temporal Pairs
+            </button>
+          )}
+
+          <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all">
+            <span className="material-symbols-outlined text-sm">ios_share</span>
+            Export Statistics
           </button>
-        )}
+        </div>
 
-        {/* Field Note button */}
-        {selected && onOpenFieldNote && (
-          <button
-            onClick={() => onOpenFieldNote(selected.productId, selected.instrument, selected.lat, selected.lon)}
-            className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold uppercase tracking-widest transition-all active:scale-[0.98] ${
-              hasNote
-                ? "bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30"
-                : "bg-[#1a2333] border border-[#232f48] text-[#92a4c9] hover:text-amber-400 hover:border-amber-500/30"
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">
-              {hasNote ? "description" : "note_add"}
-            </span>
-            {hasNote ? `Field Notes (${noteCount})` : "Add Field Note"}
-          </button>
-        )}
-
-        {/* Classify Landform button (HiRISE only) */}
-        {isHiRISE && (
-          <button
-            onClick={() => setShowLandformPanel(!showLandformPanel)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-violet-500/20 border border-violet-500/50 text-violet-400 hover:bg-violet-500/30 transition-all active:scale-[0.98]"
-          >
-            <span className="material-symbols-outlined text-sm">image_search</span>
-            Classify Landform
-          </button>
-        )}
-
-        {/* Quick Actions Bar */}
-        {selected && selected.instrument !== "CUSTOM" && (
-          <div className="grid grid-cols-2 gap-2">
-            {/* Download */}
-            {onDownloadProduct && (
-              <button
-                onClick={() => onDownloadProduct(selected.productId, selected.instrument)}
-                className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30 transition-all active:scale-[0.98]"
-              >
-                <span className="material-symbols-outlined text-sm">download</span>
-                Download
-              </button>
-            )}
-
-            {/* Find Related */}
-            {onFindRelated && (
-              <button
-                onClick={() => onFindRelated(selected.productId, selected.instrument)}
-                className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-purple-500/20 border border-purple-500/50 text-purple-400 hover:bg-purple-500/30 transition-all active:scale-[0.98]"
-              >
-                <span className="material-symbols-outlined text-sm">hub</span>
-                Related
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Find Temporal Pairs */}
-        {selected && selected.instrument !== "CUSTOM" && onFindTemporalPairs && (
-          <button
-            onClick={() => onFindTemporalPairs(selected.lat, selected.lon, selected.instrument)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-[10px] font-bold uppercase tracking-widest bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30 transition-all active:scale-[0.98]"
-          >
-            <span className="material-symbols-outlined text-sm">compare</span>
-            Find Temporal Pairs
-          </button>
-        )}
-
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all">
-          <span className="material-symbols-outlined text-sm">ios_share</span>
-          Export Statistics
-        </button>
-
-        {/* HiRISE Landform Classification */}
+        {/* ── HiRISE Landform Classification ── */}
         {showLandformPanel && isHiRISE && (
           <div className="border-t border-border-dark -mx-4 mt-4">
             <HiriseLandformPanel
@@ -834,7 +859,6 @@ export default function Inspector({
           </div>
         )}
       </div>
-
 
     </aside>
   );
