@@ -380,10 +380,14 @@ SWIM thermal ice detection uses a two-layer model (dry regolith over ice-cemente
    a. Sample SWIM thermal consistency at (lat, lon)
    b. Also sample raw TI from existing 20 ppd grid
    c. Return both: SWIM consistency score + raw TI value + ice interpretation
-3. Apply ice thresholds:
-   - TI > 600 TIU at mid-latitudes → possible ice-cemented (C_thermal = +1)
-   - TI 200–600 TIU → ambiguous (C_thermal = 0)
-   - TI < 200 TIU → fine dust, inconsistent with ice (C_thermal = −1)
+3. SWIM consistency values already encode ice interpretation:
+   - C_thermal = +1: ice-cemented ground consistent
+   - C_thermal = 0: ambiguous
+   - C_thermal = -1: inconsistent with ice
+4. Reference TI thresholds (for display context only, NOT for computing C_thermal):
+   - TI > 600 TIU at mid-latitudes → possible ice-cemented
+   - TI 200–600 TIU → ambiguous
+   - TI < 200 TIU → fine dust, unlikely ice
 ```
 
 ### API Endpoints (extend existing)
@@ -665,7 +669,7 @@ C_I[depth] = (Σ w_i × C_i) / (Σ w_i)
 
 where:
   C_i = consistency score from method i ∈ {-1, 0, +1}
-  w_i = weight for method i (from SWIM Table 1)
+  w_i = weight for method i (from SWIM Table 1, listed below)
   Sum is over methods applicable to that depth range
 
 Depth range → contributing methods:
@@ -678,6 +682,19 @@ Output: C_I ∈ [-1, +1]
    0 = mixed/ambiguous evidence
   -1 = all evidence inconsistent with ice
 ```
+
+**SWIM Method Weights (from Morgan & Putzig 2025, Table 1):**
+
+| Method | 0–1 m | 1–5 m | >5 m |
+|---|---|---|---|
+| Neutron spectroscopy | 1.0 | — | — |
+| Thermal inertia | 1.0 | — | — |
+| Radar surface power | 1.0 | 1.0 | — |
+| Radar dielectric | — | 1.0 | 1.0 |
+| Geomorphic (shallow) | 1.0 | 1.0 | — |
+| Geomorphic (deep) | — | — | 1.0 |
+
+**Note**: Weights shown are equal (1.0) per the SWIM framework. Custom weighting via the POST endpoint allows users to adjust. "—" means the method does not contribute to that depth range.
 
 ### Two Operating Modes
 
@@ -789,7 +806,7 @@ const swimLayer = new Cesium.UrlTemplateImageryProvider({
   url: '/api/swim-ice/{method}/tile/{z}/{x}/{y}.png',
   minimumLevel: 2,
   maximumLevel: 8,    // ~3 km native resolution limits useful zoom
-  rectangle: Cesium.Rectangle.fromDegrees(0, -60, 360, 60)
+  rectangle: Cesium.Rectangle.fromDegrees(-180, -60, 180, 60)  // post-CRS-conversion bounds
 });
 ```
 
@@ -908,8 +925,10 @@ frontend/src/components/LayerPanel.tsx      # Add SWIM method layer group
 | Thermal consistency | " | ~50 MB | ~3 km/px |
 | Radar surface power | " | ~50 MB | ~3 km/px |
 | Radar dielectric (2 depths) | " | ~100 MB | ~3 km/px |
+| Combined consistency SWIM 1.0 | " | ~50 MB | ~3 km/px |
+| SWIM Reconnaissance Zones | " | ~5 MB | Shapefile |
 
-**Total estimated**: ~550 MB of GeoTIFF data
+**Total estimated**: ~650 MB of GeoTIFF data + ~5 MB Shapefile
 
 **Projection**: Simple cylindrical, Mars sphere, 0–360°E, ±60° latitude
 **No-data value**: −30
