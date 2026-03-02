@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
@@ -9,149 +11,147 @@ from analysis.hirise_landforms.models import ClassifyRequest
 
 router = APIRouter(prefix="/api/hirise-landforms", tags=["HiRISE Landform Classification"])
 
-_pipeline: object | None = None
-_job_queue: object | None = None
+_job_queue: Any = None
 
 
-def _to_dict(value: object) -> dict[str, object]:
-    if isinstance(value, dict):
-        return value
-    model_dump = getattr(value, "model_dump", None)
-    if callable(model_dump):
-        dumped = model_dump()
-        if isinstance(dumped, dict):
-            return dumped
-    return {"value": value}
-
-
-def _get_pipeline() -> object:
-    global _pipeline
-    if _pipeline is None:
-        try:
-            from analysis.hirise_landforms.pipeline import HiriseLandformPipeline
-        except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"HiRISE landform pipeline unavailable: {exc}")
-        _pipeline = HiriseLandformPipeline()
-    return _pipeline
-
-
-def _get_job_queue() -> object:
+def _get_job_queue() -> Any:
     global _job_queue
-    if _job_queue is None:
-        try:
-            from analysis.hirise_landforms.job_queue import LandformJobQueue
-        except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"HiRISE job queue unavailable: {exc}")
-        _job_queue = LandformJobQueue()
+    if _job_queue is not None:
+        return _job_queue
+    try:
+        from analysis.hirise_landforms.job_queue import LandformJobQueue
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"HiRISE job queue unavailable: {exc}")
+    _job_queue = LandformJobQueue()
+    # Start the async worker
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_job_queue.start_worker())
+    except RuntimeError:
+        pass
     return _job_queue
 
 
-def _find_callable(target: object, names: tuple[str, ...]):
-    for name in names:
-        method = getattr(target, name, None)
-        if callable(method):
-            return method
-    return None
+def _flatten_result(raw: dict[str, Any]) -> dict[str, Any]:
+    """
+    Flatten the nested ClassifyResult into the shape the frontend expects:
+    { product_id, model, top_class, confidence, classes[], processing_time_s, heatmap_url, agent_reasoning, ... }
+    """
+    result = raw.get("result")
+    if result is None:
+        return raw
+
+    # If result is already a dict (from model_dump), flatten prediction
+    if isinstance(result, dict):
+        prediction = result.get("prediction", {})
+        probabilities = prediction.get("probabilities", {})
+
+        # Build classes array for frontend
+        classes = []
+        class_descriptions = {
+            "LDA": "Lobate Debris Apron",
+            "LVF": "Lineated Valley Fill",
+            "CCF": "Concentric Crater Fill",
+            "GLF": "Glacier-Like Form",
+            "BACKGROUND": "Background",
+        }
+        for class_code, prob in probabilities.items():
+            classes.append({
+                "class_code": class_code,
+                "class_name": class_descriptions.get(class_code, class_code),
+                "probability": prob,
+            })
+
+        flat_result = {
+            "product_id": result.get("product_id", ""),
+            "model": result.get("model_used", "v2"),
+            "top_class": prediction.get("top_class", "BACKGROUND"),
+            "confidence": prediction.get("confidence", 0.0),
+            "classes": classes,
+            "heatmap_url": result.get("heatmap_url"),
+            "processing_time_s": result.get("processing_time_s", 0.0),
+            "agent_reasoning": result.get("agent_reasoning"),
+            "num_tiles": result.get("num_tiles", 0),
+            "device": result.get("device", "cpu"),
+        }
+
+        return {**raw, "result": flat_result}
+    return raw
 
 
 @router.post("/classify")
 async def classify_hirise_landforms(request: ClassifyRequest):
     queue = _get_job_queue()
-    pipeline = _get_pipeline()
-    submit = _find_callable(queue, ("submit", "submit_job", "enqueue", "enqueue_job"))
-    if submit is None:
-        raise HTTPException(status_code=503, detail="HiRISE classify submission endpoint unavailable")
 
     try:
-        submitted = submit(request, pipeline)
-    except TypeError:
-        submitted = submit(req=request, pipeline=pipeline)
+        job_id = queue.submit(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=429, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to submit job: {exc}")
 
-    data = _to_dict(submitted)
-    job_id = data.get("job_id")
-    if not isinstance(job_id, str) or not job_id:
-        raise HTTPException(status_code=500, detail="Failed to create classification job")
+    # Ensure worker is running
+    try:
+        await queue.start_worker()
+    except Exception:
+        pass
 
-    estimate = data.get("estimated_seconds", 20)
-    if not isinstance(estimate, int):
-        try:
-            if isinstance(estimate, (float, str)):
-                estimate = int(estimate)
-            else:
-                estimate = 20
-        except Exception:
-            estimate = 20
-
-    return JSONResponse(content={"job_id": job_id, "status": data.get("status", "queued"), "estimated_seconds": estimate})
+    return JSONResponse(content={
+        "job_id": job_id,
+        "status": "queued",
+        "estimated_seconds": 30,
+    })
 
 
 @router.get("/jobs/{job_id}")
 async def get_job_status(job_id: str):
     queue = _get_job_queue()
-    getter = _find_callable(queue, ("get_job", "get_job_status", "status", "get_status"))
-    if getter is None:
-        raise HTTPException(status_code=503, detail="HiRISE job status endpoint unavailable")
-    status_data = getter(job_id)
-    if status_data is None:
+
+    try:
+        status = queue.get_status(job_id)
+    except KeyError:
         raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
-    response = _to_dict(status_data)
-    response.setdefault("job_id", job_id)
+
+    response = status.model_dump() if hasattr(status, "model_dump") else dict(status)
+    response = _flatten_result(response)
     return JSONResponse(content=response)
 
 
 @router.get("/status")
 async def get_hirise_landforms_status():
     queue = _get_job_queue()
-    pipeline = _get_pipeline()
 
-    queue_length = 0
-    for name in ("queue_length", "pending_count"):
-        value = getattr(queue, name, None)
-        if isinstance(value, int):
-            queue_length = value
-            break
-    if queue_length == 0:
-        queue_length_method = _find_callable(queue, ("get_queue_length",))
-        if queue_length_method is not None:
-            raw_length = queue_length_method()
-            if isinstance(raw_length, int):
-                queue_length = raw_length
+    queue_length = queue._queue.qsize() if hasattr(queue, "_queue") else 0
+    active_job = getattr(queue, "active_job", None)
 
-    active_job = None
-    for name in ("active_job", "current_job_id", "processing_job"):
-        value = getattr(queue, name, None)
-        if isinstance(value, str) and value:
-            active_job = value
-            break
+    pipeline_status: dict[str, Any] = {}
+    pipeline = getattr(queue, "_pipeline", None)
+    if pipeline is not None and hasattr(pipeline, "status"):
+        try:
+            pipeline_status = pipeline.status()
+        except Exception:
+            pass
 
-    pipeline_status: dict[str, object] = {}
-    status_getter = _find_callable(pipeline, ("status", "get_status", "runtime_status", "get_runtime_status"))
-    if status_getter is not None:
-        pipeline_status = _to_dict(status_getter())
-
-    return JSONResponse(
-        content={
-            "models_loaded": pipeline_status.get("models_loaded", []),
-            "device": pipeline_status.get("device", "unknown"),
-            "memory_mb": pipeline_status.get("memory_mb", 0.0),
-            "queue_length": queue_length,
-            "active_job": active_job,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    )
+    return JSONResponse(content={
+        "models_loaded": pipeline_status.get("models_loaded", []),
+        "device": pipeline_status.get("device", "unknown"),
+        "memory_mb": pipeline_status.get("memory_mb", 0.0),
+        "queue_length": queue_length,
+        "active_job": active_job,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
 
 
 @router.get("/classify/{product_id}")
 async def get_cached_classification(product_id: str):
     queue = _get_job_queue()
-    pipeline = _get_pipeline()
 
-    for target in (queue, pipeline):
-        cached_getter = _find_callable(target, ("get_cached_result", "get_cached", "cached_result"))
-        if cached_getter is None:
-            continue
-        cached = cached_getter(product_id)
-        if cached is not None:
-            return JSONResponse(content=_to_dict(cached))
+    # Check cache in job queue
+    cache = getattr(queue, "_cache", {})
+    for key, (expires_at, result) in cache.items():
+        if key[0] == product_id and expires_at > datetime.now(timezone.utc):
+            result_dict = result.model_dump() if hasattr(result, "model_dump") else dict(result)
+            flat = _flatten_result({"result": result_dict})
+            return JSONResponse(content=flat.get("result", result_dict))
 
     raise HTTPException(status_code=404, detail=f"No cached classification for product_id={product_id}")

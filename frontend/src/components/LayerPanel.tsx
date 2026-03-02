@@ -10,14 +10,6 @@ type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" |
 type InstrumentVisibility = Record<InstrumentId, boolean>;
 type FootprintCount = { count: number; truncated: boolean; total: number } | null;
 
-/**
- * Extract CRISM observation ID from full product ID
- * e.g., "frt0001fd76_07_if166j_mtr3" -> "frt0001fd76"
- */
-function extractCrismObsId(productId: string): string {
-  const match = productId.match(/^([a-z]{3}[0-9a-f]{8})/i);
-  return match ? match[1]!.toLowerCase() : productId.toLowerCase();
-}
 
 // Static Tailwind class lookup per instrument (avoids dynamic class issues)
 const INST_STYLES: Record<InstrumentId, {
@@ -128,153 +120,6 @@ function OverlapFilterSection({
   );
 }
 
-// Ice Score Filter state
-export interface IceScoreFilter {
-  enabled: boolean;
-  minScore: number;     // threshold m (0.05 - 1.5)
-  minPercent: number;   // percentage n (0 - 100)
-}
-
-// Available thresholds (must match backend)
-const SCORE_THRESHOLDS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5];
-
-// Ice Score Filter Section Component
-function IceScoreFilterSection({
-  filter,
-  onChange,
-  filteredCount,
-  totalLoaded,
-}: {
-  filter?: IceScoreFilter;
-  onChange?: (filter: IceScoreFilter) => void;
-  filteredCount: number | null;
-  totalLoaded: number;  // Total loaded CRISM footprints
-}) {
-  const [isCollapsed, setIsCollapsed] = useState(true);
-
-  // Default filter values
-  const currentFilter = filter ?? { enabled: false, minScore: 0.3, minPercent: 5 };
-
-  const handleToggle = () => {
-    onChange?.({ ...currentFilter, enabled: !currentFilter.enabled });
-  };
-
-  const handleScoreChange = (value: number) => {
-    onChange?.({ ...currentFilter, minScore: value });
-  };
-
-  const handlePercentChange = (value: number) => {
-    onChange?.({ ...currentFilter, minPercent: value });
-  };
-
-  // Find closest threshold index for slider
-  const scoreIndex = SCORE_THRESHOLDS.findIndex(t => t >= currentFilter.minScore);
-  const currentScoreIndex = scoreIndex === -1 ? SCORE_THRESHOLDS.length - 1 : scoreIndex;
-
-  return (
-    <div className="p-4 border-b border-[#232f48]">
-      {/* Header */}
-      <div
-        className="flex items-center justify-between mb-2 cursor-pointer"
-        onClick={() => setIsCollapsed(!isCollapsed)}
-      >
-        <h3 className="text-[#92a4c9] text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
-          <span className="material-symbols-outlined text-xs">
-            {isCollapsed ? "expand_more" : "expand_less"}
-          </span>
-          Ice Score Filter
-        </h3>
-        <div className="flex items-center gap-2">
-          {currentFilter.enabled && filteredCount !== null && totalLoaded > 0 && (
-            <span className="text-sky-400 text-[10px] font-mono">{filteredCount}/{totalLoaded}</span>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleToggle();
-            }}
-            className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase transition-colors ${
-              currentFilter.enabled
-                ? "bg-sky-500/20 text-sky-400 border border-sky-500/30"
-                : "bg-[#1a2333] text-[#6b7c9c] border border-[#232f48] hover:border-[#3a4a68]"
-            }`}
-          >
-            {currentFilter.enabled ? "ON" : "OFF"}
-          </button>
-        </div>
-      </div>
-
-      {!isCollapsed && (
-        <div className="space-y-4">
-          {/* Min Score Threshold */}
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-[9px] text-[#6b7c9c] uppercase">Min Ice Score</label>
-              <span className="text-[11px] text-white font-mono">{currentFilter.minScore.toFixed(2)}</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max={SCORE_THRESHOLDS.length - 1}
-              value={currentScoreIndex}
-              onChange={(e) => handleScoreChange(SCORE_THRESHOLDS[Number(e.target.value)]!)}
-              disabled={!currentFilter.enabled}
-              className={`w-full h-1 rounded-lg appearance-none cursor-pointer
-                ${currentFilter.enabled ? "bg-[#232f48]" : "bg-[#1a2333] opacity-50"}
-                [&::-webkit-slider-thumb]:appearance-none
-                [&::-webkit-slider-thumb]:h-3
-                [&::-webkit-slider-thumb]:w-3
-                [&::-webkit-slider-thumb]:rounded-full
-                [&::-webkit-slider-thumb]:bg-sky-400
-                [&::-webkit-slider-thumb]:cursor-pointer`}
-            />
-            <div className="flex justify-between text-[8px] text-[#4a5a7c] mt-0.5">
-              <span>0.05</span>
-              <span>0.5</span>
-              <span>1.0</span>
-              <span>1.5</span>
-            </div>
-          </div>
-
-          {/* Min Percentage */}
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-[9px] text-[#6b7c9c] uppercase">Min % of Pixels</label>
-              <span className="text-[11px] text-white font-mono">{currentFilter.minPercent}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="50"
-              value={currentFilter.minPercent}
-              onChange={(e) => handlePercentChange(Number(e.target.value))}
-              disabled={!currentFilter.enabled}
-              className={`w-full h-1 rounded-lg appearance-none cursor-pointer
-                ${currentFilter.enabled ? "bg-[#232f48]" : "bg-[#1a2333] opacity-50"}
-                [&::-webkit-slider-thumb]:appearance-none
-                [&::-webkit-slider-thumb]:h-3
-                [&::-webkit-slider-thumb]:w-3
-                [&::-webkit-slider-thumb]:rounded-full
-                [&::-webkit-slider-thumb]:bg-sky-400
-                [&::-webkit-slider-thumb]:cursor-pointer`}
-            />
-            <div className="flex justify-between text-[8px] text-[#4a5a7c] mt-0.5">
-              <span>0%</span>
-              <span>25%</span>
-              <span>50%</span>
-            </div>
-          </div>
-
-          {/* Description */}
-          <p className="text-[8px] text-[#6b7c9c] leading-relaxed">
-            Show CRISM products where at least <span className="text-sky-400 font-bold">{currentFilter.minPercent}%</span> of
-            pixels have ice score ≥ <span className="text-sky-400 font-bold">{currentFilter.minScore.toFixed(2)}</span>
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
 
 interface LayerPanelProps {
   // Map mode (2D/3D)
@@ -298,10 +143,6 @@ interface LayerPanelProps {
   footprintsLoading?: Record<string, boolean>;
   footprintCounts?: Record<string, FootprintCount>;
 
-  // Ice Score Filter
-  iceScoreFilter?: IceScoreFilter;
-  onIceScoreFilterChange?: (filter: IceScoreFilter) => void;
-  filteredProductIds?: Set<string> | null;  // null = not filtering, Set = filtered IDs
 
   // Product data
   visibleProducts?: VisibleProduct[];
@@ -609,10 +450,7 @@ export default function LayerPanel({
   onLoadFootprints,
   footprintsLoading = {},
   footprintCounts = {},
-  // Ice Score Filter
-  iceScoreFilter,
-  onIceScoreFilterChange,
-  filteredProductIds,
+  // Data
   // Data
   visibleProducts = [],
   activeOverlays = new Map(),
@@ -711,20 +549,6 @@ export default function LayerPanel({
   // Count active overlays
   const totalActiveOverlays = activeOverlays.size;
 
-  // Compute count of VISIBLE CRISM products that pass the ice score filter
-  // This shows how many loaded footprints pass, not the total in database
-  const filteredVisibleCount = useMemo(() => {
-    if (!filteredProductIds || !iceScoreFilter?.enabled) return null;
-
-    // Count visible CRISM products that pass the filter
-    const crismProducts = visibleProducts.filter(p => p.instrument === "CRISM");
-    const passingCount = crismProducts.filter(p => {
-      const obsId = extractCrismObsId(p.productId);
-      return filteredProductIds.has(obsId);
-    }).length;
-
-    return passingCount;
-  }, [visibleProducts, filteredProductIds, iceScoreFilter?.enabled]);
 
   // Collapsed state - show thin bar with toggle button (desktop only)
   if (isCollapsed && !isMobile) {
@@ -1294,13 +1118,6 @@ export default function LayerPanel({
           stats={overlapStats}
         />
 
-        {/* Ice Score Filter Section */}
-        <IceScoreFilterSection
-          filter={iceScoreFilter}
-          onChange={onIceScoreFilterChange}
-          filteredCount={filteredVisibleCount}
-          totalLoaded={visibleProducts.filter(p => p.instrument === "CRISM").length}
-        />
 
         {/* Field Notes Section */}
         <FieldNotesSection

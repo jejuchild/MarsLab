@@ -10,7 +10,6 @@ import type { TerrainPoint } from "../components/SlopeAnalysis";
 import type { ProfilePoint } from "../components/LineProfile";
 import TopBar from "../components/TopBar";
 import LayerPanelRaw from "../components/LayerPanel";
-import type { IceScoreFilter } from "../components/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
 import FieldNoteModal from "../components/FieldNoteModal";
 import AiAnalysisPanelRaw from "../components/AiAnalysisPanel";
@@ -368,12 +367,6 @@ export default function MainPage() {
   // Track which products have high-res data available
   const [productsWithHighRes, setProductsWithHighRes] = useState<Set<string>>(new Set());
 
-  // Ice score filter state
-  const [iceScoreFilter, setIceScoreFilter] = useState<IceScoreFilter>({
-    enabled: false,
-    minScore: 0.3,
-    minPercent: 5,
-  });
 
   // Multi-Instrument Overlap Filter
   const [overlapFilter, setOverlapFilter] = useState<OverlapFilter>({
@@ -405,8 +398,8 @@ export default function MainPage() {
   const [customDataLoading, setCustomDataLoading] = useState(false);
   const [customDatasets, setCustomDatasets] = useState<CustomDataset[]>([]);
 
-  // Filtered product IDs from API (null when not filtering, Set when filtering)
-  const [filteredProductIds, setFilteredProductIds] = useState<Set<string> | null>(null);
+  // Filtered product IDs (null = no filtering active)
+  const [filteredProductIds] = useState<Set<string> | null>(null);
 
   // Field Notes state
   // (field notes state moved to useFieldNotes hook)
@@ -1113,32 +1106,6 @@ export default function MainPage() {
     }
   }, [visibleProducts]);
 
-  // Fetch filtered product IDs when ice score filter changes
-  useEffect(() => {
-    if (!iceScoreFilter.enabled) {
-      setFilteredProductIds(null);
-      return;
-    }
-
-    const fetchFilteredIds = async () => {
-      try {
-        const params = new URLSearchParams({
-          min_score: iceScoreFilter.minScore.toString(),
-          min_percent: iceScoreFilter.minPercent.toString(),
-        });
-        const response = await fetch(`/api/filter/ice?${params}`);
-        if (response.ok) {
-          const data = await response.json();
-          setFilteredProductIds(new Set(data.passing_ids));
-        }
-      } catch (e) {
-        console.error("Failed to fetch filtered IDs:", e);
-        setFilteredProductIds(null);
-      }
-    };
-
-    fetchFilteredIds();
-  }, [iceScoreFilter.enabled, iceScoreFilter.minScore, iceScoreFilter.minPercent]);
 
   // Mobile auto-open is handled by panelManager.ensurePanelVisible() at each trigger point
 
@@ -1588,10 +1555,6 @@ export default function MainPage() {
       onLoadFootprints={handleLoadFootprints}
       footprintsLoading={footprintsLoading}
       footprintCounts={footprintCounts}
-      // Ice Score Filter
-      iceScoreFilter={iceScoreFilter}
-      onIceScoreFilterChange={setIceScoreFilter}
-      filteredProductIds={filteredProductIds}
       // Product data
       visibleProducts={visibleProducts}
       activeOverlays={activeOverlays}

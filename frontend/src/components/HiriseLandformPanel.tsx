@@ -6,6 +6,7 @@ import {
   type ModelType,
   type ClassifyResult,
   type JobStatus,
+  type AgentReasoning,
 } from "../api/hirise_landforms";
 
 /* =========================================================
@@ -14,6 +15,131 @@ import {
 export interface HiriseLandformPanelProps {
   productId: string;
   onClose: () => void;
+}
+
+/* =========================================================
+ * Agent Reasoning Sub-component
+ * =======================================================*/
+function AgentReasoningPanel({ reasoning }: { reasoning: AgentReasoning }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!reasoning.enabled) return null;
+
+  const hasError = !!reasoning.error;
+  const hasChain = reasoning.reasoning_chain.length > 0;
+
+  return (
+    <div className="flex flex-col gap-1.5 rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
+      {/* Header */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 text-left"
+      >
+        <span className="material-symbols-outlined text-[14px] text-amber-400">
+          psychology
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">
+          VLM Agent Reasoning
+        </span>
+        <span className="ml-auto flex items-center gap-1">
+          {reasoning.num_steps > 0 && (
+            <span className="rounded bg-amber-600/20 px-1 py-0.5 text-[8px] text-amber-400">
+              {reasoning.num_steps} step{reasoning.num_steps !== 1 ? "s" : ""}
+            </span>
+          )}
+          <span className="material-symbols-outlined text-[12px] text-[#92a4c9]">
+            {expanded ? "expand_less" : "expand_more"}
+          </span>
+        </span>
+      </button>
+
+      {/* Summary line */}
+      <div className="flex items-center gap-2 text-[9px] text-[#92a4c9]">
+        <span>Mode: {reasoning.mode}</span>
+        {reasoning.tools_used.length > 0 && (
+          <span>· Tools: {reasoning.tools_used.join(", ")}</span>
+        )}
+        {reasoning.landform_class && (
+          <span>
+            · Result: {reasoning.landform_class} (
+            {reasoning.confidence != null
+              ? `${Math.round(reasoning.confidence * 100)}%`
+              : "?"}
+            )
+          </span>
+        )}
+      </div>
+
+      {/* Error */}
+      {hasError && (
+        <div className="rounded border border-red-500/20 bg-red-500/5 px-2 py-1 text-[9px] text-red-400">
+          {reasoning.error}
+        </div>
+      )}
+
+      {/* Expanded reasoning chain */}
+      {expanded && hasChain && (
+        <div className="flex flex-col gap-1 border-t border-amber-500/10 pt-1.5">
+          {reasoning.reasoning_chain.map((step, idx) => (
+            <div
+              key={idx}
+              className="flex flex-col gap-0.5 rounded bg-[#0d1520] px-2 py-1"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="rounded bg-[#1a2744] px-1 py-0.5 font-mono text-[8px] text-[#92a4c9]">
+                  #{step.step}
+                </span>
+                {step.action && (
+                  <span className="rounded bg-violet-600/20 px-1 py-0.5 text-[8px] font-medium text-violet-300">
+                    {step.action}
+                  </span>
+                )}
+                {step.forced_final && (
+                  <span className="rounded bg-orange-600/20 px-1 py-0.5 text-[8px] text-orange-400">
+                    forced
+                  </span>
+                )}
+                {step.error && (
+                  <span className="rounded bg-red-600/20 px-1 py-0.5 text-[8px] text-red-400">
+                    error
+                  </span>
+                )}
+              </div>
+
+              {/* Thought */}
+              {step.thought && (
+                <p className="text-[9px] italic text-slate-400">
+                  💭 {step.thought}
+                </p>
+              )}
+
+              {/* Action input */}
+              {step.action_input &&
+                Object.keys(step.action_input).length > 0 && (
+                  <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-[#111b2a] px-1.5 py-0.5 font-mono text-[8px] text-slate-500">
+                    {JSON.stringify(step.action_input, null, 1)}
+                  </pre>
+                )}
+
+              {/* Observation (truncated) */}
+              {step.observation && (
+                <pre className="max-h-16 overflow-hidden whitespace-pre-wrap rounded bg-[#111b2a] px-1.5 py-0.5 font-mono text-[8px] text-slate-500">
+                  {typeof step.observation === "string"
+                    ? step.observation.slice(0, 300)
+                    : JSON.stringify(step.observation, null, 1).slice(0, 300)}
+                </pre>
+              )}
+
+              {/* Error */}
+              {step.error && (
+                <p className="text-[8px] text-red-400">{step.error}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* =========================================================
@@ -137,7 +263,7 @@ export default function HiriseLandformPanel({
               onChange={(e) => setModel(e.target.value as ModelType)}
               className="rounded border border-[#232f48] bg-[#111b2a] px-2 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
             >
-              <option value="v2">V2 (Standard)</option>
+              <option value="v2">V2 — DINOv2 + MIL + VLM</option>
               <option value="mars-bench">Mars-Bench</option>
             </select>
           </div>
@@ -171,7 +297,7 @@ export default function HiriseLandformPanel({
                   {jobStatus?.status === "queued"
                     ? "Queued…"
                     : jobStatus?.status === "processing"
-                      ? "Processing…"
+                      ? "Running DINOv2 + MIL inference…"
                       : "Submitting…"}
                 </span>
                 <span className="font-mono">{Math.round(progress * 100)}%</span>
@@ -210,8 +336,11 @@ export default function HiriseLandformPanel({
                     {result.top_class}
                   </span>
                   <span className="text-[9px] text-[#92a4c9]">
-                    Confidence: {Math.round(result.confidence * 100)}% ·{" "}
-                    {result.processing_time_s.toFixed(1)}s
+                    Confidence: {Math.round(result.confidence * 100)}%
+                    {result.processing_time_s != null &&
+                      ` · ${result.processing_time_s.toFixed(1)}s`}
+                    {result.num_tiles != null && ` · ${result.num_tiles} tiles`}
+                    {result.device && ` · ${result.device}`}
                   </span>
                 </div>
               </div>
@@ -222,7 +351,7 @@ export default function HiriseLandformPanel({
                   All Classes
                 </span>
                 {result.classes
-                  .sort((a, b) => b.probability - a.probability)
+                  ?.sort((a, b) => b.probability - a.probability)
                   .map((cls) => (
                     <LandformClassCard
                       key={cls.class_code}
@@ -233,6 +362,11 @@ export default function HiriseLandformPanel({
                     />
                   ))}
               </div>
+
+              {/* VLM Agent Reasoning */}
+              {result.agent_reasoning && (
+                <AgentReasoningPanel reasoning={result.agent_reasoning} />
+              )}
 
               {/* Attention heatmap */}
               {result.heatmap_url && (

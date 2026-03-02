@@ -20,6 +20,28 @@ export interface LandformClass {
   probability: number;
 }
 
+export interface AgentReasoningStep {
+  step: number;
+  action?: string | null;
+  action_input?: Record<string, unknown> | null;
+  observation?: Record<string, unknown> | string | null;
+  thought?: string | null;
+  vlm_response?: string | null;
+  error?: string | null;
+  forced_final?: boolean;
+}
+
+export interface AgentReasoning {
+  enabled: boolean;
+  mode: string;
+  landform_class?: string | null;
+  confidence?: number | null;
+  reasoning_chain: AgentReasoningStep[];
+  tools_used: string[];
+  num_steps: number;
+  error?: string | null;
+}
+
 export interface ClassifyResult {
   product_id: string;
   model: ModelType;
@@ -28,6 +50,9 @@ export interface ClassifyResult {
   classes: LandformClass[];
   heatmap_url: string | null;
   processing_time_s: number;
+  agent_reasoning?: AgentReasoning | null;
+  num_tiles?: number;
+  device?: string;
 }
 
 export interface JobStatus {
@@ -53,6 +78,7 @@ export const LANDFORM_TYPES: Record<string, { label: string; icon: string; color
   LVF: { label: "Lineated Valley Fill", icon: "timeline", color: "bg-cyan-500" },
   CCF: { label: "Concentric Crater Fill", icon: "target", color: "bg-violet-500" },
   GLF: { label: "Glacier-Like Form", icon: "ac_unit", color: "bg-blue-500" },
+  BACKGROUND: { label: "Background", icon: "landscape", color: "bg-slate-500" },
   OTHER: { label: "Other", icon: "help_outline", color: "bg-slate-500" },
 };
 
