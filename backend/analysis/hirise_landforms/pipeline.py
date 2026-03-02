@@ -1,270 +1,551 @@
+"""
+HiRISE Landform Classification Pipeline — Real DINOv2 + MIL + VLM Agent.
+
+Inference flow:
+  1. Fetch HiRISE browse image → tile into 224×224 patches (filter black tiles)
+  2. Transform tiles: Resize(224) → CenterCrop(224) → ToTensor → Normalize(ImageNet)
+  3. Run tiles through DINOv2-LoRA backbone → 768-dim CLS embedding per tile
+  4. Extract MOLA features at image center (23 geomorphometric features)
+  5. Feed into AttentionMILClassifier → logits + attention weights
+  6. If confidence < 0.7 → invoke VLM ReACT agent for enhanced reasoning
+"""
 from __future__ import annotations
 
-import importlib
-import math
+import asyncio
+import logging
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+import numpy as np
+import torch
 from PIL import Image
+from torchvision import transforms
 
 from .heatmap import generate_heatmap, save_heatmap
-from .models import ClassifyRequest, ClassifyResult, PredictionResult, TileResult
+from .models import (
+    AgentReasoningResult,
+    AgentReasoningStep,
+    ClassifyRequest,
+    ClassifyResult,
+    PredictionResult,
+    TileResult,
+)
 from .preprocessing import extract_mola_features, fetch_hirise_browse, tile_image
 
+logger = logging.getLogger(__name__)
+
 ROOT = Path(__file__).resolve().parents[3]
-WEIGHTS_DIR = ROOT / "backend" / "data" / "hirise_landforms" / "weights"
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+MIL_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v2_output" / "models" / "multihead_improved" / "best_mil_model.pt"
+SSL_LORA_WEIGHTS = ROOT / "Data" / "HiRISE" / "v2_output" / "ssl_lora_weights" / "best_model.pt"
+
 V2_CLASSES = ["LDA", "LVF", "CCF", "GLF", "BACKGROUND"]
-MARS_BENCH_CLASSES = ["other", "crater", "dark_dune", "streak", "bright_dune", "impact", "edge"]
+CONFIDENCE_THRESHOLD = 0.7  # Below this → invoke VLM agent
+
+
+# ── Image transform (ImageNet normalization, matching training) ───────────────
+_tile_transform = transforms.Compose([
+    transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+])
 
 
 @dataclass(frozen=True)
-class LoadedModel:
-    name: str
-    class_names: list[str]
-    checkpoint_path: Path
+class LoadedModels:
+    """Container for lazy-loaded inference models."""
+    backbone: Any  # DinoV2LoRA
+    classifier: Any  # AttentionMILClassifier
+    device: torch.device
 
 
 class HiriseLandformPipeline:
-    device: str
-    _models: dict[str, LoadedModel]
+    """Real MarsLandformNet V2 inference pipeline."""
 
     def __init__(self) -> None:
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._models: LoadedModels | None = None
+        self._loading = False
+
+    @property
+    def device(self) -> str:
+        return str(self._device)
+
+    # ── Lazy model loading ────────────────────────────────────────────────────
+
+    def _ensure_models(self) -> LoadedModels:
+        """Lazy-load DINOv2-LoRA backbone + AttentionMILClassifier on first request."""
+        if self._models is not None:
+            return self._models
+
+        if self._loading:
+            raise RuntimeError("Model loading already in progress")
+
+        self._loading = True
         try:
-            import torch
+            models = self._load_models()
+            self._models = models
+            return models
+        finally:
+            self._loading = False
 
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        except Exception:
-            self.device = "cpu"
-        self._models = {}
+    def _load_models(self) -> LoadedModels:
+        import sys
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
 
-    def load_model(self, model_name: str) -> LoadedModel:
-        normalized = model_name.strip().lower()
-        if normalized in self._models:
-            return self._models[normalized]
+        from scripts.marslandform_v2.config import DINOv2Config, MILConfig
+        from scripts.marslandform_v2.models.dinov2_lora import DinoV2LoRA
+        from scripts.marslandform_v2.models.mil_classifier import AttentionMILClassifier
 
-        if normalized == "v2":
-            loaded = self._load_v2_model()
-        elif normalized == "mars-bench":
-            loaded = self._load_mars_bench_model()
+        device = self._device
+        logger.info("Loading DINOv2-LoRA backbone on %s...", device)
+
+        # Load DINOv2-LoRA backbone
+        dinov2_cfg = DINOv2Config()
+        backbone = DinoV2LoRA(dinov2_cfg, use_lora=True)
+
+        # Load SSL LoRA weights if available
+        if SSL_LORA_WEIGHTS.exists():
+            logger.info("Loading SSL LoRA weights from %s", SSL_LORA_WEIGHTS)
+            checkpoint = torch.load(SSL_LORA_WEIGHTS, map_location="cpu", weights_only=False)
+            if "student_backbone" in checkpoint:
+                backbone.load_state_dict(checkpoint["student_backbone"], strict=False)
+                logger.info("Loaded SSL LoRA weights (student_backbone)")
+            else:
+                logger.warning("SSL checkpoint missing 'student_backbone' key, skipping")
         else:
-            raise ValueError(f"Unsupported model '{model_name}'. Expected 'v2' or 'mars-bench'.")
+            logger.warning("SSL LoRA weights not found at %s, using base DINOv2", SSL_LORA_WEIGHTS)
 
-        self._models[normalized] = loaded
-        return loaded
+        backbone.eval()
+        backbone = backbone.to(device)
 
-    def classify(self, request: ClassifyRequest) -> ClassifyResult:
-        loaded = self.load_model(request.model)
-        image = fetch_hirise_browse(request.product_id)
-        tiled = tile_image(image, tile_size=224)
-        coords = [(x, y) for x, y, _ in tiled]
-        tiles = [tile for _, _, tile in tiled]
-        lat_lon = self._tile_lat_lon(coords)
+        # Load MIL classifier
+        if not MIL_CHECKPOINT.exists():
+            raise FileNotFoundError(f"MIL checkpoint not found: {MIL_CHECKPOINT}")
 
-        probabilities, attention = self._infer(loaded.name, loaded.class_names, tiles, lat_lon)
-        top_idx = max(range(len(probabilities)), key=lambda idx: probabilities[idx])
-        prediction = PredictionResult(
-            top_class=loaded.class_names[top_idx],
-            probabilities={name: probabilities[idx] for idx, name in enumerate(loaded.class_names)},
-            confidence=probabilities[top_idx],
+        logger.info("Loading AttentionMILClassifier from %s", MIL_CHECKPOINT)
+        mil_ckpt = torch.load(MIL_CHECKPOINT, map_location="cpu", weights_only=False)
+
+        # Reconstruct MILConfig from checkpoint
+        saved_config = mil_ckpt.get("mil_config", {})
+        mil_cfg = MILConfig(
+            embed_dim=saved_config.get("embed_dim", 768),
+            mola_dim=saved_config.get("mola_dim", 23),
+            hidden_dim=saved_config.get("hidden_dim", 256),
+            attention_dim=saved_config.get("attention_dim", 128),
+            num_attention_heads=saved_config.get("num_attention_heads", 4),
+            num_classes=saved_config.get("num_classes", 5),
+            dropout=saved_config.get("dropout", 0.3),
         )
 
-        tile_results: list[TileResult] = []
-        for idx, (x, y) in enumerate(coords):
-            lat, lon = lat_lon[idx]
-            weight = attention[idx] if idx < len(attention) else 0.0
-            tile_results.append(
-                TileResult(
-                    x=x,
-                    y=y,
-                    attention_weight=max(0.0, min(1.0, weight)),
-                    lat=lat,
-                    lon=lon,
-                )
-            )
+        classifier = AttentionMILClassifier(mil_cfg)
+        classifier.load_state_dict(mil_ckpt["model_state_dict"])
+        classifier.eval()
+        classifier = classifier.to(device)
 
+        logger.info(
+            "Models loaded — backbone: DINOv2-LoRA (768-dim), "
+            "classifier: AttentionMIL (F1=%.4f, epoch=%d)",
+            mil_ckpt.get("best_landform_macro_f1", 0.0),
+            mil_ckpt.get("best_epoch", -1),
+        )
+
+        return LoadedModels(backbone=backbone, classifier=classifier, device=device)
+
+    # ── Main classify entry point ─────────────────────────────────────────────
+
+    def classify(self, request: ClassifyRequest) -> ClassifyResult:
+        """Full inference: tiling → embedding → MIL → (optional VLM agent)."""
+        t0 = time.time()
+
+        models = self._ensure_models()
+
+        # 1. Fetch browse image
+        image = fetch_hirise_browse(request.product_id)
+        img_w, img_h = image.size
+
+        # 2. Tile with content filtering
+        tiled = tile_image(image, tile_size=224, min_content=0.3)
+        coords = [(x, y) for x, y, _ in tiled]
+        tile_images = [tile for _, _, tile in tiled]
+        num_tiles = len(tile_images)
+
+        if num_tiles == 0:
+            return self._empty_result(request, time.time() - t0)
+
+        # 3. Compute tile lat/lon from image center
+        lat = request.lat
+        lon = request.lon
+        tile_lat_lon = self._compute_tile_latlon(coords, img_w, img_h, lat, lon)
+
+        # 4. Extract tile embeddings through DINOv2-LoRA
+        embeddings = self._extract_embeddings(models, tile_images)
+
+        # 5. Extract MOLA features at image center
+        if lat is not None and lon is not None:
+            mola_features = extract_mola_features(lat, lon)
+        else:
+            # Use approximate center — mid-latitude Mars as fallback
+            mola_features = np.zeros((23,), dtype=np.float32)
+
+        # 6. Run MIL classifier
+        probabilities, attention_weights = self._run_mil_classifier(
+            models, embeddings, mola_features
+        )
+
+        # 7. Build prediction
+        top_idx = int(np.argmax(probabilities))
+        top_class = V2_CLASSES[top_idx]
+        confidence = float(probabilities[top_idx])
+
+        prediction = PredictionResult(
+            top_class=top_class,
+            probabilities={name: float(probabilities[i]) for i, name in enumerate(V2_CLASSES)},
+            confidence=confidence,
+        )
+
+        # 8. Build tile results
+        tile_results = self._build_tile_results(coords, tile_lat_lon, attention_weights)
+
+        # 9. Generate heatmap if requested
         heatmap_url: str | None = None
         if request.include_heatmap:
             heatmap = generate_heatmap(image=image, tiles=tile_results, tile_size=224)
             heatmap_url = save_heatmap(heatmap, request.product_id)
 
+        # 10. VLM Agent — invoke if confidence is below threshold
+        agent_reasoning: AgentReasoningResult | None = None
+        if confidence < CONFIDENCE_THRESHOLD:
+            agent_reasoning = self._run_vlm_agent(
+                request.product_id,
+                top_class,
+                confidence,
+                probabilities,
+                attention_weights,
+                mola_features,
+                lat,
+                lon,
+            )
+            # If agent provides a higher-confidence answer, use it
+            if (
+                agent_reasoning is not None
+                and agent_reasoning.enabled
+                and agent_reasoning.confidence is not None
+                and agent_reasoning.confidence > confidence
+                and agent_reasoning.landform_class is not None
+                and agent_reasoning.landform_class in V2_CLASSES
+            ):
+                top_class = agent_reasoning.landform_class
+                confidence = agent_reasoning.confidence
+                prediction = PredictionResult(
+                    top_class=top_class,
+                    probabilities=prediction.probabilities,
+                    confidence=confidence,
+                )
+
+        processing_time = time.time() - t0
+
         return ClassifyResult(
             product_id=request.product_id,
-            model_used=loaded.name,
+            model_used="v2",
             prediction=prediction,
             tiles=tile_results,
             heatmap_url=heatmap_url,
+            processing_time_s=round(processing_time, 2),
+            agent_reasoning=agent_reasoning,
+            num_tiles=num_tiles,
+            device=str(self._device),
         )
 
-    def _load_v2_model(self) -> LoadedModel:
-        checkpoint = self._find_weight_path(("v2", "marslandform", "mil"))
-        if checkpoint is None:
-            raise FileNotFoundError(
-                f"No V2 weights found in '{WEIGHTS_DIR}'. Add a V2 checkpoint under this directory."
-            )
+    # ── Embedding extraction ──────────────────────────────────────────────────
 
-        try:
-            _ = importlib.import_module("scripts.marslandform_v2.config")
-            _ = importlib.import_module("scripts.marslandform_v2.models.mil_classifier")
-            _ = importlib.import_module("scripts.marslandform_v2.models.dinov2_lora")
-        except Exception as exc:
-            raise RuntimeError(f"Failed to import MarsLandform V2 modules at runtime: {exc}") from exc
+    @torch.no_grad()
+    def _extract_embeddings(
+        self, models: LoadedModels, tile_images: list[Image.Image],
+    ) -> np.ndarray:
+        """
+        Run tiles through DINOv2-LoRA backbone → (num_tiles, 768) embeddings.
+        Processes in batches to manage memory.
+        """
+        device = models.device
+        backbone = models.backbone
+        batch_size = 32
 
-        return LoadedModel(name="v2", class_names=V2_CLASSES, checkpoint_path=checkpoint)
-
-    def _load_mars_bench_model(self) -> LoadedModel:
-        checkpoint = self._find_weight_path(("mars-bench", "marsbench", "vit"))
-        if checkpoint is None:
-            raise FileNotFoundError(
-                f"No Mars-Bench weights found in '{WEIGHTS_DIR}'. Add a Mars-Bench checkpoint under this directory."
-            )
-        return LoadedModel(name="mars-bench", class_names=MARS_BENCH_CLASSES, checkpoint_path=checkpoint)
-
-    def _find_weight_path(self, hints: tuple[str, ...]) -> Path | None:
-        if not WEIGHTS_DIR.exists():
-            return None
-        candidates = [path for path in WEIGHTS_DIR.rglob("*") if path.is_file() or path.is_dir()]
-        if not candidates:
-            return None
-        for path in sorted(candidates):
-            lowered = path.name.lower()
-            if any(hint in lowered for hint in hints):
-                return path
-        return None
-
-    def _infer(
-        self,
-        model_name: str,
-        class_names: list[str],
-        tile_images: list[Image.Image],
-        lat_lon: list[tuple[float, float]],
-    ) -> tuple[list[float], list[float]]:
-        features = self._tile_features(tile_images)
-        if not features:
-            uniform = 1.0 / max(len(class_names), 1)
-            return [uniform for _ in class_names], []
-
-        brightness = [row[0] for row in features]
-        contrast = [row[1] for row in features]
-        edge = [row[2] for row in features]
-        texture = [row[3] for row in features]
-
-        if model_name == "v2":
-            for lat, lon in lat_lon:
-                _ = extract_mola_features(lat, lon)
-            mola_mean = 0.0
-
-            scores = [
-                self._mean([0.7 * t + 0.3 * c for t, c in zip(texture, contrast)]) + 0.10 * mola_mean,
-                self._mean([0.6 * e + 0.4 * t for e, t in zip(edge, texture)]) + 0.08 * mola_mean,
-                self._mean([0.55 * c + 0.45 * b for c, b in zip(contrast, brightness)]) + 0.06 * mola_mean,
-                self._mean([0.65 * e + 0.35 * c for e, c in zip(edge, contrast)]) + 0.05 * mola_mean,
-                self._mean([1.0 - (0.4 * e + 0.3 * t + 0.3 * c) for e, t, c in zip(edge, texture, contrast)]),
-            ]
-        else:
-            scores = [
-                self._mean([1.0 - value for value in edge]),
-                self._mean([0.5 * e + 0.5 * c for e, c in zip(edge, contrast)]),
-                self._mean([(1.0 - b) * t for b, t in zip(brightness, texture)]),
-                self._mean([0.7 * e + 0.3 * (1.0 - t) for e, t in zip(edge, texture)]),
-                self._mean([b * (1.0 - t) for b, t in zip(brightness, texture)]),
-                self._mean([0.6 * c + 0.4 * e for c, e in zip(contrast, edge)]),
-                self._mean([0.8 * e for e in edge]),
-            ]
-
-        probabilities = self._softmax(scores)
-        attention_base = [0.4 * c + 0.35 * e + 0.25 * t for c, e, t in zip(contrast, edge, texture)]
-        attention = self._normalize(attention_base)
-        return probabilities, attention
-
-    def _tile_features(self, tile_images: list[Image.Image]) -> list[tuple[float, float, float, float]]:
-        out: list[tuple[float, float, float, float]] = []
+        tensors = []
         for tile in tile_images:
-            gray = tile.convert("L")
-            width, height = gray.size
-            matrix = list(gray.tobytes())
-            rows = [matrix[start : start + width] for start in range(0, width * height, width)]
-            pixels = [float(value) / 255.0 for value in matrix]
+            rgb = tile.convert("RGB")
+            tensor = _tile_transform(rgb)
+            tensors.append(tensor)
 
-            brightness = self._mean(pixels)
-            contrast = self._std(pixels, brightness)
-            edge = self._edge_strength(rows)
-            low = self._percentile(pixels, 0.10)
-            high = self._percentile(pixels, 0.90)
-            texture = max(0.0, high - low)
-            out.append((brightness, contrast, edge, texture))
-        return out
+        all_embeddings: list[np.ndarray] = []
+        for i in range(0, len(tensors), batch_size):
+            batch = torch.stack(tensors[i : i + batch_size]).to(device)
+            with torch.amp.autocast(device_type=device.type, enabled=device.type == "cuda"):
+                emb = backbone(batch)  # (batch, 768)
+            all_embeddings.append(emb.cpu().numpy())
 
-    def _tile_lat_lon(self, coords: list[tuple[int, int]]) -> list[tuple[float, float]]:
-        if not coords:
-            return []
-        max_x = max(x for x, _ in coords)
-        max_y = max(y for _, y in coords)
-        cols = max_x + 1
-        rows = max_y + 1
-        lat_lon: list[tuple[float, float]] = []
-        for x, y in coords:
-            lat = 90.0 - 180.0 * ((y + 0.5) / max(rows, 1))
-            lon = -180.0 + 360.0 * ((x + 0.5) / max(cols, 1))
-            lat_lon.append((lat, lon))
-        return lat_lon
+        return np.concatenate(all_embeddings, axis=0)  # (num_tiles, 768)
 
-    def _mean(self, values: list[float]) -> float:
-        if not values:
-            return 0.0
-        return sum(values) / len(values)
+    # ── MIL classifier ────────────────────────────────────────────────────────
 
-    def _std(self, values: list[float], mean: float) -> float:
-        if not values:
-            return 0.0
-        variance = sum((value - mean) * (value - mean) for value in values) / len(values)
-        return math.sqrt(max(variance, 0.0))
+    @torch.no_grad()
+    def _run_mil_classifier(
+        self,
+        models: LoadedModels,
+        tile_embeddings: np.ndarray,
+        mola_features: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Run AttentionMILClassifier.
+        Returns: (probabilities [5], attention_weights [num_tiles])
+        """
+        device = models.device
+        classifier = models.classifier
 
-    def _percentile(self, values: list[float], q: float) -> float:
-        if not values:
-            return 0.0
-        sorted_values = sorted(values)
-        index = int(min(max(len(sorted_values) - 1, 0), round(q * (len(sorted_values) - 1))))
-        return sorted_values[index]
+        # Prepare tensors: (1, num_tiles, 768), (1, num_tiles) mask, (1, 23) mola
+        num_tiles = tile_embeddings.shape[0]
+        tile_emb_t = torch.from_numpy(tile_embeddings).unsqueeze(0).float().to(device)
+        tile_mask_t = torch.ones(1, num_tiles, dtype=torch.bool, device=device)
+        mola_t = torch.from_numpy(mola_features).unsqueeze(0).float().to(device)
 
-    def _edge_strength(self, rows: list[list[int]]) -> float:
-        if not rows or not rows[0]:
-            return 0.0
-        height = len(rows)
-        width = len(rows[0])
-        total = 0.0
-        count = 0
+        with torch.amp.autocast(device_type=device.type, enabled=device.type == "cuda"):
+            logits, att_weights = classifier(tile_emb_t, tile_mask_t, mola_t)
 
-        for y in range(height):
-            for x in range(width):
-                here = float(rows[y][x]) / 255.0
-                if x > 0:
-                    total += abs(here - float(rows[y][x - 1]) / 255.0)
-                    count += 1
-                if y > 0:
-                    total += abs(here - float(rows[y - 1][x]) / 255.0)
-                    count += 1
+        probs = torch.softmax(logits, dim=1).squeeze(0).cpu().numpy()  # (5,)
+        att = att_weights.squeeze(0).cpu().numpy()  # (num_tiles,)
 
-        if count == 0:
-            return 0.0
-        return total / count
+        return probs, att
 
-    def _softmax(self, scores: list[float]) -> list[float]:
-        if not scores:
-            return []
-        shifted = [score - max(scores) for score in scores]
-        exps = [math.exp(score) for score in shifted]
-        total = sum(exps)
-        if total <= 0.0:
-            uniform = 1.0 / len(scores)
-            return [uniform for _ in scores]
-        return [value / total for value in exps]
+    # ── VLM Agent ─────────────────────────────────────────────────────────────
 
-    def _normalize(self, values: list[float]) -> list[float]:
-        if not values:
-            return []
-        lo = min(values)
-        hi = max(values)
-        if hi <= lo:
-            uniform = 1.0 / len(values)
-            return [uniform for _ in values]
-        return [(value - lo) / (hi - lo) for value in values]
+    def _run_vlm_agent(
+        self,
+        product_id: str,
+        classifier_class: str,
+        classifier_confidence: float,
+        probabilities: np.ndarray,
+        attention_weights: np.ndarray,
+        mola_features: np.ndarray,
+        lat: float | None,
+        lon: float | None,
+    ) -> AgentReasoningResult:
+        """
+        Invoke VLM ReACT agent for low-confidence classifications.
+        Uses the agent framework from scripts/marslandform_v2/agent/.
+        """
+        try:
+            import sys
+            if str(ROOT) not in sys.path:
+                sys.path.insert(0, str(ROOT))
+
+            from scripts.marslandform_v2.config import AgentConfig
+            from scripts.marslandform_v2.agent.react_agent import MarsLandformAgent
+
+            # Build a lightweight classifier proxy for the agent's classify tool
+            classifier_proxy = _ClassifierProxy(
+                product_id=product_id,
+                predicted_class=classifier_class,
+                confidence=classifier_confidence,
+                probabilities=probabilities.tolist(),
+                attention_weights=attention_weights.tolist(),
+            )
+
+            # Build MOLA features dict for analyze_mola tool
+            mola_dict: dict[str, dict[str, Any]] = {}
+            if lat is not None and lon is not None:
+                feature_names = []
+                for scale in [1.0, 5.0, 20.0]:
+                    for feat in ["slope_mean", "slope_std", "curvature_mean", "TPI", "TRI", "roughness", "lobateness"]:
+                        feature_names.append(f"{feat}_{scale}km")
+                feature_names.extend(["elevation_mean", "abs_latitude"])
+
+                mola_entry: dict[str, Any] = {}
+                for i, name in enumerate(feature_names):
+                    if i < len(mola_features):
+                        mola_entry[name] = float(mola_features[i])
+                mola_entry["lat"] = lat
+                mola_entry["lon"] = lon
+                mola_dict[product_id] = mola_entry
+
+            agent_cfg = AgentConfig(
+                max_steps=3,  # Limit for API responsiveness
+                confidence_threshold=CONFIDENCE_THRESHOLD,
+                mode="agent",
+            )
+
+            agent = MarsLandformAgent(
+                config=agent_cfg,
+                classifier=classifier_proxy,
+                rag=None,  # RAG not available in API mode
+                mola_features=mola_dict,
+                metadata={},
+                vlm=None,  # Auto-detect: Groq > Claude > Mock
+            )
+
+            # Run async agent in sync context
+            loop = asyncio.new_event_loop()
+            try:
+                agent_result = loop.run_until_complete(agent.classify_image(product_id))
+            finally:
+                loop.close()
+
+            # Convert to API model
+            reasoning_steps = []
+            for step_data in agent_result.reasoning_chain:
+                if isinstance(step_data, dict):
+                    reasoning_steps.append(AgentReasoningStep(
+                        step=step_data.get("step", 0),
+                        action=step_data.get("action"),
+                        action_input=step_data.get("action_input"),
+                        observation=step_data.get("observation"),
+                        thought=step_data.get("thought") or (step_data.get("parsed", {}) or {}).get("thought"),
+                        vlm_response=step_data.get("vlm_response"),
+                        error=step_data.get("error"),
+                        forced_final=step_data.get("forced_final", False),
+                    ))
+
+            return AgentReasoningResult(
+                enabled=True,
+                mode=agent_result.mode,
+                landform_class=agent_result.landform_class,
+                confidence=agent_result.confidence,
+                reasoning_chain=reasoning_steps,
+                tools_used=agent_result.tools_used,
+                num_steps=agent_result.num_steps,
+                error=agent_result.error,
+            )
+
+        except Exception as exc:
+            logger.warning("VLM agent failed: %s", exc, exc_info=True)
+            return AgentReasoningResult(
+                enabled=True,
+                mode="agent",
+                error=str(exc),
+            )
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _compute_tile_latlon(
+        self,
+        coords: list[tuple[int, int]],
+        img_w: int,
+        img_h: int,
+        center_lat: float | None,
+        center_lon: float | None,
+    ) -> list[tuple[float, float]]:
+        """Compute approximate lat/lon for each tile from image center."""
+        if center_lat is None or center_lon is None:
+            return [(0.0, 0.0) for _ in coords]
+
+        mars_circumference_m = 2 * np.pi * 3389500
+        deg_per_meter_lat = 360.0 / mars_circumference_m
+        deg_per_meter_lon = deg_per_meter_lat / max(np.cos(np.radians(center_lat)), 0.01)
+        pixel_scale_m = 25.0  # HiRISE browse is ~25 m/px
+
+        img_center_row = img_h / 2.0
+        img_center_col = img_w / 2.0
+
+        result = []
+        for gx, gy in coords:
+            tile_center_row = gy * 224 + 112
+            tile_center_col = gx * 224 + 112
+            dy_px = img_center_row - tile_center_row  # positive = north
+            dx_px = tile_center_col - img_center_col  # positive = east
+            t_lat = center_lat + dy_px * pixel_scale_m * deg_per_meter_lat
+            t_lon = center_lon + dx_px * pixel_scale_m * deg_per_meter_lon
+            result.append((float(t_lat), float(t_lon)))
+        return result
+
+    def _build_tile_results(
+        self,
+        coords: list[tuple[int, int]],
+        tile_lat_lon: list[tuple[float, float]],
+        attention_weights: np.ndarray,
+    ) -> list[TileResult]:
+        """Build TileResult list with normalized attention weights."""
+        # Normalize attention to [0, 1]
+        att_min = float(attention_weights.min())
+        att_max = float(attention_weights.max())
+        att_range = att_max - att_min if att_max > att_min else 1.0
+
+        tile_results: list[TileResult] = []
+        for idx, (gx, gy) in enumerate(coords):
+            lat, lon = tile_lat_lon[idx]
+            raw_weight = float(attention_weights[idx]) if idx < len(attention_weights) else 0.0
+            norm_weight = (raw_weight - att_min) / att_range
+            norm_weight = max(0.0, min(1.0, norm_weight))
+            tile_results.append(
+                TileResult(x=gx, y=gy, attention_weight=norm_weight, lat=lat, lon=lon)
+            )
+        return tile_results
+
+    def _empty_result(self, request: ClassifyRequest, elapsed: float) -> ClassifyResult:
+        """Return when no tiles are extractable."""
+        return ClassifyResult(
+            product_id=request.product_id,
+            model_used="v2",
+            prediction=PredictionResult(
+                top_class="BACKGROUND",
+                probabilities={name: 0.2 for name in V2_CLASSES},
+                confidence=0.2,
+            ),
+            tiles=[],
+            heatmap_url=None,
+            processing_time_s=round(elapsed, 2),
+            num_tiles=0,
+            device=str(self._device),
+        )
+
+    def status(self) -> dict[str, Any]:
+        """Runtime status for the /status endpoint."""
+        models_loaded = []
+        if self._models is not None:
+            models_loaded = ["v2"]
+
+        memory_mb = 0.0
+        if self._device.type == "cuda":
+            try:
+                memory_mb = torch.cuda.memory_allocated(self._device) / (1024 * 1024)
+            except Exception:
+                pass
+
+        return {
+            "models_loaded": models_loaded,
+            "device": str(self._device),
+            "memory_mb": round(memory_mb, 1),
+        }
+
+
+class _ClassifierProxy:
+    """
+    Lightweight proxy that feeds pre-computed classifier results
+    into the agent's ClassifyTool without re-running inference.
+    """
+
+    def __init__(
+        self,
+        product_id: str,
+        predicted_class: str,
+        confidence: float,
+        probabilities: list[float],
+        attention_weights: list[float],
+    ) -> None:
+        self._product_id = product_id
+        self._predicted_class = predicted_class
+        self._confidence = confidence
+        self._probabilities = probabilities
+        self._attention_weights = attention_weights
+        self.is_trained = True
+
+    def predict_image(self, image_id: str) -> dict[str, Any]:
+        return {
+            "class": self._predicted_class,
+            "confidence": self._confidence,
+            "probabilities": self._probabilities,
+            "attention_weights": self._attention_weights,
+        }
