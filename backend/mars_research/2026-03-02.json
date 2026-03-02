@@ -1,0 +1,238 @@
+{
+  "date": "2026-03-02",
+  "generated_at": "2026-03-01T22:10:14.775911+00:00",
+  "topic": {
+    "focus": "Arcadia Planitia",
+    "keywords": [
+      "Arcadia Planitia",
+      "landing site",
+      "ISRU",
+      "subsurface ice",
+      "terrain"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Expanded secondary craters in the Arcadia Planitia region, Mars: Evidence for tens of Myr-old shallow subsurface ice",
+      "authors": "Donna Viola, Alfred S. McEwen, Colin M. Dundas, Shane Byrne",
+      "year": "2015",
+      "journal": "Icarus",
+      "key_findings": "The paper presents evidence for tens of Myr-old shallow subsurface ice in the Arcadia Planitia region, Mars. This finding is based on the analysis of expanded secondary craters.",
+      "methodology": "The authors used crater analysis and morphological studies to determine the presence of subsurface ice.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides insights into the subsurface ice distribution in Arcadia Planitia, a potential landing site for future Mars missions.",
+      "category": "Arcadia Planitia",
+      "url": "https://doi.org/10.1016/j.icarus.2014.10.032"
+    },
+    {
+      "title": "Wrinkle ridges of Arcadia Planitia, Mars",
+      "authors": "J. B. Plescia",
+      "year": "1993",
+      "journal": "Journal of Geophysical Research: Planets",
+      "key_findings": "The paper examines the wrinkle ridges of Arcadia Planitia, Mars, and determines their morphology, spatial distribution, and the amount of crustal shortening and strain they accommodate. The ridges trend generally northward.",
+      "methodology": "The author used geological mapping and morphological analysis to study the wrinkle ridges.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological features of Arcadia Planitia, which can be used for terrain characterization and landing site selection.",
+      "category": "Arcadia Planitia",
+      "url": "https://doi.org/10.1029/93je01324"
+    },
+    {
+      "title": "Spectral and geological analyses of domes in western Arcadia Planitia, Mars: Evidence for intrusive alkali-rich volcanism and ice-associated surface features",
+      "authors": "William H. Farrand, James W. Rice, Frank C. Chuang, A. Deanne Rogers",
+      "year": "2021",
+      "journal": "Icarus",
+      "key_findings": "The paper presents spectral and geological analyses of domes in western Arcadia Planitia, Mars, and provides evidence for intrusive alkali-rich volcanism and ice-associated surface features. The study suggests that the domes are related to volcanic activity and ice deposition.",
+      "methodology": "The authors used spectral analysis, geological mapping, and morphological studies to investigate the domes.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides insights into the geological history and potential resources of Arcadia Planitia, which can be used for landing site selection and resource utilization planning.",
+      "category": "Arcadia Planitia",
+      "url": "https://doi.org/10.1016/j.icarus.2020.114111"
+    },
+    {
+      "title": "Widespread excess ice in Arcadia Planitia, Mars",
+      "authors": "Ali M. Bramson, Shane Byrne, Nathaniel E. Putzig, Sarah Sutton, Jeffrey J. Plaut, T. Charles Brothers et al.",
+      "year": "2015",
+      "journal": "Geophysical Research Letters",
+      "key_findings": "The paper presents evidence for widespread excess ice in Arcadia Planitia, Mars, and discusses the implications for past climate and buried ice distribution. The study suggests that the excess ice is a result of pore-filling and excess ice formation.",
+      "methodology": "The authors used radar and morphological analysis to determine the distribution and concentration of subsurface ice.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the subsurface ice distribution in Arcadia Planitia, which can be used for landing site selection, resource utilization planning, and climate modeling.",
+      "category": "Arcadia Planitia",
+      "url": "https://doi.org/10.1002/2015gl064844"
+    },
+    {
+      "title": "Volcano/ground ice interactions in Elysium Planitia, Mars",
+      "authors": "Peter J. Mouginis-Mark",
+      "year": "1985",
+      "journal": "Icarus",
+      "key_findings": "The paper discusses the interactions between volcanoes and ground ice in Elysium Planitia, Mars, and presents evidence for volcanic activity and ice deposition. The study suggests that the interactions between volcanoes and ground ice played a significant role in shaping the Martian surface.",
+      "methodology": "The author used geological mapping, morphological analysis, and remote sensing data to study the volcano/ground ice interactions.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides insights into the geological history and potential resources of Elysium Planitia, which can be used for landing site selection and resource utilization planning.",
+      "category": "Elysium Planitia",
+      "url": "https://doi.org/10.1016/0019-1035(85)90090-9"
+    },
+    {
+      "title": "Volcano/ground ice interactions in Elysium Planitia, Mars",
+      "authors": "P Mouginis-Mark",
+      "year": "1985",
+      "journal": "Icarus",
+      "key_findings": "The paper discusses the interactions between volcanoes and ground ice in Elysium Planitia, Mars, and presents evidence for volcanic activity and ice deposition. The study suggests that the interactions between volcanoes and ground ice played a significant role in shaping the Martian surface.",
+      "methodology": "The author used geological mapping, morphological analysis, and remote sensing data to study the volcano/ground ice interactions.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides insights into the geological history and potential resources of Elysium Planitia, which can be used for landing site selection and resource utilization planning.",
+      "category": "Elysium Planitia",
+      "url": "https://doi.org/10.1016/0019-1035(85)90203-9"
+    },
+    {
+      "title": "Layered remnant deposits in Hellas Planitia, Mars as the remains of ancient ice mounds",
+      "authors": "Eva Z. Petrini, Michael M. Sori",
+      "year": "2025",
+      "journal": "Icarus",
+      "key_findings": "The paper presents evidence for layered remnant deposits in Hellas Planitia, Mars, and suggests that they are the remains of ancient ice mounds. The study provides insights into the geological history and climate of Mars.",
+      "methodology": "The authors used geological mapping, morphological analysis, and remote sensing data to study the layered remnant deposits.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological history and potential resources of Hellas Planitia, which can be used for landing site selection and resource utilization planning.",
+      "category": "Hellas Planitia",
+      "url": "https://doi.org/10.1016/j.icarus.2025.116604"
+    },
+    {
+      "title": "SHARAD detection and characterization of subsurface water ice deposits in Utopia Planitia, Mars",
+      "authors": "C. M. Stuurman, G. R. Osinski, J. W. Holt, J. S. Levy, T. C. Brothers, M. Kerrigan et al.",
+      "year": "2016",
+      "journal": "Geophysical Research Letters",
+      "key_findings": "The paper presents evidence for subsurface water ice deposits in Utopia Planitia, Mars, using radar sounding data. The study suggests that the deposits are a result of pore-filling and excess ice formation.",
+      "methodology": "The authors used radar sounding data and morphological analysis to determine the distribution and concentration of subsurface ice.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the subsurface ice distribution in Utopia Planitia, which can be used for landing site selection, resource utilization planning, and climate modeling.",
+      "category": "Utopia Planitia",
+      "url": "https://doi.org/10.1002/2016gl070138"
+    },
+    {
+      "title": "Geologic mapping and characterization of Gale Crater and implications for its potential as a Mars Science Laboratory landing site",
+      "authors": "Ryan Anderson",
+      "year": "",
+      "journal": "The Mars Journal",
+      "key_findings": "The paper presents a geologic mapping and characterization of Gale Crater and discusses its potential as a Mars Science Laboratory landing site. The study provides insights into the geological history and potential resources of Gale Crater.",
+      "methodology": "The author used geological mapping, morphological analysis, and remote sensing data to study Gale Crater.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological history and potential resources of Gale Crater, which can be used for landing site selection and resource utilization planning.",
+      "category": "Gale Crater",
+      "url": "https://doi.org/10.1555/mars.2010.0004"
+    },
+    {
+      "title": "Geology of the MER 2003 “Elysium” candidate landing site in southeastern Utopia Planitia, Mars",
+      "authors": "Kenneth L. Tanaka, Michael H. Carr, James A. Skinner, Martha S. Gilmore, Trent M. Hare",
+      "year": "2003",
+      "journal": "Journal of Geophysical Research: Planets",
+      "key_findings": "The paper presents a geologic mapping and characterization of the MER 2003 Elysium candidate landing site in southeastern Utopia Planitia, Mars. The study provides insights into the geological history and potential resources of the landing site.",
+      "methodology": "The authors used geological mapping, morphological analysis, and remote sensing data to study the landing site.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological history and potential resources of the landing site, which can be used for landing site selection and resource utilization planning.",
+      "category": "Utopia Planitia",
+      "url": "https://doi.org/10.1029/2003je002054"
+    },
+    {
+      "title": "Geology of central Chryse Planitia and the Viking 1 landing site: Implications for the Mars Pathfinder mission",
+      "authors": "Robert A. Craddock, Larry S. Crumpler, Jayne C. Aubele, James R. Zimbelman",
+      "year": "1997",
+      "journal": "Journal of Geophysical Research: Planets",
+      "key_findings": "The paper presents a geologic mapping and characterization of central Chryse Planitia and the Viking 1 landing site, and discusses the implications for the Mars Pathfinder mission. The study provides insights into the geological history and potential resources of Chryse Planitia.",
+      "methodology": "The authors used geological mapping, morphological analysis, and remote sensing data to study Chryse Planitia.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological history and potential resources of Chryse Planitia, which can be used for landing site selection and resource utilization planning.",
+      "category": "Chryse Planitia",
+      "url": "https://doi.org/10.1029/97je00058"
+    },
+    {
+      "title": "Dust devil track survey at Elysium Planitia, Mars: Implications for the InSight landing sites",
+      "authors": "Dennis Reiss, Ralph D. Lorenz",
+      "year": "2016",
+      "journal": "Icarus",
+      "key_findings": "The paper presents a dust devil track survey at Elysium Planitia, Mars, and discusses the implications for the InSight landing sites. The study provides insights into the geological history and potential resources of Elysium Planitia.",
+      "methodology": "The authors used remote sensing data and morphological analysis to study the dust devil tracks.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological history and potential resources of Elysium Planitia, which can be used for landing site selection and resource utilization planning.",
+      "category": "Elysium Planitia",
+      "url": "https://doi.org/10.1016/j.icarus.2015.11.012"
+    },
+    {
+      "title": "Mars: Aeolian features and wind predictions at the Terra Meridiani and Isidis Planitia potential Mars Exploration Rover landing sites",
+      "authors": "Ronald Greeley, Shane D. Thompson",
+      "year": "2003",
+      "journal": "Journal of Geophysical Research: Planets",
+      "key_findings": "The paper presents a study on aeolian features and wind predictions at the Terra Meridiani and Isidis Planitia potential Mars Exploration Rover landing sites. The study provides insights into the geological history and potential resources of the landing sites.",
+      "methodology": "The authors used remote sensing data, morphological analysis, and wind modeling to study the aeolian features and wind patterns.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological history and potential resources of the landing sites, which can be used for landing site selection and resource utilization planning.",
+      "category": "Isidis Planitia",
+      "url": "https://doi.org/10.1029/2003je002110"
+    },
+    {
+      "title": "Rayleigh Wave Ellipticity Modeling and Inversion for Shallow Structure at the Proposed InSight Landing Site in Elysium Planitia, Mars",
+      "authors": "Brigitte Knapmeyer-Endrun, Matthew P. Golombek, Matthias Ohrnberger",
+      "year": "2017",
+      "journal": "Space Science Reviews",
+      "key_findings": "The paper presents a study on Rayleigh wave ellipticity modeling and inversion for shallow structure at the proposed InSight landing site in Elysium Planitia, Mars. The study provides insights into the subsurface structure of the landing site.",
+      "methodology": "The authors used seismic data and wave modeling to study the subsurface structure.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the subsurface structure of the landing site, which can be used for landing site selection and resource utilization planning.",
+      "category": "Elysium Planitia",
+      "url": "https://doi.org/10.1007/s11214-016-0300-1"
+    },
+    {
+      "title": "Radar exposes buried ice on Mars",
+      "authors": "Mark Peplow",
+      "year": "",
+      "journal": "Nature",
+      "key_findings": "The paper discusses the use of radar to expose buried ice on Mars. The study provides insights into the potential for using radar to detect subsurface ice deposits.",
+      "methodology": "The author used radar data and morphological analysis to study the subsurface ice deposits.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the potential for using radar to detect subsurface ice deposits, which can be used for landing site selection and resource utilization planning.",
+      "category": "Ice Detection",
+      "url": "https://doi.org/10.1038/news051128-8"
+    },
+    {
+      "title": "Huge Deposit of Ice Is Gauged at the South Pole of Mars",
+      "authors": "",
+      "year": "",
+      "journal": "Physics Today",
+      "key_findings": "The paper discusses the discovery of a huge deposit of ice at the south pole of Mars. The study provides insights into the potential for using ice deposits as a resource for future Mars missions.",
+      "methodology": "The author used remote sensing data and morphological analysis to study the ice deposit.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the potential for using ice deposits as a resource for future Mars missions.",
+      "category": "Ice Detection",
+      "url": "https://doi.org/10.1063/pt.5.020951"
+    },
+    {
+      "title": "Mars: Radar probes beneath ice caps",
+      "authors": "",
+      "year": "2008",
+      "journal": "Astronomy &amp; Geophysics",
+      "key_findings": "The paper discusses the use of radar to probe beneath ice caps on Mars. The study provides insights into the potential for using radar to detect subsurface ice deposits.",
+      "methodology": "The author used radar data and morphological analysis to study the subsurface ice deposits.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the potential for using radar to detect subsurface ice deposits, which can be used for landing site selection and resource utilization planning.",
+      "category": "Ice Detection",
+      "url": "https://doi.org/10.1111/j.1468-4004.2008.49408_5.x"
+    },
+    {
+      "title": "Radar Sounding Reveals Common Evolutionary History Between the North Polar Layered Deposits and an Outlier Ice Deposit on Mars",
+      "authors": "R. A. McGlasson, M. M. Sori, A. M. Bramson, D. E. Lalich",
+      "year": "2024",
+      "journal": "Geophysical Research Letters",
+      "key_findings": "The paper presents a study on the evolutionary history of the north polar layered deposits and an outlier ice deposit on Mars. The study provides insights into the geological history and potential resources of the polar regions.",
+      "methodology": "The authors used remote sensing data, morphological analysis, and radar sounding data to study the ice deposits.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological history and potential resources of the polar regions, which can be used for landing site selection and resource utilization planning.",
+      "category": "Polar Regions",
+      "url": "https://doi.org/10.1029/2024gl109057"
+    },
+    {
+      "title": "Surface age of the ice–dust mantle deposit in Malea Planum, Mars",
+      "authors": "Malte Willmes, Dennis Reiss, Harald Hiesinger, Michael Zanetti",
+      "year": "2012",
+      "journal": "Planetary and Space Science",
+      "key_findings": "The paper presents a study on the surface age of the ice-dust mantle deposit in Malea Planum, Mars. The study provides insights into the geological history and potential resources of the region.",
+      "methodology": "The authors used remote sensing data, morphological analysis, and crater counting to study the surface age of the deposit.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the geological history and potential resources of the region, which can be used for landing site selection and resource utilization planning.",
+      "category": "Malea Planum",
+      "url": "https://doi.org/10.1016/j.pss.2011.08.006"
+    },
+    {
+      "title": "3D imaging of Mars' polar ice caps using orbital radar data",
+      "authors": "Frederick J. Foss, Nathaniel E. Putzig, Bruce A. Campbell, Roger J. Phillips",
+      "year": "2017",
+      "journal": "The Leading Edge",
+      "key_findings": "The paper presents a study on the use of orbital radar data to create 3D images of Mars' polar ice caps. The study provides insights into the potential for using radar to detect subsurface ice deposits.",
+      "methodology": "The authors used radar data and wave modeling to study the subsurface structure of the ice caps.",
+      "relevance": "This study is relevant to MarsLab's goals as it provides information on the potential for using radar to detect subsurface ice deposits, which can be used for landing site selection and resource utilization planning.",
+      "category": "Ice Detection",
+      "url": "https://doi.org/10.1190/tle36010043.1"
+    }
+  ],
+  "trend_analysis": "The papers analyzed show a trend towards the use of remote sensing data and radar sounding to study the subsurface structure and ice deposits on Mars. Many of the papers focus on the Arcadia Planitia region, which is a potential landing site for future Mars missions. The papers also show a trend towards the use of geological mapping and morphological analysis to study the surface features and potential resources of the Martian surface. Additionally, there is a trend towards the use of seismic data and wave modeling to study the subsurface structure of the Martian surface. Overall, the papers demonstrate the importance of using a combination of remote sensing data, geological mapping, and seismic data to study the Martian surface and subsurface.",
+  "connections_to_marslab": "The findings of these papers are highly relevant to MarsLab's mission, as they provide insights into the geological history and potential resources of the Martian surface. The papers demonstrate the potential for using radar and seismic data to detect subsurface ice deposits, which is a key goal of MarsLab's ice detection and resource utilization planning. Additionally, the papers provide information on the surface features and potential hazards of the Martian surface, which is important for landing site selection and mission planning. Overall, the findings of these papers can be used to inform and improve MarsLab's mission planning and resource utilization strategies."
+}
