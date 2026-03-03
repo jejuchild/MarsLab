@@ -3,6 +3,8 @@ import type { VisibleProduct, BaseLayerType, BoundingBox, MapMode, ActiveOverlay
 import { normalizeLonForMap, clampLatitude, parseCoordinate } from "../utils/coordinates";
 import type { FieldNote } from "../api/fieldnotes";
 import type { OverlapStats } from "../utils/overlapFilter";
+import type { SwimMethod, DepthRange } from "../api/swim_ice";
+import { SWIM_METHODS } from "../api/swim_ice";
 import { INSTRUMENTS, INSTRUMENT_GROUPS, type InstrumentId } from "../config/instrumentRegistry";
 import SwimIcePanel from "./SwimIcePanel";
 
@@ -192,6 +194,13 @@ interface LayerPanelProps {
   // SWIM Ice advanced panel
   swimIceLat?: number | null;
   swimIceLon?: number | null;
+
+  scienceLayerVisibility?: Record<SwimMethod, boolean>;
+  onScienceLayerToggle?: (method: SwimMethod, visible: boolean) => void;
+  scienceLayerDepth?: DepthRange;
+  onScienceLayerDepthChange?: (depth: DepthRange) => void;
+  scienceLayerOpacities?: Record<SwimMethod, number>;
+  onScienceLayerOpacity?: (method: SwimMethod, opacity: number) => void;
 
   // Field Notes
   fieldNotes?: FieldNote[];
@@ -489,6 +498,12 @@ export default function LayerPanel({
   // SWIM Ice advanced panel
   swimIceLat = null,
   swimIceLon = null,
+  scienceLayerVisibility = {} as Record<SwimMethod, boolean>,
+  onScienceLayerToggle,
+  scienceLayerDepth = "1-5m" as DepthRange,
+  onScienceLayerDepthChange,
+  scienceLayerOpacities = {} as Record<SwimMethod, number>,
+  onScienceLayerOpacity,
   // Field Notes
   fieldNotes = [],
   showFieldNotesOnMap = true,
@@ -750,6 +765,84 @@ export default function LayerPanel({
               Named Regions
             </span>
           </label>
+
+          <div className="mt-4 pt-3 border-t border-[#232f48]">
+            <h4 className="text-[#92a4c9] text-[9px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1">
+              <span className="material-symbols-outlined text-xs text-emerald-400">science</span>
+              Science Layers
+            </h4>
+            <p className="text-[8px] text-[#6b7c9c] mb-2">Individual detection methods — independent of SWIM map</p>
+
+            <div className="flex gap-1 mb-2">
+              {(["0-1m", "1-5m", "5m-plus"] as DepthRange[]).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => onScienceLayerDepthChange?.(d)}
+                  className={`flex-1 px-2 py-1 rounded text-[9px] font-medium transition-colors ${
+                    scienceLayerDepth === d
+                      ? "bg-emerald-500/20 border border-emerald-500/50 text-emerald-400"
+                      : "bg-[#1a2333] border border-[#232f48] text-[#6b7c9c] hover:border-emerald-500/30"
+                  }`}
+                >
+                  {d === "0-1m" ? "0–1 m" : d === "1-5m" ? "1–5 m" : ">5 m"}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-1">
+              {SWIM_METHODS.map((method) => {
+                const visible = scienceLayerVisibility[method] ?? false;
+                const opacity = scienceLayerOpacities[method] ?? 0.7;
+                const meta: Record<SwimMethod, { label: string; icon: string; activeClass: string }> = {
+                  neutron: { label: "Neutron (WEH)", icon: "radio_button_checked", activeClass: "bg-sky-500/10 border-sky-500/30" },
+                  thermal: { label: "Thermal Inertia", icon: "thermostat", activeClass: "bg-orange-500/10 border-orange-500/30" },
+                  radar_surface: { label: "Radar Surface", icon: "radar", activeClass: "bg-violet-500/10 border-violet-500/30" },
+                  radar_dielectric: { label: "Radar Dielectric", icon: "sensors", activeClass: "bg-rose-500/10 border-rose-500/30" },
+                  geomorphic: { label: "Geomorphology", icon: "terrain", activeClass: "bg-amber-500/10 border-amber-500/30" },
+                };
+                const m = meta[method];
+
+                return (
+                  <div
+                    key={method}
+                    className={`rounded border px-2 py-1.5 transition-colors ${
+                      visible ? m.activeClass : "border-[#232f48] bg-[#111b2a]"
+                    }`}
+                  >
+                    <label className="flex cursor-pointer items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={visible}
+                        onChange={(e) => onScienceLayerToggle?.(method, e.target.checked)}
+                        className="h-3 w-3 rounded border-[#232f48] bg-[#0d1520] accent-emerald-500"
+                      />
+                      <span className="material-symbols-outlined text-[14px] text-[#92a4c9]">{m.icon}</span>
+                      <span className={`text-[10px] font-medium ${visible ? "text-slate-200" : "text-[#92a4c9]"}`}>
+                        {m.label}
+                      </span>
+                    </label>
+                    {visible && (
+                      <div className="flex items-center gap-1.5 pl-5 mt-1">
+                        <span className="text-[9px] text-[#92a4c9]">Opacity</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={opacity}
+                          onChange={(e) => onScienceLayerOpacity?.(method, parseFloat(e.target.value))}
+                          className="h-1 w-full cursor-pointer accent-emerald-500"
+                        />
+                        <span className="min-w-[26px] text-right font-mono text-[9px] text-slate-400">
+                          {Math.round(opacity * 100)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           {/* SWIM Ice Overlay - Layer Selector */}
           <div className={`p-2 rounded transition-colors ${

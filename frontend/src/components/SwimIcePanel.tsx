@@ -1,12 +1,7 @@
 import { useState, useCallback } from "react";
-import DepthRangeSelector from "./DepthRangeSelector";
-import SwimMethodLayer from "./SwimMethodLayer";
 import IceConsistencyLegend from "./IceConsistencyLegend";
 import {
   fetchSwimConsistency,
-  SWIM_METHODS,
-  type DepthRange,
-  type SwimMethod,
   type SwimConsistencyPoint,
   type MethodScore,
 } from "../api/swim_ice";
@@ -17,9 +12,6 @@ import {
 export interface SwimIcePanelProps {
   lat: number | null;
   lon: number | null;
-  onLayerToggle?: (method: SwimMethod, visible: boolean) => void;
-  onLayerOpacity?: (method: SwimMethod, opacity: number) => void;
-  onDepthChange?: (depth: DepthRange) => void;
 }
 
 /* =========================================================
@@ -52,44 +44,13 @@ function scoreLabel(score: number | null): string {
 export default function SwimIcePanel({
   lat,
   lon,
-  onLayerToggle,
-  onLayerOpacity,
-  onDepthChange,
 }: SwimIcePanelProps) {
-  const [depth, setDepth] = useState<DepthRange>("0-1m");
-  const [visibleMethods, setVisibleMethods] = useState<Set<SwimMethod>>(new Set());
   const [collapsed, setCollapsed] = useState(false);
-  const [showMethods, setShowMethods] = useState(true);
 
-  // Query state
   const [consistency, setConsistency] = useState<SwimConsistencyPoint | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /* ── Depth change ────────────────────────────────────── */
-  const handleDepthChange = useCallback(
-    (d: DepthRange) => {
-      setDepth(d);
-      onDepthChange?.(d);
-    },
-    [onDepthChange],
-  );
-
-  /* ── Method toggle ───────────────────────────────────── */
-  const handleMethodToggle = useCallback(
-    (method: SwimMethod, visible: boolean) => {
-      setVisibleMethods((prev) => {
-        const next = new Set(prev);
-        if (visible) next.add(method);
-        else next.delete(method);
-        return next;
-      });
-      onLayerToggle?.(method, visible);
-    },
-    [onLayerToggle],
-  );
-
-  /* ── Query consistency ───────────────────────────────── */
   const queryPoint = useCallback(async () => {
     if (lat == null || lon == null) return;
     setLoading(true);
@@ -108,7 +69,6 @@ export default function SwimIcePanel({
   /* ── Render ──────────────────────────────────────────── */
   return (
     <section className="flex flex-col border-b border-[#232f48]">
-      {/* Header */}
       <button
         onClick={() => setCollapsed(!collapsed)}
         className="flex w-full items-center gap-1.5 bg-[#0d1520] px-3 py-2 text-left hover:bg-[#111b2a]"
@@ -117,7 +77,7 @@ export default function SwimIcePanel({
           ac_unit
         </span>
         <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-200">
-          SWIM Ice Detection
+          SWIM Ice Consistency
         </span>
         <span className="material-symbols-outlined ml-auto text-[14px] text-[#92a4c9]">
           {collapsed ? "expand_more" : "expand_less"}
@@ -126,37 +86,6 @@ export default function SwimIcePanel({
 
       {!collapsed && (
         <div className="flex flex-col gap-2 bg-[#0d1520] px-3 pb-3 pt-1">
-          {/* Depth selector */}
-          <DepthRangeSelector value={depth} onChange={handleDepthChange} />
-
-          {/* Method layers section */}
-          <div className="flex flex-col gap-1">
-            <button
-              onClick={() => setShowMethods(!showMethods)}
-              className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#92a4c9]"
-            >
-              <span className="material-symbols-outlined text-[12px]">
-                {showMethods ? "expand_less" : "expand_more"}
-              </span>
-              Method Layers
-            </button>
-            {showMethods && (
-              <div className="flex flex-col gap-1">
-                {SWIM_METHODS.map((method) => (
-                  <SwimMethodLayer
-                    key={method}
-                    method={method}
-                    depth={depth}
-                    visible={visibleMethods.has(method)}
-                    onToggle={handleMethodToggle}
-                    onOpacityChange={onLayerOpacity}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Point query */}
           {lat != null && lon != null && (
             <div className="flex flex-col gap-1.5 rounded border border-[#232f48] bg-[#111b2a] p-2">
               <div className="flex items-center justify-between">
@@ -176,17 +105,14 @@ export default function SwimIcePanel({
                 <span>Lon: {lon.toFixed(3)}°</span>
               </div>
 
-              {/* Error */}
               {error && (
                 <div className="rounded border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400">
                   {error}
                 </div>
               )}
 
-              {/* Results */}
               {consistency && !error && (
                 <div className="flex flex-col gap-1.5">
-                  {/* Overall score */}
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-[#92a4c9]">Score:</span>
                     <span
@@ -201,7 +127,6 @@ export default function SwimIcePanel({
                     </span>
                   </div>
 
-                  {/* Depth estimate */}
                   {consistency.depth_to_ice_estimate_m != null && (
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] text-[#92a4c9]">Est. depth:</span>
@@ -211,7 +136,6 @@ export default function SwimIcePanel({
                     </div>
                   )}
 
-                  {/* Method breakdown */}
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[9px] uppercase tracking-wider text-[#92a4c9]">
                       Method Scores
@@ -250,7 +174,6 @@ export default function SwimIcePanel({
             </div>
           )}
 
-          {/* Legend */}
           <IceConsistencyLegend />
         </div>
       )}

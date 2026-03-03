@@ -10,6 +10,7 @@ import {
 } from "../utils/dtmHover";
 import type { FieldNote } from "../api/fieldnotes";
 import type { OverlapStats } from "../utils/overlapFilter";
+import { SWIM_METHODS } from "../api/swim_ice";
 import { getInstrumentCesiumColor } from "../config/instrumentRegistry";
 import useDTMHover from "../hooks/useDTMHover";
 import useMapViewer from "../hooks/useMapViewer";
@@ -185,6 +186,9 @@ type MapViewProps = {
   terraformMode?: boolean;
   /** SWIM layer: "0-1m" | "1-5m" | ">5m" | false */
   swimLayer?: string | false;
+  scienceLayerVisibility?: Record<string, boolean>;
+  scienceLayerDepth?: string;
+  scienceLayerOpacities?: Record<string, number>;
   onOlympusMonsTripleClick?: () => void;
   onOlympusMonsClimber?: () => void;
 };
@@ -666,6 +670,9 @@ export default function MapView({
   cameraViewportRef,
   terraformMode = false,
   swimLayer = false,
+  scienceLayerVisibility = {},
+  scienceLayerDepth = "1-5m",
+  scienceLayerOpacities = {},
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
 }: MapViewProps) {
@@ -773,6 +780,8 @@ export default function MapView({
   // View bound selection refs
   const onViewBoundSelectedRef = useRef(onViewBoundSelected);
   const swimLayerRef = useRef<Cesium.ImageryLayer | null>(null);
+  const scienceLayerRefs = useRef<Map<string, Cesium.ImageryLayer>>(new Map());
+  const scienceLayerDepthRefs = useRef<Map<string, string | null>>(new Map());
   useEffect(() => {
     onViewBoundSelectedRef.current = onViewBoundSelected;
   }, [onViewBoundSelected]);
@@ -1576,6 +1585,94 @@ export default function MapView({
       }
     };
   }, [swimLayer]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    const urlSegments: Record<string, string> = {
+      neutron: "neutron",
+      thermal: "thermal",
+      radar_surface: "radar-surface",
+      radar_dielectric: "radar-dielectric",
+      geomorphic: "geomorphic",
+    };
+    const currentRefs = scienceLayerRefs.current;
+    const currentDepths = scienceLayerDepthRefs.current;
+    let cancelled = false;
+
+    const getDepthParam = (method: string): string | null => {
+      if (method === "radar_dielectric") {
+        return scienceLayerDepth === "5m-plus" ? "5m-plus" : "1-5m";
+      }
+      if (method === "geomorphic") {
+        return scienceLayerDepth === "0-1m" || scienceLayerDepth === "5m-plus" ? scienceLayerDepth : "1-5m";
+      }
+      return null;
+    };
+
+    for (const method of SWIM_METHODS) {
+      const visible = scienceLayerVisibility[method] ?? false;
+      const existing = currentRefs.get(method);
+      if (!existing) continue;
+      const nextDepth = getDepthParam(method);
+      const prevDepth = currentDepths.get(method) ?? null;
+      if (!visible || nextDepth !== prevDepth) {
+        viewer.imageryLayers.remove(existing, false);
+        currentRefs.delete(method);
+        currentDepths.delete(method);
+      }
+    }
+
+    for (const method of SWIM_METHODS) {
+      const visible = scienceLayerVisibility[method] ?? false;
+      const opacity = scienceLayerOpacities[method] ?? 0.7;
+      const existing = currentRefs.get(method);
+      if (visible && existing) {
+        existing.alpha = opacity;
+        continue;
+      }
+      if (!visible || existing) continue;
+
+      const segment = urlSegments[method] ?? method;
+      const depthParam = getDepthParam(method);
+      const suffix = depthParam ? `?depth=${depthParam}` : "";
+      const tileUrl = `/api/swim-ice/${segment}/tile/0/0/0.png${suffix}`;
+
+      Cesium.SingleTileImageryProvider.fromUrl(tileUrl, {
+        rectangle: Cesium.Rectangle.fromDegrees(-180, -60, 180, 60),
+      }).then((provider) => {
+        const v = viewerRef.current;
+        if (cancelled || !v || v.isDestroyed()) return;
+        if (currentRefs.has(method)) return;
+        const layer = v.imageryLayers.addImageryProvider(provider);
+        layer.alpha = scienceLayerOpacities[method] ?? 0.7;
+        currentRefs.set(method, layer);
+        currentDepths.set(method, depthParam);
+        v.scene.requestRender();
+      }).catch((err) => {
+        console.warn(`Failed to load science layer ${method}:`, err);
+      });
+    }
+
+    viewer.scene.requestRender();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scienceLayerVisibility, scienceLayerDepth, scienceLayerOpacities]);
+
+  useEffect(() => {
+    return () => {
+      const viewer = viewerRef.current;
+      if (!viewer || viewer.isDestroyed()) return;
+      for (const layer of scienceLayerRefs.current.values()) {
+        viewer.imageryLayers.remove(layer, false);
+      }
+      scienceLayerRefs.current.clear();
+      scienceLayerDepthRefs.current.clear();
+    };
+  }, []);
 
   // Store onHoverProduct in ref to access in hover handler
   const onHoverProductRef = useRef(onHoverProduct);

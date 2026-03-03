@@ -40,6 +40,8 @@ import SpectralComparison from "../components/SpectralComparison";
 import type { PinnedSpectrum } from "../components/SpectralComparison";
 import { CuriositySelfieModal, OlympusMonsPanel, OlympusMonsClimber, TerraformOverlay } from "../components/EasterEggs";
 import type { DetectedFeature } from "../components/CraterDetectPanel";
+import type { SwimMethod, DepthRange } from "../api/swim_ice";
+import { SWIM_METHODS } from "../api/swim_ice";
 
 // Memoize heavy child components to prevent unnecessary re-renders
 const MapView = memo(MapViewRaw);
@@ -408,6 +410,24 @@ export default function MainPage() {
   const [showGrid, setShowGrid] = useState(false);
   const [showRegionLayer, setShowRegionLayer] = useState(false);
   const [swimLayer, setSwimLayer] = useState<string | false>(false);
+
+  const [scienceLayerVisibility, setScienceLayerVisibility] = useState<Record<SwimMethod, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const m of SWIM_METHODS) init[m] = false;
+    return init as Record<SwimMethod, boolean>;
+  });
+  const [scienceLayerDepth, setScienceLayerDepth] = useState<DepthRange>("1-5m");
+  const [scienceLayerOpacities, setScienceLayerOpacities] = useState<Record<SwimMethod, number>>(() => {
+    const init: Record<string, number> = {};
+    for (const m of SWIM_METHODS) init[m] = 0.7;
+    return init as Record<SwimMethod, number>;
+  });
+  const handleScienceLayerToggle = useCallback((method: SwimMethod, visible: boolean) => {
+    setScienceLayerVisibility(prev => ({ ...prev, [method]: visible }));
+  }, []);
+  const handleScienceLayerOpacity = useCallback((method: SwimMethod, opacity: number) => {
+    setScienceLayerOpacities(prev => ({ ...prev, [method]: opacity }));
+  }, []);
 
   // Region Dashboard overlay
   const [showRegionDashboard, setShowRegionDashboard] = useState(false);
@@ -1590,6 +1610,12 @@ export default function MainPage() {
       onSwimLayerChange={setSwimLayer}
       swimIceLat={terrainPoint?.lat ?? null}
       swimIceLon={terrainPoint?.lon ?? null}
+      scienceLayerVisibility={scienceLayerVisibility}
+      onScienceLayerToggle={handleScienceLayerToggle}
+      scienceLayerDepth={scienceLayerDepth}
+      onScienceLayerDepthChange={setScienceLayerDepth}
+      scienceLayerOpacities={scienceLayerOpacities}
+      onScienceLayerOpacity={handleScienceLayerOpacity}
       // Field Notes
       fieldNotes={fieldNotes}
       showFieldNotesOnMap={showFieldNotesOnMap}
@@ -1908,6 +1934,9 @@ export default function MainPage() {
         showGrid={showGrid}
         showRegionLayer={showRegionLayer}
         swimLayer={swimLayer}
+        scienceLayerVisibility={scienceLayerVisibility}
+        scienceLayerDepth={scienceLayerDepth}
+        scienceLayerOpacities={scienceLayerOpacities}
         aiAnalysisPin={aiAnalysisPin}
         overlapFilter={overlapFilter}
         onOverlapStatsChange={handleOverlapStatsChange}
