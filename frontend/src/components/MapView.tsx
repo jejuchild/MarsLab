@@ -1637,7 +1637,7 @@ export default function MapView({
       const segment = urlSegments[method] ?? method;
       const depthParam = getDepthParam(method);
       const suffix = depthParam ? `?depth=${depthParam}` : "";
-      const tileUrl = `/api/swim-ice/${segment}/tile/0/0/0.png${suffix}`;
+      const tileUrl = `/api/swim/method-tile/${segment}${suffix}`;
 
       Cesium.SingleTileImageryProvider.fromUrl(tileUrl, {
         rectangle: Cesium.Rectangle.fromDegrees(-180, -60, 180, 60),
