@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
-from analysis.hirise_landforms.models import ClassifyRequest
+ClassifyRequest = importlib.import_module("analysis.hirise_landforms.models").ClassifyRequest
 
 router = APIRouter(prefix="/api/hirise-landforms", tags=["HiRISE Landform Classification"])
 
@@ -19,7 +20,7 @@ def _get_job_queue() -> Any:
     if _job_queue is not None:
         return _job_queue
     try:
-        from analysis.hirise_landforms.job_queue import LandformJobQueue
+        LandformJobQueue = importlib.import_module("analysis.hirise_landforms.job_queue").LandformJobQueue
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"HiRISE job queue unavailable: {exc}")
     _job_queue = LandformJobQueue()
@@ -32,59 +33,37 @@ def _get_job_queue() -> Any:
     return _job_queue
 
 
-def _flatten_result(raw: dict[str, Any]) -> dict[str, Any]:
-    """
-    Flatten the nested ClassifyResult into the shape the frontend expects:
-    { product_id, model, top_class, confidence, classes[], processing_time_s, heatmap_url, agent_reasoning, ... }
-    """
+def _normalize_result(raw: dict[str, Any]) -> dict[str, Any]:
     result = raw.get("result")
-    if result is None:
+    if not isinstance(result, dict):
         return raw
 
-    # If result is already a dict (from model_dump), flatten prediction
-    if isinstance(result, dict):
-        prediction = result.get("prediction", {})
-        probabilities = prediction.get("probabilities", {})
+    normalized = dict(result)
+    if "model_used" not in normalized and "model" in normalized:
+        normalized["model_used"] = normalized.get("model")
+    if "tile_predictions" not in normalized:
+        normalized["tile_predictions"] = []
+    if "class_summary" not in normalized:
+        normalized["class_summary"] = []
+    if "dominant_class" not in normalized:
+        normalized["dominant_class"] = "OTHER"
+    if "dominant_confidence" not in normalized:
+        normalized["dominant_confidence"] = 0.0
 
-        # Build classes array for frontend
-        classes = []
-        class_descriptions = {
-            "LDA": "Lobate Debris Apron",
-            "LVF": "Lineated Valley Fill",
-            "CCF": "Concentric Crater Fill",
-            "GLF": "Glacier-Like Form",
-            "BACKGROUND": "Background",
-        }
-        for class_code, prob in probabilities.items():
-            classes.append({
-                "class_code": class_code,
-                "class_name": class_descriptions.get(class_code, class_code),
-                "probability": prob,
-            })
-
-        flat_result = {
-            "product_id": result.get("product_id", ""),
-            "model": result.get("model_used", "v2"),
-            "top_class": prediction.get("top_class", "BACKGROUND"),
-            "confidence": prediction.get("confidence", 0.0),
-            "classes": classes,
-            "heatmap_url": result.get("heatmap_url"),
-            "processing_time_s": result.get("processing_time_s", 0.0),
-            "agent_reasoning": result.get("agent_reasoning"),
-            "num_tiles": result.get("num_tiles", 0),
-            "device": result.get("device", "cpu"),
-        }
-
-        return {**raw, "result": flat_result}
-    return raw
+    return {**raw, "result": normalized}
 
 
 @router.post("/classify")
-async def classify_hirise_landforms(request: ClassifyRequest):
+async def classify_hirise_landforms(request: dict[str, object]):
     queue = _get_job_queue()
 
     try:
-        job_id = queue.submit(request)
+        classify_request = ClassifyRequest.model_validate(request)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid classify request: {exc}")
+
+    try:
+        job_id = queue.submit(classify_request)
     except ValueError as exc:
         raise HTTPException(status_code=429, detail=str(exc))
     except Exception as exc:
@@ -113,7 +92,7 @@ async def get_job_status(job_id: str):
         raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
 
     response = status.model_dump() if hasattr(status, "model_dump") else dict(status)
-    response = _flatten_result(response)
+    response = _normalize_result(response)
     return JSONResponse(content=response)
 
 
@@ -151,7 +130,7 @@ async def get_cached_classification(product_id: str):
     for key, (expires_at, result) in cache.items():
         if key[0] == product_id and expires_at > datetime.now(timezone.utc):
             result_dict = result.model_dump() if hasattr(result, "model_dump") else dict(result)
-            flat = _flatten_result({"result": result_dict})
+            flat = _normalize_result({"result": result_dict})
             return JSONResponse(content=flat.get("result", result_dict))
 
     raise HTTPException(status_code=404, detail=f"No cached classification for product_id={product_id}")

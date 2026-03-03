@@ -19,7 +19,8 @@ export default function LandformClassCard({
   probability,
   isTopClass = false,
 }: LandformClassCardProps) {
-  const meta = LANDFORM_TYPES[classCode] ?? LANDFORM_TYPES["OTHER"];
+  const fallbackMeta = { label: "Other Terrain", icon: "landscape", color: "bg-slate-500" };
+  const meta = LANDFORM_TYPES[classCode] ?? LANDFORM_TYPES["OTHER"] ?? fallbackMeta;
   const pct = Math.round(probability * 100);
 
   // Color intensity based on probability

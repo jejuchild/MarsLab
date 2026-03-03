@@ -133,12 +133,12 @@ def compute_tile_labels(
                 min_distance = dist
 
         # If no candidates found, compute distance to nearest polygon
-        if not candidates:
+        if len(candidates) == 0:
             pt = Point(*latlon_to_equirect(lat_f, lon_f))
             # Use a large buffer query for distance estimation
             buffered = pt.buffer(OTHER_DISTANCE_M * 1.5)
             nearby = tree.query(buffered)
-            if nearby:
+            if len(nearby) > 0:
                 for idx in nearby:
                     d = gdf.geometry.iloc[idx].distance(pt)
                     if d < min_distance:

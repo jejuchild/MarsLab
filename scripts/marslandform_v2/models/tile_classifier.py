@@ -71,7 +71,7 @@ class FocalLoss(nn.Module):
         super().__init__()
         self.gamma = gamma
         self.label_smoothing = label_smoothing
-        self.register_buffer("weight", weight)
+        self.class_weight = weight
 
     def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """
@@ -81,7 +81,7 @@ class FocalLoss(nn.Module):
         num_classes = logits.shape[1]
         ce = F.cross_entropy(
             logits, targets,
-            weight=self.weight,
+            weight=self.class_weight,
             label_smoothing=self.label_smoothing,
             reduction="none",
         )
@@ -93,19 +93,22 @@ class FocalLoss(nn.Module):
 
 # ── Dataset ──────────────────────────────────────────────────────────────────
 
-class TileLabelDataset(Dataset):
+class TileLabelDataset(Dataset[dict[str, Any]]):
     """Dataset for tile-level classification from precomputed embeddings."""
 
     def __init__(
         self,
         tile_labels: list[dict[str, Any]],
         tile_indices: list[int],
-        embeddings_dir: Path,
+        embeddings_dir: Path | None,
         config: TileClassifierConfig,
         is_train: bool = True,
+        embeddings_by_image: dict[str, np.ndarray] | None = None,
     ):
         self.config = config
         self.is_train = is_train
+        self.embeddings_dir = embeddings_dir
+        self.embeddings_by_image = embeddings_by_image
 
         # Filter to usable tiles (confident, mixed, or OTHER)
         self.samples: list[dict[str, Any]] = []
@@ -121,14 +124,21 @@ class TileLabelDataset(Dataset):
 
             # Load embedding path
             img_id = t["image_id"]
-            emb_path = embeddings_dir / f"{img_id}.npy"
-            if not emb_path.exists():
+            emb_path = None
+            if self.embeddings_by_image is None:
+                if self.embeddings_dir is None:
+                    continue
+                emb_candidate = self.embeddings_dir / f"{img_id}.npy"
+                if not emb_candidate.exists():
+                    continue
+                emb_path = emb_candidate
+            elif img_id not in self.embeddings_by_image:
                 continue
 
             sample = {
                 "image_id": img_id,
                 "tile_idx": t["tile_idx"],
-                "emb_path": str(emb_path),
+                "emb_path": str(emb_path) if emb_path is not None else None,
                 "label": label,
                 "label_type": label_type,
                 "coverage": t.get("coverage", {}),
@@ -163,8 +173,15 @@ class TileLabelDataset(Dataset):
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         sample = self.samples[idx]
 
-        # Load embedding for this tile
-        all_embeddings = np.load(sample["emb_path"])  # (num_tiles, 768)
+        if self.embeddings_by_image is not None:
+            all_embeddings = self.embeddings_by_image[sample["image_id"]]
+        else:
+            emb_path = sample["emb_path"]
+            if emb_path is None:
+                all_embeddings = np.zeros((1, self.config.embed_dim), dtype=np.float32)
+            else:
+                all_embeddings = np.load(emb_path)
+
         tile_idx = sample["tile_idx"]
         if tile_idx < len(all_embeddings):
             embedding = all_embeddings[tile_idx]
@@ -267,7 +284,7 @@ class TileClassifierTrainer:
 
         # Dataloaders
         train_sampler = WeightedRandomSampler(
-            weights=train_dataset.get_sample_weights(),
+            weights=train_dataset.get_sample_weights().tolist(),
             num_samples=len(train_dataset),
             replacement=True,
         )
@@ -294,7 +311,7 @@ class TileClassifierTrainer:
         self.patience_counter = 0
 
     @staticmethod
-    def _collate(batch: list[dict]) -> dict[str, torch.Tensor]:
+    def _collate(batch: list[dict[str, Any]]) -> dict[str, torch.Tensor | torch.BoolTensor]:
         """Custom collate to handle variable-presence soft_target."""
         result = {
             "embedding": torch.stack([b["embedding"] for b in batch]),
@@ -303,7 +320,6 @@ class TileClassifierTrainer:
         }
         # Soft targets only for mixed tiles
         if any("soft_target" in b for b in batch):
-            num_classes = batch[0]["embedding"].shape[0]  # will use config
             soft = []
             has_soft = []
             for b in batch:
@@ -386,11 +402,11 @@ class TileClassifierTrainer:
         if landform_mask:
             lf_labels = [all_labels[i] for i in landform_mask]
             lf_preds = [all_preds[i] for i in landform_mask]
-            landform_f1 = f1_score(lf_labels, lf_preds, average="macro", zero_division=0)
+            landform_f1 = f1_score(lf_labels, lf_preds, average="macro", zero_division="warn")
         else:
             landform_f1 = 0.0
 
-        overall_f1 = f1_score(all_labels, all_preds, average="macro", zero_division=0)
+        overall_f1 = f1_score(all_labels, all_preds, average="macro", zero_division="warn")
         accuracy = accuracy_score(all_labels, all_preds)
 
         per_class: dict[str, dict[str, float]] = {}
@@ -398,9 +414,9 @@ class TileClassifierTrainer:
             cls_mask_true = [1 if l == cls_idx else 0 for l in all_labels]
             cls_mask_pred = [1 if p == cls_idx else 0 for p in all_preds]
             per_class[cls_name] = {
-                "precision": precision_score(cls_mask_true, cls_mask_pred, zero_division=0),
-                "recall": recall_score(cls_mask_true, cls_mask_pred, zero_division=0),
-                "f1": f1_score(cls_mask_true, cls_mask_pred, zero_division=0),
+                "precision": precision_score(cls_mask_true, cls_mask_pred, zero_division="warn"),
+                "recall": recall_score(cls_mask_true, cls_mask_pred, zero_division="warn"),
+                "f1": f1_score(cls_mask_true, cls_mask_pred, zero_division="warn"),
                 "support": sum(cls_mask_true),
             }
 

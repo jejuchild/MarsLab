@@ -4,7 +4,6 @@ import {
   pollJobStatus,
   type ModelType,
   type ClassifyResult,
-  type ClassSummary,
   type JobStatus,
   type AgentReasoning,
 } from "../api/hirise_landforms";
@@ -265,6 +264,7 @@ export default function HiriseLandformPanel({
             >
               <option value="v3">V3 — DINOv2 + Tile Classifier</option>
               <option value="v2">V2 — DINOv2 + MIL + VLM</option>
+            </select>
           </div>
 
           {/* Options row */}
