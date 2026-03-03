@@ -4,35 +4,38 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
-ModelName = Literal["v2", "mars-bench"]
+ModelName = Literal["v3", "v2"]
 JobState = Literal["queued", "processing", "completed", "failed"]
+
+V3_CLASSES = ["LDA", "LVF", "CCF", "OTHER"]
 
 
 class ClassifyRequest(BaseModel):
     product_id: str
-    model: ModelName = "v2"
+    model: ModelName = "v3"
     include_heatmap: bool = True
     lat: float | None = None
     lon: float | None = None
 
 
-class TileResult(BaseModel):
+class TilePrediction(BaseModel):
     x: int
     y: int
-    attention_weight: float = Field(..., ge=0.0, le=1.0)
+    predicted_class: str
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    probabilities: dict[str, float] = Field(default_factory=dict)
     lat: float
     lon: float
 
 
-class PredictionResult(BaseModel):
-    top_class: str
-    probabilities: dict[str, float] = Field(default_factory=dict)
-    confidence: float = Field(..., ge=0.0, le=1.0)
+class ClassSummary(BaseModel):
+    class_name: str
+    tile_count: int
+    percentage: float
+    mean_confidence: float
 
 
 class AgentReasoningStep(BaseModel):
-    """A single step from the VLM ReACT agent reasoning chain."""
     step: int
     action: str | None = None
     action_input: dict[str, Any] | None = None
@@ -44,7 +47,6 @@ class AgentReasoningStep(BaseModel):
 
 
 class AgentReasoningResult(BaseModel):
-    """VLM agent reasoning output — included when confidence < threshold."""
     enabled: bool = False
     mode: str = "fast"
     landform_class: str | None = None
@@ -58,8 +60,10 @@ class AgentReasoningResult(BaseModel):
 class ClassifyResult(BaseModel):
     product_id: str
     model_used: str
-    prediction: PredictionResult
-    tiles: list[TileResult] = Field(default_factory=list)
+    tile_predictions: list[TilePrediction] = Field(default_factory=list)
+    class_summary: list[ClassSummary] = Field(default_factory=list)
+    dominant_class: str = "OTHER"
+    dominant_confidence: float = 0.0
     heatmap_url: str | None = None
     processing_time_s: float = 0.0
     agent_reasoning: AgentReasoningResult | None = None

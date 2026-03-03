@@ -6,7 +6,7 @@
  * Types
  * =======================================================*/
 
-export type ModelType = "v2" | "mars-bench";
+export type ModelType = "v3" | "v2";
 
 export interface ClassifyRequest {
   product_id: string;
@@ -14,10 +14,21 @@ export interface ClassifyRequest {
   include_heatmap: boolean;
 }
 
-export interface LandformClass {
+export interface TilePrediction {
+  x: number;
+  y: number;
+  predicted_class: string;
+  confidence: number;
+  probabilities: Record<string, number>;
+  lat: number;
+  lon: number;
+}
+
+export interface ClassSummary {
   class_name: string;
-  class_code: string;
-  probability: number;
+  tile_count: number;
+  percentage: number;
+  mean_confidence: number;
 }
 
 export interface AgentReasoningStep {
@@ -44,10 +55,11 @@ export interface AgentReasoning {
 
 export interface ClassifyResult {
   product_id: string;
-  model: ModelType;
-  top_class: string;
-  confidence: number;
-  classes: LandformClass[];
+  model_used: string;
+  tile_predictions: TilePrediction[];
+  class_summary: ClassSummary[];
+  dominant_class: string;
+  dominant_confidence: number;
   heatmap_url: string | null;
   processing_time_s: number;
   agent_reasoning?: AgentReasoning | null;
@@ -74,12 +86,10 @@ export interface ClassificationServiceStatus {
  * =======================================================*/
 
 export const LANDFORM_TYPES: Record<string, { label: string; icon: string; color: string }> = {
-  LDA: { label: "Lobate Debris Apron", icon: "landslide", color: "bg-amber-500" },
-  LVF: { label: "Lineated Valley Fill", icon: "timeline", color: "bg-cyan-500" },
-  CCF: { label: "Concentric Crater Fill", icon: "target", color: "bg-violet-500" },
-  GLF: { label: "Glacier-Like Form", icon: "ac_unit", color: "bg-blue-500" },
-  BACKGROUND: { label: "Background", icon: "landscape", color: "bg-slate-500" },
-  OTHER: { label: "Other", icon: "help_outline", color: "bg-slate-500" },
+  LDA: { label: "Lobate Debris Apron", icon: "landslide", color: "bg-blue-500" },
+  LVF: { label: "Lineated Valley Fill", icon: "timeline", color: "bg-emerald-500" },
+  CCF: { label: "Concentric Crater Fill", icon: "target", color: "bg-amber-500" },
+  OTHER: { label: "Other Terrain", icon: "landscape", color: "bg-slate-500" },
 };
 
 /* =========================================================

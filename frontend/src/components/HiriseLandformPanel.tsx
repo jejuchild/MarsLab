@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import LandformClassCard from "./LandformClassCard";
 import {
   submitClassification,
   pollJobStatus,
   type ModelType,
   type ClassifyResult,
+  type ClassSummary,
   type JobStatus,
   type AgentReasoning,
 } from "../api/hirise_landforms";
@@ -149,7 +149,7 @@ export default function HiriseLandformPanel({
   productId,
   onClose,
 }: HiriseLandformPanelProps) {
-  const [model, setModel] = useState<ModelType>("v2");
+  const [model, setModel] = useState<ModelType>("v3");
   const [includeHeatmap, setIncludeHeatmap] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -263,9 +263,8 @@ export default function HiriseLandformPanel({
               onChange={(e) => setModel(e.target.value as ModelType)}
               className="rounded border border-[#232f48] bg-[#111b2a] px-2 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
             >
+              <option value="v3">V3 — DINOv2 + Tile Classifier</option>
               <option value="v2">V2 — DINOv2 + MIL + VLM</option>
-              <option value="mars-bench">Mars-Bench</option>
-            </select>
           </div>
 
           {/* Options row */}
@@ -277,7 +276,7 @@ export default function HiriseLandformPanel({
                 onChange={(e) => setIncludeHeatmap(e.target.checked)}
                 className="h-3 w-3 rounded border-[#232f48] bg-[#0d1520] accent-blue-500"
               />
-              <span className="text-[10px] text-[#92a4c9]">Attention Heatmap</span>
+              <span className="text-[10px] text-[#92a4c9]">Class Map</span>
             </label>
 
             <button
@@ -297,7 +296,7 @@ export default function HiriseLandformPanel({
                   {jobStatus?.status === "queued"
                     ? "Queued…"
                     : jobStatus?.status === "processing"
-                      ? "Running DINOv2 + MIL inference…"
+                      ? "Running tile-level classification…"
                       : "Submitting…"}
                 </span>
                 <span className="font-mono">{Math.round(progress * 100)}%</span>
@@ -328,39 +327,57 @@ export default function HiriseLandformPanel({
             <div className="flex flex-col gap-2">
               {/* Summary */}
               <div className="flex items-center gap-2 rounded border border-[#232f48] bg-[#111b2a] px-2 py-1.5">
-                <span className="material-symbols-outlined text-[14px] text-green-400">
-                  check_circle
-                </span>
+                <span className="material-symbols-outlined text-[14px] text-green-400">check_circle</span>
                 <div className="flex flex-col">
-                  <span className="text-[11px] font-medium text-slate-200">
-                    {result.top_class}
-                  </span>
+                  <span className="text-[11px] font-medium text-slate-200">{result.dominant_class}</span>
                   <span className="text-[9px] text-[#92a4c9]">
-                    Confidence: {Math.round(result.confidence * 100)}%
-                    {result.processing_time_s != null &&
-                      ` · ${result.processing_time_s.toFixed(1)}s`}
+                    Confidence: {Math.round(result.dominant_confidence * 100)}%
+                    {result.processing_time_s != null && ` · ${result.processing_time_s.toFixed(1)}s`}
                     {result.num_tiles != null && ` · ${result.num_tiles} tiles`}
-                    {result.device && ` · ${result.device}`}
                   </span>
                 </div>
               </div>
 
-              {/* Class cards */}
+              {/* Stacked distribution bar */}
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] uppercase tracking-wider text-[#92a4c9]">
-                  All Classes
-                </span>
-                {result.classes
-                  ?.sort((a, b) => b.probability - a.probability)
-                  .map((cls) => (
-                    <LandformClassCard
-                      key={cls.class_code}
-                      classCode={cls.class_code}
-                      className_={cls.class_name}
-                      probability={cls.probability}
-                      isTopClass={cls.class_name === result.top_class}
-                    />
-                  ))}
+                <span className="text-[9px] uppercase tracking-wider text-[#92a4c9]">Tile Distribution</span>
+                <div className="flex h-3 w-full overflow-hidden rounded-full bg-[#1a2744]">
+                  {result.class_summary
+                    ?.filter(s => s.tile_count > 0)
+                    .map(s => {
+                      const colors: Record<string, string> = {
+                        LDA: "bg-blue-500", LVF: "bg-emerald-500", CCF: "bg-amber-500", OTHER: "bg-slate-600"
+                      };
+                      return (
+                        <div
+                          key={s.class_name}
+                          className={`${colors[s.class_name] || "bg-slate-600"} transition-all`}
+                          style={{ width: `${s.percentage}%` }}
+                          title={`${s.class_name}: ${s.tile_count} tiles (${Math.round(s.percentage)}%)`}
+                        />
+                      );
+                    })}
+                </div>
+                {/* Class breakdown list */}
+                <div className="flex flex-col gap-0.5">
+                  {result.class_summary
+                    ?.filter(s => s.tile_count > 0)
+                    .sort((a, b) => b.tile_count - a.tile_count)
+                    .map(s => {
+                      const dotColors: Record<string, string> = {
+                        LDA: "bg-blue-500", LVF: "bg-emerald-500", CCF: "bg-amber-500", OTHER: "bg-slate-500"
+                      };
+                      return (
+                        <div key={s.class_name} className="flex items-center gap-2 px-1">
+                          <span className={`h-2 w-2 rounded-full ${dotColors[s.class_name] || "bg-slate-500"}`} />
+                          <span className="text-[10px] font-medium text-slate-300 w-8">{s.class_name}</span>
+                          <span className="text-[9px] text-[#92a4c9]">
+                            {s.tile_count} tiles ({Math.round(s.percentage)}%) · {Math.round(s.mean_confidence * 100)}% conf
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
 
               {/* VLM Agent Reasoning */}
@@ -368,19 +385,12 @@ export default function HiriseLandformPanel({
                 <AgentReasoningPanel reasoning={result.agent_reasoning} />
               )}
 
-              {/* Attention heatmap */}
+              {/* Class Map */}
               {result.heatmap_url && (
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] uppercase tracking-wider text-[#92a4c9]">
-                    Attention Heatmap
-                  </span>
+                  <span className="text-[9px] uppercase tracking-wider text-[#92a4c9]">Class Map</span>
                   <div className="overflow-hidden rounded border border-[#232f48]">
-                    <img
-                      src={result.heatmap_url}
-                      alt="Attention heatmap"
-                      className="h-auto w-full"
-                      loading="lazy"
-                    />
+                    <img src={result.heatmap_url} alt="Class map" className="h-auto w-full" loading="lazy" />
                   </div>
                 </div>
               )}
