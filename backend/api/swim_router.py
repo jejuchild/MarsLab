@@ -12,8 +12,8 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse, FileResponse, Response
 
 logger = logging.getLogger(__name__)
 
@@ -177,3 +177,77 @@ def get_swim_tile(layer: str):
             "X-SWIM-Bounds": "-180,-60,180,60",
         },
     )
+
+
+# ── Science method overview tiles (individual detection methods) ──
+# Maps method name to GeoTIFF file(s) in backend/data/swim/
+SWIM_METHOD_FILES: dict[str, dict[str, str]] = {
+    "neutron": {"default": "neutron_consistency.tif"},
+    "thermal": {"default": "thermal_consistency.tif"},
+    "radar-surface": {"default": "radar_surface_consistency.tif"},
+    "radar-dielectric": {"1-5m": "radar_dielectric_1_5m.tif", "5m-plus": "radar_dielectric_5m_plus.tif"},
+    "geomorphic": {"0-1m": "geomorphology_0_1m.tif", "1-5m": "geomorphology_1_5m.tif", "5m-plus": "geomorphology_5m_plus.tif"},
+}
+
+# In-memory cache for rendered PNGs (method:depth -> bytes)
+_method_tile_cache: dict[str, bytes] = {}
+
+
+@router.get("/method-tile/{method}")
+def get_method_tile(method: str, depth: str = Query(None)):
+    """Serve a colorized overview tile for an individual SWIM detection method.
+
+    Returns a single PNG covering -180..180 lon, -60..60 lat.
+    Methods: neutron, thermal, radar-surface, radar-dielectric, geomorphic.
+    Depth param required only for radar-dielectric and geomorphic.
+    """
+    files = SWIM_METHOD_FILES.get(method)
+    if not files:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown method '{method}'. Available: {list(SWIM_METHOD_FILES.keys())}"
+        )
+
+    # Resolve filename based on depth
+    if "default" in files:
+        filename = files["default"]
+    else:
+        effective_depth = depth or "1-5m"
+        filename = files.get(effective_depth)
+        if not filename:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid depth '{depth}' for {method}. Available: {list(files.keys())}"
+            )
+
+    cache_key = f"{method}:{depth or 'default'}"
+    if cache_key in _method_tile_cache:
+        return Response(
+            content=_method_tile_cache[cache_key],
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=86400", "X-SWIM-Method": method},
+        )
+
+    # Load GeoTIFF and render overview tile
+    try:
+        from analysis.swim_common import load_swim_geotiff, render_consistency_tile
+
+        geotiff = load_swim_geotiff(filename, name=f"SWIM {method}")
+        if not geotiff.loaded:
+            raise HTTPException(status_code=503, detail=f"SWIM {method} data not loaded: {geotiff.error}")
+
+        png_bytes = render_consistency_tile(geotiff, z=0, x=0, y=0)
+        if not png_bytes:
+            raise HTTPException(status_code=503, detail=f"SWIM {method} tile render returned empty")
+
+        _method_tile_cache[cache_key] = png_bytes
+        return Response(
+            content=png_bytes,
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=86400", "X-SWIM-Method": method},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to render SWIM %s tile: %s", method, e)
+        raise HTTPException(status_code=503, detail=f"SWIM {method} tile unavailable: {e}")
