@@ -7,9 +7,10 @@ All hyperparams, paths, and constants in one place.
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import List, Optional
+import os
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
-ROOT = Path("/disk1/cspark/MarsLab")
+ROOT = Path(os.getenv("MARSLAB_ROOT", "/disk1/cspark/MarsLab"))
 DATA_DIR = ROOT / "Data" / "HiRISE"
 MOLA_DEM = ROOT / "Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.tif"
 METADATA_JSON = DATA_DIR / "midlat_metadata.json"
