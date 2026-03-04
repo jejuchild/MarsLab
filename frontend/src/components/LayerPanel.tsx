@@ -7,6 +7,7 @@ import type { SwimMethod, DepthRange } from "../api/swim_ice";
 import { SWIM_METHODS } from "../api/swim_ice";
 import { INSTRUMENTS, INSTRUMENT_GROUPS, type InstrumentId } from "../config/instrumentRegistry";
 import SwimIcePanel from "./SwimIcePanel";
+import AccessibilityPanel from "./AccessibilityPanel";
 
 type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM" | "CRISM_TRR3";
 type InstrumentVisibility = Record<InstrumentId, boolean>;
@@ -213,6 +214,12 @@ interface LayerPanelProps {
   overlapFilter?: OverlapFilter;
   onOverlapFilterChange?: (filter: OverlapFilter) => void;
   overlapStats?: OverlapStats | null;
+
+  // Ice Accessibility heatmap
+  accessibilityVisible?: boolean;
+  onAccessibilityVisibleChange?: (v: boolean) => void;
+  accessibilityOpacity?: number;
+  onAccessibilityOpacityChange?: (v: number) => void;
 
   // Measurement Tools
   showMeasurementTools?: boolean;
@@ -516,6 +523,11 @@ export default function LayerPanel({
   overlapStats,
   showMeasurementTools = false,
   onToggleMeasurementTools,
+  // Accessibility
+  accessibilityVisible = false,
+  onAccessibilityVisibleChange,
+  accessibilityOpacity = 0.6,
+  onAccessibilityOpacityChange,
   isMobile = false,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
@@ -881,6 +893,57 @@ export default function LayerPanel({
             />
           )}
         </div>
+
+        {/* Ice Accessibility Heatmap */}
+        <div className={`p-2 rounded transition-colors ${
+          accessibilityVisible
+            ? "bg-emerald-500/20 border border-emerald-400/50"
+            : "bg-[#1a2333] border border-[#232f48] hover:border-emerald-400/30"
+        }`}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="material-symbols-outlined text-xs text-emerald-400">explore</span>
+            <label className="flex items-center gap-1.5 flex-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={accessibilityVisible}
+                onChange={(e) => onAccessibilityVisibleChange?.(e.target.checked)}
+                className="accent-emerald-500 w-3 h-3"
+              />
+              <span className={`text-[11px] font-medium ${accessibilityVisible ? "text-emerald-300" : "text-[#92a4c9]"}`}>
+                Ice Accessibility
+              </span>
+            </label>
+            <span className="text-[9px] text-slate-500">heatmap</span>
+          </div>
+          {accessibilityVisible && (
+            <div className="space-y-1.5 mt-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] text-slate-500">Opacity</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(accessibilityOpacity * 100)}
+                  onChange={(e) => onAccessibilityOpacityChange?.(parseInt(e.target.value) / 100)}
+                  className="flex-1 h-1 accent-emerald-500"
+                />
+                <span className="text-[9px] text-slate-400 tabular-nums w-7 text-right">
+                  {Math.round(accessibilityOpacity * 100)}%
+                </span>
+              </div>
+              <p className="text-[9px] text-slate-500">
+                SWIM + TES + MOLA composite score
+              </p>
+            </div>
+          )}
+        </div>
+
+        {accessibilityVisible && (
+          <AccessibilityPanel
+            lat={swimIceLat ?? null}
+            lon={swimIceLon ?? null}
+          />
+        )}
 
         {/* Footprints Section — Hierarchical instrument tree */}
         <div className="p-4 border-b border-[#232f48]">

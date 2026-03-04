@@ -565,6 +565,8 @@ app.include_router(mars_news_router)  # /api/mars-news — Mars News Digest
 from api.mars_research_router import router as mars_research_router
 app.include_router(mars_research_router)  # /api/mars-research — Mars Research Digest
 
+from api.accessibility_router import router as accessibility_router
+app.include_router(accessibility_router)  # /api/accessibility/* — Ice Accessibility Algorithm
 @app.get("/hirise/quickview/{product_id}.png")
 @limiter.limit("20/minute")
 def get_hirise_quickview_transparent(request: Request, product_id: str):

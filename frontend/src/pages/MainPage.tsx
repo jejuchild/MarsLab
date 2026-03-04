@@ -410,6 +410,8 @@ export default function MainPage() {
   const [showGrid, setShowGrid] = useState(false);
   const [showRegionLayer, setShowRegionLayer] = useState(false);
   const [swimLayer, setSwimLayer] = useState<string | false>(false);
+  const [accessibilityVisible, setAccessibilityVisible] = useState(false);
+  const [accessibilityOpacity, setAccessibilityOpacity] = useState(0.6);
 
   const [scienceLayerVisibility, setScienceLayerVisibility] = useState<Record<SwimMethod, boolean>>(() => {
     const init: Record<string, boolean> = {};
@@ -1629,6 +1631,11 @@ export default function MainPage() {
       // Measurement Tools
       showMeasurementTools={showMeasurementTools}
       onToggleMeasurementTools={setShowMeasurementTools}
+      // Ice Accessibility
+      accessibilityVisible={accessibilityVisible}
+      onAccessibilityVisibleChange={setAccessibilityVisible}
+      accessibilityOpacity={accessibilityOpacity}
+      onAccessibilityOpacityChange={setAccessibilityOpacity}
     />
   );
 
@@ -1951,6 +1958,8 @@ export default function MainPage() {
         onOlympusMonsClimber={handleOlympusMonsClimber}
         craterDetectFeatures={craterDetectFeatures}
         cameraViewportRef={cameraViewportRef}
+        accessibilityVisible={accessibilityVisible}
+        accessibilityOpacity={accessibilityOpacity}
       />
 
       {/* MARVIS FAB — floating chat widget with grounded tool calling */}

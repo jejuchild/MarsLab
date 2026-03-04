@@ -190,6 +190,9 @@ type MapViewProps = {
   scienceLayerDepth?: string;
   scienceLayerOpacities?: Record<string, number>;
   onOlympusMonsTripleClick?: () => void;
+  // Ice Accessibility heatmap overlay
+  accessibilityVisible?: boolean;
+  accessibilityOpacity?: number;
   onOlympusMonsClimber?: () => void;
 };
 
@@ -673,6 +676,8 @@ export default function MapView({
   scienceLayerVisibility = {},
   scienceLayerDepth = "1-5m",
   scienceLayerOpacities = {},
+  accessibilityVisible = false,
+  accessibilityOpacity = 0.6,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
 }: MapViewProps) {
@@ -782,6 +787,7 @@ export default function MapView({
   const swimLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   const scienceLayerRefs = useRef<Map<string, Cesium.ImageryLayer>>(new Map());
   const scienceLayerDepthRefs = useRef<Map<string, string | null>>(new Map());
+  const accessibilityLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   useEffect(() => {
     onViewBoundSelectedRef.current = onViewBoundSelected;
   }, [onViewBoundSelected]);
@@ -1673,6 +1679,51 @@ export default function MapView({
       scienceLayerDepthRefs.current.clear();
     };
   }, []);
+
+  // ── Ice Accessibility heatmap layer ──────────────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    // Remove existing layer
+    if (accessibilityLayerRef.current) {
+      viewer.imageryLayers.remove(accessibilityLayerRef.current, false);
+      accessibilityLayerRef.current = null;
+    }
+
+    if (!accessibilityVisible) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    // Use UrlTemplateImageryProvider for z/x/y dynamic tiles
+    const provider = new Cesium.UrlTemplateImageryProvider({
+      url: "/api/accessibility/tile/{z}/{x}/{y}.png",
+      tilingScheme: new Cesium.GeographicTilingScheme(),
+      minimumLevel: 0,
+      maximumLevel: 5,
+    });
+    const layer = viewer.imageryLayers.addImageryProvider(provider);
+    layer.alpha = accessibilityOpacity;
+    accessibilityLayerRef.current = layer;
+    viewer.scene.requestRender();
+
+    return () => {
+      if (!viewer || viewer.isDestroyed()) return;
+      if (accessibilityLayerRef.current) {
+        viewer.imageryLayers.remove(accessibilityLayerRef.current, false);
+        accessibilityLayerRef.current = null;
+      }
+    };
+  }, [accessibilityVisible]);
+
+  // Update accessibility layer opacity without recreating
+  useEffect(() => {
+    if (accessibilityLayerRef.current) {
+      accessibilityLayerRef.current.alpha = accessibilityOpacity;
+      viewerRef.current?.scene.requestRender();
+    }
+  }, [accessibilityOpacity]);
 
   // Store onHoverProduct in ref to access in hover handler
   const onHoverProductRef = useRef(onHoverProduct);
