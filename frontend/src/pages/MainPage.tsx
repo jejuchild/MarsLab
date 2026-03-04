@@ -28,6 +28,7 @@ import useCommandPalette from "../hooks/useCommandPalette";
 import usePanelManager from "../hooks/usePanelManager";
 import PanelAttentionWrapper from "../components/PanelAttentionWrapper";
 import { useUndoRedo } from "../hooks/useUndoRedo";
+import AccessibilityExplainTooltip from "../components/AccessibilityExplainTooltip";
 import CommandPalette from "../components/CommandPalette";
 import type { CommandAction } from "../components/CommandPalette";
 import EmptyState from "../components/EmptyState";
@@ -412,7 +413,8 @@ export default function MainPage() {
   const [swimLayer, setSwimLayer] = useState<string | false>(false);
   const [accessibilityVisible, setAccessibilityVisible] = useState(false);
   const [accessibilityOpacity, setAccessibilityOpacity] = useState(0.6);
-
+  const [accessibilityExplainMode, setAccessibilityExplainMode] = useState(false);
+  const [accessibilityExplainPoint, setAccessibilityExplainPoint] = useState<{ lat: number; lon: number } | null>(null);
   const [scienceLayerVisibility, setScienceLayerVisibility] = useState<Record<SwimMethod, boolean>>(() => {
     const init: Record<string, boolean> = {};
     for (const m of SWIM_METHODS) init[m] = false;
@@ -1209,7 +1211,11 @@ export default function MainPage() {
       // Crater detection: set scan center point
       setCraterDetectCenter({ lat, lon });
     }
-  }, [analysisMode]);
+    // Accessibility explain mode: show tooltip on any terrain click
+    if (accessibilityVisible && accessibilityExplainMode) {
+      setAccessibilityExplainPoint({ lat, lon });
+    }
+  }, [analysisMode, accessibilityVisible, accessibilityExplainMode]);
 
   // When a product is selected, clear terrain point
   const handleSelect = useCallback((ctx: InspectorContext | null) => {
@@ -1636,6 +1642,8 @@ export default function MainPage() {
       onAccessibilityVisibleChange={setAccessibilityVisible}
       accessibilityOpacity={accessibilityOpacity}
       onAccessibilityOpacityChange={setAccessibilityOpacity}
+      accessibilityExplainMode={accessibilityExplainMode}
+      onAccessibilityExplainModeChange={setAccessibilityExplainMode}
     />
   );
 
@@ -1961,6 +1969,15 @@ export default function MainPage() {
         accessibilityVisible={accessibilityVisible}
         accessibilityOpacity={accessibilityOpacity}
       />
+
+      {/* Accessibility Explain Tooltip — floating on map */}
+      {accessibilityExplainPoint && (
+        <AccessibilityExplainTooltip
+          lat={accessibilityExplainPoint.lat}
+          lon={accessibilityExplainPoint.lon}
+          onClose={() => setAccessibilityExplainPoint(null)}
+        />
+      )}
 
       {/* MARVIS FAB — floating chat widget with grounded tool calling */}
       {!isMobile && (

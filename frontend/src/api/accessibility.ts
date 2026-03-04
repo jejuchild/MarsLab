@@ -21,6 +21,10 @@ export interface AccessibilityScore {
   confidence: "high" | "medium" | "low" | "insufficient";
 }
 
+export interface AccessibilityExplanation extends AccessibilityScore {
+  explanation: string;
+}
+
 export interface AccessibilityWeights {
   ice_presence: number;
   ice_depth: number;
@@ -74,4 +78,26 @@ export function getAccessibilityTileUrl(
     if (qs) base += `?${qs}`;
   }
   return base;
+}
+
+
+/* =========================================================
+ * Explain fetcher (score + LLM explanation)
+ * =======================================================*/
+
+export async function fetchAccessibilityExplanation(
+  lat: number,
+  lon: number,
+  weights?: Partial<AccessibilityWeights>,
+): Promise<AccessibilityExplanation> {
+  const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
+  if (weights) {
+    if (weights.ice_presence != null) params.set("w_ice", weights.ice_presence.toString());
+    if (weights.ice_depth != null) params.set("w_depth", weights.ice_depth.toString());
+    if (weights.excavation != null) params.set("w_excavation", weights.excavation.toString());
+    if (weights.landing != null) params.set("w_landing", weights.landing.toString());
+  }
+  const res = await fetch(`/api/accessibility/explain?${params}`);
+  if (!res.ok) throw new Error(`Accessibility explain failed: ${res.status}`);
+  return res.json();
 }

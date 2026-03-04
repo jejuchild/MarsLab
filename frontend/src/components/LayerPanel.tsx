@@ -220,7 +220,8 @@ interface LayerPanelProps {
   onAccessibilityVisibleChange?: (v: boolean) => void;
   accessibilityOpacity?: number;
   onAccessibilityOpacityChange?: (v: number) => void;
-
+  accessibilityExplainMode?: boolean;
+  onAccessibilityExplainModeChange?: (v: boolean) => void;
   // Measurement Tools
   showMeasurementTools?: boolean;
   onToggleMeasurementTools?: (v: boolean) => void;
@@ -528,6 +529,8 @@ export default function LayerPanel({
   onAccessibilityVisibleChange,
   accessibilityOpacity = 0.6,
   onAccessibilityOpacityChange,
+  accessibilityExplainMode = false,
+  onAccessibilityExplainModeChange,
   isMobile = false,
 }: LayerPanelProps) {
   // Panel collapse state - initialize from localStorage
@@ -934,6 +937,15 @@ export default function LayerPanel({
               <p className="text-[9px] text-slate-500">
                 SWIM + TES + MOLA composite score
               </p>
+              <label className="flex items-center gap-1.5 mt-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={accessibilityExplainMode}
+                  onChange={(e) => onAccessibilityExplainModeChange?.(e.target.checked)}
+                  className="accent-emerald-500 w-3 h-3"
+                />
+                <span className="text-[9px] text-slate-400">Explain on click</span>
+              </label>
             </div>
           )}
         </div>
