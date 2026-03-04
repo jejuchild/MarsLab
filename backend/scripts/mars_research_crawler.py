@@ -138,17 +138,66 @@ RESEARCH_TOPICS = [
 
 
 # ======================================================================
+# Cross-day deduplication
+# ======================================================================
+
+def _load_seen_papers(n_days: int = 30) -> set[str]:
+    """Load DOIs and normalized titles from previous N days to avoid cross-day duplicates."""
+    seen: set[str] = set()
+    if not OUTPUT_DIR.is_dir():
+        return seen
+    for fpath in sorted(OUTPUT_DIR.glob("*.json"), reverse=True):
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", fpath.stem):
+            continue
+        if len(seen) > 0 and n_days <= 0:
+            break
+        n_days -= 1
+        try:
+            data = json.loads(fpath.read_text(encoding="utf-8"))
+            for paper in data.get("papers", []):
+                url = str(paper.get("url", ""))
+                if url:
+                    seen.add(url)
+                norm = re.sub(r"[^a-z0-9]", "", str(paper.get("title", "")).lower())
+                if norm:
+                    seen.add(norm)
+        except Exception:
+            continue
+    logger.info("Loaded %d seen paper keys from previous files", len(seen))
+    return seen
+
+
+# ======================================================================
+# Recency scoring — newer papers get higher priority
+# ======================================================================
+
+CURRENT_YEAR = datetime.date.today().year
+
+
+def _recency_score(year_str: str) -> float:
+    """Score 0.0-1.0 based on publication year. Current year = 1.0, 20+ years old = 0.0."""
+    try:
+        year = int(year_str)
+    except (ValueError, TypeError):
+        return 0.0
+    age = max(0, CURRENT_YEAR - year)
+    # Linear decay over 20 years, clamped to [0, 1]
+    return max(0.0, min(1.0, 1.0 - age / 20.0))
+
+
+# ======================================================================
 # Crossref API — fetch REAL papers with real DOI URLs
 # ======================================================================
 
 def fetch_crossref_papers(query: str, rows: int = 10) -> list[dict[str, Any]]:
-    """Fetch papers from Crossref API for a given query."""
+    """Fetch papers from Crossref API for a given query, preferring recent publications."""
     params = {
         "query": query,
         "rows": rows,
         "filter": "type:journal-article",
         "select": "DOI,title,author,published-print,published-online,container-title,abstract,subject",
-        "sort": "relevance",
+        "sort": "published",
+        "order": "desc",
     }
     papers = []
     try:
@@ -229,30 +278,42 @@ def fetch_crossref_papers(query: str, rows: int = 10) -> list[dict[str, Any]]:
 
 
 def fetch_papers_for_topic(topic: dict[str, Any], max_per_query: int = 8) -> list[dict[str, Any]]:
-    """Fetch papers for all queries in a topic, deduplicate by DOI."""
+    """Fetch papers for all queries in a topic, deduplicate by DOI (within-day + cross-day)."""
     all_papers: list[dict[str, Any]] = []
-    seen_dois: set[str] = set()
+    seen_keys = _load_seen_papers()
 
     queries = topic.get("queries", [])
     for query in queries:
         papers = fetch_crossref_papers(query, rows=max_per_query)
         for paper in papers:
             doi = paper.get("doi", "")
-            if doi and doi not in seen_dois:
-                seen_dois.add(doi)
-                all_papers.append(paper)
-            elif not doi:
-                # No DOI — deduplicate by normalized title
-                norm_title = re.sub(r"[^a-z0-9]", "", paper.get("title", "").lower())
-                if norm_title not in seen_dois:
-                    seen_dois.add(norm_title)
-                    all_papers.append(paper)
+            url = paper.get("url", "")
+            norm_title = re.sub(r"[^a-z0-9]", "", paper.get("title", "").lower())
+
+            # Check both DOI/URL and normalized title for cross-day dedup
+            if url and url in seen_keys:
+                continue
+            if norm_title and norm_title in seen_keys:
+                continue
+            if doi and doi in seen_keys:
+                continue
+
+            # Mark as seen
+            if url:
+                seen_keys.add(url)
+            if norm_title:
+                seen_keys.add(norm_title)
+            if doi:
+                seen_keys.add(doi)
+            all_papers.append(paper)
         # Be polite to Crossref
         time.sleep(1)
 
-    logger.info("Topic '%s': %d unique papers from %d queries", topic["focus"], len(all_papers), len(queries))
-    return all_papers
+    # Sort by recency — newer papers first
+    all_papers.sort(key=lambda p: _recency_score(p.get("year", "")), reverse=True)
 
+    logger.info("Topic '%s': %d unique papers from %d queries (after cross-day dedup)", topic["focus"], len(all_papers), len(queries))
+    return all_papers
 
 # ======================================================================
 # LLM — trend analysis and relevance scoring ONLY
@@ -364,6 +425,7 @@ def build_payload(
     normalized_papers = []
     for i, paper in enumerate(papers, 1):
         analysis = analysis_lookup.get(i, {})
+        score = round(_recency_score(paper["year"]), 3)
         normalized_papers.append({
             "title": paper["title"],
             "authors": paper["authors"],
@@ -374,8 +436,11 @@ def build_payload(
             "relevance": str(analysis.get("relevance", "")).strip(),
             "category": str(analysis.get("category", topic["focus"])).strip(),
             "url": paper["url"],
+            "recency_score": score,
         })
 
+    # Sort by recency score descending (newest first)
+    normalized_papers.sort(key=lambda p: p.get("recency_score", 0), reverse=True)
     return {
         "date": date.isoformat(),
         "generated_at": now_iso,

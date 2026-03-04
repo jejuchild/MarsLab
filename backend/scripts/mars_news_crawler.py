@@ -278,8 +278,31 @@ def fetch_arxiv_mars() -> list[dict[str, str]]:
         logger.warning("arXiv Mars failed: %s", exc)
     return items
 
+def _load_seen_titles(n_days: int = 14) -> set[str]:
+    """Load normalized titles from previous N days to avoid cross-day duplicates."""
+    seen: set[str] = set()
+    if not OUTPUT_DIR.is_dir():
+        return seen
+    for fpath in sorted(OUTPUT_DIR.glob("*.json"), reverse=True):
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", fpath.stem):
+            continue
+        if len(seen) > 0 and n_days <= 0:
+            break
+        n_days -= 1
+        try:
+            data = json.loads(fpath.read_text(encoding="utf-8"))
+            for item in data.get("items", []):
+                norm = re.sub(r"[^a-z0-9]", "", str(item.get("title", "")).lower())
+                if norm:
+                    seen.add(norm)
+        except Exception:
+            continue
+    logger.info("Loaded %d seen titles from previous files", len(seen))
+    return seen
+
+
 def fetch_all_news() -> list[dict[str, str]]:
-    """Fetch from all sources, deduplicate by title similarity."""
+    """Fetch from all sources, deduplicate by title similarity (within-day + cross-day)."""
     all_items: list[dict[str, str]] = []
     all_items.extend(fetch_nasa_mars_api())
     all_items.extend(fetch_nasa_general_rss())
@@ -287,8 +310,10 @@ def fetch_all_news() -> list[dict[str, str]]:
     all_items.extend(fetch_esa_mars_rss())
     all_items.extend(fetch_arxiv_mars())
 
-    # Deduplicate by normalized title
-    seen_titles: set[str] = set()
+    # Load previously seen titles for cross-day dedup
+    seen_titles = _load_seen_titles()
+
+    # Deduplicate by normalized title (within-day + cross-day)
     unique: list[dict[str, str]] = []
     for item in all_items:
         normalized = re.sub(r"[^a-z0-9]", "", item["title"].lower())
@@ -296,7 +321,7 @@ def fetch_all_news() -> list[dict[str, str]]:
             seen_titles.add(normalized)
             unique.append(item)
 
-    logger.info("Total unique news items: %d", len(unique))
+    logger.info("Total unique news items (after cross-day dedup): %d", len(unique))
     return unique
 
 # ======================================================================

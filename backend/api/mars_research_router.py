@@ -15,6 +15,26 @@ RESEARCH_DIR = BASE_DIR / "mars_research"
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+CURRENT_YEAR = 2026
+
+
+def _sort_papers_by_recency(data: dict[str, object]) -> dict[str, object]:
+    """Sort papers by recency_score (if present) or by year descending."""
+    papers = data.get("papers", [])
+    if not isinstance(papers, list) or not papers:
+        return data
+    for p in papers:
+        if isinstance(p, dict) and "recency_score" not in p:
+            try:
+                year = int(p.get("year", 0))
+                age = max(0, CURRENT_YEAR - year)
+                p["recency_score"] = round(max(0.0, min(1.0, 1.0 - age / 20.0)), 3)
+            except (ValueError, TypeError):
+                p["recency_score"] = 0.0
+    data["papers"] = sorted(papers, key=lambda p: p.get("recency_score", 0) if isinstance(p, dict) else 0, reverse=True)
+    return data
+
+
 def _list_research_files() -> list[Path]:
     if not RESEARCH_DIR.is_dir():
         return []
@@ -77,6 +97,7 @@ def get_latest_mars_research():
     summary_path = RESEARCH_DIR / f"{files[0].stem}_summary.md"
     summary_md = summary_path.read_text(encoding="utf-8") if summary_path.is_file() else ""
     data["summary_md"] = summary_md
+    _sort_papers_by_recency(data)
     return JSONResponse(content=data)
 
 
@@ -172,4 +193,5 @@ def get_mars_research_by_date(date: str):
     summary_path = RESEARCH_DIR / f"{date}_summary.md"
     summary_md = summary_path.read_text(encoding="utf-8") if summary_path.is_file() else ""
     data["summary_md"] = summary_md
+    _sort_papers_by_recency(data)
     return JSONResponse(content=data)
