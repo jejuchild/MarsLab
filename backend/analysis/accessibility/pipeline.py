@@ -165,6 +165,7 @@ class AccessibilityPipeline:
         lat: float,
         lon: float,
         weights: Optional[Dict[str, float]] = None,
+        landform: Optional[str] = None,
     ) -> AccessibilityResult:
         """Compute accessibility at a single point."""
         self._ensure_loaded()
@@ -189,7 +190,7 @@ class AccessibilityPipeline:
             elevation=elev,
             slope=slope,
             tri=tri,
-            landform=None,  # MarsLandformNet not ready yet
+            landform=landform,
             lat=lat,
             lon=lon,
             weights=weights,

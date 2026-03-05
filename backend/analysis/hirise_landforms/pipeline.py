@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[3]
 V3_TILE_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "best_tile_classifier.pt"
+V4B_FILM_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "marslandform_v4b_deploy.pt"
 SSL_LORA_WEIGHTS = ROOT / "Data" / "HiRISE" / "v2_output" / "ssl_lora_weights" / "best_model.pt"
 
 V3_CLASSES = ["LDA", "LVF", "CCF", "OTHER"]
@@ -46,6 +47,7 @@ class LoadedModels:
     backbone: Any
     classifier: Any
     device: torch.device
+    model_version: str  # 'v3-concat' or 'v4b-film'
 
 
 class HiriseLandformPipeline:
@@ -80,14 +82,13 @@ class HiriseLandformPipeline:
 
         config_module = importlib.import_module("scripts.marslandform_v2.config")
         dinov2_module = importlib.import_module("scripts.marslandform_v2.models.dinov2_lora")
-        tile_module = importlib.import_module("scripts.marslandform_v2.models.tile_classifier")
 
         DINOv2Config = getattr(config_module, "DINOv2Config")
-        TileClassifierConfig = getattr(config_module, "TileClassifierConfig")
         DinoV2LoRA = getattr(dinov2_module, "DinoV2LoRA")
-        TileLandformClassifier = getattr(tile_module, "TileLandformClassifier")
 
         device = self._device
+
+        # --- Load backbone (shared by both model types) ---
         dinov2_cfg = DINOv2Config()
         backbone = DinoV2LoRA(dinov2_cfg, use_lora=True)
 
@@ -103,25 +104,107 @@ class HiriseLandformPipeline:
         backbone.eval()
         backbone = backbone.to(device)
 
-        classifier: Any = None
+        # --- Load classifier (auto-detect V4b FiLM vs V3 concat) ---
+        classifier, model_version = self._load_classifier(device)
+
+        logger.info("Loaded landform model: %s on %s", model_version, device)
+        return LoadedModels(backbone=backbone, classifier=classifier, device=device, model_version=model_version)
+
+    def _load_classifier(self, device: torch.device) -> tuple[Any, str]:
+        """Auto-detect and load the best available classifier checkpoint."""
+        import sys
+
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+
+        # Priority 1: V4b FiLM model (best F1)
+        if V4B_FILM_CHECKPOINT.exists():
+            return self._load_film_classifier(V4B_FILM_CHECKPOINT, device)
+
+        # Priority 2: V3 concat model (check if checkpoint is actually FiLM)
         if V3_TILE_CHECKPOINT.exists():
             tile_ckpt = torch.load(V3_TILE_CHECKPOINT, map_location="cpu", weights_only=False)
-            cfg_data = tile_ckpt.get("config", {})
-            tile_cfg = TileClassifierConfig(
-                embed_dim=cfg_data.get("embed_dim", 768),
-                mola_dim=cfg_data.get("mola_dim", 25),
-                hidden_dim=cfg_data.get("hidden_dim", 256),
-                num_classes=cfg_data.get("num_classes", 4),
-                dropout=cfg_data.get("dropout", 0.3),
-            )
-            classifier = TileLandformClassifier(tile_cfg)
-            classifier.load_state_dict(tile_ckpt["model_state_dict"])
-            classifier.eval()
-            classifier = classifier.to(device)
-        else:
-            logger.warning("V3 tile checkpoint not found. Returning empty predictions: %s", V3_TILE_CHECKPOINT)
+            state_dict = tile_ckpt.get("model_state_dict", {})
 
-        return LoadedModels(backbone=backbone, classifier=classifier, device=device)
+            # Auto-detect: FiLM checkpoints have 'film.' keys
+            has_film_keys = any(k.startswith("film.") for k in state_dict)
+            # Also detect from cfg/version
+            cfg_data = tile_ckpt.get("cfg", tile_ckpt.get("config", {}))
+            version = tile_ckpt.get("version", "")
+            is_film = has_film_keys or "film" in version.lower()
+
+            if is_film:
+                return self._load_film_classifier(V3_TILE_CHECKPOINT, device)
+            else:
+                return self._load_concat_classifier(tile_ckpt, device)
+
+        logger.warning(
+            "No tile classifier checkpoint found. Checked: %s, %s",
+            V4B_FILM_CHECKPOINT, V3_TILE_CHECKPOINT,
+        )
+        return None, "none"
+
+    def _load_film_classifier(self, ckpt_path: Path, device: torch.device) -> tuple[Any, str]:
+        """Load V4b FiLM classifier from checkpoint."""
+        film_module = importlib.import_module("scripts.marslandform_v2.models.film_classifier")
+        FiLMClassifier = getattr(film_module, "FiLMClassifier")
+
+        tile_ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        state_dict = tile_ckpt.get("model_state_dict", {})
+        cfg_data = tile_ckpt.get("cfg", tile_ckpt.get("config", {}))
+
+        # Extract FiLM + classifier weights (filter out backbone.* keys)
+        head_state = {}
+        for k, v in state_dict.items():
+            if k.startswith("film.") or k.startswith("classifier."):
+                head_state[k] = v
+
+        classifier = FiLMClassifier(
+            visual_dim=int(cfg_data.get("hidden_dim", 768)),
+            mola_dim=int(cfg_data.get("mola_dim", 25)),
+            film_hidden=64,
+            head_hidden=int(cfg_data.get("head_hidden", 128)),
+            num_classes=int(cfg_data.get("num_classes", 4)),
+            dropout=float(cfg_data.get("dropout", 0.4)),
+        )
+
+        result = classifier.load_state_dict(head_state, strict=False)
+        if result.unexpected_keys:
+            logger.warning("Unexpected keys in FiLM checkpoint: %s", result.unexpected_keys)
+        if result.missing_keys:
+            logger.warning("Missing keys in FiLM checkpoint: %s", result.missing_keys)
+
+        classifier.eval()
+        classifier = classifier.to(device)
+        epoch = tile_ckpt.get("epoch", "?")
+        val_f1 = tile_ckpt.get("val_f1", tile_ckpt.get("test_f1", "?"))
+        logger.info("Loaded V4b FiLM classifier from %s (epoch=%s, F1=%s)", ckpt_path.name, epoch, val_f1)
+        return classifier, "v4b-film"
+
+    def _load_concat_classifier(self, tile_ckpt: dict[str, Any], device: torch.device) -> tuple[Any, str]:
+        """Load V3 concat classifier from checkpoint dict."""
+        config_module = importlib.import_module("scripts.marslandform_v2.config")
+        tile_module = importlib.import_module("scripts.marslandform_v2.models.tile_classifier")
+
+        TileClassifierConfig = getattr(config_module, "TileClassifierConfig")
+        TileLandformClassifier = getattr(tile_module, "TileLandformClassifier")
+
+        cfg_data = tile_ckpt.get("config", {})
+        tile_cfg = TileClassifierConfig(
+            embed_dim=cfg_data.get("embed_dim", 768),
+            mola_dim=cfg_data.get("mola_dim", 25),
+            hidden_dim=cfg_data.get("hidden_dim", 256),
+            num_classes=cfg_data.get("num_classes", 4),
+            dropout=cfg_data.get("dropout", 0.3),
+        )
+        classifier = TileLandformClassifier(tile_cfg)
+        classifier.load_state_dict(tile_ckpt["model_state_dict"])
+        classifier.eval()
+        classifier = classifier.to(device)
+        epoch = tile_ckpt.get("epoch", "?")
+        f1 = tile_ckpt.get("best_landform_macro_f1", "?")
+        logger.info("Loaded V3 concat classifier (epoch=%s, F1=%s)", epoch, f1)
+        return classifier, "v3-concat"
 
     def classify(self, request: ClassifyRequest) -> ClassifyResult:
         t0 = time.time()
@@ -183,7 +266,7 @@ class HiriseLandformPipeline:
 
         return ClassifyResult(
             product_id=request.product_id,
-            model_used="v3",
+            model_used=models.model_version,
             tile_predictions=tile_predictions,
             class_summary=class_summary,
             dominant_class=dominant_class,
@@ -195,6 +278,17 @@ class HiriseLandformPipeline:
             device=str(self._device),
         )
 
+    @property
+    def model_version(self) -> str:
+        """Return the currently loaded model version string."""
+        if self._models is not None:
+            return self._models.model_version
+        return "not-loaded"
+
+    @property
+    def is_loaded(self) -> bool:
+        """Return True if models are loaded."""
+        return self._models is not None and self._models.classifier is not None
     @torch.no_grad()
     def _extract_embeddings(self, models: LoadedModels, tile_images: list[Image.Image]) -> np.ndarray:
         device = models.device

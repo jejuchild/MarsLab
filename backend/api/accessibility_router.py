@@ -63,6 +63,7 @@ def _parse_weights(
 def get_accessibility_score(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
+    landform: Optional[str] = Query(None, description="Landform class: LDA, LVF, CCF, OTHER"),
     w_ice: Optional[float] = Query(None, ge=0, le=1, alias="w_ice"),
     w_depth: Optional[float] = Query(None, ge=0, le=1, alias="w_depth"),
     w_excavation: Optional[float] = Query(None, ge=0, le=1, alias="w_excavation"),
@@ -71,9 +72,14 @@ def get_accessibility_score(
     """Query ice accessibility score at a single point."""
     pipeline = _get_pipeline()
     weights = _parse_weights(w_ice, w_depth, w_excavation, w_landing)
+    # Validate landform if provided
+    valid_landforms = {"LDA", "LVF", "CCF", "OTHER"}
+    lf = landform.upper() if landform else None
+    if lf and lf not in valid_landforms:
+        lf = None
 
     try:
-        result = pipeline.query_point(lat=lat, lon=lon, weights=weights)
+        result = pipeline.query_point(lat=lat, lon=lon, weights=weights, landform=lf)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Accessibility computation failed: {exc}")
 
@@ -316,6 +322,7 @@ def _fallback_explanation(result: dict) -> str:
 def get_accessibility_explanation(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
+    landform: Optional[str] = Query(None, description="Landform class: LDA, LVF, CCF, OTHER"),
     w_ice: Optional[float] = Query(None, ge=0, le=1),
     w_depth: Optional[float] = Query(None, ge=0, le=1),
     w_excavation: Optional[float] = Query(None, ge=0, le=1),
@@ -324,9 +331,13 @@ def get_accessibility_explanation(
     """Score + LLM natural-language explanation for a point."""
     pipeline = _get_pipeline()
     weights = _parse_weights(w_ice, w_depth, w_excavation, w_landing)
+    valid_landforms = {"LDA", "LVF", "CCF", "OTHER"}
+    lf = landform.upper() if landform else None
+    if lf and lf not in valid_landforms:
+        lf = None
 
     try:
-        result = pipeline.query_point(lat=lat, lon=lon, weights=weights)
+        result = pipeline.query_point(lat=lat, lon=lon, weights=weights, landform=lf)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Computation failed: {exc}")
 
