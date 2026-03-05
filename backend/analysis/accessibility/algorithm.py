@@ -3,9 +3,15 @@ Mars Ice Accessibility Algorithm.
 
 Computes a composite accessibility score (0-1) from four sub-scores:
 1. Ice Presence — SWIM consistency + landform classification
-2. Ice Depth — SWIM depth products + thermal inertia proxy
+2. Ice Depth — SWIM depth products + thermal inertia proxy + landform depth prior
 3. Excavation Feasibility — thermal inertia + dust cover + slope
 4. Landing & Traversability — elevation + slope + roughness
+
+Landform weighting follows SWIM 2.0 depth-stratified methodology
+(Morgan et al. 2021 Nature Astronomy; Putzig et al. 2020 swim.psi.edu):
+  - 0-1m zone: geomorphology weight = 0.2 / 2.4 ≈ 8%
+  - 1-5m zone: geomorphology weight = 1.0 / 2.3 ≈ 43%
+  - >5m zone:  geomorphology weight = 1.0 / 2.0 = 50%
 
 Higher score = more accessible ice for future missions.
 """
@@ -23,7 +29,9 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
     "landing": 0.20,
 }
 
-# Landform bonus for ice presence
+# Landform ice-consistency scores (SWIM C_G mapping)
+# LDA/LVF = viscous ice-rich flow features → strongest indicator
+# CCF = ice-bearing fill → moderate indicator
 LANDFORM_BONUS: Dict[str, float] = {
     "LDA": 1.0,
     "LVF": 0.8,
@@ -31,6 +39,23 @@ LANDFORM_BONUS: Dict[str, float] = {
     "OTHER": 0.0,
 }
 
+# SWIM 2.0 depth-stratified geomorphology weights
+# (shallowness ratio s = depth_of_interest / sensing_depth)
+# LDA/LVF/CCF are deep geomorphic indicators (sensing depth ~15m)
+LANDFORM_DEPTH_WEIGHTS: Dict[str, float] = {
+    "0_1m": 0.2,    # 1m / 15m ≈ 0.07, rounded up to match SWIM 2.0 C_GS
+    "1_5m": 1.0,    # 5m / 15m ≈ 0.33, but these are primary evidence at this depth
+    "5m_plus": 1.0,  # Full weight — LDA/LVF/CCF are the primary indicator here
+}
+
+# Depth prior: expected ice depth by landform type (metres)
+# Used to boost ice_depth sub-score for shallow-ice landforms
+LANDFORM_DEPTH_PRIOR: Dict[str, float] = {
+    "LDA": 0.85,  # Ice typically at 1-10m → high shallow score
+    "LVF": 0.80,  # Similar to LDA
+    "CCF": 0.55,  # Ice typically deeper (5-20m) → moderate shallow score
+    "OTHER": 0.0,
+}
 
 @dataclass
 class AccessibilityResult:
@@ -89,21 +114,29 @@ def _normalize_weights(w: Dict[str, float]) -> Dict[str, float]:
 def compute_ice_presence(
     swim_consistency: Optional[float],
     landform: Optional[str] = None,
+    landform_confidence: float = 1.0,
 ) -> Optional[float]:
     """
     Ice Presence Score (0-1).
     SWIM consistency (-1 to +1) normalised to 0-1, combined with landform bonus.
+
+    SWIM 2.0 weighting: for the 0-1m zone, geomorphology gets weight 0.2
+    relative to geophysics weight 1.0 (Putzig et al. 2020).
+    When only landform is available, it still provides useful signal.
     """
     parts: list[float] = []
     weights: list[float] = []
 
     if swim_consistency is not None:
         parts.append(_clamp((swim_consistency + 1.0) / 2.0))
-        weights.append(0.7)
+        weights.append(1.0)  # Geophysics at full weight
 
     if landform is not None and landform in LANDFORM_BONUS:
-        parts.append(LANDFORM_BONUS[landform])
-        weights.append(0.3)
+        bonus = LANDFORM_BONUS[landform] * _clamp(landform_confidence)
+        parts.append(bonus)
+        # SWIM 2.0: geomorphology weight depends on depth zone
+        # For ice_presence (0-1m focused), use shallow weight
+        weights.append(LANDFORM_DEPTH_WEIGHTS["0_1m"])  # 0.2
 
     if not parts:
         return None
@@ -111,20 +144,25 @@ def compute_ice_presence(
     total_w = sum(weights)
     return _clamp(sum(p * w for p, w in zip(parts, weights)) / total_w)
 
-
 def compute_ice_depth(
     swim_0_1m: Optional[float],
     swim_1_5m: Optional[float],
     swim_5m_plus: Optional[float],
     thermal_inertia: Optional[float],
+    landform: Optional[str] = None,
+    landform_confidence: float = 1.0,
 ) -> Optional[float]:
     """
     Ice Depth Score (0-1). Shallower ice = higher score.
     Low TI → fine regolith → shallower ice table.
+
+    Now includes landform depth prior: LDA/LVF indicate shallow ice (1-10m),
+    boosting the depth score with SWIM 2.0 depth-zone weighting.
     """
     parts: list[float] = []
     weights: list[float] = []
 
+    # SWIM depth products (depth-stratified weighting)
     swim_vals: list[tuple[float, float]] = []
     if swim_0_1m is not None:
         swim_vals.append((_clamp((swim_0_1m + 1) / 2), 1.0))
@@ -144,6 +182,14 @@ def compute_ice_depth(
     if thermal_inertia is not None and thermal_inertia > 0:
         parts.append(_clamp(1.0 - (thermal_inertia - 150.0) / 150.0))
         weights.append(0.4)
+
+    # Landform depth prior: LDA/LVF indicate shallow ice (1-10m)
+    # SWIM 2.0 weight for 1-5m zone = 1.0 (primary depth evidence)
+    if landform is not None and landform in LANDFORM_DEPTH_PRIOR:
+        depth_prior = LANDFORM_DEPTH_PRIOR[landform] * _clamp(landform_confidence)
+        if depth_prior > 0:
+            parts.append(depth_prior)
+            weights.append(LANDFORM_DEPTH_WEIGHTS["1_5m"] * 0.3)  # Scale down to not dominate
 
     if not parts:
         return None
@@ -232,6 +278,7 @@ def compute_accessibility(
     slope: Optional[float] = None,
     tri: Optional[float] = None,
     landform: Optional[str] = None,
+    landform_confidence: float = 1.0,
     lat: float = 0.0,
     lon: float = 0.0,
     weights: Optional[Dict[str, float]] = None,
@@ -254,8 +301,9 @@ def compute_accessibility(
     tri = _safe(tri)
 
     # Sub-scores
-    ip = compute_ice_presence(swim_consistency, landform)
-    id_ = compute_ice_depth(swim_0_1m, swim_1_5m, swim_5m_plus, thermal_inertia)
+    ip = compute_ice_presence(swim_consistency, landform, landform_confidence)
+    id_ = compute_ice_depth(swim_0_1m, swim_1_5m, swim_5m_plus, thermal_inertia,
+                            landform, landform_confidence)
     ex = compute_excavation(thermal_inertia, dci, slope)
     la = compute_landing(elevation, slope, tri)
 
@@ -265,6 +313,8 @@ def compute_accessibility(
             elevation, slope, tri, swim_0_1m, swim_1_5m,
         ] if v is not None
     )
+    if landform is not None and landform != "OTHER":
+        layers_available += 1  # Landform counts as an additional evidence layer
 
     sub = {"ice_presence": ip, "ice_depth": id_, "excavation": ex, "landing": la}
     avail = {k: v for k, v in sub.items() if v is not None}
@@ -290,6 +340,7 @@ def compute_accessibility(
         "slope": slope,
         "tri": tri,
         "landform": landform,
+        "landform_confidence": round(landform_confidence, 4) if landform else None,
     }
     inputs = {k: round(v, 4) if isinstance(v, float) else v for k, v in inputs.items()}
 
@@ -344,6 +395,7 @@ def compute_accessibility_grid(
     tri: Optional[np.ndarray],
     shape: tuple[int, int],
     weights: Optional[Dict[str, float]] = None,
+    landform_grid: Optional[np.ndarray] = None,  # 0-1 landform bonus per pixel
 ) -> np.ndarray:
     """Vectorised accessibility for a 2D grid. Returns float32 (0-1), NaN = no data."""
     h, w = shape
@@ -352,16 +404,22 @@ def compute_accessibility_grid(
         wd.update(weights)
     wd = _normalize_weights(wd)
 
-    # --- Ice Presence ---
+    # --- Ice Presence (+ landform grid if provided) ---
     ip_parts: list[tuple[np.ndarray, float]] = []
     if swim_consistency is not None:
         valid = np.isfinite(swim_consistency)
         arr = np.full((h, w), np.nan, dtype=np.float32)
         arr[valid] = np.clip((swim_consistency[valid] + 1.0) / 2.0, 0, 1)
-        ip_parts.append((arr, 0.7))
+        ip_parts.append((arr, 1.0))  # Geophysics at full weight
+    if landform_grid is not None:
+        valid_lf = np.isfinite(landform_grid) & (landform_grid > 0)
+        if np.any(valid_lf):
+            lf_arr = np.full((h, w), np.nan, dtype=np.float32)
+            lf_arr[valid_lf] = np.clip(landform_grid[valid_lf], 0, 1)
+            ip_parts.append((lf_arr, LANDFORM_DEPTH_WEIGHTS["0_1m"]))  # 0.2
     ice_pres = _weighted_mean_parts(ip_parts, shape)
 
-    # --- Ice Depth ---
+    # --- Ice Depth (+ landform depth prior grid if provided) ---
     id_parts: list[tuple[np.ndarray, float]] = []
     for arr_in, arr_w in [(swim_0_1m, 1.0), (swim_1_5m, 0.6), (swim_5m_plus, 0.3)]:
         if arr_in is not None:
@@ -374,6 +432,18 @@ def compute_accessibility_grid(
         a = np.full((h, w), np.nan, dtype=np.float32)
         a[valid] = np.clip(1.0 - (thermal_inertia[valid] - 150.0) / 150.0, 0, 1)
         id_parts.append((a, 0.4))
+    if landform_grid is not None:
+        # Map landform bonus to depth prior: LDA(1.0)->0.85, LVF(0.8)->0.80,
+        # CCF(0.6)->0.55, scaled proportionally
+        valid_lf = np.isfinite(landform_grid) & (landform_grid > 0)
+        if np.any(valid_lf):
+            depth_arr = np.full((h, w), np.nan, dtype=np.float32)
+            # Linear map: bonus 1.0 -> 0.85, bonus 0.6 -> 0.55
+            depth_arr[valid_lf] = np.clip(
+                0.55 + (landform_grid[valid_lf] - 0.6) * (0.85 - 0.55) / (1.0 - 0.6),
+                0, 1,
+            )
+            id_parts.append((depth_arr, LANDFORM_DEPTH_WEIGHTS["1_5m"] * 0.3))
     ice_depth = _weighted_mean_parts(id_parts, shape)
 
     # --- Excavation ---
