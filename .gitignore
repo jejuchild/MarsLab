@@ -82,3 +82,34 @@ backend/private_memos/
 # Archive
 archive.zip
 *.zip
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+
+# Large scientific data
+backend/hirise_dtm_data/*.JP2
+backend/hirise_dtm_data/*.jp2
+backend/hirise_dtm_data/*.tif
+backend/data/swim/
+backend/data/hirise_ice.db
+backend/data/agent_sessions.json
+backend/data/download_history.json
+backend/crism_score/
+backend/sharad_highres_data/
+backend/hirise_dtm_data/crawl_metadata.json
+backend/hirise_dtm_data/epsilon_terrace_*
+
+# Global DEM
+Mars_HRSC_MOLA_*.tif
+
+# Model weights at root
+best_model.pt
+
+# Large generated outputs
+backend/crism_lbl/
+backend/hirise_lbl/
+pipeline_full_log.txt
+print.prt
+*.prt
