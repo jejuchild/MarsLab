@@ -252,6 +252,12 @@ class HiriseLandformPipeline:
         tile_mola = self._extract_tile_mola_features(tile_lat_lon, request.lat, request.lon)
         probabilities, predictions = self._run_tile_classifier(models, embeddings, tile_mola)
 
+        # Optional CRF spatial smoothing on the tile grid
+        if request.use_crf and num_tiles >= 2:
+            probabilities, predictions = self._apply_crf_smoothing(
+                coords, probabilities, smoothing_weight=1.5, n_iterations=10,
+            )
+
         tile_predictions = self._build_tile_predictions(coords, tile_lat_lon, probabilities, predictions)
         class_summary = self._build_class_summary(tile_predictions)
         dominant_class, dominant_confidence = self._dominant_from_summary(class_summary)
@@ -393,6 +399,56 @@ class HiriseLandformPipeline:
         probs = probs_t.cpu().numpy()
         preds = np.argmax(probs, axis=1).astype(np.int64)
         return probs, preds
+
+    def _apply_crf_smoothing(
+        self,
+        coords: list[tuple[int, int]],
+        probabilities: np.ndarray,
+        smoothing_weight: float = 1.5,
+        n_iterations: int = 10,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Mean-field CRF on the tile grid for spatial consistency.
+
+        Uses a compatibility matrix that allows LDA↔LVF glacial transitions
+        while penalising unlikely neighbour combinations.
+        """
+        # Compatibility matrix: how likely class_i neighbours class_j
+        #                   LDA   LVF   CCF   OTHER
+        compat = np.array([
+            [1.0, 0.8, 0.3, 0.4],  # LDA
+            [0.8, 1.0, 0.3, 0.4],  # LVF
+            [0.3, 0.3, 1.0, 0.5],  # CCF
+            [0.4, 0.4, 0.5, 1.0],  # OTHER
+        ], dtype=np.float32)
+
+        # Build position → local index mapping
+        pos_to_idx: dict[tuple[int, int], int] = {}
+        for i, (gx, gy) in enumerate(coords):
+            pos_to_idx[(gy, gx)] = i  # (row, col)
+
+        smoothed = probabilities.copy()
+        n_tiles = len(coords)
+
+        for _ in range(n_iterations):
+            new_logits = np.log(smoothed + 1e-10)  # unary
+            for i, (gx, gy) in enumerate(coords):
+                neighbour_msg = np.zeros(len(V3_CLASSES), dtype=np.float32)
+                n_nbrs = 0
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    key = (gy + dr, gx + dc)
+                    if key in pos_to_idx:
+                        nidx = pos_to_idx[key]
+                        neighbour_msg += compat @ smoothed[nidx]
+                        n_nbrs += 1
+                if n_nbrs > 0:
+                    new_logits[i] += smoothing_weight * neighbour_msg / n_nbrs
+            # Stable softmax
+            exp_x = np.exp(new_logits - np.max(new_logits, axis=1, keepdims=True))
+            smoothed = exp_x / np.sum(exp_x, axis=1, keepdims=True)
+
+        preds = np.argmax(smoothed, axis=1).astype(np.int64)
+        logger.debug("CRF smoothing: %d tiles, %d iterations", n_tiles, n_iterations)
+        return smoothed, preds
 
     def _run_vlm_agent(
         self,

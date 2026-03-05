@@ -363,8 +363,9 @@ def main():
                         help="Max test tiles (stratified sample). 0 = all.")
     parser.add_argument("--crf-weight", type=float, default=1.5)
     parser.add_argument("--crf-iters", type=int, default=10)
+    parser.add_argument("--skip-tta", action="store_true",
+                        help="Skip TTA evaluation (confirmed useless for DINOv2).")
     args = parser.parse_args()
-    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
     
@@ -390,11 +391,16 @@ def main():
     )
     baseline_f1 = f1_score(labels, preds, average="macro")
     
-    # ── 2. TTA ──
-    tta_logits, tta_preds = evaluate_tta(
-        backbone, classifier, tiles_data, device, logits, labels, mola
-    )
-    tta_f1 = f1_score(labels, tta_preds, average="macro")
+    # ── 2. TTA (skip if --skip-tta) ──
+    if args.skip_tta:
+        tta_logits, tta_preds = logits, preds
+        tta_f1 = baseline_f1
+        print("\n[TTA skipped via --skip-tta]")
+    else:
+        tta_logits, tta_preds = evaluate_tta(
+            backbone, classifier, tiles_data, device, logits, labels, mola
+        )
+        tta_f1 = f1_score(labels, tta_preds, average="macro")
     
     # ── 3. CRF on baseline ──
     crf_probs, crf_preds = evaluate_crf(
@@ -403,13 +409,17 @@ def main():
     )
     crf_f1 = f1_score(labels, crf_preds, average="macro")
     
-    # ── 4. TTA + CRF ──
-    tta_probs = _softmax(tta_logits)
-    _, combined_preds = evaluate_crf(
-        tiles_data, tta_probs, labels,
-        smoothing_weight=args.crf_weight, n_iterations=args.crf_iters,
-    )
-    combined_f1 = f1_score(labels, combined_preds, average="macro")
+    # ── 4. TTA + CRF (skip if --skip-tta) ──
+    if args.skip_tta:
+        combined_f1 = crf_f1
+        print("\n[TTA+CRF skipped via --skip-tta]")
+    else:
+        tta_probs = _softmax(tta_logits)
+        _, combined_preds = evaluate_crf(
+            tiles_data, tta_probs, labels,
+            smoothing_weight=args.crf_weight, n_iterations=args.crf_iters,
+        )
+        combined_f1 = f1_score(labels, combined_preds, average="macro")
     
     # ── Summary ──
     print("\n" + "="*70)

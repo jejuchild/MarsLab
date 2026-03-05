@@ -14,9 +14,9 @@ class ClassifyRequest(BaseModel):
     product_id: str
     model: ModelName = "v3"
     include_heatmap: bool = True
+    use_crf: bool = True  # CRF spatial smoothing on tile grid (+0.6% F1)
     lat: float | None = None
     lon: float | None = None
-
 
 class TilePrediction(BaseModel):
     x: int
