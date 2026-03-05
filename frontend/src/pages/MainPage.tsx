@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense, memo
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import MapViewRaw from "../components/MapView";
-import InspectorRaw from "../components/Inspector";
-import type { InspectorContext, RGBWavelengths } from "../components/Inspector";
+import InspectorPanelRaw from "../components/inspector/InspectorPanel";
+import type { InspectorContext, RGBWavelengths } from "../components/inspector/types";
 import SlopeAnalysis from "../components/SlopeAnalysis";
 import type { HiRiseDTMPoint } from "../components/HiRiseDTM3DViewer";
 import type { TerrainPoint } from "../components/SlopeAnalysis";
@@ -46,7 +46,7 @@ import { SWIM_METHODS } from "../api/swim_ice";
 
 // Memoize heavy child components to prevent unnecessary re-renders
 const MapView = memo(MapViewRaw);
-const Inspector = memo(InspectorRaw);
+const Inspector = memo(InspectorPanelRaw);
 const LayerPanel = memo(LayerPanelRaw);
 const AiAnalysisPanel = memo(AiAnalysisPanelRaw);
 const AgenticPanel = memo(AgenticPanelRaw);
@@ -1225,6 +1225,43 @@ export default function MainPage() {
       panelManager.ensurePanelVisible("feature_select");
     }
   }, [panelManager.ensurePanelVisible]);
+
+  // Auto-activate quickview overlay when a product is selected and has no active overlay
+  // Respects user preference stored in localStorage
+  const autoQuickviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    // Clear any pending timer on rapid product switches
+    if (autoQuickviewTimerRef.current) {
+      clearTimeout(autoQuickviewTimerRef.current);
+      autoQuickviewTimerRef.current = null;
+    }
+
+    if (!selected) return;
+
+    // Respect user preference (default: enabled)
+    const pref = localStorage.getItem("marslab.autoQuickview");
+    if (pref === "false") return;
+
+    // Skip if product already has an overlay
+    if (activeOverlaysRef.current.has(selected.productId)) return;
+
+    // Skip for custom datasets and SHARAD (no quickview available)
+    if (selected.instrument === "CUSTOM" || selected.instrument === "SHARAD" || selected.instrument === "SHARAD_HIGHRES") return;
+
+    // Debounce to avoid rapid-fire overlay creation during fast product switching
+    autoQuickviewTimerRef.current = setTimeout(() => {
+      // Re-check conditions after debounce
+      if (activeOverlaysRef.current.has(selected.productId)) return;
+      handleSetOverlay(selected.productId, "quickview");
+    }, 300);
+
+    return () => {
+      if (autoQuickviewTimerRef.current) {
+        clearTimeout(autoQuickviewTimerRef.current);
+        autoQuickviewTimerRef.current = null;
+      }
+    };
+  }, [selected?.productId, handleSetOverlay]);
 
   // Analysis mode toggle handler
   const handleAnalysisModeChange = useCallback((mode: AnalysisMode) => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import toast from "react-hot-toast";
 import type React from "react";
 import * as Cesium from "cesium";
 import type FootprintManager from "../utils/FootprintManager";
@@ -416,14 +417,18 @@ export default function useOverlays({
 
             // Fetch image first to avoid gray rectangles from 404 URLs
             const imgRes = await fetch(imageUrl);
-            if (!imgRes.ok) return null;
+            if (!imgRes.ok) {
+              toast.error(`Quickview not available for ${productId}`);
+              return null;
+            }
             const blob = await imgRes.blob();
             const blobUrl = URL.createObjectURL(blob);
 
             return { productId, bounds, imageUrl: blobUrl, instrument };
-          } catch {
+          } catch (e) {
+            console.error("[Quickview] Failed to add overlay:", productId, e);
+            toast.error(`Failed to load quickview for ${productId}`);
             return null;
-          }
         }),
       ).then((results) => {
         const v = viewerRef.current;
@@ -597,7 +602,10 @@ export default function useOverlays({
                 }),
               });
 
-              if (!response.ok) return null;
+              if (!response.ok) {
+                toast.error(`High-res overlay not available for ${productId}`);
+                return null;
+              }
 
               const blob = await response.blob();
               imageUrl = URL.createObjectURL(blob);
@@ -605,9 +613,10 @@ export default function useOverlays({
             }
 
             return { productId, bounds, imageUrl, isHiRISE };
-          } catch {
+          } catch (e) {
+            console.error("[HighRes] Failed to add overlay:", productId, e);
+            toast.error(`Failed to load high-res overlay for ${productId}`);
             return null;
-          }
         }),
       ).then((results) => {
         const v = viewerRef.current;
@@ -832,7 +841,7 @@ export default function useOverlays({
           setFootprintTransparent(viewer, productId, true);
         } catch (e) {
           console.error("[Browse] Failed to add overlay:", productId, browseType, e);
-        }
+          toast.error(`Failed to load ${browseType} browse overlay for ${productId}`);
       }
 
       // Update tracking
@@ -899,30 +908,48 @@ export default function useOverlays({
         if (existingTypes.has(scoreType)) continue;
 
         try {
-          // Load LBL for bounds
-          const lbl = await loadCRISMLBL(productId);
-          if (!lbl) {
-            continue;
+          // Try getProductBounds first, then footprint fallback, then LBL as last resort
+          let west: number;
+          let east: number;
+          let south: number;
+          let north: number;
+          let bounds = await getProductBounds(productId);
+          if (!bounds && viewerRef.current) {
+            bounds = getFootprintBounds(viewerRef.current, productId);
           }
 
-          const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
-          const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
-          const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
-          const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
+          if (bounds) {
+            west = bounds.west;
+            east = bounds.east;
+            south = bounds.south;
+            north = bounds.north;
+          } else {
+            // Last resort: try LBL directly
+            const lbl = await loadCRISMLBL(productId);
+            if (!lbl) {
+              toast.error(`Cannot determine bounds for score overlay: ${productId}`);
+              continue;
+            }
 
-          if (
-            minLat == null ||
-            maxLat == null ||
-            westLon360 == null ||
-            eastLon360 == null
-          ) {
-            continue;
-          }
+            const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
+            const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
+            const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
+            const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
 
-          const west = normalizeLonTo180(westLon360);
-          const east = normalizeLonTo180(eastLon360);
-          const south = Math.min(minLat, maxLat);
-          const north = Math.max(minLat, maxLat);
+            if (
+              minLat == null ||
+              maxLat == null ||
+              westLon360 == null ||
+              eastLon360 == null
+            ) {
+              toast.error(`Incomplete bounds in LBL for ${productId}`);
+              continue;
+            }
+
+            west = normalizeLonTo180(westLon360);
+            east = normalizeLonTo180(eastLon360);
+            south = Math.min(minLat, maxLat);
+            north = Math.max(minLat, maxLat);
 
           // Construct score image URL
           // Score files: frt00003156_score_ice.png, frt00003156_score_hyd.png
@@ -959,7 +986,7 @@ export default function useOverlays({
           setFootprintTransparent(viewer, productId, true);
         } catch (e) {
           console.error("[Score] Failed to add overlay:", productId, scoreType, e);
-        }
+          toast.error(`Failed to load ${scoreType} score overlay for ${productId}`);
       }
 
       // Update tracking
@@ -969,6 +996,8 @@ export default function useOverlays({
     viewer.scene.requestRender();
   }, [
     scoreOverlays,
+    getProductBounds,
+    getFootprintBounds,
     loadCRISMLBL,
     parseLBLValue,
     normalizeLonTo180,
@@ -1012,21 +1041,31 @@ export default function useOverlays({
       Promise.all(
         toCreate.map(async (productId) => {
           try {
-            const bounds = await getProductBounds(productId);
-            if (!bounds || !viewerRef.current) return null;
+            let bounds = await getProductBounds(productId);
+            if (!bounds && viewerRef.current) {
+              bounds = getFootprintBounds(viewerRef.current, productId);
+            }
+            if (!bounds || !viewerRef.current) {
+              toast.error(`Cannot determine bounds for mineral overlay: ${productId}`);
+              return null;
+            }
 
             const mapUrl = `/api/mineral-cnn/result/${productId}/mineral-map.png`;
 
             const res = await fetch(mapUrl);
-            if (!res.ok) return null;
+            if (!res.ok) {
+              toast.error(`Mineral map not available for ${productId}`);
+              return null;
+            }
 
             const blob = await res.blob();
             const blobUrl = URL.createObjectURL(blob);
 
             return { productId, bounds, blobUrl };
-          } catch {
+          } catch (e) {
+            console.error("[Mineral] Failed to add overlay:", productId, e);
+            toast.error(`Failed to load mineral overlay for ${productId}`);
             return null;
-          }
         }),
       ).then((results) => {
         const v = viewerRef.current;
@@ -1075,6 +1114,7 @@ export default function useOverlays({
   }, [
     mineralOverlays,
     getProductBounds,
+    getFootprintBounds,
     getProductOpacity,
     setFootprintTransparent,
     viewerRef,
