@@ -1110,6 +1110,17 @@ async def _tool_ice_evidence(session: "AgentSession", params: dict):
                           summary=f"Ice evidence failed: {e}"), f"Error: {e}"
 
 
+async def _tool_landform_classification(session: "AgentSession", params: dict):
+    """Query HiRISE landform classification cache for the current region."""
+    if not session.bbox:
+        return TaskResult(task_type="landform_classification", success=False, error="No region"), "No region defined"
+
+    from .agent_tasks import query_landform_classifications
+    class_filter = params.get("class_filter") or params.get("class")  # e.g. "LDA"
+    result = query_landform_classifications(session.bbox, class_filter=class_filter)
+    session.all_results["landform_classification"] = result
+    return result, result.summary
+
 # Tool registry — maps name → {description, params, executor}
 AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
     "resolve_region": {
@@ -1201,6 +1212,11 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
         "description": "Run εr inversion for a terraced crater detected by MOLA scan. Uses terrace depth + SHARAD travel time to compute dielectric constant.",
         "params": {"lat": "float — crater latitude", "lon": "float — crater longitude", "diameter_km": "float — crater diameter", "terrace_depth_m": "float — terrace bench depth below rim"},
         "executor": _tool_terrain_epsilon,
+    },
+    "query_landform_classification": {
+        "description": "Query HiRISE landform classification cache. Returns classified observations (LDA/LVF/CCF) in region with confidence scores and spatial distribution.",
+        "params": {"class_filter": "str, optional — filter by class: LDA, LVF, CCF, OTHER"},
+        "executor": _tool_landform_classification,
     },
     "respond": {
         "description": "Reply conversationally when no science tool is needed (e.g. greetings, clarifications, follow-up questions).",
@@ -1397,6 +1413,7 @@ _TOOL_KEYWORDS: Dict[str, list] = {
     "targeted_subsurface_at_ice":["targeted subsurface", "co-located ice", "subsurface at ice"],
     "evaluate_ice_evidence":     ["ice evidence", "ice probability", "evidence synthesis"],
     "finish":                    ["finish", "conclude", "final assessment", "done", "complete"],
+    "query_landform_classification": ["landform", "lda", "lvf", "ccf", "landform classification", "hirise classification", "glacial", "periglacial"],
 }
 
 

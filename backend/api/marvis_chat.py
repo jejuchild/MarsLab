@@ -137,7 +137,7 @@ def search_mineral_products(
 _landform_by_type_band: dict[str, dict[int, list]] | None = None
 LANDFORM_PROXIMITY_KM = 50.0
 
-LANDFORM_TYPES = ["crater", "terraced_crater", "volcanic", "graben", "channel", "wrinkle_ridge", "lda"]
+LANDFORM_TYPES = ["crater", "terraced_crater", "volcanic", "graben", "channel", "wrinkle_ridge", "lda", "lvf", "ccf"]
 
 
 def _load_landform_index() -> dict[str, dict[int, list]]:
@@ -173,38 +173,130 @@ def _load_landform_index() -> dict[str, dict[int, list]]:
 def _find_nearest_landform(
     lat: float, lon: float, landform_type: str, radius_km: float = LANDFORM_PROXIMITY_KM,
 ) -> tuple[dict | None, float | None]:
-    """Find the nearest landform of given type within radius_km. Returns (feature, dist_km)."""
+    """Find the nearest landform of given type within radius_km.
+
+    Checks both MOLA-precomputed landforms AND HiRISE classification cache.
+    Returns (feature, dist_km).
+    """
     from api.proximity_router import haversine_km
 
+    best, best_dist = None, radius_km
+
+    # 1) Check MOLA-precomputed landforms
     index = _load_landform_index()
     type_bands = index.get(landform_type, {})
-    if not type_bands:
-        return None, None
+    if type_bands:
+        center_band = int(lat // 5)
+        candidates = []
+        for offset in (-1, 0, 1):
+            candidates.extend(type_bands.get(center_band + offset, []))
 
-    center_band = int(lat // 5)
-    candidates = []
-    for offset in (-1, 0, 1):
-        candidates.extend(type_bands.get(center_band + offset, []))
+        import math
+        lat_threshold = radius_km / 60.0 + 0.5
+        cos_lat = max(math.cos(math.radians(lat)), 0.1)
+        lon_threshold = lat_threshold / cos_lat
 
-    import math
-    lat_threshold = radius_km / 60.0 + 0.5  # ~deg latitude
-    cos_lat = max(math.cos(math.radians(lat)), 0.1)
-    lon_threshold = lat_threshold / cos_lat  # wider at high latitudes
+        for lf in candidates:
+            if abs(lf["lat"] - lat) > lat_threshold:
+                continue
+            dlon = abs(lf.get("lon", 0) - lon)
+            if dlon > 180:
+                dlon = 360 - dlon
+            if dlon > lon_threshold:
+                continue
+            d = haversine_km(lat, lon, lf["lat"], lf.get("lon", 0))
+            if d < best_dist:
+                best_dist = d
+                best = lf
 
-    best, best_dist = None, radius_km
-    for lf in candidates:
-        if abs(lf["lat"] - lat) > lat_threshold:
-            continue
-        dlon = abs(lf.get("lon", 0) - lon)
-        if dlon > 180:
-            dlon = 360 - dlon  # antimeridian wrap
-        if dlon > lon_threshold:
-            continue
-        d = haversine_km(lat, lon, lf["lat"], lf.get("lon", 0))
-        if d < best_dist:
-            best_dist = d
-            best = lf
+    # 2) Also check HiRISE classification cache for LDA/LVF/CCF
+    hirise_results = _find_hirise_classified_landforms(lat, lon, landform_type, radius_km)
+    for hr in hirise_results:
+        if hr["distance_km"] < best_dist:
+            best_dist = hr["distance_km"]
+            best = {
+                "type": landform_type,
+                "lat": hr["lat"],
+                "lon": hr["lon"],
+                "product_id": hr["product_id"],
+                "confidence": hr["confidence"],
+                "source": "hirise_classification",
+            }
+
     return (best, round(best_dist, 1)) if best else (None, None)
+
+
+# ── HiRISE classification cache integration ─────────────────────────
+
+_hirise_landform_cache = None
+
+
+def _get_hirise_landform_cache():
+    """Lazy-load the HiRISE landform classification cache (fusion)."""
+    global _hirise_landform_cache
+    if _hirise_landform_cache is not None:
+        return _hirise_landform_cache
+    try:
+        from analysis.fusion.landform_cache import LandformCache
+        _hirise_landform_cache = LandformCache()
+        logging.getLogger(__name__).info(
+            "Loaded HiRISE landform cache (%d entries)", _hirise_landform_cache.size
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).warning("HiRISE landform cache unavailable: %s", exc)
+        _hirise_landform_cache = False  # sentinel: tried and failed
+    return _hirise_landform_cache
+
+
+def _find_hirise_classified_landforms(
+    lat: float, lon: float, landform_type: str, radius_km: float = LANDFORM_PROXIMITY_KM,
+) -> list[dict]:
+    """Find HiRISE-classified landforms (LDA/LVF/CCF) near (lat, lon).
+
+    Returns list of dicts compatible with compound_search result format.
+    """
+    cache = _get_hirise_landform_cache()
+    if not cache:
+        return []
+
+    class_map = {"lda": "LDA", "lvf": "LVF", "ccf": "CCF",
+                 "lobate_debris": "LDA"}
+    target_class = class_map.get(landform_type.lower())
+    if not target_class:
+        return []
+
+    from api.proximity_router import haversine_km
+    import math
+
+    # Search radius in degrees (rough)
+    deg_lat = radius_km / 59.2  # ~1 deg lat = 59.2 km on Mars
+    cos_lat = max(math.cos(math.radians(lat)), 0.01)
+    deg_lon = deg_lat / cos_lat
+
+    entries = cache.get_entries_in_bounds(
+        lat - deg_lat, lat + deg_lat,
+        lon - deg_lon, lon + deg_lon,
+    )
+
+    results = []
+    for entry in entries:
+        if entry.dominant_class != target_class:
+            continue
+        dist = haversine_km(lat, lon, entry.lat, entry.lon)
+        if dist <= radius_km:
+            results.append({
+                "product_id": entry.product_id,
+                "lat": round(entry.lat, 3),
+                "lon": round(entry.lon, 3),
+                "dominant_class": entry.dominant_class,
+                "confidence": round(entry.confidence, 3),
+                "model_version": entry.model_version,
+                "distance_km": round(dist, 1),
+                "source": "hirise_classification",
+            })
+
+    results.sort(key=lambda r: r["distance_km"])
+    return results
 
 
 # ── Compound search pipeline ─────────────────────────────────────────
@@ -838,6 +930,26 @@ _ACTION_PATTERNS = re.compile(
 )
 
 
+def _get_rag_context(query: str, n_results: int = 3) -> str:
+    """Retrieve RAG context for an informational query. Returns formatted string or empty."""
+    try:
+        from rag.retriever import retrieve, format_context
+        chunks = retrieve(query, n_results=n_results, collection="mars_science", min_score=0.2)
+        if not chunks:
+            return ""
+        ctx = format_context(chunks, max_chars=3000)
+        return (
+            "\n\n--- RETRIEVED KNOWLEDGE BASE CONTEXT ---\n"
+            "Use the following retrieved context to enhance your answer. "
+            "Reference [Source N] when citing.\n\n"
+            f"{ctx}\n"
+            "--- END CONTEXT ---"
+        )
+    except Exception as e:
+        logging.getLogger(__name__).debug(f"RAG retrieval skipped: {e}")
+        return ""
+
+
 def _is_informational(message: str) -> bool:
     """Return True if the message is a knowledge/informational question, not an action request.
     
@@ -877,16 +989,20 @@ async def _stream_groq(
     # Normalize instrument aliases in user message to help the LLM
     normalized_msg = _normalize_instrument_names(message)
 
+    # Server-side intent guard: force text-only response for informational queries
+    info_mode = _is_informational(normalized_msg)
+    if info_mode:
+        logger.info(f"Detected informational query, forcing text-only: {normalized_msg[:80]}")
+        # RAG augmentation: inject retrieved context for knowledge queries
+        rag_context = _get_rag_context(normalized_msg)
+        if rag_context:
+            system += rag_context
+
     messages = [{"role": "system", "content": system}]
     for entry in history[-MAX_HISTORY_TURNS:]:
         role = "user" if entry.role == "user" else "assistant"
         messages.append({"role": role, "content": entry.content})
     messages.append({"role": "user", "content": normalized_msg})
-
-    # Server-side intent guard: force text-only response for informational queries
-    info_mode = _is_informational(normalized_msg)
-    if info_mode:
-        logger.info(f"Detected informational query, forcing text-only: {normalized_msg[:80]}")
 
     payload = {
         "model": GROQ_MODEL,
@@ -1036,7 +1152,7 @@ _SEARCH_INTERSECT_RE = re.compile(
     r".*?\b(?:intersect\w*|overlap\w*|cross\w*)\b",
 )
 _SEARCH_LANDFORM_RE = re.compile(
-    r"(?i)\b(terraced[_ ]?crater|crater|volcanic|volcano|graben|channel|wrinkle[_ ]?ridge|ridge|lda|lobate[_ ]?debris)\b",
+    r"(?i)\b(terraced[_ ]?crater|crater|volcanic|volcano|graben|channel|wrinkle[_ ]?ridge|ridge|lda|lobate[_ ]?debris|lvf|lobate[_ ]?viscous|ccf|concentric[_ ]?crater|brain[_ ]?terrain)\b",
 )
 _MINERAL_PCT_RE = re.compile(
     r"(?:more\s+than|greater\s+than|above|over|>|>=)\s*(\d+(?:\.\d+)?)\s*%?"
@@ -1084,12 +1200,13 @@ async def _stream_llama(
         landform_m = _SEARCH_LANDFORM_RE.search(message)
         if landform_m:
             lf = landform_m.group(1).lower().replace(" ", "_")
-            if lf == "volcano":
-                lf = "volcanic"
-            elif lf == "ridge":
-                lf = "wrinkle_ridge"
-            elif lf == "lobate_debris":
-                lf = "lda"
+            # Normalize aliases
+            _LF_ALIASES = {
+                "volcano": "volcanic", "ridge": "wrinkle_ridge",
+                "lobate_debris": "lda", "lobate_viscous": "lvf",
+                "concentric_crater": "ccf", "brain_terrain": "ccf",
+            }
+            lf = _LF_ALIASES.get(lf, lf)
             params["near_landform"] = lf
 
         # Check for mineral filter

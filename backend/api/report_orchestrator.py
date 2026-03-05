@@ -516,6 +516,8 @@ async def _analyze_region(
 
     # Climate analysis step
     step_defs.append({"type": "climate", "description": "Climate analysis"})
+    # Landform classification query
+    step_defs.append({"type": "landform_classification", "description": "HiRISE landform classification"})
 
     step_defs.append({"type": "synthesize", "description": "Synthesize results"})
 
@@ -656,6 +658,12 @@ async def _analyze_region(
                 )
                 step.result = result
                 analysis.all_results["climate"] = result
+
+            elif step.type == "landform_classification":
+                from .agent_tasks import query_landform_classifications
+                result = query_landform_classifications(bbox)
+                step.result = result
+                analysis.all_results["landform_classification"] = result
 
             elif step.type == "synthesize":
                 region_ctx = get_region_context_by_name(region.display_name)

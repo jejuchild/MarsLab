@@ -567,6 +567,14 @@ app.include_router(mars_research_router)  # /api/mars-research — Mars Research
 
 from api.accessibility_router import router as accessibility_router
 app.include_router(accessibility_router)  # /api/accessibility/* — Ice Accessibility Algorithm
+
+from rag.rag_router import router as rag_router
+app.include_router(rag_router)  # /api/rag/* — Mars Science RAG
+
+from neural_climate.climate_router import router as neural_climate_router
+app.include_router(neural_climate_router)  # /api/climate/neural/* — Mars GCM Neural Emulator
+from pinns_interior.pinns_router import router as pinns_router
+app.include_router(pinns_router)
 @app.get("/hirise/quickview/{product_id}.png")
 @limiter.limit("20/minute")
 def get_hirise_quickview_transparent(request: Request, product_id: str):

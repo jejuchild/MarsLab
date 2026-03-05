@@ -3227,6 +3227,19 @@ def synthesize_results(
             "seasonal_operation_window": clim.get("seasonal_operation_window", {}),
         }
 
+    # HiRISE landform classification (fusion cache)
+    if "landform_classification" in all_results and all_results["landform_classification"].success:
+        lfc = all_results["landform_classification"].data
+        synthesis["landform_classification"] = {
+            "count": lfc.get("count", 0),
+            "class_distribution": lfc.get("class_distribution", {}),
+            "has_ice_landforms": any(
+                c in lfc.get("class_distribution", {})
+                for c in ("LDA", "LVF", "CCF")
+            ),
+            "top_entries": lfc.get("entries", [])[:5],
+        }
+
     # Thermal inertia analysis (TES)
     if "thermal_inertia" in all_results and all_results["thermal_inertia"].success:
         ti = all_results["thermal_inertia"].data
@@ -4387,5 +4400,88 @@ def terrain_epsilon_inversion(
         task_type="terrain_epsilon_inversion",
         success=True,
         data=data,
+        summary=summary,
+    )
+
+
+# =============================================================================
+# HiRISE Landform Classification Cache Query
+# =============================================================================
+
+
+def query_landform_classifications(
+    bbox: RegionBBox,
+    class_filter: Optional[str] = None,
+) -> TaskResult:
+    """Query the HiRISE landform classification cache for a region.
+
+    Returns classified HiRISE observations (LDA/LVF/CCF) within the region bbox.
+    Optionally filter by dominant_class.
+    """
+    try:
+        from analysis.fusion.landform_cache import LandformCache
+        cache = LandformCache()
+    except Exception as exc:
+        return TaskResult(
+            task_type="landform_classification",
+            success=False,
+            error=f"Landform cache unavailable: {exc}",
+            summary="HiRISE landform classification cache could not be loaded.",
+        )
+
+    entries = cache.get_entries_in_bounds(
+        bbox.min_lat, bbox.max_lat, bbox.min_lon, bbox.max_lon
+    )
+
+    if class_filter:
+        target = class_filter.upper()
+        entries = [e for e in entries if e.dominant_class == target]
+
+    if not entries:
+        filter_msg = f" with class={class_filter.upper()}" if class_filter else ""
+        return TaskResult(
+            task_type="landform_classification",
+            success=True,
+            data={"count": 0, "entries": [], "class_distribution": {}},
+            summary=f"No HiRISE landform classifications found in region{filter_msg}.",
+        )
+
+    # Build class distribution
+    class_dist: Dict[str, int] = {}
+    for e in entries:
+        class_dist[e.dominant_class] = class_dist.get(e.dominant_class, 0) + 1
+
+    # Sort by confidence
+    entries.sort(key=lambda e: e.confidence, reverse=True)
+
+    entry_data = [
+        {
+            "product_id": e.product_id,
+            "lat": round(e.lat, 4),
+            "lon": round(e.lon, 4),
+            "dominant_class": e.dominant_class,
+            "confidence": round(e.confidence, 3),
+            "model_version": e.model_version,
+        }
+        for e in entries[:50]  # cap at 50 for agent context
+    ]
+
+    dist_str = ", ".join(f"{cls}: {cnt}" for cls, cnt in sorted(class_dist.items()))
+    filter_msg = f" ({class_filter.upper()} only)" if class_filter else ""
+    summary = (
+        f"Found {len(entries)} HiRISE landform classifications in region{filter_msg}. "
+        f"Distribution: {dist_str}. "
+        f"Top confidence: {entries[0].product_id} = {entries[0].dominant_class} "
+        f"({entries[0].confidence:.0%})."
+    )
+
+    return TaskResult(
+        task_type="landform_classification",
+        success=True,
+        data={
+            "count": len(entries),
+            "class_distribution": class_dist,
+            "entries": entry_data,
+        },
         summary=summary,
     )

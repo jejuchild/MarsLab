@@ -351,3 +351,53 @@ def get_accessibility_explanation(
 
     result_dict["explanation"] = explanation
     return JSONResponse(content=result_dict)
+
+
+# ── Landform cache search (class-based) ─────────────────────────────
+
+
+@router.get("/landform-cache/search")
+async def search_landform_cache(
+    dominant_class: Optional[str] = Query(None, description="Filter by class: LDA, LVF, CCF, OTHER"),
+    lat_min: Optional[float] = Query(None, description="Southern bound"),
+    lat_max: Optional[float] = Query(None, description="Northern bound"),
+    lon_min: Optional[float] = Query(None, description="Western bound"),
+    lon_max: Optional[float] = Query(None, description="Eastern bound"),
+    limit: int = Query(100, ge=1, le=1000),
+):
+    """Search the HiRISE landform classification cache by class and/or bounds."""
+    pipeline = _get_pipeline()
+    cache = pipeline.landform_cache
+    if cache is None:
+        return JSONResponse(content={"count": 0, "entries": [], "error": "Landform cache not initialized"})
+
+    # Get entries — filter by bounds if provided
+    if lat_min is not None and lat_max is not None and lon_min is not None and lon_max is not None:
+        entries = cache.get_entries_in_bounds(lat_min, lat_max, lon_min, lon_max)
+    else:
+        entries = cache.all_entries()
+
+    # Filter by class
+    if dominant_class:
+        target = dominant_class.upper()
+        entries = [e for e in entries if e.dominant_class == target]
+
+    # Sort by confidence descending
+    entries.sort(key=lambda e: e.confidence, reverse=True)
+    entries = entries[:limit]
+
+    return JSONResponse(content={
+        "count": len(entries),
+        "entries": [
+            {
+                "product_id": e.product_id,
+                "lat": round(e.lat, 4),
+                "lon": round(e.lon, 4),
+                "dominant_class": e.dominant_class,
+                "confidence": round(e.confidence, 3),
+                "model_version": e.model_version,
+                "classified_at": e.classified_at,
+            }
+            for e in entries
+        ],
+    })
