@@ -9,7 +9,7 @@ import type { HiRiseDTMPoint } from "../components/HiRiseDTM3DViewer";
 import type { TerrainPoint } from "../components/SlopeAnalysis";
 import type { ProfilePoint } from "../components/LineProfile";
 import TopBar from "../components/TopBar";
-import LayerPanelRaw from "../components/LayerPanel";
+import LayerPanelRaw from "../components/layerpanel/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
 import FieldNoteModal from "../components/FieldNoteModal";
 import AiAnalysisPanelRaw from "../components/AiAnalysisPanel";
@@ -413,6 +413,8 @@ export default function MainPage() {
   const [swimLayer, setSwimLayer] = useState<string | false>(false);
   const [accessibilityVisible, setAccessibilityVisible] = useState(false);
   const [accessibilityOpacity, setAccessibilityOpacity] = useState(0.6);
+  const [fusionVisible, setFusionVisible] = useState(false);
+  const [fusionOpacity, setFusionOpacity] = useState(0.6);
   const [accessibilityExplainMode, setAccessibilityExplainMode] = useState(false);
   const [accessibilityExplainPoint, setAccessibilityExplainPoint] = useState<{ lat: number; lon: number } | null>(null);
   const [scienceLayerVisibility, setScienceLayerVisibility] = useState<Record<SwimMethod, boolean>>(() => {
@@ -1681,6 +1683,11 @@ export default function MainPage() {
       onAccessibilityOpacityChange={setAccessibilityOpacity}
       accessibilityExplainMode={accessibilityExplainMode}
       onAccessibilityExplainModeChange={setAccessibilityExplainMode}
+      // Ice Prospecting (Fusion)
+      fusionVisible={fusionVisible}
+      onFusionVisibleChange={setFusionVisible}
+      fusionOpacity={fusionOpacity}
+      onFusionOpacityChange={setFusionOpacity}
     />
   );
 
@@ -2005,6 +2012,8 @@ export default function MainPage() {
         cameraViewportRef={cameraViewportRef}
         accessibilityVisible={accessibilityVisible}
         accessibilityOpacity={accessibilityOpacity}
+        fusionVisible={fusionVisible}
+        fusionOpacity={fusionOpacity}
       />
 
       {/* Accessibility Explain Tooltip — floating on map */}
