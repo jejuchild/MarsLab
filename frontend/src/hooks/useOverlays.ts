@@ -429,6 +429,7 @@ export default function useOverlays({
             console.error("[Quickview] Failed to add overlay:", productId, e);
             toast.error(`Failed to load quickview for ${productId}`);
             return null;
+          }
         }),
       ).then((results) => {
         const v = viewerRef.current;
@@ -617,6 +618,7 @@ export default function useOverlays({
             console.error("[HighRes] Failed to add overlay:", productId, e);
             toast.error(`Failed to load high-res overlay for ${productId}`);
             return null;
+          }
         }),
       ).then((results) => {
         const v = viewerRef.current;
@@ -842,8 +844,8 @@ export default function useOverlays({
         } catch (e) {
           console.error("[Browse] Failed to add overlay:", productId, browseType, e);
           toast.error(`Failed to load ${browseType} browse overlay for ${productId}`);
+        }
       }
-
       // Update tracking
       existingOverlays.set(productId, new Set(types));
     });
@@ -950,6 +952,7 @@ export default function useOverlays({
             east = normalizeLonTo180(eastLon360);
             south = Math.min(minLat, maxLat);
             north = Math.max(minLat, maxLat);
+          }
 
           // Construct score image URL
           // Score files: frt00003156_score_ice.png, frt00003156_score_hyd.png
@@ -987,8 +990,8 @@ export default function useOverlays({
         } catch (e) {
           console.error("[Score] Failed to add overlay:", productId, scoreType, e);
           toast.error(`Failed to load ${scoreType} score overlay for ${productId}`);
+        }
       }
-
       // Update tracking
       existingOverlays.set(productId, new Set(types));
     });
@@ -1066,6 +1069,7 @@ export default function useOverlays({
             console.error("[Mineral] Failed to add overlay:", productId, e);
             toast.error(`Failed to load mineral overlay for ${productId}`);
             return null;
+          }
         }),
       ).then((results) => {
         const v = viewerRef.current;

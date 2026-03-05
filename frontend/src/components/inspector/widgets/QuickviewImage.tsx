@@ -49,13 +49,13 @@ export default function QuickviewImage({ productId, instrument }: QuickviewImage
 
     const img = new Image();
     img.onload = () => {
-      setCurrentUrl(urls[index]);
+      setCurrentUrl(urls[index] ?? "");
       setStatus("loaded");
     };
     img.onerror = () => {
       tryLoadImage(urls, index + 1);
     };
-    img.src = urls[index];
+    img.src = urls[index] ?? "";
   }, []);
 
   useEffect(() => {

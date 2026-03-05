@@ -22,7 +22,7 @@ export default function Histogram({ histogram, binEdges }: HistogramProps) {
     const labels: { value: string; pct: number }[] = [];
     for (let i = 0; i < binEdges.length; i += step) {
       labels.push({
-        value: binEdges[i].toFixed(0),
+        value: (binEdges[i] ?? 0).toFixed(0),
         pct: (i / (binEdges.length - 1)) * 100,
       });
     }
