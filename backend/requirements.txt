@@ -42,3 +42,8 @@ slowapi>=0.1.9
 
 # HTML sanitization
 bleach>=6.0.0
+
+# RAG (Retrieval-Augmented Generation) for Mars Science
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+requests>=2.31.0
