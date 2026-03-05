@@ -1,9 +1,11 @@
 import { useState, useCallback } from "react";
 import {
   fetchAccessibilityScore,
+  fetchLandformCache,
   DEFAULT_WEIGHTS,
   type AccessibilityScore,
   type AccessibilityWeights,
+  type LandformCacheEntry,
 } from "../api/accessibility";
 
 /* =========================================================
@@ -69,13 +71,36 @@ export default function AccessibilityPanel({ lat, lon }: AccessibilityPanelProps
   const [error, setError] = useState<string | null>(null);
   const [weights, setWeights] = useState<AccessibilityWeights>({ ...DEFAULT_WEIGHTS });
   const [showWeights, setShowWeights] = useState(false);
+  const [landformMatch, setLandformMatch] = useState<LandformCacheEntry | null>(null);
 
   const queryPoint = useCallback(async () => {
     if (lat == null || lon == null) return;
     setLoading(true);
     setError(null);
+    setLandformMatch(null);
     try {
-      const data = await fetchAccessibilityScore(lat, lon, weights);
+      // Check landform cache for nearby HiRISE classification
+      let landform: string | undefined;
+      try {
+        const cache = await fetchLandformCache();
+        // Find nearest entry within ~0.5° of query point
+        let bestEntry: LandformCacheEntry | null = null;
+        let bestDist = Infinity;
+        for (const entry of cache.entries) {
+          const dist = Math.sqrt((entry.lat - lat) ** 2 + (entry.lon - lon) ** 2);
+          if (dist < 0.5 && dist < bestDist) {
+            bestDist = dist;
+            bestEntry = entry;
+          }
+        }
+        if (bestEntry && bestEntry.dominant_class !== "OTHER") {
+          landform = bestEntry.dominant_class;
+          setLandformMatch(bestEntry);
+        }
+      } catch {
+        // Landform cache unavailable — proceed without
+      }
+      const data = await fetchAccessibilityScore(lat, lon, weights, landform);
       setResult(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Query failed");
@@ -156,6 +181,18 @@ export default function AccessibilityPanel({ lat, lon }: AccessibilityPanelProps
                   {confidenceBadge(result.confidence).text}
                 </span>
               </div>
+
+              {/* Landform enhancement badge */}
+              {landformMatch && (
+                <div className="flex items-center gap-1.5 rounded border border-violet-500/30 bg-violet-500/10 px-2 py-1">
+                  <span className="material-symbols-outlined text-[12px] text-violet-400">microscope</span>
+                  <span className="text-[9px] text-violet-300">
+                    Enhanced: <span className="font-bold">{landformMatch.dominant_class}</span>{" "}
+                    ({Math.round(landformMatch.confidence * 100)}%)
+                  </span>
+                  <span className="text-[8px] text-slate-500 ml-auto">HiRISE</span>
+                </div>
+              )}
 
               {/* Sub-scores */}
               <div className="space-y-1.5">

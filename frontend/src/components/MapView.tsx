@@ -193,6 +193,9 @@ type MapViewProps = {
   // Ice Accessibility heatmap overlay
   accessibilityVisible?: boolean;
   accessibilityOpacity?: number;
+  // Ice Prospecting Fusion overlay
+  fusionVisible?: boolean;
+  fusionOpacity?: number;
   onOlympusMonsClimber?: () => void;
 };
 
@@ -678,6 +681,8 @@ export default function MapView({
   scienceLayerOpacities = {},
   accessibilityVisible = false,
   accessibilityOpacity = 0.6,
+  fusionVisible = false,
+  fusionOpacity = 0.6,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
 }: MapViewProps) {
@@ -788,6 +793,7 @@ export default function MapView({
   const scienceLayerRefs = useRef<Map<string, Cesium.ImageryLayer>>(new Map());
   const scienceLayerDepthRefs = useRef<Map<string, string | null>>(new Map());
   const accessibilityLayerRef = useRef<Cesium.ImageryLayer | null>(null);
+  const fusionLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   useEffect(() => {
     onViewBoundSelectedRef.current = onViewBoundSelected;
   }, [onViewBoundSelected]);
@@ -1724,6 +1730,51 @@ export default function MapView({
       viewerRef.current?.scene.requestRender();
     }
   }, [accessibilityOpacity]);
+
+  // ── Ice Prospecting Fusion heatmap layer ──────────────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    // Remove existing layer
+    if (fusionLayerRef.current) {
+      viewer.imageryLayers.remove(fusionLayerRef.current, false);
+      fusionLayerRef.current = null;
+    }
+
+    if (!fusionVisible) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    // Use UrlTemplateImageryProvider for z/x/y dynamic tiles
+    const provider = new Cesium.UrlTemplateImageryProvider({
+      url: "/api/accessibility/fusion-tile/{z}/{x}/{y}.png",
+      tilingScheme: new Cesium.GeographicTilingScheme(),
+      minimumLevel: 0,
+      maximumLevel: 5,
+    });
+    const layer = viewer.imageryLayers.addImageryProvider(provider);
+    layer.alpha = fusionOpacity;
+    fusionLayerRef.current = layer;
+    viewer.scene.requestRender();
+
+    return () => {
+      if (!viewer || viewer.isDestroyed()) return;
+      if (fusionLayerRef.current) {
+        viewer.imageryLayers.remove(fusionLayerRef.current, false);
+        fusionLayerRef.current = null;
+      }
+    };
+  }, [fusionVisible]);
+
+  // Update fusion layer opacity without recreating
+  useEffect(() => {
+    if (fusionLayerRef.current) {
+      fusionLayerRef.current.alpha = fusionOpacity;
+      viewerRef.current?.scene.requestRender();
+    }
+  }, [fusionOpacity]);
 
   // Store onHoverProduct in ref to access in hover handler
   const onHoverProductRef = useRef(onHoverProduct);

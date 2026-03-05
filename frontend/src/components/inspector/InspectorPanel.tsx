@@ -301,6 +301,8 @@ export default function InspectorPanel({
           <div className="border-t border-border-dark -mx-4 mt-4">
             <HiriseLandformPanel
               productId={selected.productId}
+              lat={selected.lat}
+              lon={selected.lon}
               onClose={() => setShowLandformPanel(false)}
             />
           </div>
