@@ -113,3 +113,11 @@ backend/hirise_lbl/
 pipeline_full_log.txt
 print.prt
 *.prt
+
+# Vector DB / RAG data (generated, reproducible)
+backend/data/rag_vectordb/
+backend/data/crawl_report_*.json
+
+# Neural Climate data/checkpoints (generated)
+backend/neural_climate/checkpoints/
+backend/neural_climate/data/
