@@ -1936,6 +1936,12 @@ export default function MainPage() {
           goalPoint={pathfinderGoal}
           onRouteReady={(route) => setPathfinderRoute(route)}
           onClear={() => { setPathfinderStart(null); setPathfinderGoal(null); setPathfinderRoute(null); }}
+          onSuggestRoute={(start, goal) => {
+            setPathfinderStart(start);
+            setPathfinderGoal(goal);
+            setPathfinderRoute(null);
+            setFlyToCoords({ lat: (start.lat + goal.lat) / 2, lon: (start.lon + goal.lon) / 2 });
+          }}
           simPlaying={simPlaying}
           simSpeed={simSpeed}
           simProgress={simProgress}

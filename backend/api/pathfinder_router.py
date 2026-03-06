@@ -396,3 +396,87 @@ async def pathfinder_status():
         "algorithms": ["a_star", "field_d_star"],
         "rovers": ["perseverance", "curiosity", "generic_small"],
     })
+
+
+# ── Suggested Routes ───────────────────────────────────────────
+
+# Curated routes near Mars landing sites and geologically interesting areas.
+# Each route is designed to showcase varied terrain and scientific interest.
+SUGGESTED_ROUTES = [
+    {
+        "id": "jezero_delta",
+        "name": "Jezero Crater Delta Traverse",
+        "description": "Explore the ancient river delta in Jezero Crater where Perseverance searches for biosignatures. Features layered sedimentary rocks, fan deposits, and varied terrain.",
+        "start": {"lat": 18.4447, "lon": 77.4508},
+        "goal": {"lat": 18.4700, "lon": 77.4200},
+        "tags": ["perseverance", "astrobiology", "delta", "sedimentary"],
+        "difficulty": "moderate",
+        "estimated_distance_km": 3.2,
+        "science_interest": "high",
+    },
+    {
+        "id": "gale_msl",
+        "name": "Gale Crater — Mt. Sharp Foothills",
+        "description": "Follow Curiosity's path toward the foothills of Mt. Sharp (Aeolis Mons). Terrain transitions from smooth crater floor to layered sedimentary outcrops.",
+        "start": {"lat": -4.5895, "lon": 137.4417},
+        "goal": {"lat": -4.6300, "lon": 137.3900},
+        "tags": ["curiosity", "mt_sharp", "clay_minerals", "stratigraphy"],
+        "difficulty": "moderate",
+        "estimated_distance_km": 5.8,
+        "science_interest": "high",
+    },
+    {
+        "id": "elysium_smooth",
+        "name": "Elysium Planitia — InSight Landing Zone",
+        "description": "Flat, smooth terrain ideal for testing route planning on low-obstacle ground. Near the InSight lander site with minimal slope variation.",
+        "start": {"lat": 4.5024, "lon": 135.6234},
+        "goal": {"lat": 4.5500, "lon": 135.5700},
+        "tags": ["insight", "flat_terrain", "easy", "testing"],
+        "difficulty": "easy",
+        "estimated_distance_km": 6.1,
+        "science_interest": "low",
+    },
+    {
+        "id": "valles_marineris",
+        "name": "Valles Marineris Canyon Rim",
+        "description": "Traverse along the rim of the solar system's largest canyon. Extreme slopes and dramatic terrain with layered geological exposures.",
+        "start": {"lat": -13.9, "lon": -59.2},
+        "goal": {"lat": -14.1, "lon": -59.5},
+        "tags": ["canyon", "extreme_terrain", "geology", "layered_deposits"],
+        "difficulty": "hard",
+        "estimated_distance_km": 35.0,
+        "science_interest": "very_high",
+    },
+    {
+        "id": "olympus_mons_base",
+        "name": "Olympus Mons — Shield Volcano Base",
+        "description": "Explore the base of the tallest volcano in the solar system. Lava flow textures, volcanic plains, and gradual slope increase toward the caldera.",
+        "start": {"lat": 17.5, "lon": -134.5},
+        "goal": {"lat": 18.0, "lon": -134.0},
+        "tags": ["volcano", "olympus_mons", "lava_flows", "volcanic"],
+        "difficulty": "moderate",
+        "estimated_distance_km": 55.0,
+        "science_interest": "high",
+    },
+    {
+        "id": "utopia_ice",
+        "name": "Utopia Planitia — Ice-Rich Terrain",
+        "description": "Cross subsurface ice-rich terrain detected by radar. Important for future ISRU (In-Situ Resource Utilization) and human exploration water supply.",
+        "start": {"lat": 46.7, "lon": 110.0},
+        "goal": {"lat": 46.9, "lon": 110.4},
+        "tags": ["ice", "isru", "human_exploration", "water"],
+        "difficulty": "easy",
+        "estimated_distance_km": 22.0,
+        "science_interest": "high",
+    },
+]
+
+
+@router.get("/suggest-routes")
+async def suggest_routes():
+    """Return curated suggested routes near interesting Mars locations.
+
+    These are pre-defined routes near landing sites and geologically significant
+    areas, designed to showcase different terrain types and difficulty levels.
+    """
+    return JSONResponse(content={"routes": SUGGESTED_ROUTES})

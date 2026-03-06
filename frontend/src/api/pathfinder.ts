@@ -253,3 +253,26 @@ export async function analyzeSegment(
   }
   return res.json();
 }
+
+/* =========================================================
+ * Suggested Routes
+ * =======================================================*/
+
+export interface SuggestedRoute {
+  id: string;
+  name: string;
+  description: string;
+  start: { lat: number; lon: number };
+  goal: { lat: number; lon: number };
+  tags: string[];
+  difficulty: "easy" | "moderate" | "hard";
+  estimated_distance_km: number;
+  science_interest: string;
+}
+
+export async function fetchSuggestedRoutes(signal?: AbortSignal): Promise<SuggestedRoute[]> {
+  const res = await fetch("/api/pathfinder/suggest-routes", { signal });
+  if (!res.ok) throw new Error(`Failed to fetch suggested routes: ${res.status}`);
+  const data = await res.json();
+  return data.routes ?? [];
+}

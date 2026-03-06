@@ -12,12 +12,14 @@ import {
 import {
   planRoute,
   fetchRovers,
+  fetchSuggestedRoutes,
   type PlanRequest,
   type RouteResult,
   type RoverProfile,
   type CostWeights,
   type VLMAnalysis,
   type TerrainZone,
+  type SuggestedRoute,
   DEFAULT_COST_WEIGHTS,
 } from "../api/pathfinder";
 import type { RoverTelemetry, SpeedOption } from "../hooks/useRoverSimulation";
@@ -41,6 +43,7 @@ export interface PathfinderPanelProps {
   goalPoint: { lat: number; lon: number } | null;
   onRouteReady?: (route: RouteResult) => void;
   onClear?: () => void;
+  onSuggestRoute?: (start: { lat: number; lon: number }, goal: { lat: number; lon: number }) => void;
   /* Simulation */
   simPlaying?: boolean;
   simSpeed?: SpeedOption;
@@ -106,6 +109,7 @@ export default function PathfinderPanel({
   goalPoint,
   onRouteReady,
   onClear,
+  onSuggestRoute,
   simPlaying = false,
   simSpeed = 1,
   simProgress = 0,
@@ -127,6 +131,8 @@ export default function PathfinderPanel({
 
   const [rovers, setRovers] = useState<Record<string, RoverProfile>>({});
   const abortRef = useRef<AbortController | null>(null);
+  const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
+  const [showSuggest, setShowSuggest] = useState(false);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -167,6 +173,23 @@ export default function PathfinderPanel({
       })
       .catch(() => {});
   }, []);
+
+  // Fetch suggested routes once (on first expand)
+  const handleToggleSuggest = useCallback(() => {
+    setShowSuggest((prev) => {
+      if (!prev && suggestedRoutes.length === 0) {
+        fetchSuggestedRoutes()
+          .then((routes) => setSuggestedRoutes(routes))
+          .catch(() => {});
+      }
+      return !prev;
+    });
+  }, [suggestedRoutes.length]);
+
+  const handlePickSuggestedRoute = useCallback((route: SuggestedRoute) => {
+    onSuggestRoute?.(route.start, route.goal);
+    setShowSuggest(false);
+  }, [onSuggestRoute]);
 
   // ── Plan Route ──────────────────────────────────────────────
   const handlePlan = useCallback(async () => {
@@ -285,6 +308,53 @@ export default function PathfinderPanel({
               {goalPoint ? fmtCoord(goalPoint.lat, goalPoint.lon) : "Right-click map to set goal"}
             </span>
           </div>
+        </div>
+
+        {/* Suggest Route */}
+        <div className="bg-[#1a2333] border border-[#232f48] rounded-lg p-3">
+          <button
+            onClick={handleToggleSuggest}
+            className="w-full flex items-center justify-between gap-2 text-left"
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-orange-400 text-sm">auto_awesome</span>
+              <span className="text-[11px] font-medium text-[#92a4c9]">Suggest Route</span>
+            </div>
+            <svg className={`w-3 h-3 text-[#6b7c9c] transform transition-transform ${showSuggest ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {showSuggest && (
+            <div className="mt-2 space-y-1.5">
+              {suggestedRoutes.length === 0 && (
+                <p className="text-[10px] text-[#6b7c9c] italic">Loading routes...</p>
+              )}
+              {suggestedRoutes.map((route) => {
+                const diffColor = route.difficulty === "easy" ? "text-emerald-400" : route.difficulty === "hard" ? "text-red-400" : "text-amber-400";
+                return (
+                  <button
+                    key={route.id}
+                    onClick={() => handlePickSuggestedRoute(route)}
+                    className="w-full text-left bg-[#0a0f18] border border-[#232f48] rounded-lg p-2 hover:border-orange-500/30 hover:bg-[#0d1420] transition-colors group"
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[11px] font-medium text-white group-hover:text-orange-300 transition-colors">{route.name}</span>
+                      <span className={`text-[8px] uppercase font-bold ${diffColor}`}>{route.difficulty}</span>
+                    </div>
+                    <p className="text-[9px] text-[#6b7c9c] leading-snug mb-1">{route.description}</p>
+                    <div className="flex items-center gap-2 text-[8px] text-[#4a5a7c]">
+                      <span>~{route.estimated_distance_km} km</span>
+                      <span>•</span>
+                      <span className="capitalize">{route.science_interest.replace("_", " ")} interest</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {route.tags.slice(0, 3).map((tag) => (
+                        <span key={tag} className="px-1 py-0.5 bg-orange-500/5 border border-orange-500/10 text-orange-400/70 rounded text-[7px]">{tag}</span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="bg-[#1a2333] border border-[#232f48] rounded-lg p-3 space-y-3">
@@ -628,11 +698,15 @@ function VLMAnalysisSection({ vlm }: { vlm: VLMAnalysis }) {
       </div>
 
       {vlm.terrain_image_b64 && (
-        <div>
-          <div className="text-[9px] text-[#6b7c9c] mb-1">Composite Terrain Map (R=slope, G=traversability, B=hazard)</div>
+        <div className="group">
+          <div className="flex items-center gap-1 text-[9px] text-[#6b7c9c] mb-1">
+            <span className="material-symbols-outlined text-[10px]">satellite_alt</span>
+            AI Terrain Analysis Map
+            <span className="hidden group-hover:inline text-[8px] text-[#4a5a7c] ml-1">(slope / traversability / hazard)</span>
+          </div>
           <img
             src={`data:image/png;base64,${vlm.terrain_image_b64}`}
-            alt="VLM Terrain Composite"
+            alt="AI Terrain Analysis"
             className="w-full rounded-lg border border-[#232f48]"
           />
         </div>

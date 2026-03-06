@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import type React from "react";
 import * as Cesium from "cesium";
 import type { RouteResult, Waypoint, VLMAnalysis, SolPlan } from "../api/pathfinder";
@@ -14,6 +14,8 @@ const PF_TRAVERSED = "PATHFINDER_TRAVERSED";
 const BASE_DURATION_S = 60;
 /** Telemetry callback throttle interval */
 const TELEMETRY_THROTTLE_MS = 100;
+/** Interval to check if viewer is ready (ms) */
+const VIEWER_POLL_MS = 200;
 
 /* ==================================================
  * Exported Types
@@ -59,6 +61,12 @@ type UseRoverSimulationParams = {
 /* ==================================================
  * Helpers
  * ==================================================*/
+
+/** Safe viewer access — returns viewer only if alive */
+function getViewer(ref: React.MutableRefObject<Cesium.Viewer | null>): Cesium.Viewer | null {
+  const v = ref.current;
+  return v && !v.isDestroyed() ? v : null;
+}
 
 /** Binary-search waypoints by distance and linearly interpolate */
 function interpolateWaypoint(
@@ -140,6 +148,23 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
   // Track entity lifecycle
   const entitiesAliveRef = useRef(false);
 
+  // Signal to re-trigger entity creation when viewer becomes available
+  // This solves the problem where viewerRef.current is null on first render
+  const [viewerReady, setViewerReady] = useState(false);
+
+  /* ---------- Poll for viewer readiness ---------- */
+  useEffect(() => {
+    if (viewerReady) return;
+    const interval = setInterval(() => {
+      const v = getViewer(P.current.viewerRef);
+      if (v) {
+        setViewerReady(true);
+        clearInterval(interval);
+      }
+    }, VIEWER_POLL_MS);
+    return () => clearInterval(interval);
+  }, [viewerReady]);
+
   /* ---------- entity update helper ---------- */
   const updatePosition = useCallback((progress: number) => {
     const { routeResult, vlmAnalysis, marsEllipsoid } = P.current;
@@ -166,9 +191,9 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
     if (index < waypoints.length - 1 && positionRef.current) arr.push(positionRef.current);
     traversedRef.current = arr;
 
-    // Request render
-    const viewer = P.current.viewerRef.current;
-    if (viewer && !viewer.isDestroyed()) viewer.scene.requestRender();
+    // Request render (safely)
+    const viewer = getViewer(P.current.viewerRef);
+    if (viewer) viewer.scene.requestRender();
 
     // Throttled telemetry
     const now = performance.now();
@@ -196,12 +221,12 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
 
   /* ---------- Entity creation / cleanup ---------- */
   useEffect(() => {
-    const viewer = P.current.viewerRef.current;
-    if (!viewer || viewer.isDestroyed()) return;
+    const viewer = getViewer(P.current.viewerRef);
+    if (!viewer) return;
 
     const { marsEllipsoid, routeResult, analysisMode } = P.current;
 
-    // Cleanup
+    // Cleanup existing entities
     for (const id of [PF_ROVER, PF_ROVER_LABEL, PF_TRAVERSED]) {
       const ent = viewer.entities.getById(id);
       if (ent) viewer.entities.remove(ent);
@@ -267,24 +292,28 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
     viewer.scene.requestRender();
 
     return () => {
-      if (!viewer.isDestroyed()) {
+      const v = getViewer(P.current.viewerRef);
+      if (v) {
         for (const id of [PF_ROVER, PF_ROVER_LABEL, PF_TRAVERSED]) {
-          const ent = viewer.entities.getById(id);
-          if (ent) viewer.entities.remove(ent);
+          const ent = v.entities.getById(id);
+          if (ent) v.entities.remove(ent);
         }
-        if (viewer.trackedEntity?.id === PF_ROVER) {
-          viewer.trackedEntity = undefined;
-        }
+        try {
+          if (v.trackedEntity?.id === PF_ROVER) {
+            v.trackedEntity = undefined;
+          }
+        } catch { /* entity may already be removed */ }
         entitiesAliveRef.current = false;
-        viewer.scene.requestRender();
+        v.scene.requestRender();
       }
     };
-  }, [params.viewerRef, params.marsEllipsoid, params.routeResult, params.analysisMode]);
+    // viewerReady triggers re-run when viewer becomes available after initial null
+  }, [viewerReady, params.marsEllipsoid, params.routeResult, params.analysisMode]);
 
   /* ---------- Animation loop ---------- */
   useEffect(() => {
-    const viewer = P.current.viewerRef.current;
-    if (!viewer || viewer.isDestroyed() || !entitiesAliveRef.current) return;
+    const viewer = getViewer(P.current.viewerRef);
+    if (!viewer || !entitiesAliveRef.current) return;
 
     if (!params.isPlaying || completedRef.current) {
       if (rafRef.current !== null) {
@@ -296,7 +325,8 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
     }
 
     const animate = (ts: number) => {
-      if (!P.current.isPlaying || viewer.isDestroyed()) {
+      const v = getViewer(P.current.viewerRef);
+      if (!P.current.isPlaying || !v) {
         rafRef.current = null;
         lastFrameRef.current = null;
         return;
@@ -337,16 +367,18 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
 
   /* ---------- Camera follow ---------- */
   useEffect(() => {
-    const viewer = P.current.viewerRef.current;
-    if (!viewer || viewer.isDestroyed()) return;
+    const viewer = getViewer(P.current.viewerRef);
+    if (!viewer) return;
 
     if (params.cameraFollow && entitiesAliveRef.current) {
       const rover = viewer.entities.getById(PF_ROVER);
       if (rover) viewer.trackedEntity = rover;
     } else {
-      if (viewer.trackedEntity?.id === PF_ROVER) {
-        viewer.trackedEntity = undefined;
-      }
+      try {
+        if (viewer.trackedEntity?.id === PF_ROVER) {
+          viewer.trackedEntity = undefined;
+        }
+      } catch { /* entity may already be removed */ }
     }
   }, [params.cameraFollow]);
 
