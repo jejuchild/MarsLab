@@ -52,6 +52,7 @@ export type AnalysisMode =
   | "attenuation"
   | "mineral_sequence"
   | "strat_column"
+  | "pathfinder"
   | null;
 
 // ── Section Props ──

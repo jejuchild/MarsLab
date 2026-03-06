@@ -88,7 +88,7 @@ export interface VLMAnalysis {
   risk_level: "low" | "moderate" | "high" | "extreme";
   analysis_model: string;
   terrain_image_b64?: string;
-
+}
 export interface RouteResult {
   waypoints: Waypoint[];
   summary: RouteSummary;

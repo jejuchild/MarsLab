@@ -332,7 +332,7 @@ function AccessibilityTab({
         {accessibilityVisible && (
           <div className="space-y-1.5 mt-1.5">
             <OpacitySlider
-              value={accessibilityOpacity}
+              value={accessibilityOpacity ?? 0.7}
               onChange={(v) => onAccessibilityOpacityChange?.(v)}
               color="emerald"
             />
@@ -391,7 +391,7 @@ function FusionTab({
       {fusionVisible && (
         <div className="space-y-1.5 mt-1.5">
           <OpacitySlider
-            value={fusionOpacity}
+            value={fusionOpacity ?? 0.7}
             onChange={(v) => onFusionOpacityChange?.(v)}
             color="violet"
           />

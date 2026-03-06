@@ -118,7 +118,7 @@ export default function InspectorPanel({
         const binEdges = Array.from({ length: bins + 1 }, (_, i) => min + i * binWidth);
         dn.forEach((v) => {
           const idx = Math.min(Math.floor((v - min) / binWidth), bins - 1);
-          histogram[idx]++;
+          histogram[idx] = (histogram[idx] ?? 0) + 1;
         });
 
         setPixelStats({ mean, median, std, min, max, sum, histogram, binEdges });

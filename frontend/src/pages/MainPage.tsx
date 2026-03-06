@@ -44,7 +44,7 @@ import { CuriositySelfieModal, OlympusMonsPanel, OlympusMonsClimber, TerraformOv
 import type { DetectedFeature } from "../components/CraterDetectPanel";
 import type { SwimMethod, DepthRange } from "../api/swim_ice";
 import { SWIM_METHODS } from "../api/swim_ice";
-import type { RouteResult, RouteGeoPoint } from "../api/pathfinder";
+import type { RouteResult } from "../api/pathfinder";
 import type { RoverTelemetry, SpeedOption } from "../hooks/useRoverSimulation";
 
 // Memoize heavy child components to prevent unnecessary re-renders
@@ -568,7 +568,7 @@ export default function MainPage() {
   }, []);
 
   // Explicit footprint loading handlers
-  const handleLoadFootprints = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3") => {
+  const handleLoadFootprints = useCallback((instrument: string) => {
     // Auto-enable visibility when loading
     const id = instrument.toLowerCase() as InstrumentId;
     setInstrumentVisibility(prev => ({ ...prev, [id]: true }));

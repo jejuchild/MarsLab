@@ -1,4 +1,4 @@
-import type { FootprintSectionProps, FootprintCount, InstrumentId } from "../types";
+import type { FootprintSectionProps, FootprintCount } from "../types";
 import { lp, INST_STYLES } from "../tokens";
 import { INSTRUMENTS, INSTRUMENT_GROUPS } from "../../../config/instrumentRegistry";
 
@@ -13,7 +13,7 @@ export default function FootprintSection({
   onLoadCustomData,
   customDataLoading,
   customDatasets = [],
-  onCustomDatasetToggle,
+  onCustomDatasetToggle: _onCustomDatasetToggle,
 }: FootprintSectionProps) {
   return (
     <div className={lp.section}>
