@@ -14,11 +14,28 @@ const DailyDiscussionsPage = lazy(() => import("./pages/DailyDiscussionsPage"));
 const MarsNewsPage = lazy(() => import("./pages/MarsNewsPage"));
 const MarsResearchPage = lazy(() => import("./pages/MarsResearchPage"));
 
+const PageLoading = () => (
+  <div className="h-screen w-screen flex items-center justify-center bg-[#0a0f18] text-[#6b7c9c]">
+    Loading…
+  </div>
+);
+
+/** Wrap lazy-loaded pages with their own error boundary + suspense */
+function LazyPage({ children, scope }: { children: React.ReactNode; scope: string }) {
+  return (
+    <ErrorBoundary scope={scope}>
+      <Suspense fallback={<PageLoading />}>
+        {children}
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 export default function App() {
   const { isOnline, isUpdateAvailable, cacheStats, updateApp } = useServiceWorker();
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary scope="App">
       <OfflineIndicator
         isOnline={isOnline}
         isUpdateAvailable={isUpdateAvailable}
@@ -42,15 +59,15 @@ export default function App() {
           },
         }}
       />
-      <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center bg-[#0a0f18] text-[#6b7c9c]">Loading…</div>}>
+      <Suspense fallback={<PageLoading />}>
         <Routes>
-          <Route path="/" element={<MainPage />} />
-          <Route path="/download" element={<DataDownloadPage />} />
-          <Route path="/upload" element={<DataUploadPage />} />
-          <Route path="/suggestions" element={<FeatureSuggestionsPage />} />
-          <Route path="/discussions" element={<DailyDiscussionsPage />} />
-          <Route path="/news" element={<MarsNewsPage />} />
-          <Route path="/research" element={<MarsResearchPage />} />
+          <Route path="/" element={<ErrorBoundary scope="MainPage"><MainPage /></ErrorBoundary>} />
+          <Route path="/download" element={<LazyPage scope="DataDownload"><DataDownloadPage /></LazyPage>} />
+          <Route path="/upload" element={<LazyPage scope="DataUpload"><DataUploadPage /></LazyPage>} />
+          <Route path="/suggestions" element={<LazyPage scope="Suggestions"><FeatureSuggestionsPage /></LazyPage>} />
+          <Route path="/discussions" element={<LazyPage scope="Discussions"><DailyDiscussionsPage /></LazyPage>} />
+          <Route path="/news" element={<LazyPage scope="News"><MarsNewsPage /></LazyPage>} />
+          <Route path="/research" element={<LazyPage scope="Research"><MarsResearchPage /></LazyPage>} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

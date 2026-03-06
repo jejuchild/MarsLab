@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense, memo } from "react";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import MapViewRaw from "../components/MapView";
@@ -43,6 +44,7 @@ import { CuriositySelfieModal, OlympusMonsPanel, OlympusMonsClimber, TerraformOv
 import type { DetectedFeature } from "../components/CraterDetectPanel";
 import type { SwimMethod, DepthRange } from "../api/swim_ice";
 import { SWIM_METHODS } from "../api/swim_ice";
+import type { RouteResult, RouteGeoPoint } from "../api/pathfinder";
 
 // Memoize heavy child components to prevent unnecessary re-renders
 const MapView = memo(MapViewRaw);
@@ -66,6 +68,7 @@ const StratigraphyPanel = lazy(() => import("../components/StratigraphyPanel"));
 const AttenuationPanel = lazy(() => import("../components/AttenuationPanel"));
 const MineralSequencePanel = lazy(() => import("../components/MineralSequencePanel"));
 const StratColumnPanel = lazy(() => import("../components/StratColumnPanel"));
+const PathfinderPanel = lazy(() => import("../components/PathfinderPanel"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -229,11 +232,16 @@ export default function MainPage() {
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
   // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | null;
+  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | "pathfinder" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
 
   // Guided Workflow: user-selected location
   const [guidedLocation, setGuidedLocation] = useState<{ lat: number; lon: number } | null>(null);
+
+  // Pathfinder: start/goal points and route result
+  const [pathfinderStart, setPathfinderStart] = useState<{ lat: number; lon: number } | null>(null);
+  const [pathfinderGoal, setPathfinderGoal] = useState<{ lat: number; lon: number } | null>(null);
+  const [pathfinderRoute, setPathfinderRoute] = useState<RouteResult | null>(null);
 
   // HiRISE DTM 3D analysis point (requires product_id + lat/lon)
   const [hiRiseDTM3DPoint, setHiRiseDTM3DPoint] = useState<HiRiseDTMPoint | null>(null);
@@ -1213,11 +1221,25 @@ export default function MainPage() {
       // Crater detection: set scan center point
       setCraterDetectCenter({ lat, lon });
     }
+    if (analysisMode === "pathfinder") {
+      // Pathfinder mode: first click = start, second click = goal
+      if (!pathfinderStart) {
+        setPathfinderStart({ lat, lon });
+      } else if (!pathfinderGoal) {
+        setPathfinderGoal({ lat, lon });
+      } else {
+        // Reset and start new route
+        setPathfinderRoute(null);
+        setPathfinderStart({ lat, lon });
+        setPathfinderGoal(null);
+      }
+      return;
+    }
     // Accessibility explain mode: show tooltip on any terrain click
     if (accessibilityVisible && accessibilityExplainMode) {
       setAccessibilityExplainPoint({ lat, lon });
     }
-  }, [analysisMode, accessibilityVisible, accessibilityExplainMode]);
+  }, [analysisMode, accessibilityVisible, accessibilityExplainMode, pathfinderStart, pathfinderGoal]);
 
   // When a product is selected, clear terrain point
   const handleSelect = useCallback((ctx: InspectorContext | null) => {
@@ -1313,6 +1335,11 @@ export default function MainPage() {
     }
     if (mode !== "strat_column") {
       setStratColumnTarget(null);
+    }
+    if (mode !== "pathfinder") {
+      setPathfinderStart(null);
+      setPathfinderGoal(null);
+      setPathfinderRoute(null);
     }
   }, []);
 
@@ -1837,6 +1864,15 @@ export default function MainPage() {
           onOpenStratColumn={handleOpenStratColumn}
         />
       </Suspense>
+    ) : analysisMode === "pathfinder" ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading pathfinder...</div>}>
+        <PathfinderPanel
+          startPoint={pathfinderStart}
+          goalPoint={pathfinderGoal}
+          onRouteReady={(route) => setPathfinderRoute(route)}
+          onClear={() => { setPathfinderStart(null); setPathfinderGoal(null); setPathfinderRoute(null); }}
+        />
+      </Suspense>
     ) : (
       <div className="h-full flex items-center justify-center bg-[#101622]">
         <EmptyState
@@ -2014,6 +2050,9 @@ export default function MainPage() {
         accessibilityOpacity={accessibilityOpacity}
         fusionVisible={fusionVisible}
         fusionOpacity={fusionOpacity}
+        pathfinderStart={pathfinderStart}
+        pathfinderGoal={pathfinderGoal}
+        pathfinderRoute={pathfinderRoute}
       />
 
       {/* Accessibility Explain Tooltip — floating on map */}
@@ -2089,16 +2128,18 @@ export default function MainPage() {
 
       {/* Line Profile Popup */}
       {lineProfileData && (
-        <Suspense fallback={null}>
-          <LineProfile
-            startPoint={lineProfileData.start}
-            endPoint={lineProfileData.end}
-            onClose={() => {
-              setLineProfileData(null);
-              setLinePoints([]);
-            }}
-          />
-        </Suspense>
+        <ErrorBoundary scope="LineProfile">
+          <Suspense fallback={null}>
+            <LineProfile
+              startPoint={lineProfileData.start}
+              endPoint={lineProfileData.end}
+              onClose={() => {
+                setLineProfileData(null);
+                setLinePoints([]);
+              }}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* SHARAD Quickview Popup */}
@@ -2155,14 +2196,16 @@ export default function MainPage() {
 
       {/* Temporal Comparison Modal */}
       {showTemporalComparison && (
-        <Suspense fallback={null}>
-          <TemporalComparison
-            lat={showTemporalComparison.lat}
-            lon={showTemporalComparison.lon}
-            initialInstrument={showTemporalComparison.instrument}
-            onClose={() => setShowTemporalComparison(null)}
-          />
-        </Suspense>
+        <ErrorBoundary scope="TemporalComparison">
+          <Suspense fallback={null}>
+            <TemporalComparison
+              lat={showTemporalComparison.lat}
+              lon={showTemporalComparison.lon}
+              initialInstrument={showTemporalComparison.instrument}
+              onClose={() => setShowTemporalComparison(null)}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* Field Note Modal */}
@@ -2186,27 +2229,31 @@ export default function MainPage() {
 
       {/* Region Dashboard full-viewport overlay */}
       {showRegionDashboard && (
-        <Suspense fallback={null}>
-          <RegionDashboard
-            isOpen={showRegionDashboard}
-            onClose={() => setShowRegionDashboard(false)}
-            onFlyTo={(lat, lon) => {
-              setShowRegionDashboard(false);
-              setFlyToCoords({ lat, lon });
-            }}
-            onRunReport={() => {
-              setShowRegionDashboard(false);
-              setAnalysisMode("report");
-            }}
-          />
-        </Suspense>
+        <ErrorBoundary scope="RegionDashboard">
+          <Suspense fallback={null}>
+            <RegionDashboard
+              isOpen={showRegionDashboard}
+              onClose={() => setShowRegionDashboard(false)}
+              onFlyTo={(lat, lon) => {
+                setShowRegionDashboard(false);
+                setFlyToCoords({ lat, lon });
+              }}
+              onRunReport={() => {
+                setShowRegionDashboard(false);
+                setAnalysisMode("report");
+              }}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* Easter egg: Space Shooter Game */}
       {showGame && (
-        <Suspense fallback={null}>
-          <SpaceGame onClose={() => setShowGame(false)} />
-        </Suspense>
+        <ErrorBoundary scope="SpaceGame">
+          <Suspense fallback={null}>
+            <SpaceGame onClose={() => setShowGame(false)} />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* Easter egg: Curiosity Selfie */}

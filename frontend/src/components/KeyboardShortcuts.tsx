@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 interface ShortcutEntry {
   keys: string[];
   description: string;
-  category: "navigation" | "instruments" | "general";
+  category: "navigation" | "instruments" | "general" | "map";
 }
 
 const SHORTCUTS: ShortcutEntry[] = [
@@ -16,10 +16,26 @@ const SHORTCUTS: ShortcutEntry[] = [
   { keys: ["Esc"], description: "Close current panel or modal", category: "general" },
   { keys: ["Ctrl", "K"], description: "Open command palette", category: "general" },
   { keys: ["G"], description: "Toggle coordinate grid", category: "general" },
+  { keys: ["L"], description: "Toggle layer panel", category: "general" },
+  { keys: ["M"], description: "Toggle measurement mode", category: "general" },
 
   // Navigation
   { keys: ["N"], description: "Select next product", category: "navigation" },
   { keys: ["P"], description: "Select previous product", category: "navigation" },
+  { keys: ["+", "="], description: "Zoom in", category: "navigation" },
+  { keys: ["-"], description: "Zoom out", category: "navigation" },
+  { keys: ["Arrow Keys"], description: "Pan map", category: "navigation" },
+  { keys: ["F"], description: "Fly to current selection", category: "navigation" },
+  { keys: ["B"], description: "Add bookmark at current position", category: "navigation" },
+
+  // Map Controls
+  { keys: ["+", "="], description: "Zoom in", category: "map" },
+  { keys: ["-"], description: "Zoom out", category: "map" },
+  { keys: ["↑", "↓", "←", "→"], description: "Pan map", category: "map" },
+  { keys: ["L"], description: "Toggle layer panel", category: "map" },
+  { keys: ["M"], description: "Toggle measurement mode", category: "map" },
+  { keys: ["F"], description: "Fly to current selection", category: "map" },
+  { keys: ["B"], description: "Add bookmark at current position", category: "map" },
 
   // Instruments (1-7)
   { keys: ["1"], description: "Toggle CRISM footprints", category: "instruments" },
@@ -35,9 +51,10 @@ const CATEGORY_LABELS: Record<string, { label: string; icon: string }> = {
   general: { label: "General", icon: "settings" },
   navigation: { label: "Navigation", icon: "explore" },
   instruments: { label: "Instruments", icon: "satellite_alt" },
+  map: { label: "Map Controls", icon: "map" },
 };
 
-const CATEGORY_ORDER = ["general", "navigation", "instruments"];
+const CATEGORY_ORDER = ["general", "navigation", "map", "instruments"];
 
 /* =========================================================
  * Props

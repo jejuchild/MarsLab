@@ -15,6 +15,7 @@ import json
 import gzip
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
+import threading
 
 import aiohttp
 import numpy as np
@@ -69,6 +70,10 @@ async def lifespan(app: FastAPI):
 
     # Phase 2c: preload GeoJSON indices in parallel using threads
     _preload_indices_parallel()
+
+    # Phase 3: preload SWIM + Accessibility pipelines in background thread
+    # (prevents cold-start latency on first user request)
+    _preload_analysis_pipelines()
 
     # Auto-repair: run as background task (non-blocking startup)
     import asyncio
@@ -159,6 +164,74 @@ def _preload_indices_parallel():
             future.result()  # propagate exceptions
     logger.info(f"[CACHE] All indices preloaded in parallel ({len(_geojson_cache)} total)")
 
+
+def _preload_analysis_pipelines():
+    """Warm up SWIM and Accessibility pipelines in background threads at startup.
+    
+    Prevents cold-start latency on first user request by pre-loading pipeline models.
+    Both tasks run in parallel as daemon threads (non-blocking).
+    """
+    
+    def _warm_swim_pipelines():
+        """Load all SWIM pipeline models in parallel."""
+        try:
+            from api.swim_ice_router import (
+                _get_neutron,
+                _get_thermal,
+                _get_surface,
+                _get_dielectric,
+                _get_geomorphic,
+                _get_fusion,
+            )
+            
+            logger.info("[PRELOAD] Starting SWIM pipeline warmup...")
+            
+            # Load each pipeline and call _ensure_loaded() if available
+            pipelines = [
+                ("neutron", _get_neutron),
+                ("thermal", _get_thermal),
+                ("surface", _get_surface),
+                ("dielectric", _get_dielectric),
+                ("geomorphic", _get_geomorphic),
+                ("fusion", _get_fusion),
+            ]
+            
+            for name, getter in pipelines:
+                try:
+                    pipeline = getter()
+                    ensure_loaded = getattr(pipeline, "_ensure_loaded", None)
+                    if callable(ensure_loaded):
+                        ensure_loaded()
+                    logger.info(f"[PRELOAD] SWIM {name} pipeline loaded")
+                except Exception as e:
+                    logger.warning(f"[PRELOAD] SWIM {name} pipeline warmup failed (non-fatal): {e}")
+            
+            logger.info("[PRELOAD] SWIM pipeline warmup complete")
+        except Exception as e:
+            logger.warning(f"[PRELOAD] SWIM pipeline warmup failed (non-fatal): {e}")
+    
+    def _warm_accessibility_pipeline():
+        """Load Accessibility pipeline model."""
+        try:
+            from api.accessibility_router import _get_pipeline
+            
+            logger.info("[PRELOAD] Starting Accessibility pipeline warmup...")
+            pipeline = _get_pipeline()
+            ensure_loaded = getattr(pipeline, "_ensure_loaded", None)
+            if callable(ensure_loaded):
+                ensure_loaded()
+            logger.info("[PRELOAD] Accessibility pipeline loaded")
+        except Exception as e:
+            logger.warning(f"[PRELOAD] Accessibility pipeline warmup failed (non-fatal): {e}")
+    
+    # Start both warmup tasks in parallel as daemon threads
+    swim_thread = threading.Thread(target=_warm_swim_pipelines, daemon=True)
+    accessibility_thread = threading.Thread(target=_warm_accessibility_pipeline, daemon=True)
+    
+    swim_thread.start()
+    accessibility_thread.start()
+    
+    logger.info("[PRELOAD] Analysis pipeline warmup threads started (non-blocking)")
 
 def refresh_geojson_cache(instrument_key: str):
     """Refresh a single instrument's GeoJSON cache from disk after download.
@@ -568,6 +641,9 @@ app.include_router(mars_research_router)  # /api/mars-research — Mars Research
 from api.accessibility_router import router as accessibility_router
 app.include_router(accessibility_router)  # /api/accessibility/* — Ice Accessibility Algorithm
 
+from api.pathfinder_router import router as pathfinder_router
+app.include_router(pathfinder_router)  # /api/pathfinder/* — AI Rover Route Planning
+
 from rag.rag_router import router as rag_router
 app.include_router(rag_router)  # /api/rag/* — Mars Science RAG
 
@@ -575,6 +651,10 @@ from neural_climate.climate_router import router as neural_climate_router
 app.include_router(neural_climate_router)  # /api/climate/neural/* — Mars GCM Neural Emulator
 from pinns_interior.pinns_router import router as pinns_router
 app.include_router(pinns_router)
+
+from analysis.integration.integration_router import router as integration_router
+app.include_router(integration_router)  # /api/integration/* — Cross-system Integration Modules
+
 @app.get("/hirise/quickview/{product_id}.png")
 @limiter.limit("20/minute")
 def get_hirise_quickview_transparent(request: Request, product_id: str):

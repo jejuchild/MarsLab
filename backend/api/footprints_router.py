@@ -14,6 +14,7 @@ from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import JSONResponse
 from typing import Optional, Literal
 from functools import lru_cache
+from numbers import Integral
 import json
 import os
 
@@ -21,8 +22,15 @@ import os
 from .registry import get_registry
 
 # Try to import shapely for geometry operations
+shape = None
+mapping = None
+make_valid = None
+shapely_box = None
+STRtree = None
 try:
-    from shapely.geometry import shape, box, Point, mapping
+    from shapely.geometry import shape, Point, mapping
+    from shapely.geometry import box as shapely_box
+    from shapely import STRtree
     from shapely.ops import transform
     from shapely.validation import make_valid
     SHAPELY_AVAILABLE = True
@@ -46,8 +54,96 @@ SIMPLIFY_TOLERANCES = {
 }
 
 # Default limits
-DEFAULT_LIMIT = 2000
+DEFAULT_LIMIT = 500
 MAX_LIMIT = 5000
+
+_spatial_indices: dict[str, tuple] = {}
+
+
+def _collect_lon_lat_pairs(coords, out: list[tuple[float, float]]) -> None:
+    if not isinstance(coords, list):
+        return
+
+    if (
+        len(coords) >= 2
+        and isinstance(coords[0], (int, float))
+        and isinstance(coords[1], (int, float))
+    ):
+        out.append((normalize_lon(float(coords[0])), float(coords[1])))
+        return
+
+    for child in coords:
+        _collect_lon_lat_pairs(child, out)
+
+
+def _extract_geometry_bounds(geom: dict) -> Optional[tuple[float, float, float, float]]:
+    coords = geom.get("coordinates")
+    if not coords:
+        return None
+
+    lon_lat_pairs: list[tuple[float, float]] = []
+    _collect_lon_lat_pairs(coords, lon_lat_pairs)
+    if not lon_lat_pairs:
+        return None
+
+    lons = [p[0] for p in lon_lat_pairs]
+    lats = [p[1] for p in lon_lat_pairs]
+    return (min(lons), min(lats), max(lons), max(lats))
+
+
+def build_spatial_index(instrument: str) -> tuple:
+    if not SHAPELY_AVAILABLE or shapely_box is None or STRtree is None:
+        return (None, [], [])
+    box_fn = shapely_box
+    tree_cls = STRtree
+    assert tree_cls is not None
+
+    cache_key = instrument.lower()
+    cached = _spatial_indices.get(cache_key)
+    if cached is not None:
+        return cached
+
+    geojson = load_geojson_index(instrument)
+    all_features = geojson.get("features", [])
+
+    boxes = []
+    features = []
+    for feature in all_features:
+        geom = feature.get("geometry")
+        if not geom:
+            continue
+        bounds = _extract_geometry_bounds(geom)
+        if not bounds:
+            continue
+        min_lon, min_lat, max_lon, max_lat = bounds
+        boxes.append(box_fn(min_lon, min_lat, max_lon, max_lat))
+        features.append(feature)
+
+    tree = tree_cls(boxes) if boxes else None
+    result = (tree, boxes, features)
+    _spatial_indices[cache_key] = result
+    return result
+
+
+def get_or_build_spatial_index(instrument: str) -> tuple:
+    cache_key = instrument.lower()
+    cached = _spatial_indices.get(cache_key)
+    if cached is not None:
+        return cached
+    return build_spatial_index(instrument)
+
+
+def _query_tree_indices(tree, boxes: list, query_geom) -> set[int]:
+    matches = tree.query(query_geom)
+    if len(matches) == 0:
+        return set()
+
+    first = matches[0]
+    if isinstance(first, Integral):
+        return {int(i) for i in matches}
+
+    geom_to_idx = {id(geom): idx for idx, geom in enumerate(boxes)}
+    return {geom_to_idx[id(geom)] for geom in matches if id(geom) in geom_to_idx}
 
 
 @lru_cache(maxsize=8)
@@ -226,25 +322,28 @@ def normalize_geometry_coords(geom: dict) -> dict:
 
 def simplify_geometry(geom: dict, tolerance: float) -> dict:
     """Simplify geometry using Douglas-Peucker algorithm."""
-    if not SHAPELY_AVAILABLE:
+    if not SHAPELY_AVAILABLE or shape is None or make_valid is None or mapping is None:
         return geom
+    shape_fn = shape
+    make_valid_fn = make_valid
+    mapping_fn = mapping
 
     try:
-        shapely_geom = shape(geom)
+        shapely_geom = shape_fn(geom)
 
         # Make valid if needed
         if not shapely_geom.is_valid:
-            shapely_geom = make_valid(shapely_geom)
+            shapely_geom = make_valid_fn(shapely_geom)
 
         # Simplify with topology preservation
         simplified = shapely_geom.simplify(tolerance, preserve_topology=True)
 
         # Ensure result is valid
         if not simplified.is_valid:
-            simplified = make_valid(simplified)
+            simplified = make_valid_fn(simplified)
 
         # Convert back to GeoJSON
-        result = mapping(simplified)
+        result = mapping_fn(simplified)
 
         # Normalize coordinates
         if result.get("type") == "Polygon":
@@ -276,6 +375,7 @@ async def get_footprints(
     lod: LODType = Query("poly", description="Level of detail: none, point, or poly"),
     simplify: Optional[SimplifyLevel] = Query(None, description="Simplification level: low, mid, high"),
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT, description="Maximum features to return"),
+    offset: int = Query(0, ge=0, description="Offset for paginated fetching"),
     camera_height_km: Optional[float] = Query(None, description="Camera height in km for server-side LOD enforcement"),
 ):
     """
@@ -337,6 +437,8 @@ async def get_footprints(
                 "truncated": False,
                 "returned": 0,
                 "total_estimate": 0,
+                "offset": offset,
+                "has_more": False,
                 "lod": lod,
                 "original_lod": original_lod,
                 "lod_enforced": lod_enforced,
@@ -351,24 +453,46 @@ async def get_footprints(
     geojson = load_geojson_index(instrument)
     all_features = geojson.get("features", [])
 
-    # Filter features by bbox
     is_crism = instrument.upper() in ("CRISM", "CRISM_TRR3")
-    matching_features = []
-    for feature in all_features:
-        if feature_intersects_bbox(feature, min_lon, min_lat, max_lon, max_lat, crosses_antimeridian):
-            # For CRISM layers, only show FRT (Full Resolution Targeted) products
-            if is_crism:
-                pid = feature.get("properties", {}).get("product_id", "")
-                if pid and not pid.lower().startswith("frt"):
-                    continue
-            matching_features.append(feature)
+    if SHAPELY_AVAILABLE and shapely_box is not None and STRtree is not None:
+        box_fn = shapely_box
+        tree, boxes, indexed_features = get_or_build_spatial_index(instrument)
+        matching_indices: set[int] = set()
+
+        if tree is not None:
+            if crosses_antimeridian:
+                query_boxes = [
+                    box_fn(min_lon, min_lat, 180, max_lat),
+                    box_fn(-180, min_lat, max_lon, max_lat),
+                ]
+                for qbox in query_boxes:
+                    matching_indices.update(_query_tree_indices(tree, boxes, qbox))
+            else:
+                query_box = box_fn(min_lon, min_lat, max_lon, max_lat)
+                matching_indices.update(_query_tree_indices(tree, boxes, query_box))
+
+        matching_features = [indexed_features[i] for i in sorted(matching_indices)]
+    else:
+        matching_features = [
+            feature
+            for feature in all_features
+            if feature_intersects_bbox(feature, min_lon, min_lat, max_lon, max_lat, crosses_antimeridian)
+        ]
+
+    # For CRISM layers, only show FRT (Full Resolution Targeted) products
+    if is_crism:
+        matching_features = [
+            feature
+            for feature in matching_features
+            if feature.get("properties", {}).get("product_id", "").lower().startswith("frt")
+        ]
 
     total_matching = len(matching_features)
-    truncated = total_matching > limit
+    page_end = offset + limit
+    has_more = page_end < total_matching
+    truncated = has_more
 
-    # Limit results
-    if truncated:
-        matching_features = matching_features[:limit]
+    matching_features = matching_features[offset:page_end]
 
     # Process features based on LOD
     result_features = []
@@ -409,6 +533,8 @@ async def get_footprints(
                 "truncated": truncated,
                 "returned": len(result_features),
                 "total_estimate": total_matching,
+                "offset": offset,
+                "has_more": has_more,
                 "lod": lod,
                 "original_lod": original_lod,
                 "lod_enforced": lod_enforced,
@@ -417,7 +543,7 @@ async def get_footprints(
                 "instrument": instrument.upper(),
             }
         },
-        headers={"Cache-Control": "public, max-age=300"},
+        headers={"Cache-Control": "public, max-age=120" if offset > 0 else "public, max-age=300"},
     )
 
 

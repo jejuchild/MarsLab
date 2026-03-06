@@ -55,16 +55,18 @@ def get_elevation_m(lat: float, lon: float) -> float:
     if ds is None:
         return 0.0
     try:
-        # MOLA uses 0-360 lon
-        lon360 = lon % 360
-        row, col = ds.index(lon360, lat)
+        # MOLA DEM uses -180/180 lon convention
+        if lon > 180:
+            lon -= 360
+        elif lon < -180:
+            lon += 360
+        row, col = ds.index(lon, lat)
         elev = ds.read(1, window=((row, row + 1), (col, col + 1)))[0, 0]
         if np.isnan(elev) or elev < -20_000 or elev > 30_000:
             return 0.0
         return float(elev)
     except Exception:
         return 0.0
-
 
 # ---------------------------------------------------------------------------
 # Parametric climate functions
