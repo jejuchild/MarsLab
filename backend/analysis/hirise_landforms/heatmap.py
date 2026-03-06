@@ -11,10 +11,12 @@ ROOT = Path(__file__).resolve().parents[3]
 HEATMAP_DIR = ROOT / "backend" / "data" / "hirise_landforms" / "cache" / "heatmaps"
 
 CLASS_COLORS: dict[str, tuple[int, int, int]] = {
-    "LDA": (59, 130, 246),
-    "LVF": (16, 185, 129),
-    "CCF": (245, 158, 11),
-    "OTHER": (100, 116, 139),
+    "LDA": (59, 130, 246),    # blue
+    "LVF": (16, 185, 129),    # green
+    "CCF": (245, 158, 11),    # amber
+    "OTHER": (100, 116, 139), # slate
+    "SCT": (168, 85, 247),    # purple — scalloped terrain
+    "Uncertain": (55, 55, 75),
 }
 
 

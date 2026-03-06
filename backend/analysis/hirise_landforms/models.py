@@ -7,21 +7,33 @@ from pydantic import BaseModel, Field
 ModelName = Literal["v3", "v2"]
 JobState = Literal["queued", "processing", "completed", "failed"]
 
-V3_CLASSES = ["LDA", "LVF", "CCF", "OTHER"]
+V3_CLASSES = ["LDA", "LVF", "CCF", "OTHER", "SCT"]
+UNCERTAIN_CLASS = "Uncertain"
 
+# Per-class confidence thresholds (optimized on 11 images, 1563 tiles vs Levy polygons)
+# Below threshold → 'Uncertain'. Prevents LVF wipeout from single global threshold.
+CLASS_THRESHOLDS: dict[str, float] = {
+    "LDA": 0.65,   # global optimal 0.63, per-image mean 0.61±0.10
+    "LVF": 0.50,   # global optimal 0.53, per-image mean 0.47±0.20
+    "CCF": 0.45,   # model barely classifies CCF (F1=3.5%), low bar
+    "OTHER": 0.55, # catch-all class, moderate threshold
+    "SCT": 0.55,   # scalloped terrain — calibrate after V5 training
+}
 
 class ClassifyRequest(BaseModel):
     product_id: str
     model: ModelName = "v3"
     include_heatmap: bool = True
     use_crf: bool = True  # CRF spatial smoothing on tile grid (+0.6% F1)
+    confidence_threshold: float | None = None  # None = use per-class CLASS_THRESHOLDS
     lat: float | None = None
     lon: float | None = None
 
 class TilePrediction(BaseModel):
     x: int
     y: int
-    predicted_class: str
+    predicted_class: str  # V3_CLASSES or 'Uncertain'
+    raw_class: str = ""  # Original prediction before threshold
     confidence: float = Field(..., ge=0.0, le=1.0)
     probabilities: dict[str, float] = Field(default_factory=dict)
     lat: float

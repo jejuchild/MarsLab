@@ -22,16 +22,18 @@ from .models import (
     ClassifyResult,
     TilePrediction,
 )
-from .preprocessing import extract_mola_features, fetch_hirise_browse, tile_image
+from .preprocessing import extract_mola_features, extract_mola_features_batch, fetch_hirise_browse, tile_image
+from .models import CLASS_THRESHOLDS, UNCERTAIN_CLASS
 
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[3]
 V3_TILE_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "best_tile_classifier.pt"
 V4B_FILM_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "marslandform_v4b_deploy.pt"
+V5_FILM_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "marslandform_v5_deploy.pt"
 SSL_LORA_WEIGHTS = ROOT / "Data" / "HiRISE" / "v2_output" / "ssl_lora_weights" / "best_model.pt"
 
-V3_CLASSES = ["LDA", "LVF", "CCF", "OTHER"]
+V3_CLASSES = ["LDA", "LVF", "CCF", "OTHER", "SCT"]
 CONFIDENCE_THRESHOLD = 0.7
 
 _tile_transform = transforms.Compose([
@@ -92,10 +94,11 @@ class HiriseLandformPipeline:
         dinov2_cfg = DINOv2Config()
         backbone = DinoV2LoRA(dinov2_cfg, use_lora=True)
 
-        # Priority: load fine-tuned backbone from V4b checkpoint (includes LoRA weights)
+        # Priority: load fine-tuned backbone from best checkpoint (V5 > V4b)
         v4b_backbone_loaded = False
-        if V4B_FILM_CHECKPOINT.exists():
-            v4b_ckpt = torch.load(V4B_FILM_CHECKPOINT, map_location="cpu", weights_only=False)
+        ckpt_path = V5_FILM_CHECKPOINT if V5_FILM_CHECKPOINT.exists() else V4B_FILM_CHECKPOINT
+        if ckpt_path.exists():
+            v4b_ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
             backbone_state = {
                 k: v for k, v in v4b_ckpt.get("model_state_dict", {}).items()
                 if k.startswith("backbone.")
@@ -140,7 +143,11 @@ class HiriseLandformPipeline:
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
 
-        # Priority 1: V4b FiLM model (best F1)
+        # Priority 1: V5 FiLM model (5-class, SCT expansion)
+        if V5_FILM_CHECKPOINT.exists():
+            return self._load_film_classifier(V5_FILM_CHECKPOINT, device)
+
+        # Priority 2: V4b FiLM model (4-class, best pre-expansion F1)
         if V4B_FILM_CHECKPOINT.exists():
             return self._load_film_classifier(V4B_FILM_CHECKPOINT, device)
 
@@ -258,7 +265,9 @@ class HiriseLandformPipeline:
                 coords, probabilities, smoothing_weight=1.5, n_iterations=10,
             )
 
-        tile_predictions = self._build_tile_predictions(coords, tile_lat_lon, probabilities, predictions)
+        tile_predictions = self._build_tile_predictions(
+            coords, tile_lat_lon, probabilities, predictions, request.confidence_threshold,
+        )
         class_summary = self._build_class_summary(tile_predictions)
         dominant_class, dominant_confidence = self._dominant_from_summary(class_summary)
 
@@ -346,33 +355,45 @@ class HiriseLandformPipeline:
         center_lat: float | None,
         center_lon: float | None,
     ) -> np.ndarray:
-        if center_lat is not None and center_lon is not None:
+        n_tiles = len(tile_lat_lon)
+        if n_tiles == 0:
+            return np.zeros((0, 25), dtype=np.float32)
+
+        # Collect tiles with valid coordinates for batch extraction
+        valid_coords: list[tuple[float, float]] = []
+        valid_indices: list[int] = []
+        for i, (lat, lon) in enumerate(tile_lat_lon):
+            if lat is not None and lon is not None:
+                valid_coords.append((lat, lon))
+                valid_indices.append(i)
+
+        # Batch-extract MOLA: single DEM I/O for all tiles
+        if valid_coords:
+            batch_features = extract_mola_features_batch(valid_coords)  # (N_valid, 23)
+        else:
+            batch_features = np.zeros((0, 23), dtype=np.float32)
+
+        # Fallback for tiles without coords
+        if center_lat is not None and center_lon is not None and len(valid_coords) < n_tiles:
             center_base = extract_mola_features(center_lat, center_lon)
         else:
             center_base = np.zeros((23,), dtype=np.float32)
 
-        base_features: list[np.ndarray] = []
-        for lat, lon in tile_lat_lon:
-            if lat is None or lon is None:
-                base = center_base.copy()
-            else:
-                base = extract_mola_features(lat, lon)
-            if base.shape[0] != 23:
-                fixed = np.zeros((23,), dtype=np.float32)
-                fixed[: min(23, base.shape[0])] = base[:23]
-                base = fixed
-            base_features.append(base.astype(np.float32, copy=False))
+        # Assemble full array
+        base_arr = np.zeros((n_tiles, 23), dtype=np.float32)
+        for j, orig_i in enumerate(valid_indices):
+            base_arr[orig_i] = batch_features[j]
+        # Fill missing tiles with center MOLA
+        for i in range(n_tiles):
+            if i not in valid_indices:
+                base_arr[i] = center_base[:23]
 
-        if not base_features:
-            return np.zeros((0, 25), dtype=np.float32)
-
-        base_arr = np.stack(base_features, axis=0)
+        # Relative features: per-tile deviation from image mean
         mean_elev = float(np.mean(base_arr[:, 21]))
         mean_slope = float(np.mean(base_arr[:, 0]))
-
         rel_elev = (base_arr[:, 21] - mean_elev).reshape(-1, 1)
         rel_slope = (base_arr[:, 0] - mean_slope).reshape(-1, 1)
-        return np.concatenate([base_arr, rel_elev, rel_slope], axis=1).astype(np.float32, copy=False)
+        return np.concatenate([base_arr, rel_elev, rel_slope], axis=1).astype(np.float32)
 
     @torch.no_grad()
     def _run_tile_classifier(
@@ -594,6 +615,7 @@ class HiriseLandformPipeline:
         tile_lat_lon: list[tuple[float | None, float | None]],
         probabilities: np.ndarray,
         predictions: np.ndarray,
+        confidence_threshold: float | None = None,
     ) -> list[TilePrediction]:
         out: list[TilePrediction] = []
         for idx, (gx, gy) in enumerate(coords):
@@ -601,13 +623,18 @@ class HiriseLandformPipeline:
             pred_idx = max(0, min(pred_idx, len(V3_CLASSES) - 1))
             probs = probabilities[idx] if idx < len(probabilities) else np.zeros((len(V3_CLASSES),), dtype=np.float32)
             confidence = float(probs[pred_idx]) if pred_idx < len(probs) else 0.0
+            confidence = max(0.0, min(1.0, confidence))
+            raw_class = V3_CLASSES[pred_idx]
+            thresh = confidence_threshold if confidence_threshold is not None else CLASS_THRESHOLDS.get(raw_class, 0.6)
+            display_class = raw_class if confidence >= thresh else UNCERTAIN_CLASS
             lat, lon = tile_lat_lon[idx]
             out.append(
                 TilePrediction(
                     x=gx,
                     y=gy,
-                    predicted_class=V3_CLASSES[pred_idx],
-                    confidence=max(0.0, min(1.0, confidence)),
+                    predicted_class=display_class,
+                    raw_class=raw_class,
+                    confidence=confidence,
                     probabilities={name: float(probs[i]) for i, name in enumerate(V3_CLASSES) if i < len(probs)},
                     lat=float(lat if lat is not None else 0.0),
                     lon=float(lon if lon is not None else 0.0),
@@ -618,7 +645,8 @@ class HiriseLandformPipeline:
     def _build_class_summary(self, tile_predictions: list[TilePrediction]) -> list[ClassSummary]:
         total = max(len(tile_predictions), 1)
         summary: list[ClassSummary] = []
-        for class_name in V3_CLASSES:
+        all_classes = V3_CLASSES + [UNCERTAIN_CLASS]
+        for class_name in all_classes:
             class_tiles = [tp for tp in tile_predictions if tp.predicted_class == class_name]
             count = len(class_tiles)
             mean_conf = float(np.mean([tp.confidence for tp in class_tiles])) if class_tiles else 0.0
@@ -633,15 +661,20 @@ class HiriseLandformPipeline:
         return summary
 
     def _dominant_from_summary(self, class_summary: list[ClassSummary]) -> tuple[str, float]:
-        non_other = [s for s in class_summary if s.class_name != "OTHER"]
-        non_other = sorted(non_other, key=lambda s: s.tile_count, reverse=True)
-        if non_other and non_other[0].tile_count > 0:
-            return non_other[0].class_name, float(non_other[0].mean_confidence)
+        # Only consider real classes (not Uncertain) for dominant
+        real = [s for s in class_summary if s.class_name not in ('OTHER', UNCERTAIN_CLASS)]
+        real = sorted(real, key=lambda s: s.tile_count, reverse=True)
+        if real and real[0].tile_count > 0:
+            return real[0].class_name, float(real[0].mean_confidence)
 
-        other = next((s for s in class_summary if s.class_name == "OTHER"), None)
-        if other is None:
-            return "OTHER", 0.0
-        return "OTHER", float(other.mean_confidence)
+        other = next((s for s in class_summary if s.class_name == 'OTHER'), None)
+        if other and other.tile_count > 0:
+            return 'OTHER', float(other.mean_confidence)
+
+        uncertain = next((s for s in class_summary if s.class_name == UNCERTAIN_CLASS), None)
+        if uncertain and uncertain.tile_count > 0:
+            return UNCERTAIN_CLASS, float(uncertain.mean_confidence)
+        return 'OTHER', 0.0
 
     def _class_distribution_from_summary(self, class_summary: list[ClassSummary]) -> np.ndarray:
         percentages = {entry.class_name: float(entry.percentage) / 100.0 for entry in class_summary}
