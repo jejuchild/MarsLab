@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, type MouseEvent as ReactMouseEvent } from "react";
 import {
   ComposedChart,
   Line,
@@ -20,15 +20,35 @@ import {
   type TerrainZone,
   DEFAULT_COST_WEIGHTS,
 } from "../api/pathfinder";
+import type { RoverTelemetry, SpeedOption } from "../hooks/useRoverSimulation";
+import { SPEED_OPTIONS } from "../hooks/useRoverSimulation";
 
 /* =========================================================
  * Props
  * =======================================================*/
+export interface SimulationControls {
+  play: () => void;
+  pause: () => void;
+  togglePlayPause: () => void;
+  setSpeed: (speed: SpeedOption) => void;
+  seek: (progress: number) => void;
+  reset: () => void;
+  toggleCamera: () => void;
+}
+
 export interface PathfinderPanelProps {
   startPoint: { lat: number; lon: number } | null;
   goalPoint: { lat: number; lon: number } | null;
   onRouteReady?: (route: RouteResult) => void;
   onClear?: () => void;
+  /* Simulation */
+  simPlaying?: boolean;
+  simSpeed?: SpeedOption;
+  simProgress?: number;
+  simTelemetry?: RoverTelemetry | null;
+  simComplete?: boolean;
+  simCameraFollow?: boolean;
+  simControls?: SimulationControls;
 }
 
 /* =========================================================
@@ -86,6 +106,13 @@ export default function PathfinderPanel({
   goalPoint,
   onRouteReady,
   onClear,
+  simPlaying = false,
+  simSpeed = 1,
+  simProgress = 0,
+  simTelemetry = null,
+  simComplete = false,
+  simCameraFollow = true,
+  simControls,
 }: PathfinderPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [roverType, setRoverType] = useState("perseverance");
@@ -528,6 +555,19 @@ export default function PathfinderPanel({
               {result.vlm_analysis && (
                 <VLMAnalysisSection vlm={result.vlm_analysis} />
               )}
+
+              {/* ── Digital Twin Simulation ──────────────── */}
+              {simControls && (
+                <SimulationSection
+                  playing={simPlaying}
+                  speed={simSpeed}
+                  progress={simProgress}
+                  telemetry={simTelemetry ?? undefined}
+                  complete={simComplete}
+                  cameraFollow={simCameraFollow}
+                  controls={simControls}
+                />
+              )}
             </div>
           )}
         </div>
@@ -677,6 +717,195 @@ function TerrainZoneCard({ zone }: { zone: TerrainZone }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* =========================================================
+ * Digital Twin Simulation Section
+ * =======================================================*/
+
+const TERRAIN_ICON_MAP: Record<string, string> = {
+  bedrock: "landscape", sand: "grain", regolith: "terrain",
+  rocky: "filter_hdr", ice_rich: "ac_unit", mixed: "blur_on",
+  "N/A": "help_outline",
+};
+
+function SimulationSection({
+  playing,
+  speed,
+  progress,
+  telemetry,
+  complete,
+  cameraFollow,
+  controls,
+}: {
+  playing: boolean;
+  speed: number;
+  progress: number;
+  telemetry?: RoverTelemetry;
+  complete: boolean;
+  cameraFollow: boolean;
+  controls: SimulationControls;
+}) {
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+
+  const handleProgressBarClick = useCallback(
+    (e: ReactMouseEvent<HTMLDivElement>) => {
+      const bar = progressBarRef.current;
+      if (!bar) return;
+      const rect = bar.getBoundingClientRect();
+      const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      controls.seek(p);
+    },
+    [controls],
+  );
+
+  const pct = Math.round(progress * 100);
+  const distKm = telemetry ? (telemetry.distanceTraveled / 1000).toFixed(2) : "0.00";
+  const totalKm = telemetry ? (telemetry.totalDistance / 1000).toFixed(2) : "0.00";
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+          <span className="material-icons text-yellow-400 text-sm">smart_toy</span>
+          Digital Twin Simulation
+        </div>
+        {complete && (
+          <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-1.5 py-0.5 rounded">
+            Mission Complete
+          </span>
+        )}
+      </div>
+
+      {/* Play / Speed controls */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={controls.togglePlayPause}
+          className="flex items-center justify-center w-8 h-8 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black transition-colors"
+          title={playing ? "Pause" : "Play"}
+        >
+          <span className="material-icons text-base">
+            {complete ? "replay" : playing ? "pause" : "play_arrow"}
+          </span>
+        </button>
+
+        <div className="flex rounded-md overflow-hidden border border-slate-600">
+          {SPEED_OPTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => controls.setSpeed(s)}
+              className={`px-2 py-1 text-[10px] font-mono transition-colors ${
+                speed === s
+                  ? "bg-yellow-600/30 text-yellow-400 font-bold"
+                  : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+              }`}
+            >
+              {s}x
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={controls.reset}
+          className="ml-auto p-1.5 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+          title="Reset simulation"
+        >
+          <span className="material-icons text-sm">restart_alt</span>
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div className="space-y-1">
+        <div className="flex justify-between text-[10px] text-slate-400">
+          <span>Sol {telemetry?.currentSol ?? 1} / {telemetry?.totalSols ?? 1}</span>
+          <span className="font-mono">{distKm} / {totalKm} km</span>
+          <span className="font-mono">{pct}%</span>
+        </div>
+        <div
+          ref={progressBarRef}
+          onClick={handleProgressBarClick}
+          className="w-full h-2 bg-slate-700 rounded-full cursor-pointer relative group"
+        >
+          <div
+            className="h-full bg-gradient-to-r from-yellow-500 to-lime-400 rounded-full transition-[width] duration-100"
+            style={{ width: `${pct}%` }}
+          />
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow border-2 border-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ left: `calc(${pct}% - 6px)` }}
+          />
+        </div>
+      </div>
+
+      {/* Telemetry cards */}
+      {telemetry && (
+        <div className="grid grid-cols-3 gap-1.5">
+          <SimStatCard icon="straighten" label="Distance" value={`${distKm} km`} />
+          <SimStatCard
+            icon="trending_up"
+            label="Slope"
+            value={`${telemetry.currentSlope.toFixed(1)}°`}
+            color={
+              telemetry.currentSlope > 10 ? "text-red-400"
+              : telemetry.currentSlope > 5 ? "text-amber-400"
+              : "text-emerald-400"
+            }
+          />
+          <SimStatCard icon="height" label="Elevation" value={`${telemetry.currentElevation.toFixed(0)} m`} />
+          <SimStatCard icon="explore" label="Heading" value={`${telemetry.currentHeading.toFixed(0)}°`} />
+          <SimStatCard icon="speed" label="Speed" value={`${telemetry.speedMPerS.toFixed(3)} m/s`} />
+          <SimStatCard
+            icon={TERRAIN_ICON_MAP[telemetry.currentTerrainType] ?? "blur_on"}
+            label="Terrain"
+            value={telemetry.currentTerrainType}
+            color={
+              telemetry.currentTerrainType === "rocky" ? "text-orange-400"
+              : telemetry.currentTerrainType === "sand" ? "text-yellow-400"
+              : telemetry.currentTerrainType === "ice_rich" ? "text-cyan-400"
+              : "text-slate-300"
+            }
+          />
+        </div>
+      )}
+
+      {/* Camera mode toggle */}
+      <button
+        onClick={controls.toggleCamera}
+        className={`w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+          cameraFollow
+            ? "bg-yellow-600/20 text-yellow-400 border border-yellow-500/40"
+            : "bg-slate-800 text-slate-400 border border-slate-600 hover:bg-slate-700"
+        }`}
+      >
+        <span className="material-icons text-sm">{cameraFollow ? "videocam" : "videocam_off"}</span>
+        Camera: {cameraFollow ? "Follow Rover" : "Free"}
+      </button>
+    </div>
+  );
+}
+
+function SimStatCard({
+  icon,
+  label,
+  value,
+  color = "text-white",
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  color?: string;
+}) {
+  return (
+    <div className="bg-slate-900/60 rounded p-1.5 min-w-0">
+      <div className="flex items-center gap-1 mb-0.5">
+        <span className="material-icons text-slate-500 text-[10px]">{icon}</span>
+        <span className="text-slate-500 text-[8px] uppercase tracking-wide">{label}</span>
+      </div>
+      <div className={`text-[11px] font-mono font-semibold truncate ${color}`}>{value}</div>
     </div>
   );
 }

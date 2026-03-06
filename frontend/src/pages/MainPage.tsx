@@ -45,6 +45,7 @@ import type { DetectedFeature } from "../components/CraterDetectPanel";
 import type { SwimMethod, DepthRange } from "../api/swim_ice";
 import { SWIM_METHODS } from "../api/swim_ice";
 import type { RouteResult, RouteGeoPoint } from "../api/pathfinder";
+import type { RoverTelemetry, SpeedOption } from "../hooks/useRoverSimulation";
 
 // Memoize heavy child components to prevent unnecessary re-renders
 const MapView = memo(MapViewRaw);
@@ -242,6 +243,15 @@ export default function MainPage() {
   const [pathfinderStart, setPathfinderStart] = useState<{ lat: number; lon: number } | null>(null);
   const [pathfinderGoal, setPathfinderGoal] = useState<{ lat: number; lon: number } | null>(null);
   const [pathfinderRoute, setPathfinderRoute] = useState<RouteResult | null>(null);
+
+  // Rover simulation state
+  const [simPlaying, setSimPlaying] = useState(false);
+  const [simSpeed, setSimSpeed] = useState<SpeedOption>(1);
+  const [simCameraFollow, setSimCameraFollow] = useState(true);
+  const [simSeekTo, setSimSeekTo] = useState<number | null>(null);
+  const [simProgress, setSimProgress] = useState(0);
+  const [simTelemetry, setSimTelemetry] = useState<RoverTelemetry | null>(null);
+  const [simComplete, setSimComplete] = useState(false);
 
   // HiRISE DTM 3D analysis point (requires product_id + lat/lon)
   const [hiRiseDTM3DPoint, setHiRiseDTM3DPoint] = useState<HiRiseDTMPoint | null>(null);
@@ -1241,6 +1251,56 @@ export default function MainPage() {
     }
   }, [analysisMode, accessibilityVisible, accessibilityExplainMode, pathfinderStart, pathfinderGoal]);
 
+  // ── Simulation Callbacks ─────────────────────────────────
+  const handleSimProgress = useCallback((progress: number) => {
+    setSimProgress(progress);
+    setSimSeekTo(null);
+  }, []);
+
+  const handleSimTelemetry = useCallback((telemetry: RoverTelemetry) => {
+    setSimTelemetry(telemetry);
+  }, []);
+
+  const handleSimComplete = useCallback(() => {
+    setSimPlaying(false);
+    setSimComplete(true);
+  }, []);
+
+  // Reset simulation when a new route is planned
+  useEffect(() => {
+    setSimPlaying(false);
+    setSimProgress(0);
+    setSimTelemetry(null);
+    setSimComplete(false);
+    setSimSeekTo(null);
+  }, [pathfinderRoute]);
+
+  const simControls = useMemo(() => ({
+    play: () => { setSimComplete(false); setSimPlaying(true); },
+    pause: () => setSimPlaying(false),
+    togglePlayPause: () => {
+      if (simComplete) {
+        setSimSeekTo(0);
+        setSimComplete(false);
+        setSimPlaying(true);
+      } else {
+        setSimPlaying(p => !p);
+      }
+    },
+    setSpeed: (s: SpeedOption) => setSimSpeed(s),
+    seek: (p: number) => {
+      setSimSeekTo(p);
+      setSimPlaying(false);
+      if (p < 1) setSimComplete(false);
+    },
+    reset: () => {
+      setSimSeekTo(0);
+      setSimPlaying(false);
+      setSimComplete(false);
+    },
+    toggleCamera: () => setSimCameraFollow(c => !c),
+  }), [simComplete]);
+
   // When a product is selected, clear terrain point
   const handleSelect = useCallback((ctx: InspectorContext | null) => {
     setSelected(ctx);
@@ -1340,6 +1400,11 @@ export default function MainPage() {
       setPathfinderStart(null);
       setPathfinderGoal(null);
       setPathfinderRoute(null);
+      setSimPlaying(false);
+      setSimProgress(0);
+      setSimTelemetry(null);
+      setSimComplete(false);
+      setSimSeekTo(null);
     }
   }, []);
 
@@ -1871,6 +1936,13 @@ export default function MainPage() {
           goalPoint={pathfinderGoal}
           onRouteReady={(route) => setPathfinderRoute(route)}
           onClear={() => { setPathfinderStart(null); setPathfinderGoal(null); setPathfinderRoute(null); }}
+          simPlaying={simPlaying}
+          simSpeed={simSpeed}
+          simProgress={simProgress}
+          simTelemetry={simTelemetry}
+          simComplete={simComplete}
+          simCameraFollow={simCameraFollow}
+          simControls={simControls}
         />
       </Suspense>
     ) : (
@@ -2053,6 +2125,13 @@ export default function MainPage() {
         pathfinderStart={pathfinderStart}
         pathfinderGoal={pathfinderGoal}
         pathfinderRoute={pathfinderRoute}
+        simPlaying={simPlaying}
+        simSpeed={simSpeed}
+        simCameraFollow={simCameraFollow}
+        simSeekTo={simSeekTo}
+        onSimProgress={handleSimProgress}
+        onSimTelemetry={handleSimTelemetry}
+        onSimComplete={handleSimComplete}
       />
 
       {/* Accessibility Explain Tooltip — floating on map */}

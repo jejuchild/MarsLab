@@ -19,6 +19,7 @@ import useHoverHighlight from "../hooks/useHoverHighlight";
 import useGridOverlay from "../hooks/useGridOverlay";
 import useCustomDatasets from "../hooks/useCustomDatasets";
 import usePathfinderOverlay from "../hooks/usePathfinderOverlay";
+import useRoverSimulation from "../hooks/useRoverSimulation";
 import { useHighContrastMode } from "../hooks/useHighContrastMode";
 import useMapKeyboard from "../hooks/useMapKeyboard";
 import useBookmarks from "../hooks/useBookmarks";
@@ -214,6 +215,14 @@ type MapViewProps = {
   pathfinderStart?: { lat: number; lon: number } | null;
   pathfinderGoal?: { lat: number; lon: number } | null;
   pathfinderRoute?: import("../api/pathfinder").RouteResult | null;
+  // Rover simulation
+  simPlaying?: boolean;
+  simSpeed?: number;
+  simCameraFollow?: boolean;
+  simSeekTo?: number | null;
+  onSimProgress?: (progress: number) => void;
+  onSimTelemetry?: (telemetry: import("../hooks/useRoverSimulation").RoverTelemetry) => void;
+  onSimComplete?: () => void;
 };
 
 /* ==================================================
@@ -655,6 +664,13 @@ export default function MapView({
   pathfinderStart = null,
   pathfinderGoal = null,
   pathfinderRoute = null,
+  simPlaying = false,
+  simSpeed = 1,
+  simCameraFollow = false,
+  simSeekTo = null,
+  onSimProgress,
+  onSimTelemetry,
+  onSimComplete,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -908,6 +924,21 @@ export default function MapView({
     startPoint: pathfinderStart,
     goalPoint: pathfinderGoal,
     routeResult: pathfinderRoute,
+  });
+
+  useRoverSimulation({
+    viewerRef,
+    marsEllipsoid: MARS_ELLIPSOID,
+    routeResult: pathfinderRoute,
+    vlmAnalysis: pathfinderRoute?.vlm_analysis,
+    analysisMode,
+    isPlaying: simPlaying,
+    speed: (simSpeed as 1 | 2 | 5 | 10) || 1,
+    cameraFollow: simCameraFollow,
+    seekTo: simSeekTo,
+    onProgress: onSimProgress,
+    onTelemetry: onSimTelemetry,
+    onComplete: onSimComplete,
   });
 
   useHoverHighlight({
