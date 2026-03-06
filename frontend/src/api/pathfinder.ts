@@ -147,10 +147,25 @@ export async function* planRoute(
   req: PlanRequest,
   signal?: AbortSignal,
 ): AsyncGenerator<SSEEvent> {
+  // Transform frontend PlanRequest to backend schema
+  const backendBody = {
+    start_lat: req.start.lat,
+    start_lon: req.start.lon,
+    goal_lat: req.goal.lat,
+    goal_lon: req.goal.lon,
+    rover_type: req.rover_type,
+    waypoint_spacing_m: req.waypoint_spacing_m,
+    ...(req.cost_weights ? {
+      w_slope: req.cost_weights.slope,
+      w_roughness: req.cost_weights.roughness,
+      w_hazard: req.cost_weights.hazard,
+      w_elevation: req.cost_weights.elevation,
+    } : {}),
+  };
   const response = await fetch("/api/pathfinder/plan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
+    body: JSON.stringify(backendBody),
     signal,
   });
 
