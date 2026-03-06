@@ -1,0 +1,477 @@
+{
+  "analysis_time_s": 9.9,
+  "total_regions": 55,
+  "viable_candidates": 5,
+  "constraints": {
+    "hard": {
+      "max_elevation_m": -2000,
+      "lat_min": 25,
+      "lat_max": 50,
+      "max_slope_deg": 10
+    },
+    "soft": {
+      "preferred_elevation_m": -3000,
+      "ideal_lat_min": 30,
+      "ideal_lat_max": 45,
+      "max_dust_tau": 0.5,
+      "min_swim_consistency": 0.5,
+      "max_ice_depth_m": 10,
+      "max_wind_ms": 15,
+      "max_frost_prob": 0.5
+    }
+  },
+  "final_weights": {
+    "landing_scorer": 0.3,
+    "swim_ice": 0.25,
+    "accessibility": 0.15,
+    "climate_resilience": 0.2,
+    "science_bonus": 0.1
+  },
+  "results": [
+    {
+      "rank": 1,
+      "region_id": "arcadia_planitia",
+      "name": "Arcadia Planitia",
+      "center_lat": 49.019999999999996,
+      "center_lon": -171.855,
+      "elevation_m": -4043.0,
+      "final_score": 76.7,
+      "seasonal_avg": 87.5,
+      "worst_season": 78.2,
+      "best_season": 95.0,
+      "seasonal_grades": {
+        "0": "A",
+        "90": "A",
+        "180": "A",
+        "270": "B"
+      },
+      "swim_consistency": {
+        "0-1m": 0.6856,
+        "1-5m": 0.4286,
+        "5m+": 0.5
+      },
+      "swim_avg": 0.538,
+      "accessibility_score": 0.7307,
+      "accessibility_details": {
+        "excavation": 0.4642,
+        "landing": 0.9972,
+        "ice_landform": 0.0,
+        "water_mineral": 0.0,
+        "surface_ice": 0.0,
+        "confidence": "medium",
+        "layers": 4
+      },
+      "climate_resilience": 0.801,
+      "temp_range_k": [
+        148.1,
+        216.0
+      ],
+      "max_dust_tau": 0.384,
+      "max_wind_ms": 7.9,
+      "frost_months": 0,
+      "category_details": {
+        "terrain": {
+          "score": 1.0,
+          "weight": 0.2,
+          "weighted": 0.2,
+          "assessment": "Excellent terrain: -4043m elevation, 0.0\u00b0 slope"
+        },
+        "climate": {
+          "score": 0.775,
+          "weight": 0.25,
+          "weighted": 0.194,
+          "assessment": "T_mean=178.3K (-94.8\u00b0C), P=636Pa"
+        },
+        "dust": {
+          "score": 1.0,
+          "weight": 0.15,
+          "weighted": 0.15,
+          "assessment": "Clear skies (\u03c4=0.30) \u2014 excellent visibility"
+        },
+        "wind": {
+          "score": 0.781,
+          "weight": 0.15,
+          "weighted": 0.117,
+          "assessment": "Wind 7.2 m/s \u2014 moderate"
+        },
+        "frost": {
+          "score": 0.721,
+          "weight": 0.1,
+          "weighted": 0.072,
+          "assessment": "Occasional frost (14%) \u2014 manageable"
+        },
+        "science_value": {
+          "score": 0.9,
+          "weight": 0.15,
+          "weighted": 0.135,
+          "assessment": "Science value: high"
+        }
+      },
+      "warnings": [],
+      "data_sources": {
+        "terrain": "MOLA",
+        "climate": "neural_climate",
+        "seismic": "none",
+        "swim": "SWIM_v2_precomputed",
+        "accessibility": "algorithm (medium)",
+        "climate_annual": "neural_emulator"
+      }
+    },
+    {
+      "rank": 2,
+      "region_id": "utopia_planitia",
+      "name": "Utopia Planitia",
+      "center_lat": 43.045,
+      "center_lon": 118.375,
+      "elevation_m": -4828.0,
+      "final_score": 75.2,
+      "seasonal_avg": 89.5,
+      "worst_season": 80.5,
+      "best_season": 94.7,
+      "seasonal_grades": {
+        "0": "A",
+        "90": "A",
+        "180": "A",
+        "270": "A"
+      },
+      "swim_consistency": {
+        "0-1m": 0.3721,
+        "1-5m": 0.4286,
+        "5m+": 0.5
+      },
+      "swim_avg": 0.434,
+      "accessibility_score": 0.8517,
+      "accessibility_details": {
+        "excavation": 0.7143,
+        "landing": 0.989,
+        "ice_landform": 0.0,
+        "water_mineral": 0.0,
+        "surface_ice": 0.0,
+        "confidence": "medium",
+        "layers": 4
+      },
+      "climate_resilience": 0.811,
+      "temp_range_k": [
+        148.5,
+        218.9
+      ],
+      "max_dust_tau": 0.397,
+      "max_wind_ms": 6.8,
+      "frost_months": 0,
+      "category_details": {
+        "terrain": {
+          "score": 1.0,
+          "weight": 0.2,
+          "weighted": 0.2,
+          "assessment": "Excellent terrain: -4828m elevation, 0.6\u00b0 slope"
+        },
+        "climate": {
+          "score": 0.836,
+          "weight": 0.25,
+          "weighted": 0.209,
+          "assessment": "T_mean=182.7K (-90.4\u00b0C), P=636Pa"
+        },
+        "dust": {
+          "score": 1.0,
+          "weight": 0.15,
+          "weighted": 0.15,
+          "assessment": "Moderate dust (\u03c4=0.30) \u2014 acceptable"
+        },
+        "wind": {
+          "score": 0.934,
+          "weight": 0.15,
+          "weighted": 0.14,
+          "assessment": "Wind 5.7 m/s \u2014 moderate"
+        },
+        "frost": {
+          "score": 0.768,
+          "weight": 0.1,
+          "weighted": 0.077,
+          "assessment": "Occasional frost (12%) \u2014 manageable"
+        },
+        "science_value": {
+          "score": 0.9,
+          "weight": 0.15,
+          "weighted": 0.135,
+          "assessment": "Science value: high"
+        }
+      },
+      "warnings": [],
+      "data_sources": {
+        "terrain": "MOLA",
+        "climate": "neural_climate",
+        "seismic": "none",
+        "swim": "SWIM_v2_precomputed",
+        "accessibility": "algorithm (medium)",
+        "climate_annual": "neural_emulator"
+      }
+    },
+    {
+      "rank": 3,
+      "region_id": "acidalia_planitia",
+      "name": "Acidalia Planitia",
+      "center_lat": 41.715,
+      "center_lon": -19.35,
+      "elevation_m": -4594.0,
+      "final_score": 74.3,
+      "seasonal_avg": 89.6,
+      "worst_season": 80.4,
+      "best_season": 94.6,
+      "seasonal_grades": {
+        "0": "A",
+        "90": "A",
+        "180": "A",
+        "270": "A"
+      },
+      "swim_consistency": {
+        "0-1m": 0.2431,
+        "1-5m": 0.4286,
+        "5m+": 0.5
+      },
+      "swim_avg": 0.391,
+      "accessibility_score": 0.8623,
+      "accessibility_details": {
+        "excavation": 0.7384,
+        "landing": 0.9862,
+        "ice_landform": 0.0,
+        "water_mineral": 0.0,
+        "surface_ice": 0.0,
+        "confidence": "medium",
+        "layers": 4
+      },
+      "climate_resilience": 0.81,
+      "temp_range_k": [
+        148.4,
+        219.6
+      ],
+      "max_dust_tau": 0.401,
+      "max_wind_ms": 6.7,
+      "frost_months": 0,
+      "category_details": {
+        "terrain": {
+          "score": 1.0,
+          "weight": 0.2,
+          "weighted": 0.2,
+          "assessment": "Excellent terrain: -4594m elevation, 0.8\u00b0 slope"
+        },
+        "climate": {
+          "score": 0.837,
+          "weight": 0.25,
+          "weighted": 0.209,
+          "assessment": "T_mean=182.7K (-90.4\u00b0C), P=636Pa"
+        },
+        "dust": {
+          "score": 1.0,
+          "weight": 0.15,
+          "weighted": 0.15,
+          "assessment": "Moderate dust (\u03c4=0.31) \u2014 acceptable"
+        },
+        "wind": {
+          "score": 0.944,
+          "weight": 0.15,
+          "weighted": 0.142,
+          "assessment": "Wind 5.6 m/s \u2014 moderate"
+        },
+        "frost": {
+          "score": 0.812,
+          "weight": 0.1,
+          "weighted": 0.081,
+          "assessment": "No significant frost risk"
+        },
+        "science_value": {
+          "score": 0.9,
+          "weight": 0.15,
+          "weighted": 0.135,
+          "assessment": "Science value: high"
+        }
+      },
+      "warnings": [],
+      "data_sources": {
+        "terrain": "MOLA",
+        "climate": "neural_climate",
+        "seismic": "none",
+        "swim": "SWIM_v2_precomputed",
+        "accessibility": "algorithm (medium)",
+        "climate_annual": "neural_emulator"
+      }
+    },
+    {
+      "rank": 4,
+      "region_id": "viking_2",
+      "name": "Viking 2 Site",
+      "center_lat": 47.5,
+      "center_lon": -132.5,
+      "elevation_m": -2184.0,
+      "final_score": 70.6,
+      "seasonal_avg": 89.6,
+      "worst_season": 79.9,
+      "best_season": 94.8,
+      "seasonal_grades": {
+        "0": "A",
+        "90": "A",
+        "180": "A",
+        "270": "B"
+      },
+      "swim_consistency": {
+        "0-1m": 0.2344,
+        "1-5m": 0.4286,
+        "5m+": 0.5
+      },
+      "swim_avg": 0.388,
+      "accessibility_score": 0.7291,
+      "accessibility_details": {
+        "excavation": 0.4644,
+        "landing": 0.9937,
+        "ice_landform": 0.0,
+        "water_mineral": 0.0,
+        "surface_ice": 0.0,
+        "confidence": "medium",
+        "layers": 4
+      },
+      "climate_resilience": 0.802,
+      "temp_range_k": [
+        148.0,
+        222.6
+      ],
+      "max_dust_tau": 0.395,
+      "max_wind_ms": 6.7,
+      "frost_months": 0,
+      "category_details": {
+        "terrain": {
+          "score": 1.0,
+          "weight": 0.2,
+          "weighted": 0.2,
+          "assessment": "Excellent terrain: -2184m elevation, 0.2\u00b0 slope"
+        },
+        "climate": {
+          "score": 0.831,
+          "weight": 0.25,
+          "weighted": 0.208,
+          "assessment": "T_mean=182.3K (-90.9\u00b0C), P=636Pa"
+        },
+        "dust": {
+          "score": 1.0,
+          "weight": 0.15,
+          "weighted": 0.15,
+          "assessment": "Moderate dust (\u03c4=0.31) \u2014 acceptable"
+        },
+        "wind": {
+          "score": 0.951,
+          "weight": 0.15,
+          "weighted": 0.143,
+          "assessment": "Wind 5.5 m/s \u2014 moderate"
+        },
+        "frost": {
+          "score": 0.813,
+          "weight": 0.1,
+          "weighted": 0.081,
+          "assessment": "No significant frost risk"
+        },
+        "science_value": {
+          "score": 0.9,
+          "weight": 0.15,
+          "weighted": 0.135,
+          "assessment": "Science value: high"
+        }
+      },
+      "warnings": [],
+      "data_sources": {
+        "terrain": "MOLA",
+        "climate": "neural_climate",
+        "seismic": "none",
+        "swim": "SWIM_v2_precomputed",
+        "accessibility": "algorithm (medium)",
+        "climate_annual": "neural_emulator"
+      }
+    },
+    {
+      "rank": 5,
+      "region_id": "chryse_planitia",
+      "name": "Chryse Planitia",
+      "center_lat": 27.23,
+      "center_lon": -40.42,
+      "elevation_m": -3909.0,
+      "final_score": 61.0,
+      "seasonal_avg": 89.0,
+      "worst_season": 82.4,
+      "best_season": 91.2,
+      "seasonal_grades": {
+        "0": "A",
+        "90": "A",
+        "180": "A",
+        "270": "A"
+      },
+      "swim_consistency": {
+        "0-1m": 0.0,
+        "1-5m": 0.0,
+        "5m+": 0.0
+      },
+      "swim_avg": 0.0,
+      "accessibility_score": 0.8748,
+      "accessibility_details": {
+        "excavation": 0.7756,
+        "landing": 0.9741,
+        "ice_landform": 0.0,
+        "water_mineral": 0.0,
+        "surface_ice": 0.0,
+        "confidence": "medium",
+        "layers": 4
+      },
+      "climate_resilience": 0.734,
+      "temp_range_k": [
+        155.9,
+        239.6
+      ],
+      "max_dust_tau": 0.719,
+      "max_wind_ms": 7.0,
+      "frost_months": 0,
+      "category_details": {
+        "terrain": {
+          "score": 1.0,
+          "weight": 0.2,
+          "weighted": 0.2,
+          "assessment": "Excellent terrain: -3909m elevation, 1.1\u00b0 slope"
+        },
+        "climate": {
+          "score": 0.938,
+          "weight": 0.25,
+          "weighted": 0.235,
+          "assessment": "T_mean=197.3K (-75.9\u00b0C), P=636Pa"
+        },
+        "dust": {
+          "score": 1.0,
+          "weight": 0.15,
+          "weighted": 0.15,
+          "assessment": "Moderate dust (\u03c4=0.34) \u2014 acceptable"
+        },
+        "wind": {
+          "score": 0.933,
+          "weight": 0.15,
+          "weighted": 0.14,
+          "assessment": "Wind 5.7 m/s \u2014 moderate"
+        },
+        "frost": {
+          "score": 0.817,
+          "weight": 0.1,
+          "weighted": 0.082,
+          "assessment": "No significant frost risk"
+        },
+        "science_value": {
+          "score": 0.7,
+          "weight": 0.15,
+          "weighted": 0.105,
+          "assessment": "Science value: high"
+        }
+      },
+      "warnings": [],
+      "data_sources": {
+        "terrain": "MOLA",
+        "climate": "neural_climate",
+        "seismic": "none",
+        "swim": "SWIM_v2_precomputed",
+        "accessibility": "algorithm (medium)",
+        "climate_annual": "neural_emulator"
+      }
+    }
+  ]
+}

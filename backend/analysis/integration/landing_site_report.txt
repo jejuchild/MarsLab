@@ -1,0 +1,190 @@
+╔══════════════════════════════════════════════════════════════════╗
+║     MARS LANDING SITE ANALYSIS — COMPREHENSIVE REPORT          ║
+║     MarsLab Integration Pipeline v1.0                          ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Analysis completed in 9.9s
+Regions analyzed: 55 → 5 viable candidates
+
+═══ FINAL WEIGHTS ═══
+  landing_scorer            30%
+  swim_ice                  25%
+  accessibility             15%
+  climate_resilience        20%
+  science_bonus             10%
+
+═══ TOP LANDING SITES ═══
+
+┌──────────────────────────────────────────────────────────────┐
+│  #1  Arcadia Planitia                          [B] 76.7/100 │
+├──────────────────────────────────────────────────────────────┤
+│  Location:    49.02°N, -171.85°E
+│  Elevation:   -4043 m MOLA
+│
+│  Landing Scorer (4-season):  avg=87.5  worst=78.2  best=95.0
+│    Grades: Spr=A Sum=A Aut=A Win=B
+│    terrain        : 1.000 × 0.20 = 0.200  Excellent terrain: -4043m elevation, 0.0° slope
+│    climate        : 0.775 × 0.25 = 0.194  T_mean=178.3K (-94.8°C), P=636Pa
+│    dust           : 1.000 × 0.15 = 0.150  Clear skies (τ=0.30) — excellent visibility
+│    wind           : 0.781 × 0.15 = 0.117  Wind 7.2 m/s — moderate
+│    frost          : 0.721 × 0.10 = 0.072  Occasional frost (14%) — manageable
+│    science_value  : 0.900 × 0.15 = 0.135  Science value: high
+│
+│  SWIM Ice Consistency:  avg=0.538
+│    0-1m    : 0.686
+│    1-5m    : 0.429
+│    5m+     : 0.500
+│
+│  ISRU Accessibility:  0.731  (conf=medium)
+│    excavation=0.464  landing=0.997
+│
+│  Climate Resilience:  0.801
+│    Temp range: 148–216 K
+│    Peak dust τ: 0.38  Peak wind: 7.9 m/s
+│    Frost risk months: 0/12
+│
+│  Data sources: {'terrain': 'MOLA', 'climate': 'neural_climate', 'seismic': 'none', 'swim': 'SWIM_v2_precomputed', 'accessibility': 'algorithm (medium)', 'climate_annual': 'neural_emulator'}
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  #2  Utopia Planitia                           [B] 75.2/100 │
+├──────────────────────────────────────────────────────────────┤
+│  Location:    43.05°N, 118.38°E
+│  Elevation:   -4828 m MOLA
+│
+│  Landing Scorer (4-season):  avg=89.5  worst=80.5  best=94.7
+│    Grades: Spr=A Sum=A Aut=A Win=A
+│    terrain        : 1.000 × 0.20 = 0.200  Excellent terrain: -4828m elevation, 0.6° slope
+│    climate        : 0.836 × 0.25 = 0.209  T_mean=182.7K (-90.4°C), P=636Pa
+│    dust           : 1.000 × 0.15 = 0.150  Moderate dust (τ=0.30) — acceptable
+│    wind           : 0.934 × 0.15 = 0.140  Wind 5.7 m/s — moderate
+│    frost          : 0.768 × 0.10 = 0.077  Occasional frost (12%) — manageable
+│    science_value  : 0.900 × 0.15 = 0.135  Science value: high
+│
+│  SWIM Ice Consistency:  avg=0.434
+│    0-1m    : 0.372
+│    1-5m    : 0.429
+│    5m+     : 0.500
+│
+│  ISRU Accessibility:  0.852  (conf=medium)
+│    excavation=0.714  landing=0.989
+│
+│  Climate Resilience:  0.811
+│    Temp range: 148–219 K
+│    Peak dust τ: 0.40  Peak wind: 6.8 m/s
+│    Frost risk months: 0/12
+│
+│  Data sources: {'terrain': 'MOLA', 'climate': 'neural_climate', 'seismic': 'none', 'swim': 'SWIM_v2_precomputed', 'accessibility': 'algorithm (medium)', 'climate_annual': 'neural_emulator'}
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  #3  Acidalia Planitia                         [B] 74.3/100 │
+├──────────────────────────────────────────────────────────────┤
+│  Location:    41.72°N, -19.35°E
+│  Elevation:   -4594 m MOLA
+│
+│  Landing Scorer (4-season):  avg=89.6  worst=80.4  best=94.6
+│    Grades: Spr=A Sum=A Aut=A Win=A
+│    terrain        : 1.000 × 0.20 = 0.200  Excellent terrain: -4594m elevation, 0.8° slope
+│    climate        : 0.837 × 0.25 = 0.209  T_mean=182.7K (-90.4°C), P=636Pa
+│    dust           : 1.000 × 0.15 = 0.150  Moderate dust (τ=0.31) — acceptable
+│    wind           : 0.944 × 0.15 = 0.142  Wind 5.6 m/s — moderate
+│    frost          : 0.812 × 0.10 = 0.081  No significant frost risk
+│    science_value  : 0.900 × 0.15 = 0.135  Science value: high
+│
+│  SWIM Ice Consistency:  avg=0.391
+│    0-1m    : 0.243
+│    1-5m    : 0.429
+│    5m+     : 0.500
+│
+│  ISRU Accessibility:  0.862  (conf=medium)
+│    excavation=0.738  landing=0.986
+│
+│  Climate Resilience:  0.810
+│    Temp range: 148–220 K
+│    Peak dust τ: 0.40  Peak wind: 6.7 m/s
+│    Frost risk months: 0/12
+│
+│  Data sources: {'terrain': 'MOLA', 'climate': 'neural_climate', 'seismic': 'none', 'swim': 'SWIM_v2_precomputed', 'accessibility': 'algorithm (medium)', 'climate_annual': 'neural_emulator'}
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  #4  Viking 2 Site                             [B] 70.6/100 │
+├──────────────────────────────────────────────────────────────┤
+│  Location:    47.50°N, -132.50°E
+│  Elevation:   -2184 m MOLA
+│
+│  Landing Scorer (4-season):  avg=89.6  worst=79.9  best=94.8
+│    Grades: Spr=A Sum=A Aut=A Win=B
+│    terrain        : 1.000 × 0.20 = 0.200  Excellent terrain: -2184m elevation, 0.2° slope
+│    climate        : 0.831 × 0.25 = 0.208  T_mean=182.3K (-90.9°C), P=636Pa
+│    dust           : 1.000 × 0.15 = 0.150  Moderate dust (τ=0.31) — acceptable
+│    wind           : 0.951 × 0.15 = 0.143  Wind 5.5 m/s — moderate
+│    frost          : 0.813 × 0.10 = 0.081  No significant frost risk
+│    science_value  : 0.900 × 0.15 = 0.135  Science value: high
+│
+│  SWIM Ice Consistency:  avg=0.388
+│    0-1m    : 0.234
+│    1-5m    : 0.429
+│    5m+     : 0.500
+│
+│  ISRU Accessibility:  0.729  (conf=medium)
+│    excavation=0.464  landing=0.994
+│
+│  Climate Resilience:  0.802
+│    Temp range: 148–223 K
+│    Peak dust τ: 0.40  Peak wind: 6.7 m/s
+│    Frost risk months: 0/12
+│
+│  Data sources: {'terrain': 'MOLA', 'climate': 'neural_climate', 'seismic': 'none', 'swim': 'SWIM_v2_precomputed', 'accessibility': 'algorithm (medium)', 'climate_annual': 'neural_emulator'}
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│  #5  Chryse Planitia                           [C] 61.0/100 │
+├──────────────────────────────────────────────────────────────┤
+│  Location:    27.23°N, -40.42°E
+│  Elevation:   -3909 m MOLA
+│
+│  Landing Scorer (4-season):  avg=89.0  worst=82.4  best=91.2
+│    Grades: Spr=A Sum=A Aut=A Win=A
+│    terrain        : 1.000 × 0.20 = 0.200  Excellent terrain: -3909m elevation, 1.1° slope
+│    climate        : 0.938 × 0.25 = 0.235  T_mean=197.3K (-75.9°C), P=636Pa
+│    dust           : 1.000 × 0.15 = 0.150  Moderate dust (τ=0.34) — acceptable
+│    wind           : 0.933 × 0.15 = 0.140  Wind 5.7 m/s — moderate
+│    frost          : 0.817 × 0.10 = 0.082  No significant frost risk
+│    science_value  : 0.700 × 0.15 = 0.105  Science value: high
+│
+│  SWIM Ice Consistency:  avg=0.000
+│    0-1m    : 0.000
+│    1-5m    : 0.000
+│    5m+     : 0.000
+│
+│  ISRU Accessibility:  0.875  (conf=medium)
+│    excavation=0.776  landing=0.974
+│
+│  Climate Resilience:  0.734
+│    Temp range: 156–240 K
+│    Peak dust τ: 0.72  Peak wind: 7.0 m/s
+│    Frost risk months: 0/12
+│
+│  Data sources: {'terrain': 'MOLA', 'climate': 'neural_climate', 'seismic': 'none', 'swim': 'SWIM_v2_precomputed', 'accessibility': 'algorithm (medium)', 'climate_annual': 'neural_emulator'}
+└──────────────────────────────────────────────────────────────┘
+
+═══ SUMMARY TABLE ═══
+
+Rank  Region                         Score    Grade  Elev(m)    SWIM     Access   Climate  LS Avg  
+────────────────────────────────────────────────────────────────────────────────────────────────────
+#1    Arcadia Planitia               76.7     B      -4043      0.538    0.731    0.801    87.5    
+#2    Utopia Planitia                75.2     B      -4828      0.434    0.852    0.811    89.5    
+#3    Acidalia Planitia              74.3     B      -4594      0.391    0.862    0.810    89.6    
+#4    Viking 2 Site                  70.6     B      -2184      0.388    0.729    0.802    89.6    
+#5    Chryse Planitia                61.0     C      -3909      0.000    0.875    0.734    89.0    
+
+═══ REFERENCES ═══
+  [1] Golombek et al. (2021) — SpaceX Starship Landing Sites, LPSC 52, #2420
+  [2] Morgan et al. (2021) — SWIM Ice Availability, Nature Astronomy 5, 230–236
+  [3] Morgan et al. (2025) — SWIM Refined Global Mapping, PSJ 6(2):29
+  [4] Baker et al. (2024) — I-MIM Phase 2, LPSC 2024, #2506
+  [5] NASA DRA 5.0 — Human Exploration Reference Architecture
+  [6] Stuurman et al. (2016) — Utopia Planitia Ice, GRL 43
+  [7] Plaut et al. (2009) — Deuteronilus LDA Ice, GRL 36
