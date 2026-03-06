@@ -50,11 +50,18 @@ NUM_LANDFORM_CLASSES = 4
 V3_CLASSES = ["LDA", "LVF", "CCF", "OTHER"]
 V3_NUM_CLASSES = 4  # 3 landform + OTHER
 V3_NUM_LANDFORM_CLASSES = 3
+
+# ─── V5 Class Definitions (V4b + SCT from Wang et al. 2026) ──────────────────
+V5_CLASSES = ["LDA", "LVF", "CCF", "OTHER", "SCT"]
+V5_NUM_CLASSES = 5  # 4 landform + OTHER
+V5_NUM_LANDFORM_CLASSES = 4
+
 V3_CLASS_DESCRIPTIONS = {
     "LDA": "Lobate Debris Apron — lobate aprons at bases of scarps, radially spreading",
     "LVF": "Lineated Valley Fill — valley-confined ice with longitudinal flow lineations",
     "CCF": "Concentric Crater Fill — concentric ridges filling craters, brain terrain",
     "OTHER": "Non-target terrain or insufficient glacial/periglacial evidence",
+    "SCT": "Scalloped Terrain — asymmetric rimless thermokarst depressions from ice sublimation",
 }
 
 CLASS_DESCRIPTIONS = {
