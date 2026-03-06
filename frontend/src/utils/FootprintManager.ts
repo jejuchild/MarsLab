@@ -46,13 +46,28 @@ export interface FootprintManagerConfig {
   onError?: (instrument: InstrumentType, error: Error) => void;
 }
 
+export interface ProductBounds {
+  west: number;
+  south: number;
+  east: number;
+  north: number;
+}
+
+export interface FeatureMetadata {
+  instrument: InstrumentType;
+  productId: string;
+  properties: Record<string, unknown>;
+  bounds: ProductBounds;
+  outlineIndex: number;
+}
+
 // Using shared normalizeLonForMap from coordinates.ts
 const normalizeLon = normalizeLonForMap;
 
 export class FootprintManager {
   private viewer: Cesium.Viewer;
   private ellipsoid: Cesium.Ellipsoid;
-  private entityIds: Map<InstrumentType, Set<string>> = new Map();
+  private instanceIds: Map<InstrumentType, Set<string>> = new Map();
   private features: Map<InstrumentType, FootprintFeature[]> = new Map();
   private abortControllers: Map<InstrumentType, AbortController> = new Map();
   private requestIds: Map<InstrumentType, number> = new Map(); // Track request IDs for idempotency
@@ -61,6 +76,14 @@ export class FootprintManager {
   private inFlightLoads: Map<InstrumentType, Promise<LoadResult | null>> = new Map();
   // Store the bbox that was used when loading each instrument's footprints
   private loadedBboxes: Map<InstrumentType, [number, number, number, number]> = new Map();
+
+  private fillPrimitives: Map<InstrumentType, Cesium.GroundPrimitive> = new Map();
+  private outlineCollections: Map<InstrumentType, Cesium.PolylineCollection> = new Map();
+
+  private featureMetadata: Map<string, FeatureMetadata> = new Map();
+  private featureVisibility: Map<string, boolean> = new Map();
+
+  private hoverLabelEntity: Cesium.Entity | null = null;
 
   private onLoadStart?: (instrument: InstrumentType) => void;
   private onLoadEnd?: (instrument: InstrumentType, result: LoadResult) => void;
@@ -74,13 +97,13 @@ export class FootprintManager {
     this.onError = config.onError;
 
     // Initialize empty collections for each instrument
-    this.entityIds.set("CRISM", new Set());
-    this.entityIds.set("HIRISE", new Set());
-    this.entityIds.set("SHARAD", new Set());
-    this.entityIds.set("SHARAD_HIGHRES", new Set());
-    this.entityIds.set("CTX", new Set());
-    this.entityIds.set("HIRISE_DTM", new Set());
-    this.entityIds.set("CRISM_TRR3", new Set());
+    this.instanceIds.set("CRISM", new Set());
+    this.instanceIds.set("HIRISE", new Set());
+    this.instanceIds.set("SHARAD", new Set());
+    this.instanceIds.set("SHARAD_HIGHRES", new Set());
+    this.instanceIds.set("CTX", new Set());
+    this.instanceIds.set("HIRISE_DTM", new Set());
+    this.instanceIds.set("CRISM_TRR3", new Set());
     this.features.set("CRISM", []);
     this.features.set("HIRISE", []);
     this.features.set("SHARAD", []);
@@ -265,7 +288,7 @@ export class FootprintManager {
       // Store loaded bbox and render footprints
       this.loadedBboxes.set(instrument, bbox);
       this.features.set(instrument, data.features);
-      this.renderFeatures(instrument, data.features);
+      await this.renderFeatures(instrument, data.features, requestId);
 
       const result: LoadResult = {
         instrument,
@@ -296,18 +319,28 @@ export class FootprintManager {
    * Clear all footprints for an instrument
    */
   clearFootprints(instrument: InstrumentType): void {
-    const ids = this.entityIds.get(instrument);
-    if (ids && ids.size > 0) {
-      this.viewer.entities.suspendEvents();
-      for (const id of ids) {
-        const entity = this.viewer.entities.getById(id);
-        if (entity) this.viewer.entities.remove(entity);
-      }
-      ids.clear();
-      this.viewer.entities.resumeEvents();
-      this.viewer.scene.requestRender();
+    const fill = this.fillPrimitives.get(instrument);
+    if (fill) {
+      this.viewer.scene.primitives.remove(fill);
+      this.fillPrimitives.delete(instrument);
     }
+
+    const outlines = this.outlineCollections.get(instrument);
+    if (outlines) {
+      this.viewer.scene.primitives.remove(outlines);
+      this.outlineCollections.delete(instrument);
+    }
+
+    for (const [key, metadata] of this.featureMetadata) {
+      if (metadata.instrument === instrument) {
+        this.featureMetadata.delete(key);
+        this.featureVisibility.delete(key);
+      }
+    }
+
+    this.instanceIds.get(instrument)?.clear();
     this.features.set(instrument, []);
+    this.viewer.scene.requestRender();
   }
 
   /**
@@ -332,197 +365,208 @@ export class FootprintManager {
     return this.loadedBboxes;
   }
 
-  /**
-   * Render features as Cesium entities
-   * Passes ALL feature properties to entity for popup access
-   */
-  private renderFeatures(instrument: InstrumentType, features: FootprintFeature[]): void {
-    let ids = this.entityIds.get(instrument);
+  private getFeatureBoundsFromGeometry(
+    instrument: InstrumentType,
+    geom: FootprintFeature["geometry"],
+  ): ProductBounds | null {
+    if (geom.type === "Polygon") {
+      const ring = geom.coordinates?.[0] as [number, number][] | undefined;
+      if (!ring || ring.length === 0) return null;
+
+      let west = Infinity;
+      let east = -Infinity;
+      let south = Infinity;
+      let north = -Infinity;
+
+      for (const [lon, lat] of ring) {
+        const nlon = normalizeLon(lon);
+        if (nlon < west) west = nlon;
+        if (nlon > east) east = nlon;
+        if (lat < south) south = lat;
+        if (lat > north) north = lat;
+      }
+
+      if (east - west > 180) return null;
+      return { west, south, east, north };
+    }
+
+    if (geom.type === "LineString") {
+      const coords = geom.coordinates as [number, number][] | undefined;
+      if (!coords || coords.length < 2) return null;
+
+      let west = Infinity;
+      let east = -Infinity;
+      let south = Infinity;
+      let north = -Infinity;
+
+      for (const [lon, lat] of coords) {
+        const nlon = normalizeLon(lon);
+        if (nlon < west) west = nlon;
+        if (nlon > east) east = nlon;
+        if (lat < south) south = lat;
+        if (lat > north) north = lat;
+      }
+
+      return { west, south, east, north };
+    }
+
+    if (geom.type === "Point") {
+      const coords = geom.coordinates as [number, number] | undefined;
+      if (!coords || coords.length < 2) return null;
+      const [lon, lat] = coords;
+      if (lon === 0 && lat === 0) return null;
+
+      const nlon = normalizeLon(lon);
+      const halfW = instrument === "HIRISE" ? 0.08 : 0.07;
+      const halfH = instrument === "HIRISE" ? 0.15 : 0.06;
+      return {
+        west: nlon - halfW,
+        east: nlon + halfW,
+        south: lat - halfH,
+        north: lat + halfH,
+      };
+    }
+
+    return null;
+  }
+
+  private async renderFeatures(
+    instrument: InstrumentType,
+    features: FootprintFeature[],
+    requestId: number,
+  ): Promise<void> {
+    let ids = this.instanceIds.get(instrument);
     if (!ids) {
       ids = new Set<string>();
-      this.entityIds.set(instrument, ids);
+      this.instanceIds.set(instrument, ids);
     }
+
     const color = this.getColor(instrument);
+    const geometryInstances: Cesium.GeometryInstance[] = [];
+    const outlineCollection = new Cesium.PolylineCollection();
+    const chunkSize = 200;
 
-    this.viewer.entities.suspendEvents();
+    for (let index = 0; index < features.length; index += chunkSize) {
+      if (this.requestIds.get(instrument) !== requestId) {
+        return;
+      }
 
-    for (const feature of features) {
-      const productId = feature.properties?.product_id;
-      if (!productId) continue;
+      const chunk = features.slice(index, index + chunkSize);
+      for (const feature of chunk) {
+        const productId = feature.properties?.product_id;
+        const geom = feature.geometry;
+        if (!productId || !geom) continue;
 
-      const geom = feature.geometry;
-      if (!geom) continue;
+        const entityId = `${instrument}_FP_${productId}`;
+        if (ids.has(entityId) || this.featureMetadata.has(entityId)) continue;
 
-      const entityId = `${instrument}_FP_${productId}`;
+        const bounds = this.getFeatureBoundsFromGeometry(instrument, geom);
+        if (!bounds) continue;
 
-      // Skip duplicates (same product_id appearing twice in data)
-      if (ids.has(entityId) || this.viewer.entities.getById(entityId)) continue;
+        let outlineIndex = -1;
 
-      // Pass ALL feature properties to the entity (for popup access)
-      const entityProps = { ...feature.properties, instrument };
+        if (geom.type !== "LineString") {
+          geometryInstances.push(
+            new Cesium.GeometryInstance({
+              geometry: new Cesium.RectangleGeometry({
+                rectangle: Cesium.Rectangle.fromDegrees(
+                  bounds.west,
+                  bounds.south,
+                  bounds.east,
+                  bounds.north,
+                ),
+              }),
+              id: entityId,
+              attributes: {
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(0.12)),
+                show: new Cesium.ShowGeometryInstanceAttribute(true),
+              },
+            }),
+          );
 
-      if (geom.type === "Polygon") {
-        const ring = geom.coordinates?.[0];
-        if (!ring || ring.length === 0) continue;
-
-        // Compute bounding box
-        let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
-        for (const [lon, lat] of ring) {
-          const nlon = normalizeLon(lon);
-          if (nlon < west) west = nlon;
-          if (nlon > east) east = nlon;
-          if (lat < south) south = lat;
-          if (lat > north) north = lat;
+          outlineIndex = outlineCollection.length;
+          outlineCollection.add({
+            positions: Cesium.Cartesian3.fromDegreesArray(
+              [
+                bounds.west,
+                bounds.south,
+                bounds.west,
+                bounds.north,
+                bounds.east,
+                bounds.north,
+                bounds.east,
+                bounds.south,
+                bounds.west,
+                bounds.south,
+              ],
+              this.ellipsoid,
+            ),
+            width: 1.0,
+            material: Cesium.Material.fromType("Color", { color }),
+          });
+        } else {
+          const coords = geom.coordinates as [number, number][];
+          const positions: number[] = [];
+          for (const [lon, lat] of coords) {
+            positions.push(normalizeLon(lon), lat);
+          }
+          outlineIndex = outlineCollection.length;
+          outlineCollection.add({
+            positions: Cesium.Cartesian3.fromDegreesArray(positions, this.ellipsoid),
+            width: 3.0,
+            material: Cesium.Material.fromType("Color", { color }),
+          });
         }
 
-        // Skip if crosses dateline (would render incorrectly)
-        if (east - west > 180) continue;
-
-        const centerLon = (west + east) / 2;
-        const centerLat = (south + north) / 2;
-
-        // Add rectangle with light fill (visible but subtle)
-        this.viewer.entities.add({
-          id: entityId,
-          rectangle: {
-            coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
-            material: color.withAlpha(0.10),
-            outline: true,
-            outlineColor: color,
-            outlineWidth: 1,
-            height: 0,
-          },
-          properties: entityProps,
-        });
+        const metadata: FeatureMetadata = {
+          instrument,
+          productId,
+          properties: { ...feature.properties, instrument } as Record<string, unknown>,
+          bounds,
+          outlineIndex,
+        };
+        this.featureMetadata.set(entityId, metadata);
+        this.featureVisibility.set(entityId, true);
         ids.add(entityId);
-
-        // Add label (hidden by default, shown on hover)
-        const labelId = `${instrument}_LBL_${productId}`;
-        this.viewer.entities.add({
-          id: labelId,
-          show: false,
-          position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 0, this.ellipsoid),
-          label: {
-            text: productId,
-            font: "11px sans-serif",
-            fillColor: Cesium.Color.WHITE,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 2,
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            verticalOrigin: Cesium.VerticalOrigin.CENTER,
-            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5e6),
-          },
-          properties: entityProps,
-        });
-        ids.add(labelId);
-
-      } else if (geom.type === "LineString") {
-        const coords = geom.coordinates;
-        if (!coords || coords.length < 2) continue;
-
-        // Convert coordinates to Cesium positions
-        const positions = coords.map(([lon, lat]: [number, number]) =>
-          Cesium.Cartesian3.fromDegrees(normalizeLon(lon), lat, 0, this.ellipsoid)
-        );
-
-        this.viewer.entities.add({
-          id: entityId,
-          polyline: {
-            positions,
-            width: 3,
-            material: color,
-            clampToGround: true,
-            arcType: Cesium.ArcType.GEODESIC, // Proper great circle path for polar orbits
-          },
-          properties: entityProps,
-        });
-        ids.add(entityId);
-
-        // Compute label position at geodesic midpoint
-        const startPos = positions[0];
-        const endPos = positions[positions.length - 1];
-        const midPos = Cesium.Cartesian3.midpoint(startPos, endPos, new Cesium.Cartesian3());
-
-        const labelId = `${instrument}_LBL_${productId}`;
-        this.viewer.entities.add({
-          id: labelId,
-          show: false,
-          position: midPos,
-          label: {
-            text: productId,
-            font: "11px sans-serif",
-            fillColor: Cesium.Color.ORANGE,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 2,
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -5),
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5e6),
-          },
-          properties: entityProps,
-        });
-        ids.add(labelId);
-
-      } else if (geom.type === "Point") {
-        const [lon, lat] = geom.coordinates;
-
-        // Skip invalid placeholder coordinates (0, 0)
-        if (lon === 0 && lat === 0) continue;
-
-        const nlon = normalizeLon(lon);
-
-        // Render as a small rectangle instead of a circle dot
-        // Use typical footprint half-sizes per instrument
-        const halfW = instrument === "HIRISE" ? 0.08 : 0.07;  // degrees longitude
-        const halfH = instrument === "HIRISE" ? 0.15 : 0.06;  // degrees latitude
-
-        const west = nlon - halfW;
-        const east = nlon + halfW;
-        const south = lat - halfH;
-        const north = lat + halfH;
-
-        this.viewer.entities.add({
-          id: entityId,
-          rectangle: {
-            coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
-            material: color.withAlpha(0.10),
-            outline: true,
-            outlineColor: color,
-            outlineWidth: 1,
-            height: 0,
-          },
-          properties: entityProps,
-        });
-        ids.add(entityId);
-
-        // Add label (hidden by default, shown on hover)
-        const labelId = `${instrument}_LBL_${productId}`;
-        this.viewer.entities.add({
-          id: labelId,
-          show: false,
-          position: Cesium.Cartesian3.fromDegrees(nlon, lat, 0, this.ellipsoid),
-          label: {
-            text: productId,
-            font: "10px sans-serif",
-            fillColor: Cesium.Color.WHITE,
-            outlineColor: Cesium.Color.BLACK,
-            outlineWidth: 2,
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            verticalOrigin: Cesium.VerticalOrigin.CENTER,
-            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5e6),
-          },
-          properties: entityProps,
-        });
-        ids.add(labelId);
       }
+
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     }
 
-    this.viewer.entities.resumeEvents();
+    if (this.requestIds.get(instrument) !== requestId) {
+      return;
+    }
+
+    if (geometryInstances.length > 0) {
+      const primitive = new Cesium.GroundPrimitive({
+        geometryInstances,
+        appearance: new Cesium.PerInstanceColorAppearance({
+          flat: true,
+          translucent: true,
+        }),
+        asynchronous: true,
+        classificationType: Cesium.ClassificationType.BOTH,
+      });
+      this.viewer.scene.primitives.add(primitive);
+      this.fillPrimitives.set(instrument, primitive);
+      void (async () => {
+        while (this.requestIds.get(instrument) === requestId && !primitive.ready) {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        }
+        if (this.requestIds.get(instrument) !== requestId || !primitive.ready) return;
+        for (const id of ids) {
+          const attrs = primitive.getGeometryInstanceAttributes(id);
+          if (!attrs) continue;
+          attrs.show = Cesium.ShowGeometryInstanceAttribute.toValue(
+            this.featureVisibility.get(id) ?? true,
+          );
+        }
+        this.viewer.scene.requestRender();
+      })();
+    }
+
+    this.viewer.scene.primitives.add(outlineCollection);
+    this.outlineCollections.set(instrument, outlineCollection);
     this.viewer.scene.requestRender();
   }
 
@@ -530,29 +574,97 @@ export class FootprintManager {
    * Set visibility of footprints
    */
   setVisible(instrument: InstrumentType, visible: boolean): void {
-    const ids = this.entityIds.get(instrument);
-    if (!ids || ids.size === 0) return;
+    const fill = this.fillPrimitives.get(instrument);
+    if (fill) fill.show = visible;
+    const outlines = this.outlineCollections.get(instrument);
+    if (outlines) outlines.show = visible;
 
-    this.viewer.entities.suspendEvents();
-    for (const id of ids) {
-      const entity = this.viewer.entities.getById(id);
-      if (!entity) continue;
-      // Labels stay hidden (hover-only) — only toggle footprint entities
-      if (id.includes('_LBL_')) {
-        entity.show = false;
-      } else {
-        entity.show = visible;
+    if (!visible) {
+      this.hideHoverLabel();
+    }
+
+    this.viewer.scene.requestRender();
+  }
+
+  getFeatureMetadata(entityId: string): FeatureMetadata | null {
+    return this.featureMetadata.get(entityId) ?? null;
+  }
+
+  getFeatureBounds(entityId: string): ProductBounds | null {
+    const metadata = this.featureMetadata.get(entityId);
+    return metadata ? metadata.bounds : null;
+  }
+
+  setFeatureVisible(instrument: InstrumentType, productId: string, visible: boolean): void {
+    const id = `${instrument}_FP_${productId}`;
+    this.featureVisibility.set(id, visible);
+
+    const primitive = this.fillPrimitives.get(instrument);
+    if (primitive?.ready) {
+      const attrs = primitive.getGeometryInstanceAttributes(id);
+      if (attrs) {
+        attrs.show = Cesium.ShowGeometryInstanceAttribute.toValue(visible);
       }
     }
-    this.viewer.entities.resumeEvents();
+
+    const metadata = this.featureMetadata.get(id);
+    if (metadata) {
+      const outlines = this.outlineCollections.get(instrument);
+      if (outlines) {
+        const polyline = outlines.get(metadata.outlineIndex);
+        if (polyline) polyline.show = visible;
+      }
+    }
+
     this.viewer.scene.requestRender();
+  }
+
+  showHoverLabel(position: Cesium.Cartesian3, text: string): void {
+    if (!this.hoverLabelEntity) {
+      this.hoverLabelEntity = this.viewer.entities.add({
+        position,
+        label: {
+          text,
+          font: "11px sans-serif",
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.CENTER,
+          horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    } else {
+      this.hoverLabelEntity.position = new Cesium.ConstantPositionProperty(position);
+      const labelText = this.hoverLabelEntity.label?.text;
+      if (labelText instanceof Cesium.ConstantProperty) {
+        labelText.setValue(text);
+      } else if (this.hoverLabelEntity.label) {
+        this.hoverLabelEntity.label.text = new Cesium.ConstantProperty(text);
+      }
+      this.hoverLabelEntity.show = true;
+    }
+
+    this.viewer.scene.requestRender();
+  }
+
+  hideHoverLabel(): void {
+    if (this.hoverLabelEntity) {
+      this.hoverLabelEntity.show = false;
+      this.viewer.scene.requestRender();
+    }
+  }
+
+  hasFeature(entityId: string): boolean {
+    return this.featureMetadata.has(entityId);
   }
 
   /**
    * Check if footprints are loaded
    */
   hasFootprints(instrument: InstrumentType): boolean {
-    return (this.entityIds.get(instrument)?.size ?? 0) > 0;
+    return (this.instanceIds.get(instrument)?.size ?? 0) > 0;
   }
 
   /**
@@ -570,6 +682,25 @@ export class FootprintManager {
     for (const controller of this.abortControllers.values()) {
       controller.abort();
     }
+
+    for (const primitive of this.fillPrimitives.values()) {
+      this.viewer.scene.primitives.remove(primitive);
+    }
+    this.fillPrimitives.clear();
+
+    for (const outlines of this.outlineCollections.values()) {
+      this.viewer.scene.primitives.remove(outlines);
+    }
+    this.outlineCollections.clear();
+
+    this.featureMetadata.clear();
+    this.featureVisibility.clear();
+
+    if (this.hoverLabelEntity) {
+      this.viewer.entities.remove(this.hoverLabelEntity);
+      this.hoverLabelEntity = null;
+    }
+
     this.clearFootprints("CRISM");
     this.clearFootprints("HIRISE");
     this.clearFootprints("SHARAD");

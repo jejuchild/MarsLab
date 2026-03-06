@@ -10,6 +10,9 @@ import { isInstrumentId, type InstrumentId } from "../config/instrumentRegistry"
 export interface UrlState {
   lat?: number;
   lon?: number;
+  camLat?: number;
+  camLon?: number;
+  camHeight?: number;
   instruments?: InstrumentId[];
   product?: string;
   mode?: string;
@@ -42,6 +45,24 @@ function parseParams(params: URLSearchParams): UrlState {
   if (lonStr !== null) {
     const lon = parseFloat(lonStr);
     if (!Number.isNaN(lon)) state.lon = lon;
+  }
+
+  const camLatStr = params.get("camLat");
+  if (camLatStr !== null) {
+    const camLat = parseFloat(camLatStr);
+    if (!Number.isNaN(camLat)) state.camLat = camLat;
+  }
+
+  const camLonStr = params.get("camLon");
+  if (camLonStr !== null) {
+    const camLon = parseFloat(camLonStr);
+    if (!Number.isNaN(camLon)) state.camLon = camLon;
+  }
+
+  const camHeightStr = params.get("camHeight");
+  if (camHeightStr !== null) {
+    const camHeight = parseFloat(camHeightStr);
+    if (!Number.isNaN(camHeight)) state.camHeight = camHeight;
   }
 
   // instruments (comma-separated)
@@ -82,6 +103,9 @@ function serializeState(state: UrlState): URLSearchParams {
 
   if (state.lat !== undefined) params.set("lat", state.lat.toFixed(4));
   if (state.lon !== undefined) params.set("lon", state.lon.toFixed(4));
+  if (state.camLat !== undefined) params.set("camLat", state.camLat.toFixed(2));
+  if (state.camLon !== undefined) params.set("camLon", state.camLon.toFixed(2));
+  if (state.camHeight !== undefined) params.set("camHeight", state.camHeight.toFixed(2));
   if (state.instruments && state.instruments.length > 0) {
     params.set("instruments", state.instruments.join(","));
   }

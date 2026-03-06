@@ -88,6 +88,7 @@ export default function useOverlays({
   // or restore it when overlay is removed. This prevents the semi-transparent
   // footprint fill from tinting the overlay image.
   const setFootprintTransparent = useCallback((viewer: Cesium.Viewer, productId: string, transparent: boolean) => {
+    const footprintManager = footprintManagerRef.current;
     const isHiRISE = productId.startsWith("ESP_");
     const isHiRISEDTM = productId.startsWith("DTE");
     const isTRR3 = /^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(productId);
@@ -117,8 +118,10 @@ export default function useOverlays({
           color.withAlpha(0.10),
         );
       }
+    } else if (footprintManager?.hasFeature(`${instrument}_FP_${productId}`)) {
+      footprintManager.setFeatureVisible(instrument, productId, !transparent);
     }
-  }, []);
+  }, [footprintManagerRef]);
 
   const showHiRISEDTMRef = useRef(showHiRISEDTM);
   useEffect(() => {
@@ -171,6 +174,8 @@ export default function useOverlays({
           } else {
             entity.show = isVisible;
           }
+        } else {
+          footprintManager.setFeatureVisible(instrument, pid, highResSet.has(pid) ? false : isVisible);
         }
 
         // Update label entity (FootprintManager uses _LBL_ for labels)
@@ -229,7 +234,7 @@ export default function useOverlays({
     // Helper: check if a product is CTX by looking up its footprint entity
     const isCTXProduct = (productId: string): boolean => {
       const fpEnt = viewer.entities.getById(`CTX_FP_${productId}`);
-      return !!fpEnt;
+      return !!fpEnt || !!footprintManagerRef.current?.getFeatureMetadata(`CTX_FP_${productId}`);
     };
 
     // Helper: get CTX tile info from footprint entity properties
@@ -241,7 +246,30 @@ export default function useOverlays({
       north: number;
     } | null => {
       const fpEnt = viewer.entities.getById(`CTX_FP_${productId}`);
+      const meta = footprintManagerRef.current?.getFeatureMetadata(`CTX_FP_${productId}`);
+
+      if (!fpEnt?.properties && !meta) return null;
+
+      if (!fpEnt?.properties && meta) {
+        const tileUrl = meta.properties.tile_url;
+        const west = meta.properties.bbox_west;
+        const south = meta.properties.bbox_south;
+        const east = meta.properties.bbox_east;
+        const north = meta.properties.bbox_north;
+        if (
+          typeof tileUrl !== "string" ||
+          typeof west !== "number" ||
+          typeof south !== "number" ||
+          typeof east !== "number" ||
+          typeof north !== "number"
+        ) {
+          return null;
+        }
+        return { tileUrl, west, south, east, north };
+      }
+
       if (!fpEnt?.properties) return null;
+
       const props = fpEnt.properties as unknown as {
         tile_url?: Cesium.Property;
         bbox_west?: Cesium.Property;

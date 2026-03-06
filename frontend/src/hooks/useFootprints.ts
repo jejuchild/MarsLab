@@ -44,6 +44,7 @@ type FootprintLoadResult = {
 };
 
 type UseFootprintsParams = {
+  footprintManagerRef?: React.MutableRefObject<FootprintManager | null>;
   viewerRef: React.MutableRefObject<Cesium.Viewer | null>;
   marsEllipsoid: Cesium.Ellipsoid;
   showCRISM: boolean;
@@ -81,6 +82,7 @@ type UseFootprintsResult = {
 };
 
 export default function useFootprints({
+  footprintManagerRef: externalFootprintManagerRef,
   viewerRef,
   marsEllipsoid,
   showCRISM,
@@ -103,7 +105,8 @@ export default function useFootprints({
   showRegionLayer,
   extractCrismObsId,
 }: UseFootprintsParams): UseFootprintsResult {
-  const footprintManagerRef = useRef<FootprintManager | null>(null);
+  const internalFootprintManagerRef = useRef<FootprintManager | null>(null);
+  const footprintManagerRef = externalFootprintManagerRef ?? internalFootprintManagerRef;
 
   // Overlap filter state
   const overlapResultRef = useRef<OverlapResult | null>(null);
@@ -196,16 +199,12 @@ export default function useFootprints({
     if (show && overlapPassing) {
       // Overlap filter active: per-entity visibility
       const features = fm.getFeatures(instrument);
-      viewer.entities.suspendEvents();
       for (const feature of features) {
         const pid = feature.properties.product_id;
         if (!pid) continue;
         const visible = overlapPassing.has(pid);
-        const fpEntity = viewer.entities.getById(`${instrument}_FP_${pid}`);
-        if (fpEntity) fpEntity.show = visible;
-        // Labels stay hidden (hover-only)
+        fm.setFeatureVisible(instrument, pid, visible);
       }
-      viewer.entities.resumeEvents();
     } else {
       fm.setVisible(instrument, show);
     }
@@ -213,8 +212,7 @@ export default function useFootprints({
     // Force-show inspected product's footprint regardless of layer/filter state
     const ipid = inspectedProductIdRef.current;
     if (ipid) {
-      const fpEntity = viewer.entities.getById(`${instrument}_FP_${ipid}`);
-      if (fpEntity) fpEntity.show = true;
+      fm.setFeatureVisible(instrument, ipid, true);
     }
 
     viewer.scene.requestRender();
@@ -319,12 +317,9 @@ export default function useFootprints({
     const crismFeatures = footprintManager.getFeatures("CRISM");
     const overlapPassingCrism = overlapResultRef.current?.get("CRISM" as FPInstrumentType);
 
-    viewer.entities.suspendEvents();
     for (const feature of crismFeatures) {
       const pid = feature.properties.product_id;
       if (!pid) continue;
-
-      const entity = viewer.entities.getById(`CRISM_FP_${pid}`);
 
       // Compose filters: ice score AND overlap
       let visible = true;
@@ -334,18 +329,15 @@ export default function useFootprints({
         visible = overlapPassingCrism.has(pid);
       }
 
-      if (entity) entity.show = visible;
-      // Labels stay hidden (hover-only) — never set show=true here
+      footprintManager.setFeatureVisible("CRISM", pid, visible);
     }
 
     // Force-show inspected product's CRISM footprint
     const ipid = inspectedProductIdRef.current;
     if (ipid) {
-      const fpEnt = viewer.entities.getById(`CRISM_FP_${ipid}`);
-      if (fpEnt) fpEnt.show = true;
+      footprintManager.setFeatureVisible("CRISM", ipid, true);
     }
 
-    viewer.entities.resumeEvents();
     viewer.scene.requestRender();
   }, [crismFilteredIds, showCRISM, applyInstrumentVisibility, extractCrismObsId, viewerRef]);
 
@@ -384,11 +376,8 @@ export default function useFootprints({
       "CRISM_TRR3",
     ];
     for (const inst of instruments) {
-      const fpEntity = viewer.entities.getById(`${inst}_FP_${inspectedProductId}`);
-      if (fpEntity) {
-        fpEntity.show = true;
-        const lblEntity = viewer.entities.getById(`${inst}_LBL_${inspectedProductId}`);
-        if (lblEntity) lblEntity.show = true;
+      if (footprintManagerRef.current?.hasFeature(`${inst}_FP_${inspectedProductId}`)) {
+        footprintManagerRef.current.setFeatureVisible(inst as FPInstrumentType, inspectedProductId, true);
         break;
       }
     }
@@ -419,17 +408,13 @@ export default function useFootprints({
       // Re-apply CRISM ice score filter if active
       if (crismFilteredIds !== null && showCRISM) {
         const crismFeatures = fm.getFeatures("CRISM");
-        viewer.entities.suspendEvents();
         for (const feature of crismFeatures) {
           const pid = feature.properties.product_id;
           if (!pid) continue;
           const obsId = extractCrismObsId(pid);
           const visible = crismFilteredIds.has(obsId);
-          const fpEnt = viewer.entities.getById(`CRISM_FP_${pid}`);
-          if (fpEnt) fpEnt.show = visible;
-          // Labels stay hidden (hover-only)
+          fm.setFeatureVisible("CRISM", pid, visible);
         }
-        viewer.entities.resumeEvents();
       }
       viewer.scene.requestRender();
       return;
@@ -472,7 +457,6 @@ export default function useFootprints({
     onOverlapStatsChange?.(stats);
 
     // Apply visibility for each selected instrument (batched)
-    viewer.entities.suspendEvents();
     for (const inst of selectedInstruments) {
       const passingIds = result.get(inst);
       const features = fm.getFeatures(inst);
@@ -498,12 +482,9 @@ export default function useFootprints({
           const obsId = extractCrismObsId(pid);
           visible = crismFilteredIds.has(obsId);
         }
-        const fpEnt = viewer.entities.getById(`${inst}_FP_${pid}`);
-        if (fpEnt) fpEnt.show = visible;
-        // Labels stay hidden (hover-only)
+        fm.setFeatureVisible(inst, pid, visible);
       }
     }
-    viewer.entities.resumeEvents();
 
     viewer.scene.requestRender();
     // eslint-disable-next-line react-hooks/exhaustive-deps

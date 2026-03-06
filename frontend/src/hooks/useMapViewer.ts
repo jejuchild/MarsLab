@@ -3,6 +3,7 @@ import type React from "react";
 import * as Cesium from "cesium";
 import { loadDTMElevationGrid, throttle, type DTMElevationGrid } from "../utils/dtmHover";
 import type { FieldNote } from "../api/fieldnotes";
+import type FootprintManager from "../utils/FootprintManager";
 
 type LatLon = { lat: number; lon: number };
 type BaseLayerType = "MOLA" | "HRSC";
@@ -73,6 +74,7 @@ type UseMapViewerParams = {
   baseLayerUrls: Record<BaseLayerType, string>;
   quickviewOverlays: string[];
   highResOverlays: string[];
+  footprintManagerRef: React.MutableRefObject<FootprintManager | null>;
   onSelect: (ctx: InspectorContext | null) => void;
   onSharadClick?: (popup: SHARADPopup) => void;
   onSharadHiresClick?: (productId: string) => void;
@@ -104,6 +106,7 @@ type UseMapViewerParams = {
 type UseMapViewerResult = {
   viewerRef: React.MutableRefObject<Cesium.Viewer | null>;
   hover: LatLon | null;
+  initError: string | null;
   switchSceneMode: (mode: MapMode) => void;
   switchBaseLayer: (layer: BaseLayerType) => void;
 };
@@ -118,6 +121,7 @@ export default function useMapViewer({
   baseLayerUrls,
   quickviewOverlays,
   highResOverlays,
+  footprintManagerRef,
   onSelect,
   onSharadClick,
   onSharadHiresClick,
@@ -224,6 +228,7 @@ export default function useMapViewer({
   });
 
   const [hover, setHover] = useState<LatLon | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -235,7 +240,9 @@ export default function useMapViewer({
       moduleUrl.buildModuleUrl?.setBaseUrl?.("/cesium/");
     } catch {}
 
-    const viewer = new Cesium.Viewer(containerRef.current, {
+    let viewer: Cesium.Viewer;
+    try {
+    viewer = new Cesium.Viewer(containerRef.current, {
       sceneMode: Cesium.SceneMode.SCENE2D,
       mapProjection: new Cesium.GeographicProjection(marsEllipsoid),
       requestRenderMode: true,
@@ -324,9 +331,11 @@ export default function useMapViewer({
       }
       viewer.canvas.style.cursor = isOverOverlay ? "crosshair" : "default";
 
-      const picked = viewer.scene
-        .drillPick(endPosition)
-        .find((x: any) => x?.id instanceof Cesium.Entity);
+      const pickedList = viewer.scene.drillPick(endPosition);
+      const picked = pickedList.find((x: any) => x?.id instanceof Cesium.Entity);
+      const pickedPrimitiveId = pickedList.find(
+        (x: any) => typeof x?.id === "string" && x.id.includes("_FP_"),
+      )?.id as string | undefined;
 
       const pickedEnt = picked?.id as Cesium.Entity | undefined;
       const hs = highlightRef.current;
@@ -357,6 +366,7 @@ export default function useMapViewer({
         hs.origOutlineColor = undefined;
         hs.origLabelScale = undefined;
         hs.origPointSize = undefined;
+        footprintManagerRef.current?.hideHoverLabel();
       };
 
       if (pickedEnt) {
@@ -439,7 +449,27 @@ export default function useMapViewer({
         }
       }
 
-      if (hs.rectEnt || hs.labelEnt || hs.pointEnt) {
+      if (pickedPrimitiveId && footprintManagerRef.current?.hasFeature(pickedPrimitiveId)) {
+        const metadata = footprintManagerRef.current.getFeatureMetadata(pickedPrimitiveId);
+        if (metadata) {
+          const key = `${metadata.instrument}:${metadata.productId}`;
+          if (hs.key === key) return;
+          clearHighlight();
+          hs.key = key;
+          const pos = Cesium.Cartesian3.fromDegrees(
+            (metadata.bounds.west + metadata.bounds.east) / 2,
+            (metadata.bounds.south + metadata.bounds.north) / 2,
+            0,
+            marsEllipsoid,
+          );
+          footprintManagerRef.current.showHoverLabel(pos, metadata.productId);
+          onHoverProductRef.current?.(metadata.productId);
+          viewer.scene.requestRender();
+          return;
+        }
+      }
+
+      if (hs.key || hs.rectEnt || hs.labelEnt || hs.pointEnt) {
         clearHighlight();
         onHoverProductRef.current?.(null);
         viewer.scene.requestRender();
@@ -663,17 +693,22 @@ export default function useMapViewer({
                 ? "CRISM_TRR3"
                 : "CRISM";
           const fpEnt = viewer.entities.getById(`${fpInst}_FP_${productId}`);
+          const fpMeta = footprintManagerRef.current?.getFeatureMetadata(`${fpInst}_FP_${productId}`) ?? null;
           if (fpEnt?.rectangle?.coordinates) {
             const fpRect = fpEnt.rectangle.coordinates.getValue(
               Cesium.JulianDate.now(),
             ) as Cesium.Rectangle;
             overlayLat = Cesium.Math.toDegrees((fpRect.south + fpRect.north) / 2);
             overlayLon = Cesium.Math.toDegrees((fpRect.west + fpRect.east) / 2);
+          } else if (fpMeta) {
+            overlayLat = (fpMeta.bounds.south + fpMeta.bounds.north) / 2;
+            overlayLon = (fpMeta.bounds.west + fpMeta.bounds.east) / 2;
           }
 
           const overlayTitle = fpEnt?.properties?.title?.getValue?.() as
             | string
-            | undefined;
+            | undefined
+            ?? (typeof fpMeta?.properties.title === "string" ? fpMeta.properties.title : undefined);
           onSelect({
             instrument,
             productId,
@@ -714,16 +749,34 @@ export default function useMapViewer({
           return !!pid;
         });
 
-        if (!picked || !(picked.id instanceof Cesium.Entity)) {
+        const pickedPrimitiveId = pickedList.find(
+          (p: any) => typeof p?.id === "string" && p.id.includes("_FP_"),
+        )?.id as string | undefined;
+        const pickedPrimitiveMetadata = pickedPrimitiveId
+          ? (footprintManagerRef.current?.getFeatureMetadata(pickedPrimitiveId) ?? null)
+          : null;
+
+        if ((!picked || !(picked.id instanceof Cesium.Entity)) && !pickedPrimitiveMetadata) {
           onTerrainClickRef.current?.(clickLat, clickLon);
           return;
         }
 
-        const e = picked.id as Cesium.Entity;
-        const p: any = e.properties;
+        const e = picked?.id instanceof Cesium.Entity ? (picked.id as Cesium.Entity) : null;
+        const p = e?.properties;
 
-        const productId = p?.product_id?.getValue?.();
-        const instrument = p?.instrument?.getValue?.();
+        const getPickedProperty = (key: string): unknown => {
+          if (pickedPrimitiveMetadata) return pickedPrimitiveMetadata.properties[key];
+          const prop = p?.[key];
+          if (prop && typeof prop.getValue === "function") {
+            return prop.getValue(Cesium.JulianDate.now());
+          }
+          return prop;
+        };
+
+        const productId = (getPickedProperty("product_id") as string | undefined)
+          ?? pickedPrimitiveMetadata?.productId;
+        const instrument = (getPickedProperty("instrument") as InstrumentType | undefined)
+          ?? (pickedPrimitiveMetadata?.instrument as InstrumentType | undefined);
 
         if (!productId || !instrument) return;
 
@@ -783,11 +836,27 @@ export default function useMapViewer({
               destination: paddedRectangle(rect, 0.5),
               duration: 0.6,
             });
+          } else {
+            const bounds = footprintManagerRef.current?.getFeatureBounds(`HIRISE_DTM_FP_${productId}`);
+            if (bounds) {
+              dtmLat = (bounds.south + bounds.north) / 2;
+              dtmLon = (bounds.west + bounds.east) / 2;
+              viewer.camera.flyTo({
+                destination: paddedRectangle(
+                  Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north),
+                  0.5,
+                ),
+                duration: 0.6,
+              });
+            }
           }
 
           const dtmTitle = dtmRectEnt?.properties?.title?.getValue?.() as
             | string
-            | undefined;
+            | undefined
+            ?? (typeof pickedPrimitiveMetadata?.properties.title === "string"
+              ? pickedPrimitiveMetadata.properties.title
+              : undefined);
           onHiRiseDTMClickRef.current?.(productId, dtmLat, dtmLon, dtmTitle);
 
           // Load elevation grid for hover (async, non-blocking)
@@ -802,10 +871,10 @@ export default function useMapViewer({
 
         // Handle SHARAD separately - show popup instead of Inspector
         if (instrument === "SHARAD") {
-          const startLat = p?.start_lat?.getValue?.() ?? 0;
-          const startLon = p?.start_lon?.getValue?.() ?? 0;
-          const stopLat = p?.stop_lat?.getValue?.() ?? 0;
-          const stopLon = p?.stop_lon?.getValue?.() ?? 0;
+          const startLat = Number(getPickedProperty("start_lat") ?? 0);
+          const startLon = Number(getPickedProperty("start_lon") ?? 0);
+          const stopLat = Number(getPickedProperty("stop_lat") ?? 0);
+          const stopLon = Number(getPickedProperty("stop_lon") ?? 0);
 
           onSharadClickRef.current?.({
             productId,
@@ -833,6 +902,17 @@ export default function useMapViewer({
               destination: paddedRectangle(rect, 0.3),
               duration: 0.6,
             });
+          } else {
+            const bounds = footprintManagerRef.current?.getFeatureBounds(`CTX_FP_${productId}`);
+            if (bounds) {
+              viewer.camera.flyTo({
+                destination: paddedRectangle(
+                  Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north),
+                  0.3,
+                ),
+                duration: 0.6,
+              });
+            }
           }
           return;
         }
@@ -849,6 +929,12 @@ export default function useMapViewer({
           ) as Cesium.Rectangle;
           selectLat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
           selectLon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
+        } else {
+          const bounds = footprintManagerRef.current?.getFeatureBounds(rectEntId);
+          if (bounds) {
+            selectLat = (bounds.south + bounds.north) / 2;
+            selectLon = (bounds.west + bounds.east) / 2;
+          }
         }
 
         onSelect({
@@ -869,37 +955,47 @@ export default function useMapViewer({
             destination: dest,
             duration: 0.6,
           });
-        } else if (instrument === "HIRISE" || instrument === "CRISM") {
-          // Fallback: load LBL directly to get bounds for fly-to (HIRISE/CRISM only)
-          const isHiRISE = instrument === "HIRISE";
-          const lbl = isHiRISE
-            ? await loadHiRISELBL(productId)
-            : await loadCRISMLBL(productId);
+        } else {
+          const bounds = footprintManagerRef.current?.getFeatureBounds(rectEntId);
+          if (bounds) {
+            viewer.camera.flyTo({
+              destination: paddedRectangle(
+                Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north),
+                0.6,
+              ),
+              duration: 0.6,
+            });
+          } else if (instrument === "HIRISE" || instrument === "CRISM") {
+            const isHiRISE = instrument === "HIRISE";
+            const lbl = isHiRISE
+              ? await loadHiRISELBL(productId)
+              : await loadCRISMLBL(productId);
 
-          if (lbl) {
-            const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
-            const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
-            const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
-            const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
+            if (lbl) {
+              const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
+              const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
+              const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
+              const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
 
-            if (
-              minLat != null &&
-              maxLat != null &&
-              westLon360 != null &&
-              eastLon360 != null
-            ) {
-              const west = normalizeLonTo180(westLon360);
-              const east = normalizeLonTo180(eastLon360);
-              const south = Math.min(minLat, maxLat);
-              const north = Math.max(minLat, maxLat);
+              if (
+                minLat != null &&
+                maxLat != null &&
+                westLon360 != null &&
+                eastLon360 != null
+              ) {
+                const west = normalizeLonTo180(westLon360);
+                const east = normalizeLonTo180(eastLon360);
+                const south = Math.min(minLat, maxLat);
+                const north = Math.max(minLat, maxLat);
 
-              const rect = Cesium.Rectangle.fromDegrees(west, south, east, north);
-              const dest = paddedRectangle(rect, 0.6);
+                const rect = Cesium.Rectangle.fromDegrees(west, south, east, north);
+                const dest = paddedRectangle(rect, 0.6);
 
-              viewer.camera.flyTo({
-                destination: dest,
-                duration: 0.6,
-              });
+                viewer.camera.flyTo({
+                  destination: dest,
+                  duration: 0.6,
+                });
+              }
             }
           }
         }
@@ -923,6 +1019,11 @@ export default function useMapViewer({
         viewerRef.current = null;
       }
     };
+    } catch (err) {
+      console.error('[useMapViewer] Cesium initialization failed:', err);
+      setInitError(err instanceof Error ? err.message : 'Failed to initialize map viewer');
+      return;
+    }
   }, []);
 
   // Keep cameraViewportRef updated on every camera moveEnd (for on-demand reads)
@@ -1081,6 +1182,7 @@ export default function useMapViewer({
   return {
     viewerRef,
     hover,
+    initError,
     switchSceneMode,
     switchBaseLayer,
   };
