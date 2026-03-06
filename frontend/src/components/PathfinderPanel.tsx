@@ -622,7 +622,7 @@ const RISK_BADGE: Record<string, { bg: string; text: string }> = {
 };
 
 function VLMAnalysisSection({ vlm }: { vlm: VLMAnalysis }) {
-  const risk = RISK_BADGE[vlm.risk_level] ?? RISK_BADGE.moderate!;
+  const risk = RISK_BADGE[vlm.risk_level] ?? { bg: "bg-yellow-900/50", text: "text-yellow-400" };
 
   return (
     <div className="space-y-3">
@@ -684,7 +684,7 @@ function VLMAnalysisSection({ vlm }: { vlm: VLMAnalysis }) {
 }
 
 function TerrainZoneCard({ zone }: { zone: TerrainZone }) {
-  const style = TERRAIN_TYPE_STYLES[zone.terrain_type] ?? TERRAIN_TYPE_STYLES.mixed!;
+  const style = TERRAIN_TYPE_STYLES[zone.terrain_type] ?? { icon: "blur_on", color: "text-purple-400", label: "Mixed" };
   const confPct = Math.round(zone.confidence * 100);
 
   return (
@@ -749,7 +749,7 @@ function SimulationSection({
   controls: SimulationControls;
 }) {
   const progressBarRef = useRef<HTMLDivElement>(null);
-  const _isDraggingRef = useRef(false);
+  // isDraggingRef reserved for future drag-to-seek
 
   const handleProgressBarClick = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {

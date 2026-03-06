@@ -572,7 +572,7 @@ export default function MainPage() {
     // Auto-enable visibility when loading
     const id = instrument.toLowerCase() as InstrumentId;
     setInstrumentVisibility(prev => ({ ...prev, [id]: true }));
-    setLoadFootprintsTrigger({ instrument, timestamp: Date.now() });
+    setLoadFootprintsTrigger({ instrument: instrument as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3", timestamp: Date.now() });
   }, []);
 
   const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3", loading: boolean) => {
