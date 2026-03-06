@@ -363,8 +363,8 @@ def _call_groq_vision(
 # ── Gemini Vision (fallback) ─────────────────────────────────────
 
 GEMINI_VISION_MODELS = [
-    "gemini-2.0-flash",
     "gemini-2.5-flash",
+    "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
 ]
 
@@ -413,7 +413,7 @@ def _call_gemini_vision(
                 }],
                 config={
                     "temperature": 0.2,
-                    "max_output_tokens": 2048,
+                    "max_output_tokens": 8192,
                 },
             )
             return response.text.strip(), model_name
@@ -437,11 +437,8 @@ async def analyze_terrain_vlm(
 ) -> VLMTerrainResult | None:
     """Run VLM terrain analysis on cost map data.
 
-    Provider priority:
-        1. Groq  — Llama 3.2 Vision (90B → 11B fallback)
-        2. Gemini — Google Gemini Vision (flash → lite fallback)
-
-    Returns VLMTerrainResult or None if all providers unavailable.
+    Uses Gemini 2.5 Flash as the primary (and only) VLM provider.
+    Returns VLMTerrainResult or None if unavailable.
     This is a graceful-degradation feature — route planning works
     without it, VLM just adds richer terrain intelligence.
     """
@@ -475,15 +472,11 @@ async def analyze_terrain_vlm(
         max_slope=max_slope,
     )
 
-    # 3. Try Groq (Llama Vision) first, then Gemini fallback
-    raw_text, model_used = _call_groq_vision(prompt, composite_b64)
+    # 3. Call Gemini Vision (single provider, no fallback chain)
+    raw_text, model_used = _call_gemini_vision(prompt, composite_b64)
 
     if raw_text is None:
-        logger.info("Groq Vision unavailable — falling back to Gemini Vision")
-        raw_text, model_used = _call_gemini_vision(prompt, composite_b64)
-
-    if raw_text is None:
-        logger.warning("All VLM providers unavailable — skipping terrain analysis")
+        logger.warning("Gemini Vision unavailable — skipping terrain analysis")
         return None
 
     # 4. Parse structured response
@@ -492,6 +485,60 @@ async def analyze_terrain_vlm(
 
 
 # ── Response Parsing ─────────────────────────────────────────────
+
+def _repair_truncated_json(text: str) -> str | None:
+    """Attempt to repair truncated JSON by closing unclosed braces/brackets.
+
+    VLMs sometimes exceed token limits and return cut-off JSON.
+    This finds the first '{' and closes any unclosed structures.
+    """
+    import re
+    # Find the first '{' 
+    start = text.find('{')
+    if start < 0:
+        return None
+    fragment = text[start:]
+
+    # Remove any trailing incomplete string (cut mid-value)
+    # Truncate at the last complete key-value separator
+    last_comma = fragment.rfind(',')
+    last_brace = max(fragment.rfind('}'), fragment.rfind(']'))
+    if last_comma > last_brace:
+        # Trailing incomplete value after last comma — cut it
+        fragment = fragment[:last_comma]
+
+    # Count unclosed braces and brackets
+    opens = 0
+    open_brackets = 0
+    in_string = False
+    escape = False
+    for ch in fragment:
+        if escape:
+            escape = False
+            continue
+        if ch == '\\':
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            opens += 1
+        elif ch == '}':
+            opens -= 1
+        elif ch == '[':
+            open_brackets += 1
+        elif ch == ']':
+            open_brackets -= 1
+
+    # Close unclosed structures
+    suffix = ']' * max(open_brackets, 0) + '}' * max(opens, 0)
+    if suffix:
+        return fragment + suffix
+    return fragment
+
 
 def _parse_vlm_response(
     raw_text: str,
@@ -513,20 +560,36 @@ def _parse_vlm_response(
             lines = lines[:-1]
         text = "\n".join(lines)
 
+    # Try direct parse first
+    data = None
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
+        pass
+
+    # Try extracting JSON block from text
+    if data is None:
         import re
         json_match = re.search(r'\{[\s\S]*\}', text)
         if json_match:
             try:
                 data = json.loads(json_match.group())
             except json.JSONDecodeError:
-                logger.error(f"Failed to parse VLM response as JSON: {text[:200]}")
-                return _build_fallback_result(model_used, composite_b64)
-        else:
-            logger.error(f"No JSON found in VLM response: {text[:200]}")
-            return _build_fallback_result(model_used, composite_b64)
+                pass
+
+    # Try repairing truncated JSON (close unclosed braces/brackets)
+    if data is None:
+        repaired = _repair_truncated_json(text)
+        if repaired:
+            try:
+                data = json.loads(repaired)
+                logger.info("Recovered truncated VLM JSON via brace repair")
+            except json.JSONDecodeError:
+                pass
+
+    if data is None:
+        logger.error(f"Failed to parse VLM response (len={len(text)}): {text[:300]}")
+        return _build_fallback_result(model_used, composite_b64)
 
     # Validate and build result
     try:

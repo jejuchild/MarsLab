@@ -242,13 +242,7 @@ export default function PathfinderPanel({
             </span>
           )}
         </div>
-        <span
-          className={`material-icons text-slate-400 text-sm transform transition-transform ${
-            collapsed ? "" : "rotate-180"
-          }`}
-        >
-          expand_more
-        </span>
+        <svg className={`w-4 h-4 text-slate-400 transform transition-transform ${collapsed ? "" : "rotate-180"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
       </button>
 
       {!collapsed && (
@@ -313,13 +307,7 @@ export default function PathfinderPanel({
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="flex items-center gap-1 text-slate-400 text-xs hover:text-slate-200 transition-colors"
             >
-              <span
-                className={`material-icons text-xs transform transition-transform ${
-                  showAdvanced ? "rotate-180" : ""
-                }`}
-              >
-                expand_more
-              </span>
+              <svg className={`w-3 h-3 transform transition-transform ${showAdvanced ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
               Cost Weights
             </button>
             {showAdvanced && (
