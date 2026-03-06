@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import type React from "react";
 import * as Cesium from "cesium";
 import type { RouteResult, RouteGeoPoint } from "../api/pathfinder";
@@ -13,6 +13,8 @@ const PF_GOAL_LABEL = "PATHFINDER_GOAL_LABEL";
 const PF_ROUTE = "PATHFINDER_ROUTE";
 const PF_ROUTE_OUTLINE = "PATHFINDER_ROUTE_OUTLINE";
 
+const ALL_IDS = [PF_START, PF_GOAL, PF_START_LABEL, PF_GOAL_LABEL, PF_ROUTE, PF_ROUTE_OUTLINE];
+
 /* ==================================================
  * Types
  * ==================================================*/
@@ -25,6 +27,12 @@ type UsePathfinderOverlayParams = {
   routeResult: RouteResult | null;
 };
 
+/** Safe viewer access — returns viewer only if alive */
+function getViewer(ref: React.MutableRefObject<Cesium.Viewer | null>): Cesium.Viewer | null {
+  const v = ref.current;
+  return v && !v.isDestroyed() ? v : null;
+}
+
 /* ==================================================
  * Hook
  * ==================================================*/
@@ -36,13 +44,30 @@ export default function usePathfinderOverlay({
   goalPoint,
   routeResult,
 }: UsePathfinderOverlayParams): void {
+  // Signal to re-trigger when viewer becomes available
+  const [viewerReady, setViewerReady] = useState(false);
+  const paramsRef = useRef({ viewerRef });
+  paramsRef.current.viewerRef = viewerRef;
+
+  // Poll for viewer readiness (same pattern as useRoverSimulation)
   useEffect(() => {
-    const viewer = viewerRef.current;
+    if (viewerReady) return;
+    const interval = setInterval(() => {
+      const v = getViewer(paramsRef.current.viewerRef);
+      if (v) {
+        setViewerReady(true);
+        clearInterval(interval);
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [viewerReady]);
+
+  useEffect(() => {
+    const viewer = getViewer(viewerRef);
     if (!viewer) return;
 
     // Clear all pathfinder entities
-    const ids = [PF_START, PF_GOAL, PF_START_LABEL, PF_GOAL_LABEL, PF_ROUTE, PF_ROUTE_OUTLINE];
-    for (const id of ids) {
+    for (const id of ALL_IDS) {
       const ent = viewer.entities.getById(id);
       if (ent) viewer.entities.remove(ent);
     }
@@ -145,5 +170,17 @@ export default function usePathfinderOverlay({
     }
 
     viewer.scene.requestRender();
-  }, [analysisMode, startPoint, goalPoint, routeResult, viewerRef, marsEllipsoid]);
+
+    return () => {
+      const v = getViewer(viewerRef);
+      if (v) {
+        for (const id of ALL_IDS) {
+          const ent = v.entities.getById(id);
+          if (ent) v.entities.remove(ent);
+        }
+        v.scene.requestRender();
+      }
+    };
+    // viewerReady triggers re-run when viewer becomes available
+  }, [viewerReady, analysisMode, startPoint, goalPoint, routeResult, viewerRef, marsEllipsoid]);
 }
