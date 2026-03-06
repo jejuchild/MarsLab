@@ -71,12 +71,31 @@ export interface RouteGeoPoint {
   lon: number;
 }
 
+export interface TerrainZone {
+  zone_id: number;
+  terrain_type: "bedrock" | "sand" | "regolith" | "rocky" | "ice_rich" | "mixed";
+  confidence: number;
+  traversability: "easy" | "moderate" | "difficult" | "impassable";
+  hazards: string[];
+  description: string;
+  bbox_pct: [number, number, number, number];
+}
+
+export interface VLMAnalysis {
+  zones: TerrainZone[];
+  overall_assessment: string;
+  recommended_corridors: string[];
+  risk_level: "low" | "moderate" | "high" | "extreme";
+  analysis_model: string;
+  terrain_image_b64?: string;
+
 export interface RouteResult {
   waypoints: Waypoint[];
   summary: RouteSummary;
   profiles: RouteProfile;
   sol_plan: SolPlan[];
   route_geo: RouteGeoPoint[];
+  vlm_analysis?: VLMAnalysis;
 }
 
 export interface RoverProfile {

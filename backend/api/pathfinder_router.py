@@ -152,8 +152,45 @@ async def plan_route(req: PlanRequest):
             "elapsed_s": round(cost_time, 2),
         })
 
-        # ── Step 2: Plan path (Field D* / A*) ─────────────────
-        yield _sse("progress", {"stage": "planning", "message": "Finding optimal path (Field D*)...", "pct": 45})
+        # ── Step 2: VLM Terrain Analysis (optional) ───────────
+        vlm_result = None
+        try:
+            from analysis.pathfinder.terrain_analyzer import (
+                analyze_terrain_vlm, augment_cost_grid,
+            )
+            yield _sse("progress", {
+                "stage": "vlm_analysis",
+                "message": "Analyzing terrain with AI vision (Llama Vision)...",
+                "pct": 45,
+            })
+            vlm_result = await analyze_terrain_vlm(
+                cost_result, rover_name=rover.name, max_slope=rover.max_slope_deg,
+            )
+            if vlm_result:
+                # Augment cost grid with VLM terrain intelligence
+                augmented_cost = augment_cost_grid(cost_result, vlm_result)
+                cost_result.cost_grid = augmented_cost
+                yield _sse("progress", {
+                    "stage": "vlm_done",
+                    "message": f"AI terrain analysis complete — {len(vlm_result.zones)} zones, risk: {vlm_result.risk_level}",
+                    "pct": 50,
+                })
+            else:
+                yield _sse("progress", {
+                    "stage": "vlm_skipped",
+                    "message": "VLM unavailable — using slope-based analysis only",
+                    "pct": 50,
+                })
+        except Exception as e:
+            logger.warning(f"VLM terrain analysis failed (non-fatal): {e}")
+            yield _sse("progress", {
+                "stage": "vlm_error",
+                "message": "AI terrain analysis failed — continuing with slope-based analysis",
+                "pct": 50,
+            })
+
+        # ── Step 3: Plan path (Field D* / A*) ─────────────────
+        yield _sse("progress", {"stage": "planning", "message": "Finding optimal path (Field D*)...", "pct": 55})
 
         pl = _get_planner()
         try:
@@ -179,12 +216,12 @@ async def plan_route(req: PlanRequest):
         yield _sse("progress", {
             "stage": "planning_done",
             "message": f"Path found ({plan_result.total_distance_m:.0f} m, {plan_result.cells_explored} cells explored)",
-            "pct": 70,
+            "pct": 75,
             "elapsed_s": round(plan_time, 2),
         })
 
         # ── Step 3: Generate waypoints ────────────────────────
-        yield _sse("progress", {"stage": "waypoints", "message": "Generating waypoint sequence...", "pct": 75})
+        yield _sse("progress", {"stage": "waypoints", "message": "Generating waypoint sequence...", "pct": 80})
 
         wp_mod = _get_waypoints()
         try:
@@ -202,7 +239,7 @@ async def plan_route(req: PlanRequest):
             return
 
         # ── Step 4: Sol planning ──────────────────────────────
-        yield _sse("progress", {"stage": "sol_plan", "message": "Computing sol drive plan...", "pct": 90})
+        yield _sse("progress", {"stage": "sol_plan", "message": "Computing sol drive plan...", "pct": 92})
         sol_plan = wp_mod.estimate_sol_plan(waypoint_seq, rover)
 
         total_time = time.perf_counter() - t0
@@ -223,6 +260,9 @@ async def plan_route(req: PlanRequest):
             for p in plan_result.path_geo
         ]
 
+        # Include VLM analysis if available
+        if vlm_result:
+            result["vlm_analysis"] = vlm_result.to_dict()
         yield _sse("progress", {"stage": "complete", "message": "Route planning complete", "pct": 100})
         yield _sse("result", result)
 

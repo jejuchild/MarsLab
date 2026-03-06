@@ -16,6 +16,8 @@ import {
   type RouteResult,
   type RoverProfile,
   type CostWeights,
+  type VLMAnalysis,
+  type TerrainZone,
   DEFAULT_COST_WEIGHTS,
 } from "../api/pathfinder";
 
@@ -521,6 +523,11 @@ export default function PathfinderPanel({
                   </div>
                 </div>
               )}
+
+              {/* ── VLM Terrain Analysis ─────────────────── */}
+              {result.vlm_analysis && (
+                <VLMAnalysisSection vlm={result.vlm_analysis} />
+              )}
             </div>
           )}
         </div>
@@ -549,6 +556,126 @@ function StatCard({
       <div className="min-w-0">
         <div className="text-slate-500 text-[9px] leading-tight">{label}</div>
         <div className={`text-xs font-mono font-semibold ${color}`}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+ * VLM Terrain Analysis Section
+ * =======================================================*/
+
+const TERRAIN_TYPE_STYLES: Record<string, { icon: string; color: string; label: string }> = {
+  bedrock:  { icon: "landscape",    color: "text-blue-400",   label: "Bedrock" },
+  sand:     { icon: "grain",        color: "text-yellow-400", label: "Sand" },
+  regolith: { icon: "terrain",      color: "text-slate-300",  label: "Regolith" },
+  rocky:    { icon: "filter_hdr",   color: "text-orange-400", label: "Rocky" },
+  ice_rich: { icon: "ac_unit",      color: "text-cyan-400",   label: "Ice-rich" },
+  mixed:    { icon: "blur_on",      color: "text-purple-400", label: "Mixed" },
+};
+
+const RISK_BADGE: Record<string, { bg: string; text: string }> = {
+  low:      { bg: "bg-green-900/50",  text: "text-green-400" },
+  moderate: { bg: "bg-yellow-900/50", text: "text-yellow-400" },
+  high:     { bg: "bg-orange-900/50", text: "text-orange-400" },
+  extreme:  { bg: "bg-red-900/50",    text: "text-red-400" },
+};
+
+function VLMAnalysisSection({ vlm }: { vlm: VLMAnalysis }) {
+  const risk = RISK_BADGE[vlm.risk_level] ?? RISK_BADGE.moderate;
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium text-slate-300 flex items-center gap-1">
+          <span className="material-icons text-purple-400 text-sm">psychology</span>
+          AI Terrain Analysis
+        </div>
+        <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${risk.bg} ${risk.text}`}>
+          {vlm.risk_level} risk
+        </div>
+      </div>
+
+      {/* Overall assessment */}
+      <div className="bg-slate-900/50 rounded-lg p-3">
+        <p className="text-[11px] text-slate-300 leading-relaxed">{vlm.overall_assessment}</p>
+        <div className="mt-2 flex items-center gap-1 text-[9px] text-slate-500">
+          <span className="material-icons text-[10px]">smart_toy</span>
+          {vlm.analysis_model}
+        </div>
+      </div>
+
+      {/* Recommended corridors */}
+      {vlm.recommended_corridors.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[9px] text-slate-500">Safe corridors:</span>
+          {vlm.recommended_corridors.map((c) => (
+            <span
+              key={c}
+              className="px-1.5 py-0.5 bg-green-900/30 text-green-400 rounded text-[9px] font-medium"
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Terrain zones */}
+      <div className="space-y-1.5">
+        {vlm.zones.map((zone) => (
+          <TerrainZoneCard key={zone.zone_id} zone={zone} />
+        ))}
+      </div>
+
+      {/* Composite terrain image */}
+      {vlm.terrain_image_b64 && (
+        <div>
+          <div className="text-[9px] text-slate-500 mb-1">Composite Terrain Map (R=slope, G=traversability, B=hazard)</div>
+          <img
+            src={`data:image/png;base64,${vlm.terrain_image_b64}`}
+            alt="VLM Terrain Composite"
+            className="w-full rounded-lg border border-slate-700/50"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TerrainZoneCard({ zone }: { zone: TerrainZone }) {
+  const style = TERRAIN_TYPE_STYLES[zone.terrain_type] ?? TERRAIN_TYPE_STYLES.mixed;
+  const confPct = Math.round(zone.confidence * 100);
+
+  return (
+    <div className="bg-slate-900/40 rounded-lg p-2 flex items-start gap-2">
+      <span className={`material-icons text-sm mt-0.5 ${style.color}`}>{style.icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <span className={`text-[11px] font-medium ${style.color}`}>{style.label}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] text-slate-500">{confPct}%</span>
+            <div className="w-12 h-1 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-purple-500 to-blue-400"
+                style={{ width: `${confPct}%` }}
+              />
+            </div>
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{zone.description}</p>
+        {zone.hazards.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {zone.hazards.map((h) => (
+              <span
+                key={h}
+                className="px-1 py-0.5 bg-red-900/30 text-red-400 rounded text-[8px]"
+              >
+                {h.replace(/_/g, " ")}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
