@@ -95,6 +95,15 @@ export default function AnalysisTools({
           color="sky"
           badge="NEW"
         />
+        <ToolButton
+          active={analysisMode === "pathfinder"}
+          onClick={() => toggle("pathfinder")}
+          icon="route"
+          title="Pathfinder"
+          description="AI rover route planning (Field D*)"
+          color="orange"
+          badge="NEW"
+        />
 
         {/* ── Detection & Dashboard ── */}
         <div className="mt-3">
