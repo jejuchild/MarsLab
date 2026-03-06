@@ -16,6 +16,7 @@ _surface_pipeline: object | None = None
 _dielectric_pipeline: object | None = None
 _geomorphic_pipeline: object | None = None
 _fusion_pipeline: object | None = None
+_tile_cache: dict[str, bytes] = {}  # LRU-like cache, max 200 entries
 
 
 def _as_dict(value: object) -> dict[str, object]:
@@ -141,6 +142,11 @@ def get_neutron_region(north: float, south: float, east: float, west: float):
 
 @router.get("/neutron/tile/{z}/{x}/{y}.png")
 def get_neutron_tile(z: int, x: int, y: int):
+    # Check cache first
+    cache_key = f"neutron_{z}_{x}_{y}"
+    if cache_key in _tile_cache:
+        return Response(content=_tile_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+    
     pipeline = _get_neutron()
     ensure_loaded = getattr(pipeline, "_ensure_loaded", None)
     if callable(ensure_loaded):
@@ -149,7 +155,15 @@ def get_neutron_tile(z: int, x: int, y: int):
     png_bytes = _call_method(pipeline, "get_tile", z=z, x=x, y=y)
     if not isinstance(png_bytes, (bytes, bytearray)):
         raise HTTPException(status_code=404, detail="SWIM neutron tile unavailable")
-    return Response(content=bytes(png_bytes), media_type="image/png")
+    
+    # Store in cache (simple LRU: remove oldest if cache exceeds 200 entries)
+    png_bytes = bytes(png_bytes)
+    if len(_tile_cache) >= 200:
+        oldest_key = next(iter(_tile_cache))
+        del _tile_cache[oldest_key]
+    _tile_cache[cache_key] = png_bytes
+    
+    return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/thermal/point")
@@ -165,6 +179,11 @@ def get_thermal_point(lat: float = Query(...), lon: float = Query(...)):
 
 @router.get("/thermal/tile/{z}/{x}/{y}.png")
 def get_thermal_tile(z: int, x: int, y: int):
+    # Check cache first
+    cache_key = f"thermal_{z}_{x}_{y}"
+    if cache_key in _tile_cache:
+        return Response(content=_tile_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+    
     pipeline = _get_thermal()
     ensure_loaded = getattr(pipeline, "_ensure_loaded", None)
     if callable(ensure_loaded):
@@ -173,7 +192,15 @@ def get_thermal_tile(z: int, x: int, y: int):
     png_bytes = _call_method(pipeline, "get_tile", z=z, x=x, y=y)
     if not isinstance(png_bytes, (bytes, bytearray)):
         raise HTTPException(status_code=404, detail="SWIM thermal tile unavailable")
-    return Response(content=bytes(png_bytes), media_type="image/png")
+    
+    # Store in cache (simple LRU: remove oldest if cache exceeds 200 entries)
+    png_bytes = bytes(png_bytes)
+    if len(_tile_cache) >= 200:
+        oldest_key = next(iter(_tile_cache))
+        del _tile_cache[oldest_key]
+    _tile_cache[cache_key] = png_bytes
+    
+    return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/thermal/region")
@@ -200,6 +227,11 @@ def get_radar_surface_point(lat: float = Query(...), lon: float = Query(...)):
 
 @router.get("/radar-surface/tile/{z}/{x}/{y}.png")
 def get_radar_surface_tile(z: int, x: int, y: int):
+    # Check cache first
+    cache_key = f"surface_{z}_{x}_{y}"
+    if cache_key in _tile_cache:
+        return Response(content=_tile_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+    
     pipeline = _get_surface()
     ensure_loaded = getattr(pipeline, "_ensure_loaded", None)
     if callable(ensure_loaded):
@@ -208,7 +240,15 @@ def get_radar_surface_tile(z: int, x: int, y: int):
     png_bytes = _call_method(pipeline, "get_tile", z=z, x=x, y=y)
     if not isinstance(png_bytes, (bytes, bytearray)):
         raise HTTPException(status_code=404, detail="SWIM radar-surface tile unavailable")
-    return Response(content=bytes(png_bytes), media_type="image/png")
+    
+    # Store in cache (simple LRU: remove oldest if cache exceeds 200 entries)
+    png_bytes = bytes(png_bytes)
+    if len(_tile_cache) >= 200:
+        oldest_key = next(iter(_tile_cache))
+        del _tile_cache[oldest_key]
+    _tile_cache[cache_key] = png_bytes
+    
+    return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/radar-surface/region")
@@ -236,13 +276,26 @@ def get_radar_dielectric_point(lat: float = Query(...), lon: float = Query(...))
 
 @router.get("/radar-dielectric/tile/{z}/{x}/{y}.png")
 def get_radar_dielectric_tile(z: int, x: int, y: int, depth: Literal["1-5m", "5m-plus"] = Query(...)):
+    # Check cache first
+    cache_key = f"dielectric_{depth}_{z}_{x}_{y}"
+    if cache_key in _tile_cache:
+        return Response(content=_tile_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+    
     pipeline = _get_dielectric()
     geotiff = _call_method(pipeline, "_get_geotiff_for_depth", depth=depth)
     _ensure_loaded(geotiff, f"SWIM radar-dielectric data ({depth}) not loaded")
     png_bytes = _call_method(pipeline, "get_tile", z=z, x=x, y=y, depth=depth)
     if not isinstance(png_bytes, (bytes, bytearray)):
         raise HTTPException(status_code=404, detail="SWIM radar-dielectric tile unavailable")
-    return Response(content=bytes(png_bytes), media_type="image/png")
+    
+    # Store in cache (simple LRU: remove oldest if cache exceeds 200 entries)
+    png_bytes = bytes(png_bytes)
+    if len(_tile_cache) >= 200:
+        oldest_key = next(iter(_tile_cache))
+        del _tile_cache[oldest_key]
+    _tile_cache[cache_key] = png_bytes
+    
+    return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/radar-dielectric/region")
@@ -273,13 +326,26 @@ def get_geomorphic_point(lat: float = Query(...), lon: float = Query(...)):
 
 @router.get("/geomorphic/tile/{z}/{x}/{y}.png")
 def get_geomorphic_tile(z: int, x: int, y: int, depth: Literal["0-1m", "1-5m", "5m-plus"] = Query(...)):
+    # Check cache first
+    cache_key = f"geomorphic_{depth}_{z}_{x}_{y}"
+    if cache_key in _tile_cache:
+        return Response(content=_tile_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+    
     pipeline = _get_geomorphic()
     geotiff = _call_method(pipeline, "_get_geotiff_for_depth", depth=depth)
     _ensure_loaded(geotiff, f"SWIM geomorphic data ({depth}) not loaded")
     png_bytes = _call_method(pipeline, "get_tile", z=z, x=x, y=y, depth=depth)
     if not isinstance(png_bytes, (bytes, bytearray)):
         raise HTTPException(status_code=404, detail="SWIM geomorphic tile unavailable")
-    return Response(content=bytes(png_bytes), media_type="image/png")
+    
+    # Store in cache (simple LRU: remove oldest if cache exceeds 200 entries)
+    png_bytes = bytes(png_bytes)
+    if len(_tile_cache) >= 200:
+        oldest_key = next(iter(_tile_cache))
+        del _tile_cache[oldest_key]
+    _tile_cache[cache_key] = png_bytes
+    
+    return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/geomorphic/landforms")
@@ -301,13 +367,26 @@ def get_consistency_point(lat: float = Query(...), lon: float = Query(...), mode
 
 @router.get("/consistency/tile/{z}/{x}/{y}.png")
 def get_consistency_tile(z: int, x: int, y: int, depth: Literal["0-1m", "1-5m", "5m-plus"] = Query(...)):
+    # Check cache first
+    cache_key = f"consistency_{depth}_{z}_{x}_{y}"
+    if cache_key in _tile_cache:
+        return Response(content=_tile_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
+    
     pipeline = _get_fusion()
     geotiff = _call_method(pipeline, "_get_geotiff_for_depth", depth=depth)
     _ensure_loaded(geotiff, f"SWIM consistency data ({depth}) not loaded")
     png_bytes = _call_method(pipeline, "get_tile", z=z, x=x, y=y, depth=depth)
     if not isinstance(png_bytes, (bytes, bytearray)):
         raise HTTPException(status_code=404, detail="SWIM consistency tile unavailable")
-    return Response(content=bytes(png_bytes), media_type="image/png")
+    
+    # Store in cache (simple LRU: remove oldest if cache exceeds 200 entries)
+    png_bytes = bytes(png_bytes)
+    if len(_tile_cache) >= 200:
+        oldest_key = next(iter(_tile_cache))
+        del _tile_cache[oldest_key]
+    _tile_cache[cache_key] = png_bytes
+    
+    return Response(content=png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/consistency/region")

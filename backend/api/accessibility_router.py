@@ -1,4 +1,4 @@
-"""API router for the Mars Ice Accessibility algorithm.
+"""API router for Mars ISRU Accessibility algorithm.
 
 Endpoints:
   GET /api/accessibility/score    — Point query with optional custom weights
@@ -21,9 +21,10 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse, Response
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/accessibility", tags=["Ice Accessibility"])
+router = APIRouter(prefix="/api/accessibility", tags=["ISRU Accessibility"])
 
 _pipeline: object | None = None
+_tile_cache: dict[str, bytes] = {}  # LRU-like cache, max 500 entries
 
 
 def _get_pipeline():
@@ -35,25 +36,28 @@ def _get_pipeline():
 
 
 def _parse_weights(
-    w_ice: Optional[float],
-    w_depth: Optional[float],
+    w_ice_landform: Optional[float],
+    w_water_mineral: Optional[float],
+    w_surface_ice: Optional[float],
     w_excavation: Optional[float],
     w_landing: Optional[float],
 ) -> Optional[dict[str, float]]:
     """Build weights dict from query params. Returns None if all defaults."""
-    if all(v is None for v in [w_ice, w_depth, w_excavation, w_landing]):
+    vals = [w_ice_landform, w_water_mineral, w_surface_ice, w_excavation, w_landing]
+    if all(v is None for v in vals):
         return None
     w: dict[str, float] = {}
-    if w_ice is not None:
-        w["ice_presence"] = w_ice
-    if w_depth is not None:
-        w["ice_depth"] = w_depth
+    if w_ice_landform is not None:
+        w["ice_landform"] = w_ice_landform
+    if w_water_mineral is not None:
+        w["water_mineral"] = w_water_mineral
+    if w_surface_ice is not None:
+        w["surface_ice"] = w_surface_ice
     if w_excavation is not None:
         w["excavation"] = w_excavation
     if w_landing is not None:
         w["landing"] = w_landing
     return w
-
 
 # --------------------------------------------------------------------------
 # Point query
@@ -64,27 +68,30 @@ def get_accessibility_score(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
     landform: Optional[str] = Query(None, description="Landform class: LDA, LVF, CCF, OTHER"),
-    w_ice: Optional[float] = Query(None, ge=0, le=1, alias="w_ice"),
-    w_depth: Optional[float] = Query(None, ge=0, le=1, alias="w_depth"),
-    w_excavation: Optional[float] = Query(None, ge=0, le=1, alias="w_excavation"),
-    w_landing: Optional[float] = Query(None, ge=0, le=1, alias="w_landing"),
+    landform_confidence: float = Query(1.0, ge=0, le=1),
+    w_ice_landform: Optional[float] = Query(None, ge=0, le=1),
+    w_water_mineral: Optional[float] = Query(None, ge=0, le=1),
+    w_surface_ice: Optional[float] = Query(None, ge=0, le=1),
+    w_excavation: Optional[float] = Query(None, ge=0, le=1),
+    w_landing: Optional[float] = Query(None, ge=0, le=1),
 ):
-    """Query ice accessibility score at a single point."""
+    """Query ISRU accessibility score at a single point."""
     pipeline = _get_pipeline()
-    weights = _parse_weights(w_ice, w_depth, w_excavation, w_landing)
-    # Validate landform if provided
+    weights = _parse_weights(w_ice_landform, w_water_mineral, w_surface_ice, w_excavation, w_landing)
     valid_landforms = {"LDA", "LVF", "CCF", "OTHER"}
     lf = landform.upper() if landform else None
     if lf and lf not in valid_landforms:
         lf = None
 
     try:
-        result = pipeline.query_point(lat=lat, lon=lon, weights=weights, landform=lf)
+        result = pipeline.query_point(
+            lat=lat, lon=lon, weights=weights,
+            landform=lf, landform_confidence=landform_confidence,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Accessibility computation failed: {exc}")
 
-    return JSONResponse(content=asdict(result))
-
+    return JSONResponse(content=asdict(result), headers={"Cache-Control": "public, max-age=86400"})
 
 # --------------------------------------------------------------------------
 # Tile endpoints
@@ -95,14 +102,23 @@ def get_accessibility_tile(
     z: int,
     x: int,
     y: int,
-    w_ice: Optional[float] = Query(None, ge=0, le=1),
-    w_depth: Optional[float] = Query(None, ge=0, le=1),
+    w_ice_landform: Optional[float] = Query(None, ge=0, le=1),
+    w_water_mineral: Optional[float] = Query(None, ge=0, le=1),
+    w_surface_ice: Optional[float] = Query(None, ge=0, le=1),
     w_excavation: Optional[float] = Query(None, ge=0, le=1),
     w_landing: Optional[float] = Query(None, ge=0, le=1),
 ):
     """Render accessibility heatmap tile as PNG."""
+    # Build cache key from tile coordinates and weights
+    weights = _parse_weights(w_ice_landform, w_water_mineral, w_surface_ice, w_excavation, w_landing)
+    weights_str = str(sorted(weights.items())) if weights else "default"
+    cache_key = f"accessibility_{z}_{x}_{y}_{weights_str}"
+
+    # Check cache first
+    if cache_key in _tile_cache:
+        return Response(content=_tile_cache[cache_key], media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
     pipeline = _get_pipeline()
-    weights = _parse_weights(w_ice, w_depth, w_excavation, w_landing)
 
     try:
         png_bytes = pipeline.get_tile(z=z, x=x, y=y, weights=weights)
@@ -112,10 +128,17 @@ def get_accessibility_tile(
     if png_bytes is None:
         raise HTTPException(status_code=404, detail="No data for this tile")
 
+    # Store in cache (simple LRU: remove oldest if cache exceeds 500 entries)
+    png_bytes = bytes(png_bytes)
+    if len(_tile_cache) >= 500:
+        oldest_key = next(iter(_tile_cache))
+        del _tile_cache[oldest_key]
+    _tile_cache[cache_key] = png_bytes
+
     return Response(
         content=png_bytes,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 
@@ -128,7 +151,7 @@ def get_layer_tile(
 ):
     """Render an individual data layer tile (for debug / layer panel).
 
-    Supported layers: mola_elevation, mola_slope, mola_tri, swim_consistency
+    Supported layers: mola_elevation, mola_slope, mola_tri
     """
     pipeline = _get_pipeline()
 
@@ -143,7 +166,7 @@ def get_layer_tile(
     return Response(
         content=png_bytes,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 
@@ -153,18 +176,18 @@ def get_layer_tile(
 
 @router.get("/weights")
 def get_default_weights():
-    """Return the default sub-score weights."""
+    """Return the default ISRU sub-score weights."""
     from analysis.accessibility.algorithm import DEFAULT_WEIGHTS
     return JSONResponse(content={
         "weights": DEFAULT_WEIGHTS,
         "description": {
-            "ice_presence": "How likely is ice at this location (SWIM + landform)",
-            "ice_depth": "How shallow is the ice (SWIM depth + thermal inertia)",
-            "excavation": "How easy is it to dig (thermal inertia + slope)",
+            "ice_landform": "Ice-rich landform indicator from HiRISE classification (LDA/LVF/CCF)",
+            "water_mineral": "Water-related mineral signal from CRISM classification",
+            "surface_ice": "Surface H2O ice detection from CRISM",
+            "excavation": "How easy to dig (based on TES thermal inertia)",
             "landing": "How safe for landing/traversal (elevation + slope + roughness)",
         },
     })
-
 
 @router.get("/layers")
 def get_available_layers():
@@ -187,10 +210,6 @@ def get_available_layers():
         "mola_elevation": _status(pipeline._mola_elev),
         "mola_slope": _status(pipeline._mola_slope),
         "mola_tri": _status(pipeline._mola_tri),
-        "swim_consistency_0_1m": _status(pipeline._swim_consistency),
-        "swim_depth_0_1m": _status(pipeline._swim_0_1m),
-        "swim_depth_1_5m": _status(pipeline._swim_1_5m),
-        "swim_depth_5m_plus": _status(pipeline._swim_5m_plus),
         "tes_thermal_inertia": {
             "loaded": pipeline._tes_ti_grid is not None,
             "shape": list(pipeline._tes_ti_grid.shape) if pipeline._tes_ti_grid is not None else None,
@@ -208,32 +227,30 @@ GROQ_MODEL = "llama-3.1-8b-instant"
 
 
 def _build_explain_prompt(result: dict) -> str:
-    """Build a concise prompt for the LLM from accessibility result data."""
+    """Build a concise prompt for the LLM from ISRU accessibility result data."""
     inputs = result.get("inputs", {})
     score = result.get("score", 0)
-    ip = result.get("ice_presence", 0)
-    id_ = result.get("ice_depth", 0)
+    il = result.get("ice_landform", 0)
+    wm = result.get("water_mineral", 0)
+    si = result.get("surface_ice", 0)
     ex = result.get("excavation", 0)
     la = result.get("landing", 0)
     lat = result.get("lat", 0)
     lon = result.get("lon", 0)
 
-    return f"""You are a Mars exploration scientist explaining an ice accessibility score to a researcher.
+    return f"""You are a Mars exploration scientist explaining an ISRU accessibility score to a researcher.
 
 Location: ({lat:.2f}°, {lon:.2f}°)
-Overall Score: {score:.0%}
+Overall ISRU Score: {score:.0%}
 
 Sub-scores:
-- Ice Presence: {ip:.0%}
-- Ice Depth: {id_:.0%}
+- Ice-Related Landform: {il:.0%}
+- Water-Related Mineral: {wm:.0%}
+- Surface Ice Signal: {si:.0%}
 - Excavation Feasibility: {ex:.0%}
 - Landing Safety: {la:.0%}
 
 Raw sensor data:
-- SWIM ice consistency: {inputs.get('swim_consistency', 'N/A')}
-- SWIM depth 0-1m: {inputs.get('swim_0_1m', 'N/A')}
-- SWIM depth 1-5m: {inputs.get('swim_1_5m', 'N/A')}
-- SWIM depth >5m: {inputs.get('swim_5m_plus', 'N/A')}
 - TES Thermal Inertia: {inputs.get('thermal_inertia', 'N/A')} TIU
 - MOLA Elevation: {inputs.get('elevation', 'N/A')} m
 - MOLA Slope: {inputs.get('slope', 'N/A')}°
@@ -244,10 +261,8 @@ Reference thresholds:
 - Slope < 5° = flat (safe), > 15° = steep (risky)
 - Elevation < 0m = thicker atmosphere (better for landing)
 - TRI < 50m = smooth, > 500m = very rough
-- SWIM values near +1 = strong ice signal, near -1 = no ice
 
 Write 2-3 concise sentences explaining WHY this location got this score. Be specific about which factors help and which hurt. Use plain language a researcher would appreciate — no jargon dumps, no bullet points. If a value is N/A, skip it."""
-
 
 def _call_groq(prompt: str) -> str | None:
     """Call Groq LLM for explanation. Returns None on failure."""
@@ -297,23 +312,14 @@ def _fallback_explanation(result: dict) -> str:
         elif slope > 5:
             parts.append(f"Moderate slope ({slope:.1f}°) — landing is feasible but not ideal.")
 
-    swim = inputs.get("swim_consistency")
-    if isinstance(swim, (int, float)):
-        if swim > 0.5:
-            parts.append("Strong SWIM ice signal — high confidence ice is present.")
-        elif swim > 0:
-            parts.append("Weak but positive ice signal from SWIM data.")
-        elif swim <= 0:
-            parts.append("No significant ice signal from SWIM.")
-
     elev = inputs.get("elevation")
     if isinstance(elev, (int, float)) and elev > 2000:
         parts.append(f"High elevation ({elev:.0f}m) reduces atmospheric braking for landing.")
 
     if not parts:
         if score >= 0.6:
-            return "This location shows generally favorable conditions for ice access."
-        return "This location has limited accessibility for ice extraction."
+            return "This location shows generally favorable conditions for surface operations."
+        return "This location has limited accessibility for surface operations."
 
     return " ".join(parts)
 
@@ -323,21 +329,26 @@ def get_accessibility_explanation(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
     landform: Optional[str] = Query(None, description="Landform class: LDA, LVF, CCF, OTHER"),
-    w_ice: Optional[float] = Query(None, ge=0, le=1),
-    w_depth: Optional[float] = Query(None, ge=0, le=1),
+    landform_confidence: float = Query(1.0, ge=0, le=1),
+    w_ice_landform: Optional[float] = Query(None, ge=0, le=1),
+    w_water_mineral: Optional[float] = Query(None, ge=0, le=1),
+    w_surface_ice: Optional[float] = Query(None, ge=0, le=1),
     w_excavation: Optional[float] = Query(None, ge=0, le=1),
     w_landing: Optional[float] = Query(None, ge=0, le=1),
 ):
-    """Score + LLM natural-language explanation for a point."""
+    """ISRU score + LLM natural-language explanation for a point."""
     pipeline = _get_pipeline()
-    weights = _parse_weights(w_ice, w_depth, w_excavation, w_landing)
+    weights = _parse_weights(w_ice_landform, w_water_mineral, w_surface_ice, w_excavation, w_landing)
     valid_landforms = {"LDA", "LVF", "CCF", "OTHER"}
     lf = landform.upper() if landform else None
     if lf and lf not in valid_landforms:
         lf = None
 
     try:
-        result = pipeline.query_point(lat=lat, lon=lon, weights=weights, landform=lf)
+        result = pipeline.query_point(
+            lat=lat, lon=lon, weights=weights,
+            landform=lf, landform_confidence=landform_confidence,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Computation failed: {exc}")
 
@@ -351,7 +362,6 @@ def get_accessibility_explanation(
 
     result_dict["explanation"] = explanation
     return JSONResponse(content=result_dict)
-
 
 # ── Landform cache search (class-based) ─────────────────────────────
 

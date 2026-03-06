@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   fetchAccessibilityScore,
   fetchLandformCache,
@@ -72,42 +72,99 @@ export default function AccessibilityPanel({ lat, lon }: AccessibilityPanelProps
   const [weights, setWeights] = useState<AccessibilityWeights>({ ...DEFAULT_WEIGHTS });
   const [showWeights, setShowWeights] = useState(false);
   const [landformMatch, setLandformMatch] = useState<LandformCacheEntry | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const weightsRef = useRef(weights);
+  const landformMatchCacheRef = useRef<Map<string, LandformCacheEntry | null>>(new Map());
 
-  const queryPoint = useCallback(async () => {
-    if (lat == null || lon == null) return;
+  useEffect(() => {
+    weightsRef.current = weights;
+  }, [weights]);
+
+  const findNearestLandform = useCallback(async (queryLat: number, queryLon: number) => {
+    const cacheKey = `${queryLat.toFixed(5)},${queryLon.toFixed(5)}`;
+    if (landformMatchCacheRef.current.has(cacheKey)) {
+      return landformMatchCacheRef.current.get(cacheKey) ?? null;
+    }
+
+    try {
+      const cache = await fetchLandformCache();
+      let bestEntry: LandformCacheEntry | null = null;
+      let bestDist = Infinity;
+      for (const entry of cache.entries) {
+        const dist = Math.sqrt((entry.lat - queryLat) ** 2 + (entry.lon - queryLon) ** 2);
+        if (dist < 0.5 && dist < bestDist) {
+          bestDist = dist;
+          bestEntry = entry;
+        }
+      }
+
+      const matched = bestEntry && bestEntry.dominant_class !== "OTHER" ? bestEntry : null;
+      landformMatchCacheRef.current.set(cacheKey, matched);
+      return matched;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const queryPoint = useCallback(async (queryLat: number, queryLon: number) => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     setError(null);
     setLandformMatch(null);
+
     try {
-      // Check landform cache for nearby HiRISE classification
+      const matched = await findNearestLandform(queryLat, queryLon);
+      if (controller.signal.aborted) return;
+
       let landform: string | undefined;
-      try {
-        const cache = await fetchLandformCache();
-        // Find nearest entry within ~0.5° of query point
-        let bestEntry: LandformCacheEntry | null = null;
-        let bestDist = Infinity;
-        for (const entry of cache.entries) {
-          const dist = Math.sqrt((entry.lat - lat) ** 2 + (entry.lon - lon) ** 2);
-          if (dist < 0.5 && dist < bestDist) {
-            bestDist = dist;
-            bestEntry = entry;
-          }
-        }
-        if (bestEntry && bestEntry.dominant_class !== "OTHER") {
-          landform = bestEntry.dominant_class;
-          setLandformMatch(bestEntry);
-        }
-      } catch {
-        // Landform cache unavailable — proceed without
+      if (matched) {
+        landform = matched.dominant_class;
+        setLandformMatch(matched);
       }
-      const data = await fetchAccessibilityScore(lat, lon, weights, landform);
+
+      const data = await fetchAccessibilityScore(
+        queryLat,
+        queryLon,
+        weightsRef.current,
+        landform,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
       setResult(data);
     } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (controller.signal.aborted) return;
       setError(e instanceof Error ? e.message : "Query failed");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [lat, lon, weights]);
+  }, [findNearestLandform]);
+
+  const queryCurrentPoint = useCallback(() => {
+    if (lat == null || lon == null) return;
+    void queryPoint(lat, lon);
+  }, [lat, lon, queryPoint]);
+
+  useEffect(() => {
+    if (lat == null || lon == null) return;
+    const timeoutId = window.setTimeout(() => {
+      void queryPoint(lat, lon);
+    }, 500);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [lat, lon, queryPoint]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const updateWeight = (key: keyof AccessibilityWeights, rawValue: number) => {
     const next = { ...weights, [key]: rawValue / 100 };
@@ -144,7 +201,7 @@ export default function AccessibilityPanel({ lat, lon }: AccessibilityPanelProps
         <div className="space-y-2 px-3 py-2 text-[11px] text-slate-300">
           {/* Query button */}
           <button
-            onClick={queryPoint}
+            onClick={queryCurrentPoint}
             disabled={lat == null || lon == null || loading}
             className={`w-full rounded py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
               loading
@@ -152,11 +209,29 @@ export default function AccessibilityPanel({ lat, lon }: AccessibilityPanelProps
                 : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30"
             }`}
           >
-            {loading ? "Computing…" : "Query Accessibility"}
+            {loading ? "Refreshing…" : "Refresh Accessibility"}
           </button>
 
+          {loading && (
+            <div className="space-y-1.5 rounded border border-emerald-500/20 bg-emerald-500/5 p-2 animate-pulse">
+              <div className="h-2 w-28 rounded bg-emerald-500/20" />
+              <div className="h-1.5 w-full rounded bg-slate-700/60" />
+              <div className="h-1.5 w-5/6 rounded bg-slate-700/50" />
+              <div className="h-1.5 w-2/3 rounded bg-slate-700/40" />
+            </div>
+          )}
+
           {error && (
-            <p className="text-[10px] text-red-400">{error}</p>
+            <div className="flex items-center justify-between gap-2 rounded border border-red-500/20 bg-red-500/5 px-2 py-1.5">
+              <p className="text-[10px] text-red-400">{error}</p>
+              <button
+                onClick={queryCurrentPoint}
+                disabled={lat == null || lon == null || loading}
+                className="rounded border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+              >
+                Retry
+              </button>
+            </div>
           )}
 
           {/* Results */}

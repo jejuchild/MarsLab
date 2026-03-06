@@ -1,16 +1,15 @@
-"""Accessibility pipeline — orchestrates all data layers.
+"""Accessibility pipeline — orchestrates TES + MOLA data layers.
 
-Lazily loads MOLA derived products, SWIM consistency, and TES thermal
-inertia, then delegates scoring to *algorithm.py* and tile rendering to
-*tile_renderer.py*.
+Lazily loads MOLA derived products and TES thermal inertia, then delegates
+scoring to *algorithm.py* and tile rendering to *tile_renderer.py*.
+
+No SWIM data — ice presence is handled by the landform classifier.
 """
 
 import logging
 from typing import Dict, Optional
 
 import numpy as np
-
-from analysis.swim_common.geotiff_loader import SwimGeoTIFF, load_swim_geotiff
 
 from .algorithm import (
     AccessibilityResult,
@@ -60,7 +59,7 @@ def _resample_to_target(
 
 
 class AccessibilityPipeline:
-    """Load all layers and compute accessibility scores."""
+    """Load TES + MOLA layers and compute accessibility scores."""
 
     # Target grid: 16 ppd matching MOLA derived products
     TARGET_H = 2880
@@ -72,15 +71,9 @@ class AccessibilityPipeline:
 
     def __init__(self) -> None:
         # MOLA derived (GeoTIFF, 5760×2880)
-        self._mola_elev: Optional[SwimGeoTIFF] = None
-        self._mola_slope: Optional[SwimGeoTIFF] = None
-        self._mola_tri: Optional[SwimGeoTIFF] = None
-
-        # SWIM consistency (GeoTIFF)
-        self._swim_consistency: Optional[SwimGeoTIFF] = None
-        self._swim_0_1m: Optional[SwimGeoTIFF] = None
-        self._swim_1_5m: Optional[SwimGeoTIFF] = None
-        self._swim_5m_plus: Optional[SwimGeoTIFF] = None
+        self._mola_elev = None
+        self._mola_slope = None
+        self._mola_tri = None
 
         # TES Thermal Inertia (numpy, 7200×3600, 0-360°E)
         self._tes_ti_grid: Optional[np.ndarray] = None
@@ -113,32 +106,16 @@ class AccessibilityPipeline:
             name="MOLA TRI",
         )
 
-        # SWIM consistency products
-        self._swim_consistency = load_swim_geotiff(
-            "consistency_0_1m.tif", name="SWIM Consistency 0-1m"
-        )
-        self._swim_0_1m = load_swim_geotiff(
-            "consistency_0_1m.tif", name="SWIM Depth 0-1m"
-        )
-        self._swim_1_5m = load_swim_geotiff(
-            "consistency_1_5m.tif", name="SWIM Depth 1-5m"
-        )
-        self._swim_5m_plus = load_swim_geotiff(
-            "consistency_5m_plus.tif", name="SWIM Depth 5m+"
-        )
-
         # TES Thermal Inertia (existing .npy)
         self._load_tes_ti()
 
         loaded_layers = sum(1 for g in [
             self._mola_elev, self._mola_slope, self._mola_tri,
-            self._swim_consistency, self._swim_0_1m, self._swim_1_5m,
-            self._swim_5m_plus,
         ] if g is not None and g.loaded)
         ti_ok = self._tes_ti_grid is not None
 
         logger.info(
-            "Accessibility pipeline loaded: %d GeoTIFFs + TES TI=%s",
+            "Accessibility pipeline loaded: %d MOLA GeoTIFFs + TES TI=%s",
             loaded_layers, "ok" if ti_ok else "missing",
         )
 
@@ -166,40 +143,39 @@ class AccessibilityPipeline:
         lon: float,
         weights: Optional[Dict[str, float]] = None,
         landform: Optional[str] = None,
+        landform_confidence: float = 1.0,
+        water_mineral_score: Optional[float] = None,
+        surface_ice_score: Optional[float] = None,
+        crism_obs_id: str = "",
+        crism_minerals: Optional[Dict[str, float]] = None,
     ) -> AccessibilityResult:
-        """Compute accessibility at a single point."""
+        """Compute ISRU accessibility at a single point."""
         self._ensure_loaded()
 
         # Sample each layer
-        swim_c = self._sample_geotiff(self._swim_consistency, lat, lon)
-        swim_01 = self._sample_geotiff(self._swim_0_1m, lat, lon)
-        swim_15 = self._sample_geotiff(self._swim_1_5m, lat, lon)
-        swim_5p = self._sample_geotiff(self._swim_5m_plus, lat, lon)
         ti = self._sample_tes_ti(lat, lon)
         elev = self._sample_geotiff(self._mola_elev, lat, lon)
         slope = self._sample_geotiff(self._mola_slope, lat, lon)
         tri = self._sample_geotiff(self._mola_tri, lat, lon)
 
         return compute_accessibility(
-            swim_consistency=swim_c,
-            swim_0_1m=swim_01,
-            swim_1_5m=swim_15,
-            swim_5m_plus=swim_5p,
             thermal_inertia=ti,
-            dci=None,  # DCI not available in V1
             elevation=elev,
             slope=slope,
             tri=tri,
-            landform=landform,
             lat=lat,
             lon=lon,
             weights=weights,
+            landform=landform,
+            landform_confidence=landform_confidence,
+            water_mineral_score=water_mineral_score,
+            surface_ice_score=surface_ice_score,
+            crism_obs_id=crism_obs_id,
+            crism_minerals=crism_minerals,
         )
 
     @staticmethod
-    def _sample_geotiff(
-        geo: Optional[SwimGeoTIFF], lat: float, lon: float,
-    ) -> Optional[float]:
+    def _sample_geotiff(geo, lat: float, lon: float) -> Optional[float]:
         if geo is None or not geo.loaded:
             return None
         return geo.sample_point(lat, lon)
@@ -338,9 +314,9 @@ class AccessibilityPipeline:
         lons: np.ndarray,
         shape: tuple[int, int],
     ) -> Dict[str, Optional[np.ndarray]]:
-        """Extract all data layers resampled to target lat/lon grid."""
+        """Extract TES + MOLA layers resampled to target lat/lon grid."""
 
-        def _from_geo(geo: Optional[SwimGeoTIFF]) -> Optional[np.ndarray]:
+        def _from_geo(geo) -> Optional[np.ndarray]:
             if geo is None or not geo.loaded or geo.data is None:
                 return None
             return _resample_to_target(
@@ -365,12 +341,7 @@ class AccessibilityPipeline:
             tes_ti[~lat_mask[:, None].repeat(shape[1], axis=1)] = np.nan
 
         return {
-            "swim_consistency": _from_geo(self._swim_consistency),
-            "swim_0_1m": _from_geo(self._swim_0_1m),
-            "swim_1_5m": _from_geo(self._swim_1_5m),
-            "swim_5m_plus": _from_geo(self._swim_5m_plus),
             "thermal_inertia": tes_ti,
-            "dci": None,
             "elevation": _from_geo(self._mola_elev),
             "slope": _from_geo(self._mola_slope),
             "tri": _from_geo(self._mola_tri),
@@ -391,11 +362,10 @@ class AccessibilityPipeline:
 
         from analysis.swim_common.tile_renderer import render_consistency_tile
 
-        geo_map: Dict[str, Optional[SwimGeoTIFF]] = {
+        geo_map = {
             "mola_elevation": self._mola_elev,
             "mola_slope": self._mola_slope,
             "mola_tri": self._mola_tri,
-            "swim_consistency": self._swim_consistency,
         }
 
         geo = geo_map.get(layer)

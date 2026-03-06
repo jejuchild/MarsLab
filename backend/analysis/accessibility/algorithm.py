@@ -1,19 +1,14 @@
 """
-Mars Ice Accessibility Algorithm.
+Mars ISRU Accessibility Algorithm.
 
-Computes a composite accessibility score (0-1) from four sub-scores:
-1. Ice Presence — SWIM consistency + landform classification
-2. Ice Depth — SWIM depth products + thermal inertia proxy + landform depth prior
-3. Excavation Feasibility — thermal inertia + dust cover + slope
-4. Landing & Traversability — elevation + slope + roughness
+Computes a composite accessibility score (0-1) from five sub-scores:
+1. Ice-Related Landform — HiRISE classification (LDA/LVF/CCF/OTHER)
+2. Water-Related Mineral — CRISM mineral tier scoring
+3. Surface Ice Signal — CRISM H2O Ice detection
+4. Excavation Feasibility — thermal inertia + dust cover + slope
+5. Landing & Traversability — elevation + slope + roughness
 
-Landform weighting follows SWIM 2.0 depth-stratified methodology
-(Morgan et al. 2021 Nature Astronomy; Putzig et al. 2020 swim.psi.edu):
-  - 0-1m zone: geomorphology weight = 0.2 / 2.4 ≈ 8%
-  - 1-5m zone: geomorphology weight = 1.0 / 2.3 ≈ 43%
-  - >5m zone:  geomorphology weight = 1.0 / 2.0 = 50%
-
-Higher score = more accessible ice for future missions.
+Higher score = more accessible for future ISRU missions.
 """
 
 from dataclasses import dataclass, field
@@ -21,53 +16,38 @@ from typing import Dict, Literal, Optional
 
 import numpy as np
 
-# Default weights for the composite score
+# Default weights for the composite score (5 sub-scores)
 DEFAULT_WEIGHTS: Dict[str, float] = {
-    "ice_presence": 0.35,
-    "ice_depth": 0.25,
+    "ice_landform": 0.25,
+    "water_mineral": 0.20,
+    "surface_ice": 0.15,
     "excavation": 0.20,
     "landing": 0.20,
 }
 
-# Landform ice-consistency scores (SWIM C_G mapping)
-# LDA/LVF = viscous ice-rich flow features → strongest indicator
-# CCF = ice-bearing fill → moderate indicator
-LANDFORM_BONUS: Dict[str, float] = {
-    "LDA": 1.0,
-    "LVF": 0.8,
-    "CCF": 0.6,
+# Landform → ice indicator score (from PRD)
+LANDFORM_SCORE: Dict[str, float] = {
+    "LDA": 1.0,       # Lobate Debris Apron — strongest ice indicator
+    "LVF": 0.8,       # Lineated Valley Fill
+    "CCF": 0.6,       # Concentric Crater Fill
+    "SCT": 0.9,       # Scalloped Terrain — thermokarst from ice sublimation, strong ice indicator
     "OTHER": 0.0,
+    "Uncertain": 0.0,
 }
 
-# SWIM 2.0 depth-stratified geomorphology weights
-# (shallowness ratio s = depth_of_interest / sensing_depth)
-# LDA/LVF/CCF are deep geomorphic indicators (sensing depth ~15m)
-LANDFORM_DEPTH_WEIGHTS: Dict[str, float] = {
-    "0_1m": 0.2,    # 1m / 15m ≈ 0.07, rounded up to match SWIM 2.0 C_GS
-    "1_5m": 1.0,    # 5m / 15m ≈ 0.33, but these are primary evidence at this depth
-    "5m_plus": 1.0,  # Full weight — LDA/LVF/CCF are the primary indicator here
-}
-
-# Depth prior: expected ice depth by landform type (metres)
-# Used to boost ice_depth sub-score for shallow-ice landforms
-LANDFORM_DEPTH_PRIOR: Dict[str, float] = {
-    "LDA": 0.85,  # Ice typically at 1-10m → high shallow score
-    "LVF": 0.80,  # Similar to LDA
-    "CCF": 0.55,  # Ice typically deeper (5-20m) → moderate shallow score
-    "OTHER": 0.0,
-}
 
 @dataclass
 class AccessibilityResult:
-    """Result of accessibility computation at a single point."""
+    """Result of ISRU accessibility computation at a single point."""
 
     lat: float
     lon: float
     score: float  # Composite 0-1
 
     # Sub-scores (0-1 each)
-    ice_presence: float
-    ice_depth: float
+    ice_landform: float
+    water_mineral: float
+    surface_ice: float
     excavation: float
     landing: float
 
@@ -77,9 +57,13 @@ class AccessibilityResult:
     # Raw input values
     inputs: Dict[str, object] = field(default_factory=dict)
 
+    # CRISM metadata (optional)
+    crism_obs_id: str = ""
+    crism_minerals: Dict[str, float] = field(default_factory=dict)
+
     # Data quality
     layers_available: int = 0
-    layers_total: int = 8
+    layers_total: int = 7  # TES TI, elevation, slope, TRI, landform, CRISM×2
     confidence: Literal["high", "medium", "low", "insufficient"] = "insufficient"
 
 
@@ -111,122 +95,58 @@ def _normalize_weights(w: Dict[str, float]) -> Dict[str, float]:
 # Sub-score functions (scalar)
 # ---------------------------------------------------------------------------
 
-def compute_ice_presence(
-    swim_consistency: Optional[float],
+def compute_ice_landform(
     landform: Optional[str] = None,
     landform_confidence: float = 1.0,
 ) -> Optional[float]:
     """
-    Ice Presence Score (0-1).
-    SWIM consistency (-1 to +1) normalised to 0-1, combined with landform bonus.
-
-    SWIM 2.0 weighting: for the 0-1m zone, geomorphology gets weight 0.2
-    relative to geophysics weight 1.0 (Putzig et al. 2020).
-    When only landform is available, it still provides useful signal.
+    Ice-Related Landform Score (0-1).
+    Based on HiRISE classification result.
     """
-    parts: list[float] = []
-    weights: list[float] = []
-
-    if swim_consistency is not None:
-        parts.append(_clamp((swim_consistency + 1.0) / 2.0))
-        weights.append(1.0)  # Geophysics at full weight
-
-    if landform is not None and landform in LANDFORM_BONUS:
-        bonus = LANDFORM_BONUS[landform] * _clamp(landform_confidence)
-        parts.append(bonus)
-        # SWIM 2.0: geomorphology weight depends on depth zone
-        # For ice_presence (0-1m focused), use shallow weight
-        weights.append(LANDFORM_DEPTH_WEIGHTS["0_1m"])  # 0.2
-
-    if not parts:
+    if landform is None:
         return None
+    base = LANDFORM_SCORE.get(landform, 0.0)
+    return _clamp(base * landform_confidence)
 
-    total_w = sum(weights)
-    return _clamp(sum(p * w for p, w in zip(parts, weights)) / total_w)
 
-def compute_ice_depth(
-    swim_0_1m: Optional[float],
-    swim_1_5m: Optional[float],
-    swim_5m_plus: Optional[float],
-    thermal_inertia: Optional[float],
-    landform: Optional[str] = None,
-    landform_confidence: float = 1.0,
+def compute_water_mineral(
+    water_mineral_score: Optional[float] = None,
 ) -> Optional[float]:
     """
-    Ice Depth Score (0-1). Shallower ice = higher score.
-    Low TI → fine regolith → shallower ice table.
-
-    Now includes landform depth prior: LDA/LVF indicate shallow ice (1-10m),
-    boosting the depth score with SWIM 2.0 depth-zone weighting.
+    Water-Related Mineral Score (0-1).
+    Directly from CRISM bridge pre-computed score.
     """
-    parts: list[float] = []
-    weights: list[float] = []
-
-    # SWIM depth products (depth-stratified weighting)
-    swim_vals: list[tuple[float, float]] = []
-    if swim_0_1m is not None:
-        swim_vals.append((_clamp((swim_0_1m + 1) / 2), 1.0))
-    if swim_1_5m is not None:
-        swim_vals.append((_clamp((swim_1_5m + 1) / 2), 0.6))
-    if swim_5m_plus is not None:
-        swim_vals.append((_clamp((swim_5m_plus + 1) / 2), 0.3))
-
-    if swim_vals:
-        swim_depth = sum(v * w for v, w in swim_vals) / sum(w for _, w in swim_vals)
-        parts.append(swim_depth)
-        weights.append(0.6)
-
-    # TI < 150 TIU → fine regolith → shallow ice → 1.0
-    # TI 150-300 → mixed → linear decay
-    # TI > 300 → consolidated → deep/no ice → 0.0
-    if thermal_inertia is not None and thermal_inertia > 0:
-        parts.append(_clamp(1.0 - (thermal_inertia - 150.0) / 150.0))
-        weights.append(0.4)
-
-    # Landform depth prior: LDA/LVF indicate shallow ice (1-10m)
-    # SWIM 2.0 weight for 1-5m zone = 1.0 (primary depth evidence)
-    if landform is not None and landform in LANDFORM_DEPTH_PRIOR:
-        depth_prior = LANDFORM_DEPTH_PRIOR[landform] * _clamp(landform_confidence)
-        if depth_prior > 0:
-            parts.append(depth_prior)
-            weights.append(LANDFORM_DEPTH_WEIGHTS["1_5m"] * 0.3)  # Scale down to not dominate
-
-    if not parts:
+    if water_mineral_score is None:
         return None
+    return _clamp(water_mineral_score)
 
-    return _clamp(sum(p * w for p, w in zip(parts, weights)) / sum(weights))
+
+def compute_surface_ice(
+    surface_ice_score: Optional[float] = None,
+) -> Optional[float]:
+    """
+    Surface Ice Signal Score (0-1).
+    Directly from CRISM bridge H2O Ice detection.
+    """
+    if surface_ice_score is None:
+        return None
+    return _clamp(surface_ice_score)
 
 
 def compute_excavation(
     thermal_inertia: Optional[float],
-    dci: Optional[float],
-    slope: Optional[float],
 ) -> Optional[float]:
     """
     Excavation Feasibility Score (0-1). Easier digging = higher score.
+
+    Based solely on TES Thermal Inertia (Putzig & Mellon 2007):
+      TI ≤ 200   → dust/sand, easy excavation → 1.0
+      200 < TI < 2000 → linear decay (duricrust ~889 → 0.62)
+      TI ≥ 2000  → consolidated rock → 0.0
     """
-    parts: list[float] = []
-    weights: list[float] = []
-
-    # TI < 100 → very soft → 1.0;  TI > 500 → very hard → 0.0
-    if thermal_inertia is not None and thermal_inertia > 0:
-        parts.append(_clamp(1.0 - (thermal_inertia - 100.0) / 400.0))
-        weights.append(0.5)
-
-    # DCI ~0.94 (dusty) → easy surface → 1.0;  DCI ~1.0 (rocky) → 0.0
-    if dci is not None and 0.9 <= dci <= 1.0:
-        parts.append(_clamp((1.0 - dci) / 0.06))
-        weights.append(0.25)
-
-    # Slope < 5° → 1.0;  > 15° → 0.0
-    if slope is not None and slope >= 0:
-        parts.append(_clamp(1.0 - slope / 15.0))
-        weights.append(0.25)
-
-    if not parts:
+    if thermal_inertia is None or thermal_inertia <= 0:
         return None
-
-    return _clamp(sum(p * w for p, w in zip(parts, weights)) / sum(weights))
+    return _clamp(1.0 - (thermal_inertia - 200.0) / 1800.0)
 
 
 def compute_landing(
@@ -252,7 +172,6 @@ def compute_landing(
         weights.append(0.35)
 
     # TRI < 50m → smooth plains → 1.0;  50-500m → linear decay;  > 500m → rough → 0.0
-    # (at 3km resolution, TRI is in metres; mid-lat median ~48m, p95 ~470m)
     if tri is not None and tri >= 0:
         parts.append(_clamp(1.0 - (tri - 50.0) / 450.0))
         weights.append(0.25)
@@ -268,79 +187,80 @@ def compute_landing(
 # ---------------------------------------------------------------------------
 
 def compute_accessibility(
-    swim_consistency: Optional[float] = None,
-    swim_0_1m: Optional[float] = None,
-    swim_1_5m: Optional[float] = None,
-    swim_5m_plus: Optional[float] = None,
     thermal_inertia: Optional[float] = None,
-    dci: Optional[float] = None,
     elevation: Optional[float] = None,
     slope: Optional[float] = None,
     tri: Optional[float] = None,
-    landform: Optional[str] = None,
-    landform_confidence: float = 1.0,
     lat: float = 0.0,
     lon: float = 0.0,
     weights: Optional[Dict[str, float]] = None,
+    # New ISRU params
+    landform: Optional[str] = None,
+    landform_confidence: float = 1.0,
+    water_mineral_score: Optional[float] = None,
+    surface_ice_score: Optional[float] = None,
+    crism_obs_id: str = "",
+    crism_minerals: Optional[Dict[str, float]] = None,
 ) -> AccessibilityResult:
-    """Compute full accessibility score at a single point."""
+    """Compute full ISRU accessibility score at a single point."""
     w = dict(DEFAULT_WEIGHTS)
     if weights:
         w.update(weights)
     w = _normalize_weights(w)
 
     # Sanitise
-    swim_consistency = _safe(swim_consistency)
-    swim_0_1m = _safe(swim_0_1m)
-    swim_1_5m = _safe(swim_1_5m)
-    swim_5m_plus = _safe(swim_5m_plus)
     thermal_inertia = _safe(thermal_inertia)
-    dci = _safe(dci)
     elevation = _safe(elevation)
     slope = _safe(slope)
     tri = _safe(tri)
 
     # Sub-scores
-    ip = compute_ice_presence(swim_consistency, landform, landform_confidence)
-    id_ = compute_ice_depth(swim_0_1m, swim_1_5m, swim_5m_plus, thermal_inertia,
-                            landform, landform_confidence)
-    ex = compute_excavation(thermal_inertia, dci, slope)
+    il = compute_ice_landform(landform, landform_confidence)
+    wm = compute_water_mineral(water_mineral_score)
+    si = compute_surface_ice(surface_ice_score)
+    ex = compute_excavation(thermal_inertia)
     la = compute_landing(elevation, slope, tri)
 
     layers_available = sum(
-        1 for v in [
-            swim_consistency, thermal_inertia, dci,
-            elevation, slope, tri, swim_0_1m, swim_1_5m,
-        ] if v is not None
+        1 for v in [thermal_inertia, elevation, slope, tri]
+        if v is not None
     )
-    if landform is not None and landform != "OTHER":
-        layers_available += 1  # Landform counts as an additional evidence layer
+    if landform is not None:
+        layers_available += 1
+    if water_mineral_score is not None:
+        layers_available += 1
+    if surface_ice_score is not None:
+        layers_available += 1
 
-    sub = {"ice_presence": ip, "ice_depth": id_, "excavation": ex, "landing": la}
+    sub = {
+        "ice_landform": il,
+        "water_mineral": wm,
+        "surface_ice": si,
+        "excavation": ex,
+        "landing": la,
+    }
     avail = {k: v for k, v in sub.items() if v is not None}
 
     if not avail:
         composite = 0.0
         confidence: Literal["high", "medium", "low", "insufficient"] = "insufficient"
     else:
-        avail_w = {k: w[k] for k in avail}
+        avail_w = {k: w.get(k, 0) for k in avail}
         tw = sum(avail_w.values())
         composite = sum(avail[k] * avail_w[k] for k in avail) / tw if tw > 0 else 0.0
         n = len(avail)
-        confidence = "high" if n == 4 else "medium" if n >= 3 else "low" if n >= 1 else "insufficient"
+        if n >= 4:
+            confidence = "high"
+        elif n >= 2:
+            confidence = "medium"
+        else:
+            confidence = "low"
 
     inputs: Dict[str, object] = {
-        "swim_consistency": swim_consistency,
-        "swim_0_1m": swim_0_1m,
-        "swim_1_5m": swim_1_5m,
-        "swim_5m_plus": swim_5m_plus,
         "thermal_inertia": thermal_inertia,
-        "dci": dci,
         "elevation": elevation,
         "slope": slope,
         "tri": tri,
-        "landform": landform,
-        "landform_confidence": round(landform_confidence, 4) if landform else None,
     }
     inputs = {k: round(v, 4) if isinstance(v, float) else v for k, v in inputs.items()}
 
@@ -348,13 +268,17 @@ def compute_accessibility(
         lat=lat,
         lon=lon,
         score=round(composite, 4),
-        ice_presence=round(ip, 4) if ip is not None else 0.0,
-        ice_depth=round(id_, 4) if id_ is not None else 0.0,
+        ice_landform=round(il, 4) if il is not None else 0.0,
+        water_mineral=round(wm, 4) if wm is not None else 0.0,
+        surface_ice=round(si, 4) if si is not None else 0.0,
         excavation=round(ex, 4) if ex is not None else 0.0,
         landing=round(la, 4) if la is not None else 0.0,
         weights=w,
         inputs=inputs,
+        crism_obs_id=crism_obs_id,
+        crism_minerals=crism_minerals or {},
         layers_available=layers_available,
+        layers_total=6,  # TES TI, elevation, slope, TRI, landform, CRISM
         confidence=confidence,
     )
 
@@ -384,86 +308,39 @@ def _weighted_mean_parts(
 
 
 def compute_accessibility_grid(
-    swim_consistency: Optional[np.ndarray],
-    swim_0_1m: Optional[np.ndarray],
-    swim_1_5m: Optional[np.ndarray],
-    swim_5m_plus: Optional[np.ndarray],
     thermal_inertia: Optional[np.ndarray],
-    dci: Optional[np.ndarray],
     elevation: Optional[np.ndarray],
     slope: Optional[np.ndarray],
     tri: Optional[np.ndarray],
     shape: tuple[int, int],
     weights: Optional[Dict[str, float]] = None,
-    landform_grid: Optional[np.ndarray] = None,  # 0-1 landform bonus per pixel
 ) -> np.ndarray:
-    """Vectorised accessibility for a 2D grid. Returns float32 (0-1), NaN = no data."""
+    """Vectorised accessibility for a 2D grid. Returns float32 (0-1), NaN = no data.
+
+    Note: Grid computation only uses excavation+landing (TES/MOLA data).
+    ice_landform, water_mineral, surface_ice are point-query only (per-observation).
+    """
     h, w = shape
     wd = dict(DEFAULT_WEIGHTS)
     if weights:
         wd.update(weights)
     wd = _normalize_weights(wd)
 
-    # --- Ice Presence (+ landform grid if provided) ---
-    ip_parts: list[tuple[np.ndarray, float]] = []
-    if swim_consistency is not None:
-        valid = np.isfinite(swim_consistency)
-        arr = np.full((h, w), np.nan, dtype=np.float32)
-        arr[valid] = np.clip((swim_consistency[valid] + 1.0) / 2.0, 0, 1)
-        ip_parts.append((arr, 1.0))  # Geophysics at full weight
-    if landform_grid is not None:
-        valid_lf = np.isfinite(landform_grid) & (landform_grid > 0)
-        if np.any(valid_lf):
-            lf_arr = np.full((h, w), np.nan, dtype=np.float32)
-            lf_arr[valid_lf] = np.clip(landform_grid[valid_lf], 0, 1)
-            ip_parts.append((lf_arr, LANDFORM_DEPTH_WEIGHTS["0_1m"]))  # 0.2
-    ice_pres = _weighted_mean_parts(ip_parts, shape)
+    # For grid rendering, only excavation + landing are available
+    # Renormalize weights to just these two
+    grid_keys = ["excavation", "landing"]
+    grid_w = {k: wd.get(k, 0) for k in grid_keys}
+    tw = sum(grid_w.values())
+    if tw > 0:
+        grid_w = {k: v / tw for k, v in grid_w.items()}
 
-    # --- Ice Depth (+ landform depth prior grid if provided) ---
-    id_parts: list[tuple[np.ndarray, float]] = []
-    for arr_in, arr_w in [(swim_0_1m, 1.0), (swim_1_5m, 0.6), (swim_5m_plus, 0.3)]:
-        if arr_in is not None:
-            valid = np.isfinite(arr_in)
-            a = np.full((h, w), np.nan, dtype=np.float32)
-            a[valid] = np.clip((arr_in[valid] + 1.0) / 2.0, 0, 1)
-            id_parts.append((a, arr_w))
+    # --- Excavation (TI only) ---
+    excavation: Optional[np.ndarray] = None
     if thermal_inertia is not None:
         valid = np.isfinite(thermal_inertia) & (thermal_inertia > 0)
         a = np.full((h, w), np.nan, dtype=np.float32)
-        a[valid] = np.clip(1.0 - (thermal_inertia[valid] - 150.0) / 150.0, 0, 1)
-        id_parts.append((a, 0.4))
-    if landform_grid is not None:
-        # Map landform bonus to depth prior: LDA(1.0)->0.85, LVF(0.8)->0.80,
-        # CCF(0.6)->0.55, scaled proportionally
-        valid_lf = np.isfinite(landform_grid) & (landform_grid > 0)
-        if np.any(valid_lf):
-            depth_arr = np.full((h, w), np.nan, dtype=np.float32)
-            # Linear map: bonus 1.0 -> 0.85, bonus 0.6 -> 0.55
-            depth_arr[valid_lf] = np.clip(
-                0.55 + (landform_grid[valid_lf] - 0.6) * (0.85 - 0.55) / (1.0 - 0.6),
-                0, 1,
-            )
-            id_parts.append((depth_arr, LANDFORM_DEPTH_WEIGHTS["1_5m"] * 0.3))
-    ice_depth = _weighted_mean_parts(id_parts, shape)
-
-    # --- Excavation ---
-    ex_parts: list[tuple[np.ndarray, float]] = []
-    if thermal_inertia is not None:
-        valid = np.isfinite(thermal_inertia) & (thermal_inertia > 0)
-        a = np.full((h, w), np.nan, dtype=np.float32)
-        a[valid] = np.clip(1.0 - (thermal_inertia[valid] - 100.0) / 400.0, 0, 1)
-        ex_parts.append((a, 0.5))
-    if dci is not None:
-        valid = np.isfinite(dci) & (dci >= 0.9) & (dci <= 1.0)
-        a = np.full((h, w), np.nan, dtype=np.float32)
-        a[valid] = np.clip((1.0 - dci[valid]) / 0.06, 0, 1)
-        ex_parts.append((a, 0.25))
-    if slope is not None:
-        valid = np.isfinite(slope) & (slope >= 0)
-        a = np.full((h, w), np.nan, dtype=np.float32)
-        a[valid] = np.clip(1.0 - slope[valid] / 15.0, 0, 1)
-        ex_parts.append((a, 0.25))
-    excavation = _weighted_mean_parts(ex_parts, shape)
+        a[valid] = np.clip(1.0 - (thermal_inertia[valid] - 200.0) / 1800.0, 0, 1)
+        excavation = a
 
     # --- Landing ---
     la_parts: list[tuple[np.ndarray, float]] = []
@@ -492,15 +369,13 @@ def compute_accessibility_grid(
     weight_sum = np.zeros((h, w), dtype=np.float32)
 
     for name, grid in [
-        ("ice_presence", ice_pres),
-        ("ice_depth", ice_depth),
         ("excavation", excavation),
         ("landing", landing),
     ]:
         if grid is not None:
             valid = np.isfinite(grid)
-            result[valid] += grid[valid] * wd[name]
-            weight_sum[valid] += wd[name]
+            result[valid] += grid[valid] * grid_w[name]
+            weight_sum[valid] += grid_w[name]
 
     ok = weight_sum > 0
     result[ok] /= weight_sum[ok]

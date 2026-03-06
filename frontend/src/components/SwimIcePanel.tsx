@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import IceConsistencyLegend from "./IceConsistencyLegend";
 import {
   fetchSwimConsistency,
@@ -50,21 +50,53 @@ export default function SwimIcePanel({
   const [consistency, setConsistency] = useState<SwimConsistencyPoint | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const queryPoint = useCallback(async () => {
-    if (lat == null || lon == null) return;
+  const queryPoint = useCallback(async (queryLat: number, queryLon: number) => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     setError(null);
+
     try {
-      const data = await fetchSwimConsistency(lat, lon);
+      const data = await fetchSwimConsistency(queryLat, queryLon, undefined, controller.signal);
+      if (controller.signal.aborted) return;
       setConsistency(data);
     } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      if (controller.signal.aborted) return;
       const msg = e instanceof Error ? e.message : "Query failed";
       setError(msg);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [lat, lon]);
+  }, []);
+
+  const queryCurrentPoint = useCallback(() => {
+    if (lat == null || lon == null) return;
+    void queryPoint(lat, lon);
+  }, [lat, lon, queryPoint]);
+
+  useEffect(() => {
+    if (lat == null || lon == null) return;
+    const timeoutId = window.setTimeout(() => {
+      void queryPoint(lat, lon);
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [lat, lon, queryPoint]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   /* ── Render ──────────────────────────────────────────── */
   return (
@@ -93,11 +125,11 @@ export default function SwimIcePanel({
                   Point Query
                 </span>
                 <button
-                  onClick={queryPoint}
+                  onClick={queryCurrentPoint}
                   disabled={loading}
                   className="rounded bg-blue-600/20 px-2 py-0.5 text-[10px] font-medium text-blue-300 transition-colors hover:bg-blue-600/30 disabled:opacity-50"
                 >
-                  {loading ? "Querying…" : "Query Ice"}
+                  {loading ? "Refreshing..." : "Refresh Ice"}
                 </button>
               </div>
               <div className="flex gap-3 font-mono text-[10px] text-slate-400">
@@ -105,9 +137,25 @@ export default function SwimIcePanel({
                 <span>Lon: {lon.toFixed(3)}°</span>
               </div>
 
+              {loading && (
+                <div className="space-y-1.5 rounded border border-blue-500/20 bg-blue-500/5 p-2 animate-pulse">
+                  <div className="h-2 w-24 rounded bg-blue-500/20" />
+                  <div className="h-1.5 w-full rounded bg-slate-700/60" />
+                  <div className="h-1.5 w-4/5 rounded bg-slate-700/50" />
+                  <div className="h-1.5 w-2/3 rounded bg-slate-700/40" />
+                </div>
+              )}
+
               {error && (
-                <div className="rounded border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400">
-                  {error}
+                <div className="flex items-center justify-between gap-2 rounded border border-red-500/20 bg-red-500/5 px-2 py-1 text-[10px] text-red-400">
+                  <span>{error}</span>
+                  <button
+                    onClick={queryCurrentPoint}
+                    disabled={loading}
+                    className="rounded border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    Retry
+                  </button>
                 </div>
               )}
 

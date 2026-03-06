@@ -63,6 +63,7 @@ export async function fetchAccessibilityScore(
   lon: number,
   weights?: Partial<AccessibilityWeights>,
   landform?: string,
+  signal?: AbortSignal,
 ): Promise<AccessibilityScore> {
   const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
   if (landform) params.set("landform", landform);
@@ -72,7 +73,7 @@ export async function fetchAccessibilityScore(
     if (weights.excavation != null) params.set("w_excavation", weights.excavation.toString());
     if (weights.landing != null) params.set("w_landing", weights.landing.toString());
   }
-  const res = await fetch(`/api/accessibility/score?${params}`);
+  const res = await fetch(`/api/accessibility/score?${params}`, { signal });
   if (!res.ok) throw new Error(`Accessibility query failed: ${res.status}`);
   return res.json();
 }
@@ -146,9 +147,24 @@ export function getFusionTileUrl(
  * =======================================================*/
 
 export async function fetchLandformCache(): Promise<LandformCacheResponse> {
-  const res = await fetch("/api/accessibility/landform-cache");
-  if (!res.ok) throw new Error(`Landform cache fetch failed: ${res.status}`);
-  return res.json();
+  if (!_landformCachePromise) {
+    _landformCachePromise = fetch("/api/accessibility/landform-cache")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Landform cache fetch failed: ${res.status}`);
+        return res.json();
+      })
+      .catch((error) => {
+        _landformCachePromise = null;
+        throw error;
+      });
+  }
+  return _landformCachePromise;
+}
+
+let _landformCachePromise: Promise<LandformCacheResponse> | null = null;
+
+export function clearLandformCache(): void {
+  _landformCachePromise = null;
 }
 
 export async function registerLandform(

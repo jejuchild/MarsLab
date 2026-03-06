@@ -179,10 +179,11 @@ export async function fetchSwimConsistency(
   lat: number,
   lon: number,
   mode?: "precomputed" | "live",
+  signal?: AbortSignal,
 ): Promise<SwimConsistencyPoint> {
   const params = new URLSearchParams({ lat: lat.toString(), lon: lon.toString() });
   if (mode) params.set("mode", mode);
-  const res = await fetch(`/api/swim-ice/consistency/point?${params}`);
+  const res = await fetch(`/api/swim-ice/consistency/point?${params}`, { signal });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || `SWIM consistency query failed (${res.status})`);
