@@ -924,6 +924,11 @@ export default function MainPage() {
     if (urlState.base === "MOLA" || urlState.base === "HRSC") {
       setBaseLayer(urlState.base);
     }
+
+    // Restore view mode (2D / 3D)
+    if (urlState.view === "2D" || urlState.view === "3D") {
+      setMapMode(urlState.view);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally run once on mount
 
   // --- URL State: Write on state change (debounced) ---
@@ -975,6 +980,12 @@ export default function MainPage() {
     if (!urlWriteReadyRef.current) return;
     updateUrl({ base: baseLayer !== "MOLA" ? baseLayer : undefined });
   }, [baseLayer, updateUrl]);
+
+  // Sync mapMode → view in URL (only write non-default)
+  useEffect(() => {
+    if (!urlWriteReadyRef.current) return;
+    updateUrl({ view: mapMode !== "2D" ? mapMode : undefined });
+  }, [mapMode, updateUrl]);
 
   // Track recently inspected products
   useEffect(() => {
@@ -2153,6 +2164,7 @@ export default function MainPage() {
       {!isMobile && (
         <CopilotFab
           hidden={analysisMode === "agentic"}
+          inspectorOpen={selected !== null}
           onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
           onLoadInstrument={(inst) => handleLoadFootprints(inst as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3")}
           onSelectInstrumentProduct={handleSelectInstrumentProduct}

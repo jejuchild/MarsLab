@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { NavigationSectionProps } from "../types";
 import { lp } from "../tokens";
+import CollapsibleSection from "../shared/CollapsibleSection";
 import {
   normalizeLonForMap,
   clampLatitude,
@@ -246,7 +247,7 @@ export default function NavigationSection({
   onToggleRegionLayer,
 }: NavigationSectionProps) {
   return (
-    <div className={lp.section}>
+    <CollapsibleSection title="Navigation" icon="explore" defaultOpen storageKey="navigation">
       {/* Fly To */}
       <FlyToInput onFlyToCoords={onFlyToCoords} />
 
@@ -297,6 +298,6 @@ export default function NavigationSection({
           Named Regions
         </span>
       </label>
-    </div>
+    </CollapsibleSection>
   );
 }

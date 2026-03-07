@@ -493,6 +493,8 @@ export default function ProductsHub({
     <CollapsibleSection
       title="Products"
       icon="layers"
+      defaultOpen={false}
+      storageKey="products"
       trailing={
         <span className="text-primary text-[10px] font-mono">{totalCount}</span>
       }

@@ -40,14 +40,21 @@ function newsMarkdownToHtml(md: string): string {
     // Headings
     .replace(/^### (.+)$/gm, '<h3 class="text-base font-bold text-white mt-8 mb-3 flex items-center gap-2"><span class="w-1 h-5 rounded-full bg-primary inline-block"></span>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2 class="text-lg font-bold text-white mt-8 mb-3">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold text-white mt-8 mb-4">$1</h1>')
     // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
     // Italic
     .replace(/\*(.+?)\*/g, '<em class="text-slate-300 italic">$1</em>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded bg-white/10 text-primary text-xs font-mono">$1</code>')
     // Numbered list items
     .replace(/^(\d+)\.\s+(.+)$/gm, '<li class="ml-4 mb-2 text-slate-300 list-decimal list-inside"><span>$2</span></li>')
     // Wrap consecutive <li> in <ol>
     .replace(/((?:<li[^>]*>.*<\/li>\n?)+)/g, '<ol class="my-3 space-y-1">$1</ol>')
+    // Unordered bullet lists
+    .replace(/^- (.+)$/gm, '<li class="ml-4 mb-2 text-slate-300 list-disc list-inside"><span>$1</span></li>')
+    // Wrap consecutive <li> with list-disc in <ul>
+    .replace(/((?:<li[^>]*list-disc[^>]*>.*<\/li>\n?)+)/g, '<ul class="my-3 space-y-1">$1</ul>')
     // Paragraphs (lines not already tagged)
     .split("\n\n")
     .map((block) => {
@@ -60,7 +67,6 @@ function newsMarkdownToHtml(md: string): string {
 
   return html;
 }
-
 /* =========================================================
  * Helpers
  * =======================================================*/

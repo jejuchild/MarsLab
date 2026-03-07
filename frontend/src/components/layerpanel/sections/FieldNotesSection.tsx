@@ -67,6 +67,7 @@ export default function FieldNotesSection({
       title="Field Notes"
       icon="sticky_note_2"
       defaultOpen={false}
+      storageKey="fieldnotes"
       trailing={
         <span className="text-amber-400 text-[10px] font-mono">{fieldNotes.length}</span>
       }

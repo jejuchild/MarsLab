@@ -40,6 +40,7 @@ export type SearchResult = {
 
 export default function CopilotFab({
   hidden = false,
+  inspectorOpen = false,
   onFlyTo,
   onLoadInstrument,
   onSelectInstrumentProduct,
@@ -50,6 +51,7 @@ export default function CopilotFab({
   currentLon,
 }: {
   hidden?: boolean;
+  inspectorOpen?: boolean;
   onFlyTo?: (lat: number, lon: number) => void;
   onLoadInstrument?: (instrument: string) => void;
   onSelectInstrumentProduct?: (instrument: string) => void;
@@ -180,7 +182,7 @@ export default function CopilotFab({
       {/* Expanded chat panel */}
       {expanded && (
         <div
-          className="fixed bottom-16 right-4 z-50 flex flex-col rounded-xl border border-[#232f48] bg-[#101622]/95 shadow-2xl backdrop-blur-sm"
+          className={`fixed bottom-16 z-50 flex flex-col rounded-xl border border-[#232f48] bg-[#101622]/95 shadow-2xl backdrop-blur-sm transition-all duration-200 ${inspectorOpen ? "right-[400px]" : "right-4"}`}
           style={{ width: 380, maxHeight: 480 }}
         >
           {/* Header */}
@@ -313,7 +315,7 @@ export default function CopilotFab({
       {/* FAB button */}
       <button
         onClick={() => setExpanded(prev => !prev)}
-        className={`fixed bottom-4 right-4 z-40 flex items-center gap-2 h-10 px-4 shadow-lg shadow-black/40 transition-all duration-200 ${
+        className={`fixed bottom-4 z-40 flex items-center gap-2 h-10 px-4 shadow-lg shadow-black/40 transition-all duration-200 ${inspectorOpen ? "right-[400px]" : "right-4"} ${
           expanded
             ? "bg-[#0d1520] border border-fuchsia-500/50 rounded-full"
             : "bg-[#0d1520]/90 border border-fuchsia-500/30 rounded-full hover:border-fuchsia-500/60 hover:shadow-fuchsia-500/10"

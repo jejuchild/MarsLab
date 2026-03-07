@@ -16,28 +16,49 @@ const TOUR_STEPS: TourStep[] = [
   {
     title: "Welcome to MarsLab",
     description:
-      "MarsLab is a Mars orbital data analysis workbench. Explore multi-instrument datasets from MRO including CRISM mineral spectra, HiRISE high-resolution imagery, SHARAD subsurface radar, and CTX context images -- all in one unified interface.",
+      "MarsLab is a Mars orbital data analysis workbench. Explore multi-instrument datasets from MRO \u2014 CRISM mineral spectra, HiRISE imagery, SHARAD radar, and CTX context images \u2014 all in one unified 3D globe interface.",
     icon: "rocket_launch",
     target: null,
   },
   {
-    title: "Load Instruments",
+    title: "Load Instrument Data",
     description:
-      "Use the Layers panel on the left to load instrument footprints onto the map. Toggle CRISM, HiRISE, SHARAD, CTX, and more. Click the \"Load\" button next to each instrument to fetch footprints for the current map view.",
+      "Open the Footprints section in the left panel and click \u2018Load\u2019 next to any instrument (try CRISM or HiRISE). This fetches observation footprints for the current map view. Toggle visibility with the instrument switches.",
     icon: "layers",
     target: "left-panel",
   },
   {
-    title: "Inspect Products",
+    title: "Navigate Mars",
     description:
-      "Click any footprint on the map to open the Inspector panel on the right. View product metadata, activate quickview overlays, browse spectral data, and download raw files. Use the search bar to find specific product IDs.",
+      "Drag to pan, scroll to zoom, and use \u2018Fly To\u2019 to jump to named locations like Jezero Crater or Valles Marineris. Switch between 2D Map and 3D Globe views at the top of the left panel.",
+    icon: "explore",
+    target: "center",
+  },
+  {
+    title: "Inspect Observations",
+    description:
+      "Click any footprint on the map to open the Inspector panel. View metadata, activate quickview image overlays, browse spectral data, compare products side-by-side, and download raw files from PDS.",
     icon: "info",
     target: "right-panel",
   },
   {
-    title: "AI Analysis",
+    title: "Explore Ice Detection",
     description:
-      "MarsLab includes AI-powered analysis tools. Open the Agentic AI panel for autonomous multi-instrument investigation, generate Landing Site Reports comparing regions, or use Guided Workflows for step-by-step research procedures.",
+      "The Ice Detection section combines five independent techniques \u2014 neutron spectroscopy, thermal inertia, radar surface, radar dielectric, and geomorphology \u2014 to map subsurface water ice. Toggle methods and adjust depth ranges.",
+    icon: "ac_unit",
+    target: "left-panel",
+  },
+  {
+    title: "Analysis & AI Tools",
+    description:
+      "Use Terrain Analysis tools for slope analysis, elevation profiles, and measurements. AI-powered tools include Agentic AI for autonomous investigation, Landing Site Reports for region comparison, and Guided Workflows for step-by-step research.",
+    icon: "build",
+    target: "left-panel",
+  },
+  {
+    title: "Meet MARVIS",
+    description:
+      "Click the MARVIS button in the bottom-right to chat with your AI assistant. MARVIS can navigate the map, load instruments, search for products, and answer questions about Mars. You can also save Field Notes and share your current view via URL.",
     icon: "smart_toy",
     target: null,
   },

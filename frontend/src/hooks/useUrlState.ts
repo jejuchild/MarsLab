@@ -17,6 +17,7 @@ export interface UrlState {
   product?: string;
   mode?: string;
   base?: string;
+  view?: string;
 }
 
 /** Debounce interval for URL writes (ms) */
@@ -91,6 +92,9 @@ function parseParams(params: URLSearchParams): UrlState {
   // base
   const base = params.get("base");
   if (base) state.base = base;
+  // view (2D / 3D)
+  const view = params.get("view");
+  if (view) state.view = view;
 
   return state;
 }
@@ -112,6 +116,7 @@ function serializeState(state: UrlState): URLSearchParams {
   if (state.product) params.set("product", state.product);
   if (state.mode) params.set("mode", state.mode);
   if (state.base) params.set("base", state.base);
+  if (state.view) params.set("view", state.view);
 
   return params;
 }

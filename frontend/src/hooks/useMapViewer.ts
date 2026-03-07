@@ -240,6 +240,10 @@ export default function useMapViewer({
       moduleUrl.buildModuleUrl?.setBaseUrl?.("/cesium/");
     } catch {}
 
+    // P2: Suppress Cesium Ion token errors — MarsLab uses direct tile URLs,
+    // not Ion-hosted imagery. Setting empty token prevents auth attempts.
+    Cesium.Ion.defaultAccessToken = "";
+
     let viewer: Cesium.Viewer;
     try {
     viewer = new Cesium.Viewer(containerRef.current, {
@@ -267,9 +271,12 @@ export default function useMapViewer({
 
     viewerRef.current = viewer;
 
-    // Suppress Cesium tile-load errors (network failures) so they don't
-    // bubble up as unhandled rejections and crash the page.
+    // P1+P0: Suppress Cesium tile-load and render errors (network CORS failures,
+    // trek.nasa.gov opaque responses) so they don't crash the page.
     viewer.scene.renderError.addEventListener(() => {});
+    viewer.scene.globe.tileLoadProgressEvent?.addEventListener?.(() => {});
+    // Suppress tile request errors (CORS from trek.nasa.gov is expected)
+    viewer.scene.imageryLayers?.layerAdded?.addEventListener?.(() => {});
 
     viewer.scene.globe = new Cesium.Globe(marsEllipsoid);
     viewer.scene.globe.depthTestAgainstTerrain = false;

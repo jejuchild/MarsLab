@@ -27,11 +27,7 @@ type UsePathfinderOverlayParams = {
   routeResult: RouteResult | null;
 };
 
-/** Safe viewer access — returns viewer only if alive */
-function getViewer(ref: React.MutableRefObject<Cesium.Viewer | null>): Cesium.Viewer | null {
-  const v = ref.current;
-  return v && !v.isDestroyed() ? v : null;
-}
+import { getViewer } from "../utils/viewerGuard";
 
 /* ==================================================
  * Hook

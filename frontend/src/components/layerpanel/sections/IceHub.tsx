@@ -74,7 +74,7 @@ export default function IceHub({
   ) : undefined;
 
   return (
-    <CollapsibleSection title="Ice Detection" icon="ac_unit" defaultOpen trailing={trailing}>
+    <CollapsibleSection title="Ice Detection" icon="ac_unit" defaultOpen={false} storageKey="ice" trailing={trailing}>
       {/* ── Tab Bar ── */}
       <div className="flex gap-1 mb-3">
         {TAB_DEFS.map((tab) => {

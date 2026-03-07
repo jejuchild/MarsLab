@@ -1,6 +1,14 @@
 import type { FootprintSectionProps, FootprintCount } from "../types";
-import { lp, INST_STYLES } from "../tokens";
+import { INST_STYLES } from "../tokens";
 import { INSTRUMENTS, INSTRUMENT_GROUPS } from "../../../config/instrumentRegistry";
+import CollapsibleSection from "../shared/CollapsibleSection";
+
+/** Known data-rich regions for the empty-state helper */
+const SUGGESTED_REGIONS = [
+  { name: "Jezero Crater", lat: 18.44, lon: 77.45 },
+  { name: "Valles Marineris", lat: -13.9, lon: -59.2 },
+  { name: "Olympus Mons", lat: 18.65, lon: -133.8 },
+];
 
 export default function FootprintSection({
   instrumentVisibility,
@@ -15,10 +23,29 @@ export default function FootprintSection({
   customDatasets = [],
   onCustomDatasetToggle: _onCustomDatasetToggle,
 }: FootprintSectionProps) {
-  return (
-    <div className={lp.section}>
-      <h3 className={`${lp.h3} mb-3`}>Footprints</h3>
+  // Count how many instruments have loaded data
+  const loadedCount = Object.values(footprintCounts).filter(Boolean).length;
+  const totalVisible = Object.values(footprintCounts).reduce(
+    (sum, c) => sum + ((c as FootprintCount)?.count ?? 0),
+    0,
+  );
 
+  // Check if any instrument has been loaded but shows 0 products
+  const hasLoaded = loadedCount > 0;
+  const hasZeroProducts = hasLoaded && totalVisible === 0;
+
+  const trailing = loadedCount > 0 ? (
+    <span className="text-primary text-[10px] font-mono">{totalVisible}</span>
+  ) : undefined;
+
+  return (
+    <CollapsibleSection
+      title="Footprints"
+      icon="hexagon"
+      defaultOpen={false}
+      storageKey="footprints"
+      trailing={trailing}
+    >
       <div className="space-y-1">
         {INSTRUMENT_GROUPS.map((group) => {
           const activeCount = group.instruments.filter((id) => instrumentVisibility[id]).length;
@@ -54,7 +81,7 @@ export default function FootprintSection({
                 </span>
               </button>
 
-              {/* Child instruments */}
+              {/* Child instruments — single "Load & Show" toggle per instrument */}
               <div className="pl-4 space-y-1 py-1 bg-[#0d1219]">
                 {group.instruments.map((instId) => {
                   const inst = INSTRUMENTS[instId];
@@ -62,54 +89,76 @@ export default function FootprintSection({
                   const isLoading = footprintsLoading[instId] ?? false;
                   const count = footprintCounts[instId] as FootprintCount;
                   const style = INST_STYLES[instId];
+                  const isLoaded = !!count;
+
+                  // U2: Single button replaces checkbox + Load
+                  // Not loaded → "Load" (fetches + shows)
+                  // Loaded + visible → styled active with eye icon (click hides)
+                  // Loaded + hidden → dimmed with eye-off icon (click shows)
+                  const handleClick = () => {
+                    if (isLoading) return;
+                    if (!isLoaded) {
+                      // First click: load AND show
+                      onToggleInstrument(instId, true);
+                      onLoadFootprints?.(
+                        inst.name as
+                          | "CRISM"
+                          | "HIRISE"
+                          | "SHARAD"
+                          | "SHARAD_HIGHRES"
+                          | "CTX"
+                          | "HIRISE_DTM"
+                          | "CRISM_TRR3",
+                      );
+                    } else {
+                      // Toggle visibility
+                      onToggleInstrument(instId, !isVisible);
+                    }
+                  };
 
                   return (
-                    <div key={instId} className="flex items-center gap-1.5 pr-2">
-                      <label
-                        className={`flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer transition-colors flex-1 ${
-                          isVisible ? style.bgActive : "bg-transparent hover:bg-[#1a2333]"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isVisible}
-                          onChange={(e) => onToggleInstrument(instId, e.target.checked)}
-                          className={`rounded bg-[#0a0f18] border-[#232f48] focus:ring-0 focus:ring-offset-0 ${style.checkbox}`}
-                        />
-                        <span className={`text-[10px] font-medium ${style.text}`}>{inst.subLabel}</span>
-                        {count && (
-                          <span className={`text-[8px] ${style.text} opacity-60 ml-auto`}>
-                            {count.count}
-                            {count.truncated && `/${count.total}`}
-                          </span>
-                        )}
-                      </label>
-                      <button
-                        aria-label={`Load ${inst.displayName} footprints`}
-                        onClick={() =>
-                          onLoadFootprints?.(
-                            inst.name as
-                              | "CRISM"
-                              | "HIRISE"
-                              | "SHARAD"
-                              | "SHARAD_HIGHRES"
-                              | "CTX"
-                              | "HIRISE_DTM"
-                              | "CRISM_TRR3",
-                          )
-                        }
-                        disabled={isLoading}
-                        className={`px-1.5 py-1 rounded text-[9px] font-medium transition-colors whitespace-nowrap ${
-                          isLoading ? style.btnLoading : style.btn
-                        }`}
-                      >
-                        {isLoading ? (
-                          <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                        ) : (
-                          "Load"
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      key={instId}
+                      onClick={handleClick}
+                      disabled={isLoading}
+                      className={`flex items-center gap-2 w-full py-1.5 px-2 rounded transition-colors text-left ${
+                        isLoading
+                          ? "opacity-60 cursor-wait"
+                          : isLoaded && isVisible
+                            ? style.bgActive
+                            : isLoaded
+                              ? "bg-transparent opacity-50 hover:opacity-80"
+                              : "bg-transparent hover:bg-[#1a2333]"
+                      }`}
+                    >
+                      {/* Status icon */}
+                      <span className={`material-symbols-outlined text-xs ${style.text}`}>
+                        {isLoading
+                          ? "progress_activity"
+                          : isLoaded && isVisible
+                            ? "visibility"
+                            : isLoaded
+                              ? "visibility_off"
+                              : "download"}
+                      </span>
+                      <span className={`text-[10px] font-medium flex-1 ${style.text}`}>
+                        {inst.subLabel}
+                      </span>
+                      {count && (
+                        <span className={`text-[8px] ${style.text} opacity-60`}>
+                          {count.count}
+                          {count.truncated && `/${count.total}`}
+                        </span>
+                      )}
+                      {!isLoaded && !isLoading && (
+                        <span className={`text-[8px] font-medium ${style.text} opacity-60`}>Load</span>
+                      )}
+                      {isLoading && (
+                        <span className="material-symbols-outlined text-xs animate-spin text-[#6b7c9c]">
+                          progress_activity
+                        </span>
+                      )}
+                    </button>
                   );
                 })}
               </div>
@@ -157,6 +206,29 @@ export default function FootprintSection({
           </button>
         </div>
       </div>
-    </div>
+
+      {/* U3: Contextual empty state when instruments loaded but 0 products */}
+      {hasZeroProducts && (
+        <div className="mt-3 p-3 rounded-lg border border-[#232f48] bg-[#0d1219] text-center">
+          <span className="material-symbols-outlined text-lg text-[#6b7c9c] mb-1 block">
+            search_off
+          </span>
+          <p className="text-[10px] text-[#6b7c9c] leading-relaxed mb-2">
+            No products found in the current view. Try zooming out or panning to a different area.
+          </p>
+          <p className="text-[9px] text-[#4a5a7a] font-medium mb-1">Data-rich regions:</p>
+          <div className="flex flex-wrap gap-1 justify-center">
+            {SUGGESTED_REGIONS.map((r) => (
+              <span
+                key={r.name}
+                className="text-[8px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary/70 border border-primary/20"
+              >
+                {r.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </CollapsibleSection>
   );
 }
