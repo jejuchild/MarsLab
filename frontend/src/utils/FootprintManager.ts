@@ -319,17 +319,20 @@ export class FootprintManager {
    * Clear all footprints for an instrument
    */
   clearFootprints(instrument: InstrumentType): void {
+    // Guard: viewer may already be destroyed during error cascade
+    const sceneAlive = this.viewer && !this.viewer.isDestroyed();
+
     const fill = this.fillPrimitives.get(instrument);
-    if (fill) {
+    if (fill && sceneAlive) {
       this.viewer.scene.primitives.remove(fill);
-      this.fillPrimitives.delete(instrument);
     }
+    this.fillPrimitives.delete(instrument);
 
     const outlines = this.outlineCollections.get(instrument);
-    if (outlines) {
+    if (outlines && sceneAlive) {
       this.viewer.scene.primitives.remove(outlines);
-      this.outlineCollections.delete(instrument);
     }
+    this.outlineCollections.delete(instrument);
 
     for (const [key, metadata] of this.featureMetadata) {
       if (metadata.instrument === instrument) {
@@ -340,7 +343,7 @@ export class FootprintManager {
 
     this.instanceIds.get(instrument)?.clear();
     this.features.set(instrument, []);
-    this.viewer.scene.requestRender();
+    if (sceneAlive) this.viewer.scene.requestRender();
   }
 
   /**
@@ -683,32 +686,43 @@ export class FootprintManager {
       controller.abort();
     }
 
-    for (const primitive of this.fillPrimitives.values()) {
-      this.viewer.scene.primitives.remove(primitive);
+    // Guard: viewer may already be destroyed (e.g. render error cascade)
+    const viewerAlive = this.viewer && !this.viewer.isDestroyed();
+
+    if (viewerAlive) {
+      for (const primitive of this.fillPrimitives.values()) {
+        this.viewer.scene.primitives.remove(primitive);
+      }
+      for (const outlines of this.outlineCollections.values()) {
+        this.viewer.scene.primitives.remove(outlines);
+      }
+      if (this.hoverLabelEntity) {
+        this.viewer.entities.remove(this.hoverLabelEntity);
+      }
     }
+
     this.fillPrimitives.clear();
-
-    for (const outlines of this.outlineCollections.values()) {
-      this.viewer.scene.primitives.remove(outlines);
-    }
     this.outlineCollections.clear();
-
     this.featureMetadata.clear();
     this.featureVisibility.clear();
+    this.hoverLabelEntity = null;
 
-    if (this.hoverLabelEntity) {
-      this.viewer.entities.remove(this.hoverLabelEntity);
-      this.hoverLabelEntity = null;
+    // Skip clearFootprints if viewer is dead — it calls viewer.scene.requestRender()
+    if (viewerAlive) {
+      this.clearFootprints("CRISM");
+      this.clearFootprints("HIRISE");
+      this.clearFootprints("SHARAD");
+      this.clearFootprints("SHARAD_HIGHRES");
+      this.clearFootprints("CTX");
+      this.clearFootprints("HIRISE_DTM");
+      this.clearFootprints("CRISM_TRR3");
+    } else {
+      // Just clear data structures without touching viewer
+      for (const inst of this.features.keys()) {
+        this.features.set(inst, []);
+        this.instanceIds.get(inst)?.clear();
+      }
     }
-
-    this.clearFootprints("CRISM");
-    this.clearFootprints("HIRISE");
-    this.clearFootprints("SHARAD");
-    this.clearFootprints("SHARAD_HIGHRES");
-    this.clearFootprints("CTX");
-    this.clearFootprints("HIRISE_DTM");
-    this.clearFootprints("CRISM_TRR3");
-  }
 }
 
 export default FootprintManager;

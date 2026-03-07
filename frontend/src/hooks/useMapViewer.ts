@@ -240,9 +240,10 @@ export default function useMapViewer({
       moduleUrl.buildModuleUrl?.setBaseUrl?.("/cesium/");
     } catch {}
 
-    // P2: Suppress Cesium Ion token errors — MarsLab uses direct tile URLs,
-    // not Ion-hosted imagery. Setting empty token prevents auth attempts.
-    Cesium.Ion.defaultAccessToken = "";
+    // P2: Suppress Cesium Ion — MarsLab uses direct tile URLs on Mars,
+    // not Ion-hosted Earth imagery. Prevent the default Bing Maps base
+    // layer from being created (it requires Ion auth → 401 → crash).
+    // `baseLayer: false` is the official Cesium 1.104+ API for this.
 
     let viewer: Cesium.Viewer;
     try {
@@ -254,6 +255,7 @@ export default function useMapViewer({
       animation: false,
       timeline: false,
       baseLayerPicker: false,
+      baseLayer: false,  // P2: prevent default Ion/Bing imagery
       geocoder: false,
       homeButton: false,
       navigationHelpButton: false,

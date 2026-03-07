@@ -178,8 +178,14 @@ export default function useFootprints({
       if (poll) {
         clearInterval(poll);
       }
+      // Guard: only dispose if manager exists and viewer is still alive
+      // (viewer may already be destroyed during render error cascade)
       if (footprintManagerRef.current) {
-        footprintManagerRef.current.dispose();
+        try {
+          footprintManagerRef.current.dispose();
+        } catch {
+          // Swallow errors during teardown — viewer may be in bad state
+        }
         footprintManagerRef.current = null;
       }
     };
