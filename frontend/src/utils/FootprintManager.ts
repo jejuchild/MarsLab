@@ -723,6 +723,7 @@ export class FootprintManager {
         this.instanceIds.get(inst)?.clear();
       }
     }
+  }
 }
 
 export default FootprintManager;
