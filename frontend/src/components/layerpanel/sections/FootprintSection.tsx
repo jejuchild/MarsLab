@@ -91,74 +91,78 @@ export default function FootprintSection({
                   const style = INST_STYLES[instId];
                   const isLoaded = !!count;
 
-                  // U2: Single button replaces checkbox + Load
-                  // Not loaded → "Load" (fetches + shows)
-                  // Loaded + visible → styled active with eye icon (click hides)
-                  // Loaded + hidden → dimmed with eye-off icon (click shows)
+                  // U2: Simplified controls
+                  // Not loaded → click row to load & show
+                  // Loaded → click row to toggle visibility, small reload button to re-fetch
                   const handleClick = () => {
                     if (isLoading) return;
                     if (!isLoaded) {
-                      // First click: load AND show
                       onToggleInstrument(instId, true);
-                      onLoadFootprints?.(
-                        inst.name as
-                          | "CRISM"
-                          | "HIRISE"
-                          | "SHARAD"
-                          | "SHARAD_HIGHRES"
-                          | "CTX"
-                          | "HIRISE_DTM"
-                          | "CRISM_TRR3",
-                      );
+                      onLoadFootprints?.(inst.name as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
                     } else {
-                      // Toggle visibility
                       onToggleInstrument(instId, !isVisible);
                     }
                   };
 
+                  const handleReload = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (isLoading) return;
+                    onToggleInstrument(instId, true);
+                    onLoadFootprints?.(inst.name as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
+                  };
+
                   return (
-                    <button
-                      key={instId}
-                      onClick={handleClick}
-                      disabled={isLoading}
-                      className={`flex items-center gap-2 w-full py-1.5 px-2 rounded transition-colors text-left ${
-                        isLoading
-                          ? "opacity-60 cursor-wait"
-                          : isLoaded && isVisible
-                            ? style.bgActive
-                            : isLoaded
-                              ? "bg-transparent opacity-50 hover:opacity-80"
-                              : "bg-transparent hover:bg-[#1a2333]"
-                      }`}
-                    >
-                      {/* Status icon */}
-                      <span className={`material-symbols-outlined text-xs ${style.text}`}>
-                        {isLoading
-                          ? "progress_activity"
-                          : isLoaded && isVisible
-                            ? "visibility"
-                            : isLoaded
-                              ? "visibility_off"
-                              : "download"}
-                      </span>
-                      <span className={`text-[10px] font-medium flex-1 ${style.text}`}>
-                        {inst.subLabel}
-                      </span>
-                      {count && (
-                        <span className={`text-[8px] ${style.text} opacity-60`}>
-                          {count.count}
-                          {count.truncated && `/${count.total}`}
+                    <div key={instId} className="flex items-center gap-0.5">
+                      <button
+                        onClick={handleClick}
+                        disabled={isLoading}
+                        className={`flex items-center gap-2 flex-1 py-1.5 px-2 rounded-l transition-colors text-left ${
+                          isLoading
+                            ? "opacity-60 cursor-wait"
+                            : isLoaded && isVisible
+                              ? style.bgActive
+                              : isLoaded
+                                ? "bg-transparent opacity-50 hover:opacity-80"
+                                : "bg-transparent hover:bg-[#1a2333]"
+                        }`}
+                      >
+                        <span className={`material-symbols-outlined text-xs ${style.text}`}>
+                          {isLoading
+                            ? "progress_activity"
+                            : isLoaded && isVisible
+                              ? "visibility"
+                              : isLoaded
+                                ? "visibility_off"
+                                : "download"}
                         </span>
-                      )}
-                      {!isLoaded && !isLoading && (
-                        <span className={`text-[8px] font-medium ${style.text} opacity-60`}>Load</span>
-                      )}
-                      {isLoading && (
-                        <span className="material-symbols-outlined text-xs animate-spin text-[#6b7c9c]">
-                          progress_activity
+                        <span className={`text-[10px] font-medium flex-1 ${style.text}`}>
+                          {inst.subLabel}
                         </span>
+                        {count && (
+                          <span className={`text-[8px] ${style.text} opacity-60`}>
+                            {count.count}
+                            {count.truncated && `/${count.total}`}
+                          </span>
+                        )}
+                        {!isLoaded && !isLoading && (
+                          <span className={`text-[8px] font-medium ${style.text} opacity-60`}>Load</span>
+                        )}
+                        {isLoading && (
+                          <span className="material-symbols-outlined text-xs animate-spin text-[#6b7c9c]">
+                            progress_activity
+                          </span>
+                        )}
+                      </button>
+                      {isLoaded && !isLoading && (
+                        <button
+                          onClick={handleReload}
+                          className={`p-1.5 rounded-r transition-colors ${style.text} opacity-40 hover:opacity-80 hover:bg-[#1a2333]`}
+                          title="Reload for current view"
+                        >
+                          <span className="material-symbols-outlined text-xs">refresh</span>
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
