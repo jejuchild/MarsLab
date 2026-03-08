@@ -1,8 +1,9 @@
 """Mars terrain traversability cost map generator.
 
 Computes per-pixel traversal cost from DEM elevation, slope, roughness,
-and hazard data.  Each cell in the output grid corresponds to one DEM
-pixel (~200 m at the HRSC/MOLA Blend resolution).
+and hazard data.  Supports multi-resolution DEM:
+  - HiRISE DTM (~1 m/px) when available for the region
+  - HRSC/MOLA Blend (~200 m/px) global fallback
 
 The cost map feeds directly into the Field D* path planner.
 
@@ -12,12 +13,16 @@ References:
 """
 
 import io
+import json
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Any
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Optional
 
 import numpy as np
+import rasterio
 from rasterio.windows import Window
 from scipy.ndimage import gaussian_filter
 
@@ -60,13 +65,192 @@ class CostMapResult:
     #            px_m_ns, px_m_ew, px_deg_ns, px_deg_ew
 
 
+# ── HiRISE DTM Index ───────────────────────────────────────────
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+_DTM_DIR = _BACKEND_DIR / "hirise_dtm_data"
+_DTM_INDEX = _DTM_DIR / "index.geojson"
+
+
+@lru_cache(maxsize=1)
+def _load_dtm_index() -> list[dict]:
+    """Load HiRISE DTM index as a list of {product_id, dtm_file, west, east, south, north}."""
+    if not _DTM_INDEX.exists():
+        return []
+    try:
+        with open(_DTM_INDEX) as f:
+            data = json.load(f)
+        return [feat["properties"] for feat in data.get("features", [])]
+    except Exception as e:
+        logger.warning("Failed to load HiRISE DTM index: %s", e)
+        return []
+
+
+def _find_best_hirise_dtm(
+    lat_min: float, lat_max: float,
+    lon_min: float, lon_max: float,
+) -> Optional[dict]:
+    """Find the HiRISE DTM with the best coverage for the given bbox.
+
+    Returns the DTM properties dict with the largest overlap, or None
+    if no DTM covers at least 10% of the request bbox.
+    """
+    index = _load_dtm_index()
+    if not index:
+        return None
+
+    req_area = (lat_max - lat_min) * (lon_max - lon_min)
+    if req_area <= 0:
+        return None
+
+    best_dtm = None
+    best_overlap = 0.0
+
+    for dtm in index:
+        dtm_file = dtm.get("dtm_file", "")
+        if not dtm_file:
+            continue
+        # Check file exists on disk
+        dtm_path = _DTM_DIR / dtm_file
+        if not dtm_path.exists():
+            continue
+
+        dw = dtm.get("west", 0)
+        de = dtm.get("east", 0)
+        ds_ = dtm.get("south", 0)
+        dn = dtm.get("north", 0)
+
+        # Compute overlap area
+        o_lat_min = max(lat_min, ds_)
+        o_lat_max = min(lat_max, dn)
+        o_lon_min = max(lon_min, dw)
+        o_lon_max = min(lon_max, de)
+
+        if o_lat_min >= o_lat_max or o_lon_min >= o_lon_max:
+            continue
+
+        overlap = (o_lat_max - o_lat_min) * (o_lon_max - o_lon_min)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_dtm = dtm
+
+    # Require at least 10% coverage of request bbox
+    if best_dtm and best_overlap / req_area >= 0.10:
+        return best_dtm
+    return None
+
+
 # ── DEM Extraction ──────────────────────────────────────────────
 
-def _extract_dem_bbox(
+
+def _extract_hirise_dtm_bbox(
+    dtm_props: dict,
     lat_min: float, lat_max: float,
     lon_min: float, lon_max: float,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    """Extract DEM window for a geographic bounding box.
+    """Extract elevation from a HiRISE DTM .IMG file for the given bbox.
+
+    HiRISE DTMs use projected CRS (equirectangular on Mars). We use
+    pyproj to convert lat/lon to the DTM's native CRS, then read the
+    corresponding window.
+
+    Returns (elevation_array, meta_dict).
+    """
+    from pyproj import Transformer
+
+    dtm_path = _DTM_DIR / dtm_props["dtm_file"]
+    ds = rasterio.open(dtm_path)
+
+    # Transform bbox from geographic to the DTM's projected CRS
+    crs = ds.crs
+    transformer = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+
+    # Convert corner coordinates
+    x_min, y_min = transformer.transform(lon_min, lat_min)
+    x_max, y_max = transformer.transform(lon_max, lat_max)
+
+    # Ensure min < max after projection
+    if x_min > x_max:
+        x_min, x_max = x_max, x_min
+    if y_min > y_max:
+        y_min, y_max = y_max, y_min
+
+    # Convert to pixel coordinates
+    inv_transform = ~ds.transform
+    col_min_f, row_min_f = inv_transform * (x_min, y_max)  # y_max = top
+    col_max_f, row_max_f = inv_transform * (x_max, y_min)  # y_min = bottom
+
+    col_min = max(0, int(col_min_f))
+    col_max = min(ds.width, int(col_max_f) + 1)
+    row_min = max(0, int(row_min_f))
+    row_max = min(ds.height, int(row_max_f) + 1)
+
+    if col_max <= col_min or row_max <= row_min:
+        ds.close()
+        raise ValueError(f"HiRISE DTM bbox produces empty window")
+
+    # Limit grid size to prevent OOM (max ~4000x4000 = 16M cells)
+    max_dim = 4000
+    width = col_max - col_min
+    height = row_max - row_min
+    step = 1
+    if width > max_dim or height > max_dim:
+        step = max(width // max_dim, height // max_dim, 1)
+        logger.info("HiRISE DTM subsampling by factor %d (grid too large: %dx%d)", step, height, width)
+
+    window = Window(col_min, row_min, col_max - col_min, row_max - row_min)
+    elev = ds.read(1, window=window, out_shape=(
+        (row_max - row_min + step - 1) // step,
+        (col_max - col_min + step - 1) // step,
+    )).astype(np.float32)
+
+    # Mark nodata
+    if ds.nodata is not None:
+        elev[elev == ds.nodata] = np.nan
+
+    # Pixel sizes in meters (from the DTM's native resolution)
+    px_m_ew = abs(ds.transform.a) * step  # meters per pixel in x
+    px_m_ns = abs(ds.transform.e) * step  # meters per pixel in y
+
+    # Compute degree equivalents for meta
+    mid_lat = (lat_min + lat_max) / 2.0
+    mars_circ_lat = 2 * math.pi * MARS_MEAN_RADIUS
+    mars_circ_lon = 2 * math.pi * MARS_MEAN_RADIUS * math.cos(math.radians(mid_lat))
+    px_deg_ns = px_m_ns / (mars_circ_lat / 360.0) if mars_circ_lat > 0 else 0.001
+    px_deg_ew = px_m_ew / (mars_circ_lon / 360.0) if mars_circ_lon > 0 else 0.001
+
+    ds.close()
+
+    meta = {
+        "lat_min": lat_min,
+        "lat_max": lat_max,
+        "lon_min": lon_min,
+        "lon_max": lon_max,
+        "rows": elev.shape[0],
+        "cols": elev.shape[1],
+        "px_m_ns": px_m_ns,
+        "px_m_ew": px_m_ew,
+        "px_deg_ns": px_deg_ns,
+        "px_deg_ew": px_deg_ew,
+        "dem_source": "HiRISE_DTM",
+        "dem_product_id": dtm_props.get("product_id", ""),
+        "dem_resolution_m": round(max(px_m_ns, px_m_ew), 2),
+    }
+
+    logger.info(
+        "HiRISE DTM loaded: %s — %dx%d grid @ %.1f m/px",
+        dtm_props.get("product_id", "?"), elev.shape[0], elev.shape[1],
+        max(px_m_ns, px_m_ew),
+    )
+
+    return elev, meta
+
+
+def _extract_mola_dem_bbox(
+    lat_min: float, lat_max: float,
+    lon_min: float, lon_max: float,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Extract DEM window from global HRSC/MOLA blend (~200 m/px).
 
     Returns (elevation_array, meta_dict).
     """
@@ -115,12 +299,40 @@ def _extract_dem_bbox(
         "px_m_ew": px_m_ew,
         "px_deg_ns": px_deg_ns,
         "px_deg_ew": px_deg_ew,
+        "dem_source": "MOLA",
+        "dem_resolution_m": round(max(px_m_ns, px_m_ew), 1),
         "row0": row_min,
         "col0": col_min,
     }
 
     return elev, meta
 
+
+def _extract_dem_bbox(
+    lat_min: float, lat_max: float,
+    lon_min: float, lon_max: float,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Extract DEM window for a geographic bounding box.
+
+    Multi-resolution strategy:
+      1. Search for HiRISE DTM (~1 m/px) covering the bbox
+      2. Fall back to global HRSC/MOLA blend (~200 m/px)
+
+    Returns (elevation_array, meta_dict).
+    """
+    # Try HiRISE DTM first
+    hirise = _find_best_hirise_dtm(lat_min, lat_max, lon_min, lon_max)
+    if hirise:
+        try:
+            return _extract_hirise_dtm_bbox(hirise, lat_min, lat_max, lon_min, lon_max)
+        except Exception as e:
+            logger.warning(
+                "HiRISE DTM %s failed, falling back to MOLA: %s",
+                hirise.get("product_id", "?"), e,
+            )
+
+    # Fallback: global MOLA
+    return _extract_mola_dem_bbox(lat_min, lat_max, lon_min, lon_max)
 
 # ── Terrain Derivatives ─────────────────────────────────────────
 

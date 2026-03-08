@@ -145,11 +145,19 @@ async def plan_route(req: PlanRequest):
             return
 
         cost_time = time.perf_counter() - t0
+        dem_source = cost_result.meta.get('dem_source', 'MOLA')
+        dem_res = cost_result.meta.get('dem_resolution_m', 200)
+        dem_pid = cost_result.meta.get('dem_product_id', '')
+        dem_label = f"{dem_source} ({dem_res:.0f} m/px)"
+        if dem_pid:
+            dem_label += f" [{dem_pid}]"
         yield _sse("progress", {
             "stage": "cost_map_done",
-            "message": f"Cost map ready ({cost_result.meta['rows']}×{cost_result.meta['cols']} grid)",
+            "message": f"Cost map ready ({cost_result.meta['rows']}×{cost_result.meta['cols']} grid, DEM: {dem_label})",
             "pct": 40,
             "elapsed_s": round(cost_time, 2),
+            "dem_source": dem_source,
+            "dem_resolution_m": dem_res,
         })
 
         # ── Step 2: VLM Terrain Analysis (optional) ───────────
@@ -254,6 +262,9 @@ async def plan_route(req: PlanRequest):
             "grid_size": f"{cost_result.meta['rows']}x{cost_result.meta['cols']}",
             "rover_type": req.rover_type,
             "algorithm": "field_d_star",
+            "dem_source": cost_result.meta.get('dem_source', 'MOLA'),
+            "dem_resolution_m": cost_result.meta.get('dem_resolution_m', 200),
+            "dem_product_id": cost_result.meta.get('dem_product_id', ''),
         }
         result["route_geo"] = [
             {"lat": round(p[0], 6), "lon": round(p[1], 6)}
@@ -457,6 +468,17 @@ SUGGESTED_ROUTES = [
         "difficulty": "moderate",
         "estimated_distance_km": 55.0,
         "science_interest": "high",
+    },
+    {
+        "id": "arcadia_ice_traverse",
+        "name": "Arcadia Planitia — Ice-Rich Traverse (HiRISE)",
+        "description": "High-resolution traverse through Arcadia Planitia's ice-rich terrain using 1m/px HiRISE DTM. Features periglacial polygonal terrain, sublimation pits, and potential subsurface ice deposits for ISRU.",
+        "start": {"lat": 54.3, "lon": -169.4},
+        "goal": {"lat": 54.5, "lon": -169.1},
+        "tags": ["ice", "hirise_dtm", "high_resolution", "isru", "arcadia"],
+        "difficulty": "moderate",
+        "estimated_distance_km": 18.0,
+        "science_interest": "very_high",
     },
     {
         "id": "utopia_ice",
