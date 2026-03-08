@@ -240,11 +240,20 @@ export default function useMapViewer({
       moduleUrl.buildModuleUrl?.setBaseUrl?.("/cesium/");
     } catch {}
 
-    // P2: Suppress Cesium Ion — MarsLab uses direct tile URLs on Mars,
-    // not Ion-hosted Earth imagery. Prevent the default Bing Maps base
-    // layer from being created (it requires Ion auth → 401 → crash).
-    // `baseLayer: false` is the official Cesium 1.104+ API for this.
+    // P2: Suppress Cesium Ion entirely — MarsLab uses direct tile URLs on Mars,
+    // not Ion-hosted Earth imagery. Setting defaultAccessToken to empty string
+    // prevents ALL Ion API calls (terrain metadata, credits, assets/2/endpoint).
+    // `baseLayer: false` alone only blocks the default Bing Maps layer.
+    Cesium.Ion.defaultAccessToken = "";
 
+    // Guard: ensure container has non-zero dimensions before creating viewer.
+    // Cesium crashes with `DeveloperError: Expected width > 0` if the container
+    // hasn't been laid out yet (e.g. tab hidden, CSS not applied).
+    const { clientWidth, clientHeight } = containerRef.current;
+    if (clientWidth === 0 || clientHeight === 0) {
+      console.warn('[useMapViewer] Container has zero dimensions, deferring init');
+      return;
+    }
     let viewer: Cesium.Viewer;
     try {
     viewer = new Cesium.Viewer(containerRef.current, {
