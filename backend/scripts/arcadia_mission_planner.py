@@ -1043,7 +1043,7 @@ def generate_animation(
         path_z.append(float(terrain_z[ri, ci]) + 5)  # 5m above surface
 
     # Create animation
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=(10, 6), dpi=100)
     fig.patch.set_facecolor("#0a0a0a")
     ax = fig.add_subplot(111, projection="3d")
     ax.set_facecolor("#0a0a0a")
@@ -1070,7 +1070,7 @@ def generate_animation(
     ax.set_title("Arcadia Planitia — Rover Traverse (3D)", color="white", fontsize=14)
 
     # Interpolate path to N frames
-    n_frames = 120
+    n_frames = 60
     path_indices = np.linspace(0, len(path_lons) - 1, n_frames).astype(int)
 
     def update(frame):
@@ -1091,7 +1091,7 @@ def generate_animation(
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         plt.rcParams["animation.ffmpeg_path"] = ffmpeg_path
         from matplotlib.animation import FFMpegWriter
-        writer = FFMpegWriter(fps=12, bitrate=2000)
+        writer = FFMpegWriter(fps=10, bitrate=1500)
         anim.save(str(mp4_path), writer=writer)
         log.info("  ✓ rover_traverse_3d.mp4 saved (%d frames)", n_frames)
     except Exception as e:
