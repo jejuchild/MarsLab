@@ -120,12 +120,18 @@ def _detect_reflectors(
 
 
 def _epsilon_to_consistency(epsilon_r: float) -> float:
-    if epsilon_r <= 4.5:
-        return 1.0
-    if epsilon_r >= 6.0:
-        return -1.0
-    return float(1.0 - 2.0 * (epsilon_r - 4.5) / (6.0 - 4.5))
+    """SWIM2 RD consistency score from real dielectric permittivity.
 
+    Formula (swim.psi.edu/SWIM2Products.php):
+        C_rd = -0.5 * epsilon_r + 2.5  (clamped to [-1, +1])
+
+    Calibration:
+        epsilon_r = 3.0  (pure ice)  -> C_rd = +1.0
+        epsilon_r = 5.0  (mixed)     -> C_rd =  0.0
+        epsilon_r = 7.0  (rock)      -> C_rd = -1.0
+    """
+    c_rd = -0.5 * epsilon_r + 2.5
+    return float(max(-1.0, min(1.0, c_rd)))
 
 def compute_dielectric(track: TrackData) -> DielectricResult | None:
     segments = _detect_reflectors(track.power, track.surface_bins)

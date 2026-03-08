@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
 
 import numpy as np
 
@@ -72,43 +71,55 @@ def compute_surface_power(track: TrackData) -> SurfacePowerResult | None:
     )
 
 
-def build_latitude_reference(results: list[SurfacePowerResult]) -> Callable[[np.ndarray | float], np.ndarray | float]:
+def build_global_power_stats(
+    results: list[SurfacePowerResult],
+) -> tuple[float, float]:
+    """Compute global mean and std of corrected power across ALL tracks.
+
+    SWIM2 RS methodology (swim.psi.edu/SWIM2Products.php):
+    Consistency values are assigned according to the **global** power
+    distribution expressed in sigma (standard deviation) units.
+
+    Returns (mean_dB, std_dB) of the pooled corrected-power distribution.
+    """
     if not results:
-        return lambda lat: np.zeros_like(np.asarray(lat, dtype=np.float64))
-
-    all_lat = np.concatenate([r.lat for r in results if r.lat.size > 0])
-    all_power = np.concatenate([r.p_corr_db for r in results if r.p_corr_db.size > 0])
-    if all_lat.size == 0:
-        return lambda lat: np.zeros_like(np.asarray(lat, dtype=np.float64))
-
-    band_values = np.full(36, np.nan, dtype=np.float64)
-    band_idx = np.floor((all_lat + 90.0) / 5.0).astype(int)
-    band_idx = np.clip(band_idx, 0, 35)
-    for i in range(36):
-        m = band_idx == i
-        if np.any(m):
-            band_values[i] = float(np.median(all_power[m]))
-
-    global_median = float(np.median(all_power))
-
-    def ref(lat: np.ndarray | float) -> np.ndarray | float:
-        lat_arr = np.asarray(lat, dtype=np.float64)
-        idx = np.floor((lat_arr + 90.0) / 5.0).astype(int)
-        idx = np.clip(idx, 0, 35)
-        out = band_values[idx]
-        out = np.where(np.isfinite(out), out, global_median)
-        if np.isscalar(lat):
-            return float(out)
-        return out
-
-    return ref
+        return 0.0, 1.0
+    all_power = np.concatenate(
+        [r.p_corr_db for r in results if r.p_corr_db.size > 0]
+    )
+    if all_power.size == 0:
+        return 0.0, 1.0
+    mu = float(np.mean(all_power))
+    sigma = float(np.std(all_power))
+    if sigma <= 0:
+        sigma = 1.0
+    return mu, sigma
 
 
 def score_surface_consistency(
     result: SurfacePowerResult,
-    ref_func: Callable[[np.ndarray | float], np.ndarray | float],
+    mu: float,
+    sigma: float,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    ref_vals = np.asarray(ref_func(result.lat), dtype=np.float64)
-    excess_db = result.p_corr_db - ref_vals
-    consistency = np.clip(excess_db / 3.0, -1.0, 1.0)
-    return result.lat, result.lon, consistency.astype(np.float32), result.snr
+    """Assign SWIM2 discrete RS consistency scores.
+
+    SWIM2 rubric (swim.psi.edu/SWIM2Products.php):
+      z < -1 sigma         ->  +1.0  (very low power, consistent with ice)
+      -1 sigma <= z < -0.5 sigma  ->  +0.5
+      -0.5 sigma <= z < 0.5 sigma ->   0.0  (inconclusive)
+      0.5 sigma <= z < 1 sigma    ->  -0.5
+      z >= 1 sigma         ->  -1.0  (very high power, inconsistent with ice)
+
+    Note: the sign is *inverted* vs. power: low power = ice = positive.
+    """
+    z = (result.p_corr_db - mu) / sigma
+
+    # SWIM2 5-level discrete rubric
+    consistency = np.zeros(z.size, dtype=np.float32)
+    consistency[z < -1.0] = 1.0
+    consistency[(z >= -1.0) & (z < -0.5)] = 0.5
+    # -0.5 <= z < 0.5 -> 0.0 (already initialised)
+    consistency[(z >= 0.5) & (z < 1.0)] = -0.5
+    consistency[z >= 1.0] = -1.0
+
+    return result.lat, result.lon, consistency, result.snr

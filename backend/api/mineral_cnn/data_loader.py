@@ -160,9 +160,21 @@ def resolve_trr_files(obs_id: str) -> dict:
     if not ddr_imgs or not ddr_lbls:
         raise FileNotFoundError(f"DDR files (.img + .lbl) not found in {obs_dir}")
 
+    # Prefer L-sensor I/F data over browse (BRFALL) — L-sensor has 438+ bands for CNN
+    def _prefer_if_l(paths: list[str]) -> str:
+        for p in paths:
+            upper = os.path.basename(p).upper()
+            if "_IF" in upper and "L_" in upper:
+                return p
+        # Fallback: any I/F file, then first file
+        for p in paths:
+            if "_IF" in os.path.basename(p).upper():
+                return p
+        return paths[0]
+
     return {
-        "trr_img": trr_imgs[0],
-        "trr_lbl": trr_lbls[0],
+        "trr_img": _prefer_if_l(trr_imgs),
+        "trr_lbl": _prefer_if_l(trr_lbls),
         "ddr_img": ddr_imgs[0],
         "ddr_lbl": ddr_lbls[0],
     }

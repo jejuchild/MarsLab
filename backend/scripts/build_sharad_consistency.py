@@ -23,7 +23,7 @@ _gridder = importlib.import_module("analysis.sharad_rdr_pipeline.gridder")
 list_available_products = _rdr_loader.list_available_products
 load_track_data = _rdr_loader.load_track_data
 SurfacePowerResult = _surface_power.SurfacePowerResult
-build_latitude_reference = _surface_power.build_latitude_reference
+build_global_power_stats = _surface_power.build_global_power_stats
 compute_surface_power = _surface_power.compute_surface_power
 score_surface_consistency = _surface_power.score_surface_consistency
 DielectricResult = _dielectric.DielectricResult
@@ -84,14 +84,15 @@ def main() -> int:
     )
 
     if surface_results:
-        ref_func = build_latitude_reference(surface_results)
+        mu, sigma = build_global_power_stats(surface_results)
+        print(f"Global power stats: mu={mu:.2f} dB, sigma={sigma:.2f} dB")
         s_lats: list[np.ndarray] = []
         s_lons: list[np.ndarray] = []
         s_vals: list[np.ndarray] = []
         s_w: list[np.ndarray] = []
 
         for sr in surface_results:
-            lat, lon, consistency, snr = score_surface_consistency(sr, ref_func)
+            lat, lon, consistency, snr = score_surface_consistency(sr, mu, sigma)
             if consistency.size == 0:
                 continue
             s_lats.append(lat)
