@@ -876,16 +876,16 @@ function SimulationSection({
           <SimStatCard
             icon="trending_up"
             label="Slope"
-            value={`${telemetry.currentSlope.toFixed(1)}°`}
+            value={`${(telemetry.currentSlope ?? 0).toFixed(1)}°`}
             color={
-              telemetry.currentSlope > 10 ? "text-red-400"
-              : telemetry.currentSlope > 5 ? "text-amber-400"
+              (telemetry.currentSlope ?? 0) > 10 ? "text-red-400"
+              : (telemetry.currentSlope ?? 0) > 5 ? "text-amber-400"
               : "text-emerald-400"
             }
           />
-          <SimStatCard icon="height" label="Elevation" value={`${telemetry.currentElevation.toFixed(0)} m`} />
-          <SimStatCard icon="explore" label="Heading" value={`${telemetry.currentHeading.toFixed(0)}°`} />
-          <SimStatCard icon="speed" label="Speed" value={`${telemetry.speedMPerS.toFixed(3)} m/s`} />
+          <SimStatCard icon="height" label="Elevation" value={`${(telemetry.currentElevation ?? 0).toFixed(0)} m`} />
+          <SimStatCard icon="explore" label="Heading" value={`${(telemetry.currentHeading ?? 0).toFixed(0)}°`} />
+          <SimStatCard icon="speed" label="Speed" value={`${(telemetry.speedMPerS ?? 0).toFixed(3)} m/s`} />
           <SimStatCard
             icon={TERRAIN_ICON_MAP[telemetry.currentTerrainType] ?? "blur_on"}
             label="Terrain"

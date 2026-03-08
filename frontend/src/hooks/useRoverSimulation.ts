@@ -92,7 +92,7 @@ function interpolateWaypoint(
   if (segLen <= 0) return { wp: wpA, index: lo };
 
   const t = (targetDist - wpA.distance_from_start) / segLen;
-  const lerp = (a: number, b: number) => a + (b - a) * t;
+  const lerp = (a: number, b: number) => (a ?? 0) + ((b ?? 0) - (a ?? 0)) * t;
 
   return {
     wp: {
