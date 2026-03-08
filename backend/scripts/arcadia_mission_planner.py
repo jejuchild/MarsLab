@@ -585,6 +585,22 @@ def find_science_waypoints(
 # Phase 5: Rover Traverse
 # ═══════════════════════════════════════════════════════════════
 
+def _snap_to_traversable(cost_grid: np.ndarray, row: int, col: int, max_radius: int = 50) -> Tuple[int, int]:
+    """Find nearest traversable cell via spiral search from (row, col)."""
+    rows, cols = cost_grid.shape
+    if 0 <= row < rows and 0 <= col < cols and np.isfinite(cost_grid[row, col]):
+        return (row, col)
+    for radius in range(1, max_radius + 1):
+        for dr in range(-radius, radius + 1):
+            for dc in range(-radius, radius + 1):
+                if abs(dr) != radius and abs(dc) != radius:
+                    continue  # only check perimeter
+                r2, c2 = row + dr, col + dc
+                if 0 <= r2 < rows and 0 <= c2 < cols and np.isfinite(cost_grid[r2, c2]):
+                    return (r2, c2)
+    return (row, col)  # fallback
+
+
 def plan_traverse(
     landing: SiteCandidate, waypoints: List[ScienceWaypoint]
 ) -> Optional[Dict[str, Any]]:
@@ -594,7 +610,7 @@ def plan_traverse(
 
     try:
         from analysis.pathfinder.cost_map import compute_cost_map_for_route
-        from analysis.pathfinder.planner import plan_geo
+        from analysis.pathfinder.planner import plan_geo, _geo_to_grid, _grid_to_geo, MarsPathPlanner
         from analysis.pathfinder.waypoints import generate_waypoints, estimate_sol_plan
         from analysis.pathfinder.rover_models import PERSEVERANCE
     except ImportError as e:
@@ -617,16 +633,40 @@ def plan_traverse(
 
     log.info("  Route: (%.4f, %.4f) → (%.4f, %.4f)", landing.lat, landing.lon, target_lat, target_lon)
 
-    # Try planning with margin
-    for attempt, (dlat, dlon) in enumerate([(0, 0), (0.01, 0.01), (-0.01, -0.01), (0.02, 0), (0, 0.02)]):
+    # Try planning — first compute cost map, then snap start/goal to traversable cells
+    for attempt, (dlat, dlon) in enumerate([(0, 0), (0.01, 0.01), (-0.01, -0.01)]):
         sl = landing.lat + dlat
         slo = landing.lon + dlon
         gl = target_lat + dlat
         glo = target_lon + dlon
 
         try:
-            cost_result = compute_cost_map_for_route(sl, slo, gl, glo, margin_km=3.0, rover=PERSEVERANCE)
-            plan = plan_geo(sl, slo, gl, glo, cost_result, PERSEVERANCE)
+            cost_result = compute_cost_map_for_route(sl, slo, gl, glo, margin_km=5.0, rover=PERSEVERANCE)
+            meta = cost_result.meta
+            cost_grid = cost_result.cost_grid
+
+            # Convert to grid and snap to nearest traversable cell
+            sr, sc = _geo_to_grid(sl, slo, meta)
+            gr, gc = _geo_to_grid(gl, glo, meta)
+
+            sr2, sc2 = _snap_to_traversable(cost_grid, sr, sc, max_radius=80)
+            gr2, gc2 = _snap_to_traversable(cost_grid, gr, gc, max_radius=80)
+
+            if not np.isfinite(cost_grid[sr2, sc2]) or not np.isfinite(cost_grid[gr2, gc2]):
+                log.info("  Attempt %d: no traversable cell near start/goal within radius", attempt + 1)
+                continue
+
+            # Convert snapped grid cells back to geo
+            snap_start_lat, snap_start_lon = _grid_to_geo(sr2, sc2, meta)
+            snap_goal_lat, snap_goal_lon = _grid_to_geo(gr2, gc2, meta)
+
+            log.info("  Snapped start: (%.4f, %.4f) → (%.4f, %.4f) [shift %d cells]",
+                     sl, slo, snap_start_lat, snap_start_lon, abs(sr2 - sr) + abs(sc2 - sc))
+            log.info("  Snapped goal:  (%.4f, %.4f) → (%.4f, %.4f) [shift %d cells]",
+                     gl, glo, snap_goal_lat, snap_goal_lon, abs(gr2 - gr) + abs(gc2 - gc))
+
+            # Plan with snapped coordinates
+            plan = plan_geo(snap_start_lat, snap_start_lon, snap_goal_lat, snap_goal_lon, cost_result, PERSEVERANCE)
 
             if plan.success:
                 log.info("  ✓ Route found (attempt %d): %.0f m, %d cells explored", attempt + 1, plan.total_distance_m, plan.cells_explored)
@@ -645,8 +685,8 @@ def plan_traverse(
                     "cost_result": cost_result,
                     "waypoint_seq": wp_seq,
                     "sol_plan": sol_plan,
-                    "start": (sl, slo),
-                    "goal": (gl, glo),
+                    "start": (snap_start_lat, snap_start_lon),
+                    "goal": (snap_goal_lat, snap_goal_lon),
                     "target_name": target.name,
                     "dem_source": cost_result.meta.get("dem_source", "MOLA"),
                     "dem_resolution_m": cost_result.meta.get("dem_resolution_m", 200),
@@ -655,10 +695,69 @@ def plan_traverse(
                 log.info("  Attempt %d failed: %s", attempt + 1, plan.message)
         except Exception as e:
             log.info("  Attempt %d error: %s", attempt + 1, e)
+            import traceback
+            traceback.print_exc()
+
+    # Last resort: try with MOLA (lower resolution, more likely to succeed)
+    log.info("  Trying MOLA fallback (no HiRISE)...")
+    try:
+        from analysis.pathfinder.cost_map import compute_cost_map
+        from analysis.pathfinder.mars_constants import meters_per_degree_lat, meters_per_degree_lon
+        mid_lat = (landing.lat + target_lat) / 2.0
+        margin_deg_lat = 5.0 / (meters_per_degree_lat(mid_lat) / 1000.0)
+        margin_deg_lon = 5.0 / (meters_per_degree_lon(mid_lat) / 1000.0)
+        lat_min = min(landing.lat, target_lat) - margin_deg_lat
+        lat_max = max(landing.lat, target_lat) + margin_deg_lat
+        lon_min = min(landing.lon, target_lon) - margin_deg_lon
+        lon_max = max(landing.lon, target_lon) + margin_deg_lon
+
+        # Force MOLA by temporarily hiding HiRISE index
+        import analysis.pathfinder.cost_map as cm_mod
+        orig_find = cm_mod._find_best_hirise_dtm
+        cm_mod._find_best_hirise_dtm = lambda *a, **k: None
+        try:
+            cost_result = compute_cost_map(lat_min, lat_max, lon_min, lon_max, PERSEVERANCE)
+        finally:
+            cm_mod._find_best_hirise_dtm = orig_find
+
+        meta = cost_result.meta
+        cost_grid = cost_result.cost_grid
+        sr, sc = _geo_to_grid(landing.lat, landing.lon, meta)
+        gr, gc = _geo_to_grid(target_lat, target_lon, meta)
+        sr2, sc2 = _snap_to_traversable(cost_grid, sr, sc)
+        gr2, gc2 = _snap_to_traversable(cost_grid, gr, gc)
+        snap_start_lat, snap_start_lon = _grid_to_geo(sr2, sc2, meta)
+        snap_goal_lat, snap_goal_lon = _grid_to_geo(gr2, gc2, meta)
+
+        plan = plan_geo(snap_start_lat, snap_start_lon, snap_goal_lat, snap_goal_lon, cost_result, PERSEVERANCE)
+        if plan.success:
+            log.info("  ✓ MOLA route found: %.0f m, %d cells", plan.total_distance_m, plan.cells_explored)
+            wp_seq = generate_waypoints(
+                path_geo=plan.path_geo,
+                elevation_profile=plan.elevation_profile,
+                slope_profile=plan.slope_profile,
+                cost_profile=getattr(plan, "cost_profile", [1.0] * len(plan.path_geo)),
+                rover=PERSEVERANCE,
+            )
+            sol_plan = estimate_sol_plan(wp_seq, PERSEVERANCE)
+            return {
+                "plan": plan,
+                "cost_result": cost_result,
+                "waypoint_seq": wp_seq,
+                "sol_plan": sol_plan,
+                "start": (snap_start_lat, snap_start_lon),
+                "goal": (snap_goal_lat, snap_goal_lon),
+                "target_name": target.name,
+                "dem_source": "MOLA",
+                "dem_resolution_m": 200,
+            }
+    except Exception as e:
+        log.error("  MOLA fallback error: %s", e)
+        import traceback
+        traceback.print_exc()
 
     log.warning("  All route planning attempts failed.")
     return None
-
 
 # ═══════════════════════════════════════════════════════════════
 # Phase 6: Generate Figures
