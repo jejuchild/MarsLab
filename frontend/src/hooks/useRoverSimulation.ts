@@ -92,7 +92,8 @@ function interpolateWaypoint(
   if (segLen <= 0) return { wp: wpA, index: lo };
 
   const t = (targetDist - wpA.distance_from_start) / segLen;
-  const lerp = (a: number, b: number) => (a ?? 0) + ((b ?? 0) - (a ?? 0)) * t;
+  const safe = (v: number) => (Number.isFinite(v) ? v : 0);
+  const lerp = (a: number, b: number) => safe(a) + (safe(b) - safe(a)) * t;
 
   return {
     wp: {
@@ -171,6 +172,7 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
     const { wp, index } = interpolateWaypoint(waypoints, progress);
 
     // Update refs (Cesium reads via CallbackProperty)
+    if (!Number.isFinite(wp.lon) || !Number.isFinite(wp.lat)) return;
     positionRef.current = Cesium.Cartesian3.fromDegrees(wp.lon, wp.lat, 0, marsEllipsoid);
 
     const sol = findCurrentSol(routeResult.sol_plan, index);
@@ -182,7 +184,11 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
     const arr: Cesium.Cartesian3[] = [];
     const limit = Math.min(index + 1, waypoints.length);
     for (let i = 0; i < limit; i++) {
-      arr.push(Cesium.Cartesian3.fromDegrees(waypoints[i]!.lon, waypoints[i]!.lat, 0, marsEllipsoid));
+      const wLon = waypoints[i]!.lon;
+      const wLat = waypoints[i]!.lat;
+      if (Number.isFinite(wLon) && Number.isFinite(wLat)) {
+        arr.push(Cesium.Cartesian3.fromDegrees(wLon, wLat, 0, marsEllipsoid));
+      }
     }
     if (index < waypoints.length - 1 && positionRef.current) arr.push(positionRef.current);
     traversedRef.current = arr;
@@ -239,7 +245,9 @@ export default function useRoverSimulation(params: UseRoverSimulationParams): vo
     completedRef.current = false;
 
     const wp0 = routeResult.waypoints[0]!;
-    positionRef.current = Cesium.Cartesian3.fromDegrees(wp0.lon, wp0.lat, 0, marsEllipsoid);
+    const wp0Lon = Number.isFinite(wp0.lon) ? wp0.lon : 0;
+    const wp0Lat = Number.isFinite(wp0.lat) ? wp0.lat : 0;
+    positionRef.current = Cesium.Cartesian3.fromDegrees(wp0Lon, wp0Lat, 0, marsEllipsoid);
     labelTextRef.current = "ROVER | Ready";
     traversedRef.current = [positionRef.current];
 
