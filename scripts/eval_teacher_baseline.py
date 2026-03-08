@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
 # ── Config ──
-DATA_DIR = Path("/disk1/cspark/hirise-api/data/HiRISE/v5_colab_data")
+DATA_DIR = Path("/disk1/cspark/hirise-api/data/HiRISE/v5_merged_data")
 CKPT_PATH = DATA_DIR / "marslandform_v4b_deploy.pt"
 TILES_DIR = DATA_DIR / "tiles"
 LABELS_PATH = DATA_DIR / "tile_labels_v5.json"
