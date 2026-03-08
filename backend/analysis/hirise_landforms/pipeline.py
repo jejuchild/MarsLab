@@ -434,13 +434,25 @@ class HiriseLandformPipeline:
         while penalising unlikely neighbour combinations.
         """
         # Compatibility matrix: how likely class_i neighbours class_j
-        #                   LDA   LVF   CCF   OTHER
-        compat = np.array([
-            [1.0, 0.8, 0.3, 0.4],  # LDA
-            [0.8, 1.0, 0.3, 0.4],  # LVF
-            [0.3, 0.3, 1.0, 0.5],  # CCF
-            [0.4, 0.4, 0.5, 1.0],  # OTHER
-        ], dtype=np.float32)
+        # Derive n_classes from actual probabilities to handle both V4b (4) and V5 (5)
+        n_classes = probabilities.shape[1]
+        if n_classes == 5:
+            #                   LDA   LVF   CCF   OTHER  SCT
+            compat = np.array([
+                [1.0, 0.8, 0.3, 0.4, 0.5],  # LDA
+                [0.8, 1.0, 0.3, 0.4, 0.5],  # LVF
+                [0.3, 0.3, 1.0, 0.5, 0.3],  # CCF
+                [0.4, 0.4, 0.5, 1.0, 0.4],  # OTHER
+                [0.5, 0.5, 0.3, 0.4, 1.0],  # SCT
+            ], dtype=np.float32)
+        else:
+            #                   LDA   LVF   CCF   OTHER
+            compat = np.array([
+                [1.0, 0.8, 0.3, 0.4],  # LDA
+                [0.8, 1.0, 0.3, 0.4],  # LVF
+                [0.3, 0.3, 1.0, 0.5],  # CCF
+                [0.4, 0.4, 0.5, 1.0],  # OTHER
+            ], dtype=np.float32)
 
         # Build position → local index mapping
         pos_to_idx: dict[tuple[int, int], int] = {}
@@ -453,7 +465,7 @@ class HiriseLandformPipeline:
         for _ in range(n_iterations):
             new_logits = np.log(smoothed + 1e-10)  # unary
             for i, (gx, gy) in enumerate(coords):
-                neighbour_msg = np.zeros(len(V3_CLASSES), dtype=np.float32)
+                neighbour_msg = np.zeros(n_classes, dtype=np.float32)
                 n_nbrs = 0
                 for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                     key = (gy + dr, gx + dc)

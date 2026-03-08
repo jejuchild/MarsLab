@@ -152,10 +152,10 @@ def compute_excavation(
 def compute_landing(
     elevation: Optional[float],
     slope: Optional[float],
-    tri: Optional[float],
 ) -> Optional[float]:
     """
     Landing & Traversability Score (0-1). Safer = higher score.
+    Based on elevation and slope only.
     """
     parts: list[float] = []
     weights: list[float] = []
@@ -164,17 +164,12 @@ def compute_landing(
     if elevation is not None:
         elev_score = 1.0 if elevation < 0 else _clamp(1.0 - elevation / 2000.0)
         parts.append(elev_score)
-        weights.append(0.4)
+        weights.append(0.55)
 
     # Slope < 5° → 1.0;  > 15° → 0.0
     if slope is not None and slope >= 0:
         parts.append(_clamp(1.0 - slope / 15.0))
-        weights.append(0.35)
-
-    # TRI < 50m → smooth plains → 1.0;  50-500m → linear decay;  > 500m → rough → 0.0
-    if tri is not None and tri >= 0:
-        parts.append(_clamp(1.0 - (tri - 50.0) / 450.0))
-        weights.append(0.25)
+        weights.append(0.45)
 
     if not parts:
         return None
@@ -212,17 +207,17 @@ def compute_accessibility(
     thermal_inertia = _safe(thermal_inertia)
     elevation = _safe(elevation)
     slope = _safe(slope)
-    tri = _safe(tri)
+    # tri removed from landing scoring
 
     # Sub-scores
     il = compute_ice_landform(landform, landform_confidence)
     wm = compute_water_mineral(water_mineral_score)
     si = compute_surface_ice(surface_ice_score)
     ex = compute_excavation(thermal_inertia)
-    la = compute_landing(elevation, slope, tri)
+    la = compute_landing(elevation, slope)
 
     layers_available = sum(
-        1 for v in [thermal_inertia, elevation, slope, tri]
+        1 for v in [thermal_inertia, elevation, slope]
         if v is not None
     )
     if landform is not None:
@@ -278,7 +273,7 @@ def compute_accessibility(
         crism_obs_id=crism_obs_id,
         crism_minerals=crism_minerals or {},
         layers_available=layers_available,
-        layers_total=6,  # TES TI, elevation, slope, TRI, landform, CRISM
+        layers_total=5,  # TES TI, elevation, slope, landform, CRISM
         confidence=confidence,
     )
 
@@ -351,17 +346,13 @@ def compute_accessibility_grid(
             elevation[valid] < 0, 1.0,
             np.clip(1.0 - elevation[valid] / 2000.0, 0, 1),
         )
-        la_parts.append((a, 0.4))
+        la_parts.append((a, 0.55))
     if slope is not None:
         valid = np.isfinite(slope) & (slope >= 0)
         a = np.full((h, w), np.nan, dtype=np.float32)
         a[valid] = np.clip(1.0 - slope[valid] / 15.0, 0, 1)
-        la_parts.append((a, 0.35))
-    if tri is not None:
-        valid = np.isfinite(tri) & (tri >= 0)
-        a = np.full((h, w), np.nan, dtype=np.float32)
-        a[valid] = np.clip(1.0 - (tri[valid] - 50.0) / 450.0, 0, 1)
-        la_parts.append((a, 0.25))
+        la_parts.append((a, 0.45))
+    # TRI removed from landing scoring
     landing = _weighted_mean_parts(la_parts, shape)
 
     # --- Composite ---
