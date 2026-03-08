@@ -24,7 +24,7 @@ MOLA_PATH = DATA_DIR / "mola_features_by_tile.npy"
 CLASS_NAMES_4 = ["LDA", "LVF", "CCF", "OTHER"]
 OLD_LANDFORM_INDICES = [0, 1, 2]  # LDA, LVF, CCF
 CLASS_TO_IDX = {"LDA": 0, "LVF": 1, "CCF": 2, "OTHER": 3, "SCT": 4}
-BATCH_SIZE = 8
+BATCH_SIZE = 16
 NUM_WORKERS = 2
 
 
@@ -128,17 +128,29 @@ def main():
     val_indices = splits["val"]
     print(f"  Total val indices: {len(val_indices)}")
 
-    # Filter to old landform classes only (LDA, LVF, CCF) for speed
-    # Also include OTHER to check false positives from other classes
-    old_val_indices = []
+    # Filter to old landform classes only (LDA, LVF, CCF)
+    by_class = {0: [], 1: [], 2: []}  # LDA, LVF, CCF
     for idx in val_indices:
         lbl = CLASS_TO_IDX.get(labels[idx]["label"], -1)
-        if lbl in OLD_LANDFORM_INDICES:
-            old_val_indices.append(idx)
+        if lbl in by_class:
+            by_class[lbl].append(idx)
+
+    # Sample up to MAX_PER_CLASS for CPU speed
+    import random
+    random.seed(42)
+    MAX_PER_CLASS = 200
+    old_val_indices = []
+    for cls_idx, indices in by_class.items():
+        if len(indices) > MAX_PER_CLASS:
+            sampled = random.sample(indices, MAX_PER_CLASS)
+        else:
+            sampled = indices
+        old_val_indices.extend(sampled)
+    random.shuffle(old_val_indices)
 
     from collections import Counter
     dist = Counter(labels[i]["label"] for i in old_val_indices)
-    print(f"  Old-class val tiles: {len(old_val_indices)}")
+    print(f"  Sampled val tiles: {len(old_val_indices)} (max {MAX_PER_CLASS}/class)")
     print(f"  Distribution: {dict(dist)}")
 
     # DINOv2 preprocessing
