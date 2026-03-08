@@ -472,12 +472,12 @@ SUGGESTED_ROUTES = [
     {
         "id": "arcadia_ice_traverse",
         "name": "Arcadia Planitia — Ice-Rich Traverse (HiRISE)",
-        "description": "High-resolution traverse through Arcadia Planitia's ice-rich terrain using 1m/px HiRISE DTM. Features periglacial polygonal terrain, sublimation pits, and potential subsurface ice deposits for ISRU.",
-        "start": {"lat": 54.3, "lon": -169.4},
-        "goal": {"lat": 54.5, "lon": -169.1},
+        "description": "High-resolution traverse through Arcadia Planitia's ice-rich terrain using 1m/px HiRISE DTM (DTEEC_007736). Features periglacial polygonal terrain, sublimation pits, and potential subsurface ice deposits for ISRU.",
+        "start": {"lat": 54.26, "lon": -169.04},
+        "goal": {"lat": 54.42, "lon": -169.07},
         "tags": ["ice", "hirise_dtm", "high_resolution", "isru", "arcadia"],
         "difficulty": "moderate",
-        "estimated_distance_km": 18.0,
+        "estimated_distance_km": 9.5,
         "science_interest": "very_high",
     },
     {

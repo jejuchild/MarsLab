@@ -150,31 +150,46 @@ def _extract_hirise_dtm_bbox(
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Extract elevation from a HiRISE DTM .IMG file for the given bbox.
 
-    HiRISE DTMs use projected CRS (equirectangular on Mars). We use
-    pyproj to convert lat/lon to the DTM's native CRS, then read the
-    corresponding window.
+    HiRISE DTMs use Mars equirectangular projection. We manually convert
+    lat/lon to projected metres using the CRS parameters from the raster.
 
     Returns (elevation_array, meta_dict).
     """
-    from pyproj import Transformer
-
     dtm_path = _DTM_DIR / dtm_props["dtm_file"]
     ds = rasterio.open(dtm_path)
 
-    # Transform bbox from geographic to the DTM's projected CRS
-    crs = ds.crs
-    transformer = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+    # Parse equirectangular CRS parameters from the WKT
+    crs_wkt = ds.crs.to_wkt() if ds.crs else ""
+    import re
+    std_par_m = re.search(r'standard_parallel_1",([-\d.]+)', crs_wkt)
+    cen_mer_m = re.search(r'central_meridian",([-\d.]+)', crs_wkt)
+    spheroid_m = re.search(r'SPHEROID\["[^"]+",([-\d.]+)', crs_wkt)
 
-    # Convert corner coordinates
-    x_min, y_min = transformer.transform(lon_min, lat_min)
-    x_max, y_max = transformer.transform(lon_max, lat_max)
+    std_parallel = float(std_par_m.group(1)) if std_par_m else 0.0
+    central_meridian = float(cen_mer_m.group(1)) if cen_mer_m else 0.0
+    mars_radius = float(spheroid_m.group(1)) if spheroid_m else 3389500.0
 
-    # Ensure min < max after projection
+    # Convert central meridian from 0-360 to -180/180 if needed
+    if central_meridian > 180:
+        central_meridian -= 360
+
+    cos_std = math.cos(math.radians(std_parallel))
+
+    def geo_to_proj(lat: float, lon: float) -> tuple[float, float]:
+        """Geographic (lat, lon in degrees) -> projected (x, y in meters)."""
+        x = math.radians(lon - central_meridian) * mars_radius * cos_std
+        y = math.radians(lat) * mars_radius
+        return x, y
+
+    # Convert bbox corners to projected coordinates
+    x_min, y_min = geo_to_proj(lat_min, lon_min)
+    x_max, y_max = geo_to_proj(lat_max, lon_max)
+
+    # Ensure min < max
     if x_min > x_max:
         x_min, x_max = x_max, x_min
     if y_min > y_max:
         y_min, y_max = y_max, y_min
-
     # Convert to pixel coordinates
     inv_transform = ~ds.transform
     col_min_f, row_min_f = inv_transform * (x_min, y_max)  # y_max = top
@@ -189,14 +204,20 @@ def _extract_hirise_dtm_bbox(
         ds.close()
         raise ValueError(f"HiRISE DTM bbox produces empty window")
 
-    # Limit grid size to prevent OOM (max ~4000x4000 = 16M cells)
-    max_dim = 4000
+    # Limit grid size for planner performance.
+    # A* on grids >1000x1000 may timeout. Subsample to keep
+    # effective resolution ~2-5 m/px (still 40-100x better than MOLA 200m).
+    max_dim = 1000
     width = col_max - col_min
     height = row_max - row_min
     step = 1
     if width > max_dim or height > max_dim:
-        step = max(width // max_dim, height // max_dim, 1)
-        logger.info("HiRISE DTM subsampling by factor %d (grid too large: %dx%d)", step, height, width)
+        step = max(-(-width // max_dim), -(-height // max_dim), 1)  # ceiling division
+        logger.info(
+            "HiRISE DTM subsampling by %dx (%dx%d -> ~%dx%d, ~%.1f m/px)",
+            step, height, width, height // step, width // step,
+            abs(ds.transform.a) * step,
+        )
 
     window = Window(col_min, row_min, col_max - col_min, row_max - row_min)
     elev = ds.read(1, window=window, out_shape=(

@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # ── Planning timeout ────────────────────────────────────────────
-PLANNING_TIMEOUT_S = 30.0
+PLANNING_TIMEOUT_S = 60.0  # increased for high-res HiRISE DTM grids
 
 # ── 8-connected neighbor offsets ────────────────────────────────
 _NEIGHBORS = [

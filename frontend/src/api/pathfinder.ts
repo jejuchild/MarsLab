@@ -81,6 +81,18 @@ export interface TerrainZone {
   bbox_pct: [number, number, number, number];
 }
 
+export interface PlanningMeta {
+  total_computation_s: number;
+  cells_explored: number;
+  path_length_cells: number;
+  grid_size: string;
+  rover_type: string;
+  algorithm: string;
+  dem_source: string;
+  dem_resolution_m: number;
+  dem_product_id: string;
+}
+
 export interface VLMAnalysis {
   zones: TerrainZone[];
   overall_assessment: string;
@@ -89,6 +101,7 @@ export interface VLMAnalysis {
   analysis_model: string;
   terrain_image_b64?: string;
 }
+
 export interface RouteResult {
   waypoints: Waypoint[];
   summary: RouteSummary;
@@ -96,6 +109,7 @@ export interface RouteResult {
   sol_plan: SolPlan[];
   route_geo: RouteGeoPoint[];
   vlm_analysis?: VLMAnalysis;
+  planning_meta?: PlanningMeta;
 }
 
 export interface RoverProfile {

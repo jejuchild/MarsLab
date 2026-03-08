@@ -509,6 +509,14 @@ export default function PathfinderPanel({
                   }
                 />
                 <StatCard icon="height" label="Elev. Gain" value={`+${result.summary.total_elevation_gain_m.toFixed(0)} m`} />
+                {result.planning_meta?.dem_source && (
+                  <StatCard
+                    icon="satellite_alt"
+                    label="DEM Source"
+                    value={`${result.planning_meta.dem_source}${result.planning_meta.dem_resolution_m ? ` ${Math.round(result.planning_meta.dem_resolution_m)}m/px` : ''}`}
+                    color={result.planning_meta.dem_source === 'HiRISE_DTM' ? 'text-cyan-400' : 'text-gray-400'}
+                  />
+                )}
               </div>
             </div>
 
