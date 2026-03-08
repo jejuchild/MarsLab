@@ -22,7 +22,7 @@ class DielectricResult:
 def _detect_reflectors(
     power: np.ndarray,
     surface: np.ndarray,
-    min_depth_bins: int = 20,
+    min_depth_bins: int = 5,
     max_depth_bins: int = 200,
     snr_threshold: float = 3.0,
     continuity_tol_bins: int = 5,
@@ -160,9 +160,12 @@ def compute_dielectric(track: TrackData) -> DielectricResult | None:
         delta_t_s = delta_bins * SHARAD_SAMPLE_INTERVAL_S
         d_apparent_m = SPEED_OF_LIGHT * delta_t_s / 2.0
         d_ice_m = d_apparent_m / np.sqrt(3.15)
-        if d_ice_m < 5.0:
+        # SWIM depth zones: 1-5m and >5m.
+        # SHARAD vertical resolution in ice ≈ 8.5m, so most detections
+        # fall in the >5m zone.  Keep a 1m floor to reject surface clutter.
+        if d_ice_m < 1.0:
             continue
-        depth_bin = "1-5m" if d_ice_m < 50.0 else "5m-plus"
+        depth_bin = "1-5m" if d_ice_m < 5.0 else "5m-plus"
 
         surf_bins_seg = track.surface_bins[trace_idx]
         valid = (surf_bins_seg >= 0) & (pick_bins >= 0)

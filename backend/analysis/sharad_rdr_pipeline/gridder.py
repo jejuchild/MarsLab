@@ -7,11 +7,11 @@ import rasterio
 from rasterio.transform import from_bounds
 
 
-GRID_ROWS = 240
-GRID_COLS = 720
+GRID_ROWS = 2400
+GRID_COLS = 7200
 LAT_MIN, LAT_MAX = -60.0, 60.0
 LON_MIN, LON_MAX = -180.0, 180.0
-CELL_SIZE = 0.5
+CELL_SIZE = 0.05
 MARS_EQC_CRS = (
     'PROJCS["Mars2000_equicylindrical_clon0",'
     'GEOGCS["GCS_Mars_2000_Sphere",'
