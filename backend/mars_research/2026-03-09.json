@@ -1,0 +1,114 @@
+{
+  "date": "2026-03-09",
+  "generated_at": "2026-03-08T22:10:13.668658+00:00",
+  "topic": {
+    "focus": "Ice Detection & Geomorphology",
+    "keywords": [
+      "SHARAD",
+      "subsurface ice",
+      "radar sounding",
+      "lobate debris aprons",
+      "glacial"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Landslide morphology of the Batote area, Jammu &amp; Kashmir, NW Himalaya: Implications for the age of prehistoric debris slides",
+      "authors": "Abdul Qayoom Paul, Pankaj Kumar, Irfan Maqbool Bhat, Waseem Qader, Ajay Kumar",
+      "year": "2026",
+      "journal": "Results in Earth Sciences",
+      "key_findings": "This paper examines the landslide morphology of the Batote area in the NW Himalaya, providing insights into the age of prehistoric debris slides. The study's findings have implications for understanding geological processes in mountainous regions.",
+      "methodology": "The authors used a combination of field observations, remote sensing, and laboratory analysis to investigate the landslide morphology.",
+      "relevance": "While not directly related to Mars exploration, this study's focus on debris slides and geological processes could inform the analysis of similar features on Mars, such as lobate debris aprons.",
+      "category": "Geomorphology",
+      "url": "https://doi.org/10.1016/j.rines.2026.100153",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Structural fragility curves for brick-concrete buildings subjected to debris flow loading in northern China using momentum flux approach",
+      "authors": "Xinren Zhang, Ying Wang, Mengxia Zhao, Jing Qi, Hao Chang, Yu Chen",
+      "year": "2026",
+      "journal": "Reliability Engineering &amp; System Safety",
+      "key_findings": "This paper presents a study on the structural fragility of brick-concrete buildings subjected to debris flow loading, using a momentum flux approach. The authors developed fragility curves for buildings in northern China.",
+      "methodology": "The study employed a combination of numerical modeling and field data to derive the fragility curves.",
+      "relevance": "Similar to paper 1, this study's focus on debris flows and geological processes could be applied to the analysis of Martian geomorphology, particularly in regions with mid-latitude glaciers.",
+      "category": "Geomorphology",
+      "url": "https://doi.org/10.1016/j.ress.2026.112344",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Connectivity before scale: Governance depth and ESG risk in multinational enterprises",
+      "authors": "Mirela Popa",
+      "year": "2026",
+      "journal": "Strategic Business Research",
+      "key_findings": "This paper explores the relationship between governance depth and ESG risk in multinational enterprises, with a focus on connectivity and scale. The study's findings have implications for business strategy and risk management.",
+      "methodology": "The author used a qualitative approach, analyzing case studies and literature reviews to develop the framework.",
+      "relevance": "This paper has no direct relevance to Mars exploration or geomorphology.",
+      "category": "None",
+      "url": "https://doi.org/10.1016/j.sbr.2026.100088",
+      "recency_score": 1.0
+    },
+    {
+      "title": "An in-depth exploration of CNN-based deep learning models in cervical carcinoma analysis",
+      "authors": "P. Karthika, M. Premkumar",
+      "year": "2026",
+      "journal": "Advances in Biomarker Sciences and Technology",
+      "key_findings": "This paper presents an in-depth exploration of CNN-based deep learning models for cervical carcinoma analysis. The authors evaluated the performance of different models and techniques.",
+      "methodology": "The study employed a range of deep learning architectures and datasets to develop and test the models.",
+      "relevance": "This paper has no direct relevance to Mars exploration or geomorphology.",
+      "category": "None",
+      "url": "https://doi.org/10.1016/j.abst.2025.11.007",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Short, Mid, and Long-Term Melatonin Exposure Alleviates the Effects of Abamectin on the Antioxidant Defense Mechanism in the Midgut of Spodoptera litura (Insecta: Lepidoptera)",
+      "authors": "Subramanian Panchu Ravindra Rajan Subala, Muthugounder Subramanian Shivakumar",
+      "year": "2026",
+      "journal": "Free Radicals and Antioxidants",
+      "key_findings": "This paper investigates the effects of melatonin exposure on the antioxidant defense mechanism in the midgut of Spodoptera litura. The authors found that melatonin alleviates the effects of abamectin on the insect's antioxidant system.",
+      "methodology": "The study used a combination of biochemical assays and insect rearing experiments to investigate the effects of melatonin.",
+      "relevance": "This paper has no direct relevance to Mars exploration or geomorphology.",
+      "category": "None",
+      "url": "https://doi.org/10.5530/fra.2025.1.4",
+      "recency_score": 1.0
+    },
+    {
+      "title": "A benchmark and method for photographed table reasoning",
+      "authors": "Xiaoqiang Kang, Zimu Wang, Xiaochen Zi, Xiaobo Jin, Kaizhu Huang, Fei Yin et al.",
+      "year": "2026",
+      "journal": "Pattern Recognition",
+      "key_findings": "This paper presents a benchmark and method for photographed table reasoning, using a range of deep learning models and datasets. The authors evaluated the performance of different approaches.",
+      "methodology": "The study employed a range of deep learning architectures and datasets to develop and test the models.",
+      "relevance": "This paper has no direct relevance to Mars exploration or geomorphology.",
+      "category": "None",
+      "url": "https://doi.org/10.1016/j.patcog.2026.113355",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Fusion of FEA and SEA for mid-frequency acoustics in a variable-section duct: Impedance-based coupling and experimental validation",
+      "authors": "Tao Han, Huancai Lu, D. Michael McFarland, Hanbo Jiang",
+      "year": "2026",
+      "journal": "Journal of Computational and Applied Mathematics",
+      "key_findings": "This paper presents a fusion of FEA and SEA for mid-frequency acoustics in a variable-section duct, using an impedance-based coupling approach. The authors validated the method using experimental data.",
+      "methodology": "The study employed a combination of numerical modeling and experimental techniques to develop and validate the method.",
+      "relevance": "This paper has no direct relevance to Mars exploration or geomorphology, but the use of numerical modeling and experimental validation could be applied to the analysis of Martian subsurface ice.",
+      "category": "None",
+      "url": "https://doi.org/10.1016/j.cam.2026.117481",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Comparison of the LRFD Method and the Performance-Based Method in the Design of Mid-Rise Reinforced Concrete Moment Frames under Blast Loading",
+      "authors": "Sajjad Mohammadian Abi, Pouya hassanvand, Mojtaba Hoseini",
+      "year": "",
+      "journal": "Passive Defense",
+      "key_findings": "This paper compares the LRFD method and the performance-based method in the design of mid-rise reinforced concrete moment frames under blast loading. The authors evaluated the performance of different design approaches.",
+      "methodology": "The study used a combination of numerical modeling and design codes to evaluate the different methods.",
+      "relevance": "This paper has no direct relevance to Mars exploration or geomorphology.",
+      "category": "None",
+      "url": "https://doi.org/10.47176/pd.2026.1544",
+      "recency_score": 0.0
+    }
+  ],
+  "trend_analysis": "The papers analyzed show a trend towards interdisciplinary research, with studies combining fields such as geology, materials science, and computer science. However, none of the papers directly address Mars exploration or geomorphology, highlighting a gap in research focus. The use of numerical modeling, experimental validation, and deep learning techniques is prevalent across the papers, demonstrating the importance of these methods in modern research. Further analysis of Martian geomorphology and subsurface ice detection could benefit from the application of these techniques.",
+  "connections_to_marslab": "While the papers analyzed do not directly address MarsLab's mission, the findings and methodologies presented could be applied to the analysis of Martian geomorphology and subsurface ice detection. For example, the use of numerical modeling and experimental validation could inform the development of methods for detecting and characterizing subsurface ice on Mars. Additionally, the study of debris flows and geological processes on Earth could provide insights into similar features on Mars, such as lobate debris aprons. By leveraging these connections, MarsLab could advance its mission to explore and understand the Martian environment."
+}
