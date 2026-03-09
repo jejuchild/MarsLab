@@ -506,6 +506,7 @@ export class FootprintManager {
             ),
             width: 1.0,
             material: Cesium.Material.fromType("Color", { color }),
+            id: entityId,
           });
         } else {
           const coords = geom.coordinates as [number, number][];
@@ -518,6 +519,7 @@ export class FootprintManager {
             positions: Cesium.Cartesian3.fromDegreesArray(positions, this.ellipsoid),
             width: 3.0,
             material: Cesium.Material.fromType("Color", { color }),
+            id: entityId,
           });
         }
 
