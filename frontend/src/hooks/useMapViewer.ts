@@ -602,7 +602,6 @@ export default function useMapViewer({
         // If we found an overlay, use it
         if (overlayProduct) {
           console.log('[CLICK] PRIORITY 1: overlay matched', overlayProduct);
-        }
           const { productId, instrument } = overlayProduct;
 
           // For CRISM, calculate pixel coordinates
