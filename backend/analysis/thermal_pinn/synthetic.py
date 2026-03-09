@@ -51,7 +51,7 @@ def solve_heat_equation(k_z, cfg):
         cp[i] = c[i]/w[i]
 
     Ts = surface_forcing(t_all, cfg)
-    T = np.full(nz, cfg.T_mean)
+    T = np.full(nz, float(cfg.T_mean))
     nsp = cfg.spinup_sols; nt_out = cfg.n_sols*cfg.dt_per_sol
     Tout = np.zeros((nt_out, nz))
     rhs, dp, x = np.zeros(nz), np.zeros(nz), np.zeros(nz)
