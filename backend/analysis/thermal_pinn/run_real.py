@@ -50,7 +50,8 @@ EMISSIVITY_BAND9 = 0.97
 # ── THEMIS observation extraction ───────────────────────────────
 
 def extract_observations(target_lat: float, target_lon: float,
-                         search_radius_deg: float = 1.5) -> list[dict]:
+                         search_radius_deg: float = 1.5,
+                         data_dir: Path | None = None) -> list[dict]:
     """
     Parse all downloaded THEMIS IRBTR images and extract brightness temperature
     at the target location.
@@ -61,7 +62,7 @@ def extract_observations(target_lat: float, target_lon: float,
 
     Returns list of observation dicts ready for inversion.
     """
-    raw_dir = DATA_DIR / "raw"
+    raw_dir = (data_dir or DATA_DIR) / "raw"
     img_files = sorted(raw_dir.glob("*BTR.IMG"))
     logger.info("Found %d IRBTR images in %s", len(img_files), raw_dir)
 
@@ -345,6 +346,8 @@ def main():
     parser.add_argument("--nz", type=int, default=40)
     parser.add_argument("--lr", type=float, default=0.03)
     parser.add_argument("--sched-step", type=int, default=100)
+    parser.add_argument("--data-dir", type=str, default=None,
+                        help="THEMIS data directory (default: backend/data/themis_irbtr)")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -360,7 +363,8 @@ def main():
     logger.info("Target: %.1f°N, %.1f°E", args.target_lat, args.target_lon)
 
     # Step 1: Extract observations from downloaded THEMIS images
-    observations = extract_observations(args.target_lat, args.target_lon)
+    data_dir = Path(args.data_dir) if args.data_dir else None
+    observations = extract_observations(args.target_lat, args.target_lon, data_dir=data_dir)
     if len(observations) < 5:
         logger.error("Not enough observations (%d). Need at least 5.", len(observations))
         return
@@ -435,11 +439,12 @@ def main():
     logger.info("  Interpretation: %s", interp)
     logger.info("=" * 60)
 
-    # Step 6: Save
-    weights_path = OUT_DIR / "real_ebbc_weights.pt"
+    # Step 6: Save — use location tag in filenames to avoid overwriting
+    tag = f"{int(args.target_lat)}N_{int(args.target_lon)}E"
+    weights_path = OUT_DIR / f"real_ebbc_weights_{tag}.pt"
     torch.save(k_model.state_dict(), weights_path)
 
-    results_path = OUT_DIR / "real_ebbc_results.npz"
+    results_path = OUT_DIR / f"real_ebbc_results_{tag}.npz"
     np.savez(
         results_path,
         z=z, k_pred=k_pred,
@@ -452,16 +457,16 @@ def main():
         n_observations=len(obs_mapped),
         elapsed=elapsed,
     )
-    logger.info("Saved results → %s", results_path)
+    logger.info("Saved results \u2192 %s", results_path)
 
     # Save observations for reference
-    obs_path = OUT_DIR / "real_observations.json"
+    obs_path = OUT_DIR / f"real_observations_{tag}.json"
     with open(obs_path, "w") as f:
         json.dump(observations, f, indent=2)
-    logger.info("Saved observations → %s", obs_path)
+    logger.info("Saved observations \u2192 %s", obs_path)
 
     # Step 7: Plot
-    plot_path = OUT_DIR / "real_ebbc_results.png"
+    plot_path = OUT_DIR / f"real_ebbc_results_{tag}.png"
     plot_real_results(observations, k_pred, z, hist, cfg, kp, swim_ct,
                       elapsed, plot_path)
 

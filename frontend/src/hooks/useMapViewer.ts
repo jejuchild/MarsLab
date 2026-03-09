@@ -746,7 +746,8 @@ export default function useMapViewer({
 
         // PRIORITY 2: No overlay clicked, try Cesium entity picking for footprints
         const pickedList = viewer.scene.drillPick(m.position);
-        console.log('[CLICK] PRIORITY 2: drillPick returned', pickedList.length, 'items', pickedList.map((p: any) => ({ id: p?.id, type: typeof p?.id, constructorName: p?.id?.constructor?.name })));
+        console.log('[CLICK] PRIORITY 2: drillPick returned', pickedList.length, 'items');
+        pickedList.forEach((p: any, i: number) => console.log(`  [${i}] id:`, p?.id, 'type:', typeof p?.id, 'primitive:', p?.primitive?.constructor?.name, 'detail:', p?.detail));
 
         // PRIORITY 2a: Check for field note markers first
         const pickedFieldNote = pickedList.find((p: any) => {
