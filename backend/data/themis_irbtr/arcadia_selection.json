@@ -1,0 +1,402 @@
+[
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0077/i850xxbtr/I85084032BTR.IMG",
+    "local_time": 5.794,
+    "solar_lon": 5.284,
+    "center_lat": 45.479,
+    "center_lon": 190.209,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0078/i852xxbtr/I85215012BTR.IMG",
+    "local_time": 18.258,
+    "solar_lon": 10.55,
+    "center_lat": 46.509,
+    "center_lon": 189.969,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0010/i111xxbtr/I11159032BTR.IMG",
+    "local_time": 4.67083,
+    "solar_lon": 49.6424,
+    "center_lat": 45.403,
+    "center_lon": 189.821,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0018/i194xxbtr/I19458032BTR.IMG",
+    "local_time": 4.73167,
+    "solar_lon": 48.0108,
+    "center_lat": 45.394,
+    "center_lon": 189.575,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0056/i621xxbtr/I62186033BTR.IMG",
+    "local_time": 19.153,
+    "solar_lon": 84.319,
+    "center_lat": 44.454,
+    "center_lon": 191.012,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0026/i285xxbtr/I28518032BTR.IMG",
+    "local_time": 5.21583,
+    "solar_lon": 73.8826,
+    "center_lat": 45.453,
+    "center_lon": 188.699,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0034/i377xxbtr/I37776032BTR.IMG",
+    "local_time": 3.93139,
+    "solar_lon": 107.251,
+    "center_lat": 45.441,
+    "center_lon": 190.951,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0020/i212xxbtr/I21280032BTR.IMG",
+    "local_time": 5.2475,
+    "solar_lon": 114.408,
+    "center_lat": 45.374,
+    "center_lon": 191.237,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0050/i549xxbtr/I54991009BTR.IMG",
+    "local_time": 5.513,
+    "solar_lon": 127.239,
+    "center_lat": 45.829,
+    "center_lon": 190.096,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0005/i053xxbtr/I05355014BTR.IMG",
+    "local_time": 4.8825,
+    "solar_lon": 144.597,
+    "center_lat": 45.43,
+    "center_lon": 190.84,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0006/i061xxbtr/I06129009BTR.IMG",
+    "local_time": 5.13972,
+    "solar_lon": 178.46,
+    "center_lat": 44.562,
+    "center_lon": 189.596,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0051/i556xxbtr/I55659006BTR.IMG",
+    "local_time": 18.234,
+    "solar_lon": 154.596,
+    "center_lat": 45.887,
+    "center_lon": 189.83,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0044/i482xxbtr/I48223036BTR.IMG",
+    "local_time": 4.52333,
+    "solar_lon": 196.237,
+    "center_lat": 45.438,
+    "center_lon": 189.579,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0067/i735xxbtr/I73511043BTR.IMG",
+    "local_time": 19.533,
+    "solar_lon": 209.038,
+    "center_lat": 43.232,
+    "center_lon": 190.7,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0022/i237xxbtr/I23701033BTR.IMG",
+    "local_time": 5.45667,
+    "solar_lon": 221.65,
+    "center_lat": 45.43,
+    "center_lon": 191.151,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0067/i735xxbtr/I73536042BTR.IMG",
+    "local_time": 19.526,
+    "solar_lon": 210.29,
+    "center_lat": 43.236,
+    "center_lon": 189.16,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0015/i157xxbtr/I15739008BTR.IMG",
+    "local_time": 5.07417,
+    "solar_lon": 241.37,
+    "center_lat": 44.758,
+    "center_lon": 190.933,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0007/i075xxbtr/I07552013BTR.IMG",
+    "local_time": 4.84111,
+    "solar_lon": 249.601,
+    "center_lat": 44.772,
+    "center_lon": 191.843,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0076/i833xxbtr/I83393022BTR.IMG",
+    "local_time": 18.319,
+    "solar_lon": 288.434,
+    "center_lat": 44.997,
+    "center_lon": 191.277,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0023/i249xxbtr/I24924032BTR.IMG",
+    "local_time": 4.49444,
+    "solar_lon": 285.003,
+    "center_lat": 45.469,
+    "center_lon": 191.62,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0061/i675xxbtr/I67531033BTR.IMG",
+    "local_time": 5.696,
+    "solar_lon": 327.913,
+    "center_lat": 45.397,
+    "center_lon": 188.119,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0076/i839xxbtr/I83967043BTR.IMG",
+    "local_time": 18.01,
+    "solar_lon": 316.501,
+    "center_lat": 43.26,
+    "center_lon": 191.859,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0046/i509xxbtr/I50945033BTR.IMG",
+    "local_time": 3.488,
+    "solar_lon": 332.468,
+    "center_lat": 45.415,
+    "center_lon": 191.491,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0054/i595xxbtr/I59522033BTR.IMG",
+    "local_time": 5.236,
+    "solar_lon": 342.687,
+    "center_lat": 45.407,
+    "center_lon": 187.909,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0050/i545xxbtr/I54579002BTR.IMG",
+    "local_time": 5.348,
+    "solar_lon": 111.402,
+    "center_lat": 45.713,
+    "center_lon": 188.591,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0032/i352xxbtr/I35218032BTR.IMG",
+    "local_time": 3.28861,
+    "solar_lon": 12.9858,
+    "center_lat": 45.612,
+    "center_lon": 188.218,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0003/i031xxbtr/I03158032BTR.IMG",
+    "local_time": 4.08139,
+    "solar_lon": 62.0848,
+    "center_lat": 45.393,
+    "center_lon": 187.899,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0052/i578xxbtr/I57887032BTR.IMG",
+    "local_time": 5.601,
+    "solar_lon": 263.6,
+    "center_lat": 45.451,
+    "center_lon": 192.049,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0077/i845xxbtr/I84566042BTR.IMG",
+    "local_time": 18.016,
+    "solar_lon": 343.614,
+    "center_lat": 44.451,
+    "center_lon": 192.034,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0063/i697xxbtr/I69732041BTR.IMG",
+    "local_time": 18.914,
+    "solar_lon": 55.753,
+    "center_lat": 44.537,
+    "center_lon": 187.874,
+    "is_night": true
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0032/i354xxbtr/I35461041BTR.IMG",
+    "local_time": 15.2919,
+    "solar_lon": 22.4674,
+    "center_lat": 44.622,
+    "center_lon": 189.537,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0018/i195xxbtr/I19589004BTR.IMG",
+    "local_time": 17.1892,
+    "solar_lon": 52.7897,
+    "center_lat": 44.975,
+    "center_lon": 189.433,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0026/i285xxbtr/I28599004BTR.IMG",
+    "local_time": 17.6303,
+    "solar_lon": 76.8045,
+    "center_lat": 43.248,
+    "center_lon": 190.276,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0073/i797xxbtr/I79793032BTR.IMG",
+    "local_time": 6.876,
+    "solar_lon": 118.668,
+    "center_lat": 45.459,
+    "center_lon": 189.595,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0043/i470xxbtr/I47093033BTR.IMG",
+    "local_time": 16.675,
+    "solar_lon": 145.418,
+    "center_lat": 44.318,
+    "center_lon": 190.552,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0028/i307xxbtr/I30745041BTR.IMG",
+    "local_time": 17.7761,
+    "solar_lon": 159.86,
+    "center_lat": 44.507,
+    "center_lon": 189.444,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0067/i734xxbtr/I73430034BTR.IMG",
+    "local_time": 7.159,
+    "solar_lon": 204.992,
+    "center_lat": 46.662,
+    "center_lon": 189.919,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0052/i569xxbtr/I56976018BTR.IMG",
+    "local_time": 6.063,
+    "solar_lon": 216.355,
+    "center_lat": 46.655,
+    "center_lon": 188.416,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0068/i743xxbtr/I74353036BTR.IMG",
+    "local_time": 6.632,
+    "solar_lon": 252.405,
+    "center_lat": 45.391,
+    "center_lon": 191.592,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0076/i832xxbtr/I83287034BTR.IMG",
+    "local_time": 6.0,
+    "solar_lon": 283.048,
+    "center_lat": 46.749,
+    "center_lon": 190.367,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0054/i590xxbtr/I59029042BTR.IMG",
+    "local_time": 17.535,
+    "solar_lon": 320.487,
+    "center_lat": 44.529,
+    "center_lon": 188.813,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0054/i596xxbtr/I59628042BTR.IMG",
+    "local_time": 17.709,
+    "solar_lon": 347.274,
+    "center_lat": 44.489,
+    "center_lon": 189.071,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0033/i361xxbtr/I36110018BTR.IMG",
+    "local_time": 15.8611,
+    "solar_lon": 46.764,
+    "center_lat": 45.053,
+    "center_lon": 190.827,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0034/i373xxbtr/I37333016BTR.IMG",
+    "local_time": 16.2428,
+    "solar_lon": 90.9436,
+    "center_lat": 44.517,
+    "center_lon": 189.531,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0010/i106xxbtr/I10641009BTR.IMG",
+    "local_time": 16.8283,
+    "solar_lon": 30.4778,
+    "center_lat": 45.078,
+    "center_lon": 191.065,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0073/i803xxbtr/I80392032BTR.IMG",
+    "local_time": 6.993,
+    "solar_lon": 142.434,
+    "center_lat": 45.466,
+    "center_lon": 188.992,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0035/i384xxbtr/I38481006BTR.IMG",
+    "local_time": 16.4633,
+    "solar_lon": 134.505,
+    "center_lat": 43.946,
+    "center_lon": 190.515,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0070/i772xxbtr/I77235032BTR.IMG",
+    "local_time": 6.108,
+    "solar_lon": 24.71,
+    "center_lat": 45.425,
+    "center_lon": 191.37,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0035/i379xxbtr/I37957009BTR.IMG",
+    "local_time": 16.3647,
+    "solar_lon": 114.076,
+    "center_lat": 45.031,
+    "center_lon": 188.05,
+    "is_night": false
+  },
+  {
+    "label_url": "https://static.mars.asu.edu/pds/ODTSDP_v1/data/odtib1_0064/i698xxbtr/I69813006BTR.IMG",
+    "local_time": 6.558,
+    "solar_lon": 58.674,
+    "center_lat": 44.15,
+    "center_lon": 191.272,
+    "is_night": false
+  }
+]
