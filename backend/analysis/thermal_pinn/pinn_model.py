@@ -1,512 +1,240 @@
 """
-Physics-Informed Neural Network (PINN) for Mars thermal inversion.
-V2: Dual-coordinate time encoding (diurnal + seasonal phases).
-
-Architecture:
-    NN₁(z, t_d, t_s) → T(z, t)      Temperature field
-    NN₂(z)           → k(z)          Thermal conductivity profile
-
-Physics loss via finite-difference approximation (CPU-optimized):
-    ρc · ∂T/∂t ≈ ∂/∂z(k(z) · ∂T/∂z)
-
-Key improvements over v1:
-    - Dual time coordinates: diurnal phase t_d ∈ [0,1] + seasonal phase t_s
-      → FD stencil sizes are period-relative, NOT simulation-length-relative
-    - Physically motivated Fourier features at known diurnal/seasonal frequencies
-    - Reduced smoothness regularization for step-like k(z) recovery
+PINN for Mars thermal inversion — V3.
+Fixes: exp(raw) k-output, separate optimizers, balanced physics weight.
 """
 from __future__ import annotations
-
 import logging
 from dataclasses import dataclass
-
 import numpy as np
 import torch
 import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 
-# Mars constants
-RHO = 1500.0                  # soil density [kg/m³]
-C_P = 627.9                   # heat capacity [J/kg/K]
-RHO_CP = RHO * C_P            # volumetric heat capacity
-MARS_SOL = 88_775.0           # seconds per sol
-MARS_YEAR_SOLS = 668.6        # sols per Mars year
-MARS_YEAR_SEC = MARS_YEAR_SOLS * MARS_SOL  # seconds per Mars year
-
+RHO = 1500.0; C_P = 627.9; RHO_CP = RHO * C_P
+MARS_SOL = 88_775.0; MARS_YEAR_SOLS = 668.6
+MARS_YEAR_SEC = MARS_YEAR_SOLS * MARS_SOL
 
 @dataclass
 class PINNConfig:
-    """PINN training configuration — V2 with dual time coords."""
-    # Network architecture
-    n_hidden_T: int = 4         # hidden layers for temperature net
-    n_neurons_T: int = 64       # neurons per layer
-    n_hidden_k: int = 3         # hidden layers for conductivity net
-    n_neurons_k: int = 32       # neurons per layer
-
-    # Fourier feature counts
-    n_harmonics_diurnal: int = 4    # sin/cos(n·2π·t_d), n=1..4
-    n_harmonics_seasonal: int = 3   # sin/cos(n·2π·t_s), n=1..3
-    n_depth_modes: int = 4          # sin/cos(n·π·z), n=1..4
-
-    # Physical bounds
-    k_min: float = 0.005        # min conductivity [W/m/K] (fine dust)
-    k_max: float = 4.0          # max conductivity [W/m/K] (ice)
-    T_min: float = 140.0        # min temperature [K]
-    T_max: float = 300.0        # max temperature [K]
-
-    # Domain (set from data)
-    z_max: float = 3.0          # depth range [m]
-
-    # FD stencil sizes (in phase/normalized coordinates)
-    # These are INDEPENDENT of simulation length — key V2 improvement
-    eps_z: float = 0.002        # normalized depth: 0.002 × 3m = 0.006m
-    eps_d: float = 0.01         # diurnal phase: 0.01 sol ≈ 15 min
-    eps_s: float = 0.005        # seasonal phase: 0.005 year ≈ 3.3 sols
-
-    # Loss weights
-    w_physics: float = 1.0      # PDE residual weight
-    w_data: float = 10.0        # surface observation weight
-    w_k_smooth: float = 1e-4    # k(z) smoothness (very low — allow steps)
-
-    # Training
-    lr: float = 1e-3
-    n_epochs: int = 6000
-    batch_colloc: int = 4096    # collocation points per batch
-    scheduler_step: int = 2000
-    scheduler_gamma: float = 0.5
-
+    n_hidden_T: int = 4; n_neurons_T: int = 64
+    n_hidden_k: int = 3; n_neurons_k: int = 32
+    n_harmonics_diurnal: int = 4; n_harmonics_seasonal: int = 3
+    n_depth_modes: int = 4
+    k_min: float = 0.005; k_max: float = 4.0
+    T_min: float = 140.0; T_max: float = 300.0
+    z_max: float = 3.0
+    eps_z: float = 0.002; eps_d: float = 0.01; eps_s: float = 0.005
+    w_physics: float = 1.0; w_data: float = 10.0
+    w_k_smooth: float = 1e-5; w_k_bounds: float = 0.01
+    lr_T: float = 1e-3; lr_k: float = 1e-2
+    n_epochs: int = 5000; batch_colloc: int = 4096
+    scheduler_step: int = 2000; scheduler_gamma: float = 0.5
+    k_only_interval: int = 5
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
 
-
 class TemperatureNet(nn.Module):
-    """
-    NN₁: (z_norm, t_diurnal, t_seasonal) → T
-
-    Physically motivated Fourier features:
-      - Diurnal harmonics: sin/cos(n·2π·t_d), n = 1,...,N_d
-      - Seasonal harmonics: sin/cos(n·2π·t_s), n = 1,...,N_s
-      - Depth modes: sin/cos(n·π·z_norm), n = 1,...,N_z
-
-    Input dim = 1 (z) + 2·N_d + 2·N_s + 2·N_z
-    """
-
-    def __init__(self, n_hidden: int = 4, n_neurons: int = 64,
-                 n_harmonics_d: int = 4, n_harmonics_s: int = 3,
-                 n_depth_modes: int = 4):
+    def __init__(self, nh=4, nn_=64, nhd=4, nhs=3, ndz=4):
         super().__init__()
-        self.n_hd = n_harmonics_d
-        self.n_hs = n_harmonics_s
-        self.n_dz = n_depth_modes
-
-        input_dim = 1 + 2 * n_harmonics_d + 2 * n_harmonics_s + 2 * n_depth_modes
-
-        layers = [nn.Linear(input_dim, n_neurons), nn.Tanh()]
-        for _ in range(n_hidden - 1):
-            layers.extend([nn.Linear(n_neurons, n_neurons), nn.Tanh()])
-        layers.append(nn.Linear(n_neurons, 1))
+        self.nhd, self.nhs, self.ndz = nhd, nhs, ndz
+        dim = 1 + 2*nhd + 2*nhs + 2*ndz
+        layers = [nn.Linear(dim, nn_), nn.Tanh()]
+        for _ in range(nh - 1):
+            layers += [nn.Linear(nn_, nn_), nn.Tanh()]
+        layers.append(nn.Linear(nn_, 1))
         self.net = nn.Sequential(*layers)
-        self._init_weights()
-
-    def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight)
-                nn.init.zeros_(m.bias)
+                nn.init.xavier_normal_(m.weight); nn.init.zeros_(m.bias)
 
-    def forward(self, z: torch.Tensor, t_d: torch.Tensor,
-                t_s: torch.Tensor) -> torch.Tensor:
-        """
-        z: normalized depth [0, 1]
-        t_d: diurnal phase [0, 1), wraps every sol
-        t_s: seasonal phase, ~[0, 1] for 1 Mars year
-        """
-        z = z.view(-1, 1)
-        t_d = t_d.view(-1, 1)
-        t_s = t_s.view(-1, 1)
-
-        TWO_PI = 2.0 * np.pi
-        PI = np.pi
-
-        features = [z]
-
-        # Diurnal harmonics — captures daily temperature cycle
-        for n in range(1, self.n_hd + 1):
-            phase = TWO_PI * n * t_d
-            features.append(torch.sin(phase))
-            features.append(torch.cos(phase))
-
-        # Seasonal harmonics — captures yearly temperature cycle
-        for n in range(1, self.n_hs + 1):
-            phase = TWO_PI * n * t_s
-            features.append(torch.sin(phase))
-            features.append(torch.cos(phase))
-
-        # Depth modes — captures exponential decay structure
-        for n in range(1, self.n_dz + 1):
-            phase = PI * n * z
-            features.append(torch.sin(phase))
-            features.append(torch.cos(phase))
-
-        x = torch.cat(features, dim=1)
-        return self.net(x)
-
+    def forward(self, z, td, ts):
+        z, td, ts = z.view(-1,1), td.view(-1,1), ts.view(-1,1)
+        f = [z]
+        for n in range(1, self.nhd+1):
+            p = 2*np.pi*n*td; f += [torch.sin(p), torch.cos(p)]
+        for n in range(1, self.nhs+1):
+            p = 2*np.pi*n*ts; f += [torch.sin(p), torch.cos(p)]
+        for n in range(1, self.ndz+1):
+            p = np.pi*n*z; f += [torch.sin(p), torch.cos(p)]
+        return self.net(torch.cat(f, 1))
 
 class ConductivityNet(nn.Module):
-    """
-    NN₂: z → k(z)
-    Maps normalized depth to thermal conductivity.
-    Output bounded to [k_min, k_max] via sigmoid.
-    """
-
-    def __init__(self, n_hidden: int = 3, n_neurons: int = 32,
-                 k_min: float = 0.005, k_max: float = 4.0):
+    """k = exp(raw). No sigmoid saturation. dk/d(raw) = k."""
+    def __init__(self, nh=3, nn_=32, k_min=0.005, k_max=4.0):
         super().__init__()
-        self.k_min = k_min
-        self.k_max = k_max
-
-        layers = [nn.Linear(1, n_neurons), nn.Tanh()]
-        for _ in range(n_hidden - 1):
-            layers.extend([nn.Linear(n_neurons, n_neurons), nn.Tanh()])
-        layers.append(nn.Linear(n_neurons, 1))
+        self.log_k_min = float(np.log(k_min))
+        self.log_k_max = float(np.log(k_max))
+        layers = [nn.Linear(1, nn_), nn.Tanh()]
+        for _ in range(nh - 1):
+            layers += [nn.Linear(nn_, nn_), nn.Tanh()]
+        layers.append(nn.Linear(nn_, 1))
         self.net = nn.Sequential(*layers)
-        self._init_weights()
-
-    def _init_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Linear):
-                nn.init.xavier_normal_(m.weight)
-                nn.init.zeros_(m.bias)
+                nn.init.xavier_normal_(m.weight, gain=0.5); nn.init.zeros_(m.bias)
+        with torch.no_grad():
+            self.net[-1].bias.fill_(0.5*(self.log_k_min + self.log_k_max))
 
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
-        z = z.view(-1, 1)
-        raw = self.net(z)
-        k = self.k_min + (self.k_max - self.k_min) * torch.sigmoid(raw)
-        return k
-
+    def forward(self, z):
+        return torch.exp(self.net(z.view(-1,1)).clamp(-8., 3.))
 
 class ThermalPINN(nn.Module):
-    """
-    Combined PINN for thermal inversion — V2 dual time coordinates.
-
-    Physics loss uses dual-coordinate FD stencils:
-        ∂T/∂t = (∂T/∂t_d)(1/P_sol) + (∂T/∂t_s)(1/P_year)
-        ∂/∂z(k·∂T/∂z) via conservative stencil in normalized z
-    """
-
-    def __init__(self, config: PINNConfig):
+    def __init__(self, cfg):
         super().__init__()
-        self.config = config
-        self.device = torch.device(config.device)
-
-        self.T_net = TemperatureNet(
-            n_hidden=config.n_hidden_T,
-            n_neurons=config.n_neurons_T,
-            n_harmonics_d=config.n_harmonics_diurnal,
-            n_harmonics_s=config.n_harmonics_seasonal,
-            n_depth_modes=config.n_depth_modes,
-        )
-        self.k_net = ConductivityNet(
-            n_hidden=config.n_hidden_k,
-            n_neurons=config.n_neurons_k,
-            k_min=config.k_min,
-            k_max=config.k_max,
-        )
+        self.config = cfg
+        self.device = torch.device(cfg.device)
+        self.T_net = TemperatureNet(cfg.n_hidden_T, cfg.n_neurons_T,
+            cfg.n_harmonics_diurnal, cfg.n_harmonics_seasonal, cfg.n_depth_modes)
+        self.k_net = ConductivityNet(cfg.n_hidden_k, cfg.n_neurons_k,
+            cfg.k_min, cfg.k_max)
         self.to(self.device)
 
-    def predict_T(self, z: torch.Tensor, t_d: torch.Tensor,
-                  t_s: torch.Tensor) -> torch.Tensor:
-        """Predict temperature T(z, t) in physical units [K]."""
-        T_norm = self.T_net(z, t_d, t_s)
-        T = self.config.T_min + (self.config.T_max - self.config.T_min) * (
-            0.5 * (T_norm + 1.0)
-        )
-        return T
+    def predict_T(self, z, td, ts):
+        r = self.T_net(z, td, ts)
+        return self.config.T_min + (self.config.T_max-self.config.T_min)*0.5*(r+1)
 
-    def predict_k(self, z: torch.Tensor) -> torch.Tensor:
-        """Predict thermal conductivity k(z) in [W/m/K]."""
+    def predict_k(self, z):
         return self.k_net(z)
 
-    def physics_loss_fd(
-        self, z_c: torch.Tensor, t_d_c: torch.Tensor, t_s_c: torch.Tensor
-    ) -> torch.Tensor:
-        """
-        PDE residual via finite differences with dual time coordinates.
+    def physics_loss_fd(self, zc, tdc, tsc):
+        ez, ed, es = self.config.eps_z, self.config.eps_d, self.config.eps_s
+        zc = zc.clamp(2*ez, 1-2*ez)
+        Tdp = self.predict_T(zc, tdc+ed, tsc)
+        Tdm = self.predict_T(zc, tdc-ed, tsc)
+        dTtd = (Tdp-Tdm)/(2*ed)
+        Tsp = self.predict_T(zc, tdc, tsc+es)
+        Tsm = self.predict_T(zc, tdc, tsc-es)
+        dTts = (Tsp-Tsm)/(2*es)
+        dTdt = dTtd/MARS_SOL + dTts/MARS_YEAR_SEC
 
-        ρc · ∂T/∂t = ∂/∂z(k(z) · ∂T/∂z)
+        Tc = self.predict_T(zc, tdc, tsc)
+        Tzp = self.predict_T(zc+ez, tdc, tsc)
+        Tzm = self.predict_T(zc-ez, tdc, tsc)
+        kp = self.predict_k(zc+.5*ez)
+        km = self.predict_k(zc-.5*ez)
+        fp = kp*(Tzp-Tc)/ez; fm = km*(Tc-Tzm)/ez
+        div = (fp-fm)/ez/(self.config.z_max**2)
 
-        ∂T/∂t = (∂T/∂t_d)(1/P_sol) + (∂T/∂t_s)(1/P_year)
+        res = RHO_CP*dTdt - div
+        cs = RHO_CP*0.5*(self.config.T_max-self.config.T_min)*2*np.pi/MARS_SOL
+        return ((res/max(cs,1e-10))**2).mean()
 
-        Key V2 advantage: eps_d and eps_s are in phase coordinates,
-        so they always correspond to fixed physical time intervals
-        regardless of simulation length.
-        """
-        eps_z = self.config.eps_z
-        eps_d = self.config.eps_d
-        eps_s = self.config.eps_s
+    def data_loss(self, zo, tdo, tso, To):
+        Tp = self.predict_T(zo, tdo, tso)
+        s = self.config.T_max - self.config.T_min
+        return ((Tp - To.view(-1,1))**2).mean() / (s**2)
 
-        # Clamp z to avoid boundary stencil issues
-        z_c = z_c.clamp(2 * eps_z, 1.0 - 2 * eps_z)
+    def k_smooth_loss(self, zp):
+        e = self.config.eps_z; z = zp.clamp(e,1-e)
+        kc = self.predict_k(z); kp = self.predict_k(z+e); km = self.predict_k(z-e)
+        d2k = (kp-2*kc+km)/(e**2)
+        return ((d2k/(self.config.k_max-self.config.k_min))**2).mean()
 
-        # --- Temporal derivatives (dual coordinates) ---
-        # ∂T/∂t_d via central difference (diurnal)
-        T_dp = self.predict_T(z_c, t_d_c + eps_d, t_s_c)
-        T_dm = self.predict_T(z_c, t_d_c - eps_d, t_s_c)
-        dT_dtd = (T_dp - T_dm) / (2.0 * eps_d)  # K per diurnal-phase-unit
+def train_pinn(model, data, cfg):
+    dev = model.device; zm = float(data["z"].max()); cfg.z_max = zm
+    zo = torch.tensor(data.get("z_obs", np.zeros_like(data["t_obs_diurnal"]))/zm,
+                      dtype=torch.float32).to(dev)
+    tdo = torch.tensor(data["t_obs_diurnal"], dtype=torch.float32).to(dev)
+    tso = torch.tensor(data["t_obs_seasonal"], dtype=torch.float32).to(dev)
+    To = torch.tensor(data["T_obs"], dtype=torch.float32).to(dev)
+    zca = torch.tensor(data["z_colloc"]/zm, dtype=torch.float32).to(dev)
+    tdca = torch.tensor(data["t_colloc_diurnal"], dtype=torch.float32).to(dev)
+    tsca = torch.tensor(data["t_colloc_seasonal"], dtype=torch.float32).to(dev)
 
-        # ∂T/∂t_s via central difference (seasonal)
-        T_sp = self.predict_T(z_c, t_d_c, t_s_c + eps_s)
-        T_sm = self.predict_T(z_c, t_d_c, t_s_c - eps_s)
-        dT_dts = (T_sp - T_sm) / (2.0 * eps_s)  # K per seasonal-phase-unit
+    optT = torch.optim.Adam(model.T_net.parameters(), lr=cfg.lr_T)
+    optk = torch.optim.Adam(model.k_net.parameters(), lr=cfg.lr_k)
+    schT = torch.optim.lr_scheduler.StepLR(optT, cfg.scheduler_step, cfg.scheduler_gamma)
+    schk = torch.optim.lr_scheduler.StepLR(optk, cfg.scheduler_step, cfg.scheduler_gamma)
 
-        # Physical ∂T/∂t via chain rule [K/s]:
-        #   t_d = t / P_sol      → dt_d/dt = 1/P_sol
-        #   t_s = t / P_year     → dt_s/dt = 1/P_year
-        #   ∂T/∂t = (∂T/∂t_d)(1/P_sol) + (∂T/∂t_s)(1/P_year)
-        dT_dt = dT_dtd / MARS_SOL + dT_dts / MARS_YEAR_SEC
-
-        # --- Spatial derivative ---
-        # ∂/∂z(k · ∂T/∂z) via conservative FD stencil (normalized z)
-        T_c = self.predict_T(z_c, t_d_c, t_s_c)
-        T_zp = self.predict_T(z_c + eps_z, t_d_c, t_s_c)
-        T_zm = self.predict_T(z_c - eps_z, t_d_c, t_s_c)
-
-        k_zph = self.predict_k(z_c + 0.5 * eps_z)  # k at z+ε/2
-        k_zmh = self.predict_k(z_c - 0.5 * eps_z)  # k at z-ε/2
-
-        flux_p = k_zph * (T_zp - T_c) / eps_z
-        flux_m = k_zmh * (T_c - T_zm) / eps_z
-        div_flux_norm = (flux_p - flux_m) / eps_z
-
-        # Convert to physical: ∂/∂z_phys = (1/z_max)·∂/∂z_norm
-        # → ∂/∂z(k·∂T/∂z) = div_flux_norm / z_max²
-        div_flux = div_flux_norm / (self.config.z_max ** 2)
-
-        # PDE residual: ρc · ∂T/∂t - ∂/∂z(k·∂T/∂z) = 0
-        residual = RHO_CP * dT_dt - div_flux
-
-        # Normalize by characteristic scale: ρc · T_amp · ω_diurnal
-        T_amp = 0.5 * (self.config.T_max - self.config.T_min)
-        omega_d = 2.0 * np.pi / MARS_SOL
-        char_scale = RHO_CP * T_amp * omega_d
-
-        return ((residual / max(char_scale, 1e-10)) ** 2).mean()
-
-    def data_loss(
-        self, t_d_obs: torch.Tensor, t_s_obs: torch.Tensor,
-        T_obs: torch.Tensor
-    ) -> torch.Tensor:
-        """Surface observation loss: |T_pred(z=0, t) - T_observed|²"""
-        z_surface = torch.zeros_like(t_d_obs)
-        T_pred = self.predict_T(z_surface, t_d_obs, t_s_obs)
-        T_scale = self.config.T_max - self.config.T_min
-        return ((T_pred - T_obs.view(-1, 1)) ** 2).mean() / (T_scale ** 2)
-
-    def k_smoothness_loss_fd(self, z_points: torch.Tensor) -> torch.Tensor:
-        """k(z) smoothness via FD second derivative."""
-        eps = self.config.eps_z
-        z = z_points.clamp(eps, 1.0 - eps)
-        k_c = self.predict_k(z)
-        k_p = self.predict_k(z + eps)
-        k_m = self.predict_k(z - eps)
-        d2k = (k_p - 2.0 * k_c + k_m) / (eps ** 2)
-        k_range = self.config.k_max - self.config.k_min
-        return ((d2k / k_range) ** 2).mean()
-
-
-def train_pinn(
-    model: ThermalPINN,
-    data: dict,
-    config: PINNConfig,
-) -> dict:
-    """
-    Train the PINN model with 3-phase curriculum learning.
-
-    Phase 1 (0-25%):   Data focus — learn surface T accurately
-    Phase 2 (25-60%):  Physics ramp — begin constraining interior, learn k(z)
-    Phase 3 (60-100%): Physics dominance — fine-tune k(z) recovery
-    """
-    device = model.device
-
-    z_max = float(data["z"].max())
-    config.z_max = z_max
-
-    # Surface observations (dual coordinates)
-    t_d_obs = torch.tensor(
-        data["t_obs_diurnal"], dtype=torch.float32
-    ).to(device)
-    t_s_obs = torch.tensor(
-        data["t_obs_seasonal"], dtype=torch.float32
-    ).to(device)
-    T_obs = torch.tensor(data["T_obs"], dtype=torch.float32).to(device)
-
-    # Collocation points (normalized z, phase coordinates)
-    z_colloc_all = torch.tensor(
-        data["z_colloc"] / z_max, dtype=torch.float32
-    ).to(device)
-    t_d_colloc_all = torch.tensor(
-        data["t_colloc_diurnal"], dtype=torch.float32
-    ).to(device)
-    t_s_colloc_all = torch.tensor(
-        data["t_colloc_seasonal"], dtype=torch.float32
-    ).to(device)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
-    scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=config.scheduler_step, gamma=config.scheduler_gamma
-    )
-
-    history = {
-        "loss_total": [], "loss_physics": [],
-        "loss_data": [], "loss_smooth": [],
-    }
-
+    hist = {"loss_total":[],"loss_physics":[],"loss_data":[],"loss_smooth":[]}
     rng = np.random.default_rng(0)
-    n_epochs = config.n_epochs
-    phase1_end = int(0.25 * n_epochs)
-    phase2_end = int(0.60 * n_epochs)
+    ne = cfg.n_epochs; p1=int(.20*ne); p2=int(.60*ne)
+    lkmin, lkmax = float(np.log(cfg.k_min)), float(np.log(cfg.k_max))
 
-    for epoch in range(n_epochs):
-        model.train()
-        optimizer.zero_grad()
-
-        # 3-phase curriculum
-        if epoch < phase1_end:
-            # Phase 1: Data focus — nail the surface T fit
-            w_phys = config.w_physics * 0.001
-            w_data = config.w_data * 5.0
-        elif epoch < phase2_end:
-            # Phase 2: Ramp physics — force PDE consistency, begin k(z) learning
-            progress = (epoch - phase1_end) / max(phase2_end - phase1_end, 1)
-            w_phys = config.w_physics * (0.001 + 4.999 * progress)
-            w_data = config.w_data * (5.0 - 3.0 * progress)
+    for ep in range(ne):
+        model.train(); optT.zero_grad(); optk.zero_grad()
+        if ep < p1:
+            wp, wd = cfg.w_physics*0.5, cfg.w_data*3.0
+        elif ep < p2:
+            pr = (ep-p1)/max(p2-p1,1)
+            wp = cfg.w_physics*(0.5+9.5*pr); wd = cfg.w_data*(3.0-1.0*pr)
         else:
-            # Phase 3: Physics dominance — fine-tune k(z)
-            w_phys = config.w_physics * 5.0
-            w_data = config.w_data * 2.0
+            wp, wd = cfg.w_physics*10.0, cfg.w_data*2.0
 
-        # Sample collocation batch
-        idx = rng.choice(
-            len(z_colloc_all),
-            size=min(config.batch_colloc, len(z_colloc_all)),
-            replace=False,
-        )
-        z_c = z_colloc_all[idx]
-        t_d_c = t_d_colloc_all[idx]
-        t_s_c = t_s_colloc_all[idx]
+        idx = rng.choice(len(zca), size=min(cfg.batch_colloc,len(zca)), replace=False)
+        zc, tdc, tsc = zca[idx], tdca[idx], tsca[idx]
 
-        # Compute losses
-        loss_phys = model.physics_loss_fd(z_c, t_d_c, t_s_c)
-        loss_data = model.data_loss(t_d_obs, t_s_obs, T_obs)
-
-        z_smooth = torch.linspace(0.01, 0.99, 50, device=device)
-        loss_smooth = model.k_smoothness_loss_fd(z_smooth)
-
-        loss = w_phys * loss_phys + w_data * loss_data + config.w_k_smooth * loss_smooth
+        lp = model.physics_loss_fd(zc, tdc, tsc)
+        ld = model.data_loss(zo, tdo, tso, To)
+        zs = torch.linspace(.01,.99,50,device=dev)
+        ls = model.k_smooth_loss(zs)
+        ks = model.predict_k(zs); lk = torch.log(ks+1e-10)
+        lb = (torch.relu(lkmin-lk)**2 + torch.relu(lk-lkmax)**2).mean()
+        loss = wp*lp + wd*ld + cfg.w_k_smooth*ls + cfg.w_k_bounds*lb
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optimizer.step()
-        scheduler.step()
+        optT.step(); optk.step(); schT.step(); schk.step()
 
-        history["loss_total"].append(loss.item())
-        history["loss_physics"].append(loss_phys.item())
-        history["loss_data"].append(loss_data.item())
-        history["loss_smooth"].append(loss_smooth.item())
+        if ep % cfg.k_only_interval == 0 and ep >= p1:
+            for p in model.T_net.parameters(): p.requires_grad_(False)
+            optk.zero_grad()
+            lko = model.physics_loss_fd(zc, tdc, tsc)
+            lko.backward()
+            torch.nn.utils.clip_grad_norm_(model.k_net.parameters(), 1.0)
+            optk.step()
+            for p in model.T_net.parameters(): p.requires_grad_(True)
 
-        if (epoch + 1) % 500 == 0 or epoch == 0:
-            if epoch < phase1_end:
-                phase_label = "P1-data"
-            elif epoch < phase2_end:
-                phase_label = "P2-ramp"
-            else:
-                phase_label = "P3-phys"
+        hist["loss_total"].append(loss.item())
+        hist["loss_physics"].append(lp.item())
+        hist["loss_data"].append(ld.item())
+        hist["loss_smooth"].append(ls.item())
 
-            logger.info(
-                "Epoch %5d/%d [%s] | L=%.3e | Phys=%.3e | Data=%.3e | "
-                "w_p=%.3f | w_d=%.1f | LR=%.1e",
-                epoch + 1, n_epochs, phase_label,
-                loss.item(), loss_phys.item(), loss_data.item(),
-                w_phys, w_data, optimizer.param_groups[0]["lr"],
-            )
-
-            # Quick k(z) diagnostic at key depths
+        if (ep+1) % 500 == 0 or ep == 0:
+            ph = "P1" if ep<p1 else ("P2" if ep<p2 else "P3")
+            gk = sum(p.grad.norm().item() for p in model.k_net.parameters()
+                     if p.grad is not None)
+            gt = sum(p.grad.norm().item() for p in model.T_net.parameters()
+                     if p.grad is not None)
+            logger.info("E%5d [%s] L=%.2e Ph=%.2e Da=%.2e wp=%.1f wd=%.1f gT=%.1e gk=%.1e",
+                        ep+1, ph, loss.item(), lp.item(), ld.item(), wp, wd, gt, gk)
             model.eval()
             with torch.no_grad():
-                z_test = torch.tensor(
-                    [0.0, 0.05, 0.1, 0.167, 0.333, 0.5, 0.667, 1.0],
-                    device=device
-                )
-                k_test = model.predict_k(z_test).cpu().numpy().flatten()
-                # z_test * z_max = physical depth
-                depths = z_test.cpu().numpy() * config.z_max
-                parts = [f"z={d:.1f}m:{k:.4f}" for d, k in zip(depths, k_test)]
-                logger.info("  k(z): %s", "  ".join(parts[:4]))
-                logger.info("        %s", "  ".join(parts[4:]))
+                zt = torch.tensor([0.,.05,.1,.167,.333,.5,.667,1.], device=dev)
+                kt = model.predict_k(zt).cpu().numpy().flatten()
+                d = zt.cpu().numpy()*cfg.z_max
+                logger.info("  k: %s", "  ".join(f"{dd:.1f}m={kk:.4f}" for dd,kk in zip(d,kt)))
+    return hist
 
-    return history
-
-
-def evaluate_pinn(model: ThermalPINN, data: dict) -> dict:
-    """Evaluate trained PINN against ground truth."""
-    device = model.device
-    config = model.config
-
-    z = data["z"]
-    z_norm = torch.tensor(z / config.z_max, dtype=torch.float32).to(device)
-
+def evaluate_pinn(model, data):
+    dev = model.device; cfg = model.config
+    z = data["z"]; zn = torch.tensor(z/cfg.z_max, dtype=torch.float32).to(dev)
     model.eval()
     with torch.no_grad():
-        k_pred = model.predict_k(z_norm).cpu().numpy().flatten()
-
-    k_true = data["k_true"]
-
-    # Surface T comparison
-    t_d_obs = torch.tensor(
-        data["t_obs_diurnal"], dtype=torch.float32
-    ).to(device)
-    t_s_obs = torch.tensor(
-        data["t_obs_seasonal"], dtype=torch.float32
-    ).to(device)
-    z_zero = torch.zeros_like(t_d_obs)
-
+        kp = model.predict_k(zn).cpu().numpy().flatten()
+    kt = data["k_true"]
+    td = torch.tensor(data["t_obs_diurnal"], dtype=torch.float32).to(dev)
+    ts = torch.tensor(data["t_obs_seasonal"], dtype=torch.float32).to(dev)
+    # Only evaluate on surface observations
+    mask = data.get("z_obs", np.zeros(len(data["t_obs_diurnal"]))) < 0.001
+    td_s, ts_s = td[mask], ts[mask]
+    z0 = torch.zeros_like(td_s)
     with torch.no_grad():
-        T_pred = model.predict_T(z_zero, t_d_obs, t_s_obs).cpu().numpy().flatten()
+        Tp = model.predict_T(z0, td_s, ts_s).cpu().numpy().flatten()
+    Tt = data["T_obs"][mask]
 
-    T_true = data["T_obs"]
+    kr = float(np.sqrt(np.mean((kp-kt)**2)))
+    Tr = float(np.sqrt(np.mean((Tp-Tt)**2)))
+    TIp = np.sqrt(np.clip(kp,0,None)*RHO*C_P)
+    TIt = np.sqrt(kt*RHO*C_P)
+    bi = np.argmax(np.abs(np.gradient(kp))); bd = z[bi]
+    ka = np.mean(kp[:max(bi,1)]); kb = np.mean(kp[min(bi+10,len(kp)):])
 
-    k_rmse = float(np.sqrt(np.mean((k_pred - k_true) ** 2)))
-    T_rmse = float(np.sqrt(np.mean((T_pred - T_true) ** 2)))
-
-    TI_pred = np.sqrt(np.clip(k_pred, 0, None) * RHO * C_P)
-    TI_true = np.sqrt(k_true * RHO * C_P)
-
-    # Layer detection: check if PINN finds the transition
-    boundary_idx = np.argmax(np.abs(np.gradient(k_pred)))
-    boundary_depth = z[boundary_idx]
-    k_above = np.mean(k_pred[:max(boundary_idx, 1)])
-    k_below = np.mean(k_pred[min(boundary_idx + 10, len(k_pred)):])
-
-    logger.info("=" * 50)
-    logger.info("EVALUATION RESULTS")
-    logger.info("  k RMSE:         %.4f W/m/K", k_rmse)
-    logger.info("  T surface RMSE: %.2f K", T_rmse)
-    logger.info("  TI predicted:   %.0f - %.0f tiu", TI_pred.min(), TI_pred.max())
-    logger.info("  TI true:        %.0f - %.0f tiu", TI_true.min(), TI_true.max())
-    logger.info("  Layer boundary: %.2f m (detected)", boundary_depth)
-    logger.info("  k above/below:  %.4f / %.4f W/m/K", k_above, k_below)
-    logger.info("  k true  range:  %.4f - %.4f W/m/K", k_true.min(), k_true.max())
-    logger.info("=" * 50)
-
-    return {
-        "z": z,
-        "k_pred": k_pred,
-        "k_true": k_true,
-        "TI_pred": TI_pred,
-        "TI_true": TI_true,
-        "T_pred_surface": T_pred,
-        "T_true_surface": T_true,
-        "k_rmse": k_rmse,
-        "T_rmse": T_rmse,
-        "boundary_depth": boundary_depth,
-    }
+    logger.info("="*50)
+    logger.info("k_RMSE=%.4f  T_RMSE=%.2f K  boundary=%.2fm", kr, Tr, bd)
+    logger.info("TI: pred %.0f-%.0f  true %.0f-%.0f  k_above=%.4f k_below=%.4f",
+                TIp.min(), TIp.max(), TIt.min(), TIt.max(), ka, kb)
+    logger.info("="*50)
+    return {"z":z, "k_pred":kp, "k_true":kt, "TI_pred":TIp, "TI_true":TIt,
+            "T_pred_surface":Tp, "T_true_surface":Tt,
+            "k_rmse":kr, "T_rmse":Tr, "boundary_depth":bd}

@@ -1,282 +1,118 @@
-"""
-Synthetic data generation for PINN validation (Phase 1).
-V2: Extended simulation (1 Mars year) with dual time coordinates.
-
-Generates ground-truth T(z,t) by solving 1D heat diffusion with a known
-k(z) profile using Crank-Nicolson finite differences. The surface temperature
-T(0,t) serves as synthetic "THEMIS observations" for PINN training.
-
-The PINN must recover the known k(z) profile from surface observations alone.
-"""
+"""Synthetic data generation for PINN — V3 with subsurface obs support."""
 from __future__ import annotations
-
 import logging
 from dataclasses import dataclass
-
 import numpy as np
 
 logger = logging.getLogger(__name__)
-
-# Mars physical constants
-MARS_SOL = 88_775.0           # seconds per sol
-MARS_YEAR_SOLS = 668.6        # sols per Mars year
-MARS_YEAR_SEC = MARS_YEAR_SOLS * MARS_SOL  # seconds per Mars year
-RHO = 1500.0                  # soil density [kg/m³]
-C_P = 627.9                   # soil heat capacity [J/kg/K]
-SIGMA = 5.670374419e-8        # Stefan-Boltzmann constant
-
+MARS_SOL = 88_775.0; MARS_YEAR_SOLS = 668.6
+MARS_YEAR_SEC = MARS_YEAR_SOLS * MARS_SOL
+RHO = 1500.0; C_P = 627.9
 
 @dataclass
 class SyntheticConfig:
-    """Configuration for synthetic data generation."""
-    # Domain
-    z_max: float = 3.0          # maximum depth [m]
-    n_z: int = 200              # spatial grid points
-    n_sols: int = 668           # number of sols to simulate (1 Mars year)
-    dt_per_sol: int = 144       # time steps per sol (10 min each)
-    spinup_sols: int = 668      # spinup sols (1 Mars year)
+    z_max: float = 3.0; n_z: int = 200; n_sols: int = 668
+    dt_per_sol: int = 144; spinup_sols: int = 668
+    T_mean: float = 210.0; T_amp_diurnal: float = 40.0
+    T_amp_seasonal: float = 20.0; latitude: float = 45.0
+    rho: float = RHO; c_p: float = C_P
 
-    # Surface forcing
-    T_mean: float = 210.0       # mean surface temperature [K]
-    T_amp_diurnal: float = 40.0 # diurnal amplitude [K]
-    T_amp_seasonal: float = 20.0# seasonal amplitude [K]
+def two_layer_k_profile(z, k_upper=0.02, k_lower=2.0,
+                         boundary_depth=0.5, transition_width=0.05):
+    return k_upper + (k_lower-k_upper)/(1+np.exp(-(z-boundary_depth)/transition_width))
 
-    # Latitude (controls diurnal cycle shape)
-    latitude: float = 45.0      # degrees N (Arcadia Planitia)
+def three_layer_k_profile(z, k1=0.02, k2=0.1, k3=2.0,
+                           d1=0.2, d2=0.8, tw=0.05):
+    s1 = 1/(1+np.exp(-(z-d1)/tw)); s2 = 1/(1+np.exp(-(z-d2)/tw))
+    return k1 + (k2-k1)*s1 + (k3-k2)*s2
 
-    # Material properties (fixed ρ, c — only k varies with depth)
-    rho: float = RHO
-    c_p: float = C_P
+def surface_forcing(t, cfg):
+    wd = 2*np.pi/MARS_SOL; ws = 2*np.pi/MARS_YEAR_SEC
+    return cfg.T_mean + cfg.T_amp_diurnal*np.sin(wd*t) + cfg.T_amp_seasonal*np.sin(ws*t)
 
+def solve_heat_equation(k_z, cfg):
+    nz = cfg.n_z; dz = cfg.z_max/(nz-1); z = np.linspace(0,cfg.z_max,nz)
+    nt_total = (cfg.n_sols+cfg.spinup_sols)*cfg.dt_per_sol
+    dt = MARS_SOL/cfg.dt_per_sol; t_all = np.arange(nt_total)*dt
+    rc = cfg.rho*cfg.c_p
+    kh = 2*k_z[:-1]*k_z[1:]/(k_z[:-1]+k_z[1:])
+    r = kh*dt/(rc*dz*dz)
 
-def two_layer_k_profile(
-    z: np.ndarray,
-    k_upper: float = 0.02,        # dust-like [W/m/K] → TI ≈ 137 tiu
-    k_lower: float = 2.0,         # ice-like  [W/m/K] → TI ≈ 1372 tiu
-    boundary_depth: float = 0.5,  # layer boundary [m]
-    transition_width: float = 0.05,  # smooth transition [m]
-) -> np.ndarray:
-    """
-    Two-layer k(z) profile with smooth transition.
-    Upper layer: low thermal conductivity (dust/sand).
-    Lower layer: high thermal conductivity (ice-cemented soil).
-    """
-    k = k_upper + (k_lower - k_upper) / (
-        1.0 + np.exp(-(z - boundary_depth) / transition_width)
-    )
-    return k
+    a, b, c = np.zeros(nz), np.zeros(nz), np.zeros(nz)
+    b[0] = 1.0
+    a[1:-1] = -.5*r[:-1]; b[1:-1] = 1+.5*(r[:-1]+r[1:]); c[1:-1] = -.5*r[1:]
+    a[-1] = -.5*r[-1]; b[-1] = 1+.5*r[-1]
 
+    cp, w = np.zeros(nz), np.zeros(nz)
+    w[0] = b[0]; cp[0] = c[0]/w[0]
+    for i in range(1,nz):
+        w[i] = b[i]-a[i]*cp[i-1]
+        if abs(w[i]) < 1e-30: w[i] = 1e-30
+        cp[i] = c[i]/w[i]
 
-def three_layer_k_profile(
-    z: np.ndarray,
-    k1: float = 0.02,     # surface dust
-    k2: float = 0.1,      # sand
-    k3: float = 2.0,      # ice-cemented
-    d1: float = 0.2,      # dust/sand boundary [m]
-    d2: float = 0.8,      # sand/ice boundary [m]
-    tw: float = 0.05,     # transition width [m]
-) -> np.ndarray:
-    """Three-layer k(z) profile."""
-    s1 = 1.0 / (1.0 + np.exp(-(z - d1) / tw))
-    s2 = 1.0 / (1.0 + np.exp(-(z - d2) / tw))
-    k = k1 + (k2 - k1) * s1 + (k3 - k2) * s2
-    return k
+    Ts = surface_forcing(t_all, cfg)
+    T = np.full(nz, cfg.T_mean)
+    nsp = cfg.spinup_sols; nt_out = cfg.n_sols*cfg.dt_per_sol
+    Tout = np.zeros((nt_out, nz))
+    rhs, dp, x = np.zeros(nz), np.zeros(nz), np.zeros(nz)
 
+    for n in range(nt_total):
+        rhs[0] = Ts[n]
+        rhs[1:-1] = T[1:-1] + .5*r[:-1]*(T[:-2]-T[1:-1]) + .5*r[1:]*(T[2:]-T[1:-1])
+        rhs[-1] = T[-1] + .5*r[-1]*(T[-2]-T[-1])
+        dp[0] = rhs[0]/w[0]
+        for i in range(1,nz): dp[i] = (rhs[i]-a[i]*dp[i-1])/w[i]
+        x[-1] = dp[-1]
+        for i in range(nz-2,-1,-1): x[i] = dp[i]-cp[i]*x[i+1]
+        T[:] = x
+        oi = n - nsp*cfg.dt_per_sol
+        if oi >= 0: Tout[oi] = T
 
-def surface_forcing(t: np.ndarray, config: SyntheticConfig) -> np.ndarray:
-    """
-    Synthetic surface temperature forcing.
-    Combines diurnal and seasonal cycles.
+    return Tout, z, np.arange(nt_out)*dt
 
-    T_surface(t) = T_mean + T_amp_diurnal * sin(2π t/P_sol)
-                          + T_amp_seasonal * sin(2π t/P_year)
-    """
-    omega_d = 2.0 * np.pi / MARS_SOL
-    omega_s = 2.0 * np.pi / MARS_YEAR_SEC
-
-    T = (config.T_mean
-         + config.T_amp_diurnal * np.sin(omega_d * t)
-         + config.T_amp_seasonal * np.sin(omega_s * t))
-    return T
-
-
-def solve_heat_equation(
-    k_z: np.ndarray,
-    config: SyntheticConfig,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Solve 1D heat diffusion with Crank-Nicolson scheme.
-
-        ρc ∂T/∂t = ∂/∂z(k(z) ∂T/∂z)
-
-    Uses precomputed Thomas factorization (constant tridiagonal matrix)
-    and vectorized RHS computation for performance.
-
-    Returns:
-        T: temperature array (n_t, n_z) [K]
-        z: depth array (n_z,) [m]
-        t: time array (n_t,) [s]
-    """
-    n_z = config.n_z
-    dz = config.z_max / (n_z - 1)
-    z = np.linspace(0, config.z_max, n_z)
-
-    n_spinup = config.spinup_sols
-    total_sols = config.n_sols + n_spinup
-    n_t_total = total_sols * config.dt_per_sol
-    dt = MARS_SOL / config.dt_per_sol
-    t_total = np.arange(n_t_total) * dt
-
-    rho_c = config.rho * config.c_p
-
-    # Interface conductivities (harmonic mean) — vectorized
-    k_half = 2.0 * k_z[:-1] * k_z[1:] / (k_z[:-1] + k_z[1:])
-
-    # Courant numbers
-    r = k_half * dt / (rho_c * dz * dz)
-
-    # Build CONSTANT tridiagonal matrix for Crank-Nicolson: (I + 0.5*A)
-    a_diag = np.zeros(n_z)  # lower diagonal
-    b_diag = np.zeros(n_z)  # main diagonal
-    c_diag = np.zeros(n_z)  # upper diagonal
-
-    b_diag[0] = 1.0  # Dirichlet top BC
-    # Interior: vectorized
-    a_diag[1:-1] = -0.5 * r[:-1]
-    b_diag[1:-1] = 1.0 + 0.5 * (r[:-1] + r[1:])
-    c_diag[1:-1] = -0.5 * r[1:]
-    # Bottom: zero-flux BC (uses last interface r[-1])
-    a_diag[-1] = -0.5 * r[-1]
-    b_diag[-1] = 1.0 + 0.5 * r[-1]
-
-    # Precompute Thomas factorization (constant — computed once)
-    c_prime = np.zeros(n_z)
-    w = np.zeros(n_z)
-    w[0] = b_diag[0]
-    c_prime[0] = c_diag[0] / w[0]
-    for i in range(1, n_z):
-        w[i] = b_diag[i] - a_diag[i] * c_prime[i - 1]
-        if abs(w[i]) < 1e-30:
-            w[i] = 1e-30
-        c_prime[i] = c_diag[i] / w[i]
-
-    # Surface forcing
-    T_surface = surface_forcing(t_total, config)
-
-    # Initialize
-    T_current = np.full(n_z, config.T_mean)
-
-    # Storage (only after spinup)
-    n_t_out = config.n_sols * config.dt_per_sol
-    T_out = np.zeros((n_t_out, n_z))
-
-    # Preallocate work arrays
-    rhs = np.zeros(n_z)
-    d_prime = np.zeros(n_z)
-    x = np.zeros(n_z)
-
-    for n in range(n_t_total):
-        # Build RHS: (I - 0.5*A) T^n + BC — vectorized
-        rhs[0] = T_surface[n]
-        rhs[1:-1] = (T_current[1:-1]
-                     + 0.5 * r[:-1] * (T_current[:-2] - T_current[1:-1])
-                     + 0.5 * r[1:] * (T_current[2:] - T_current[1:-1]))
-        rhs[-1] = T_current[-1] + 0.5 * r[-1] * (T_current[-2] - T_current[-1])
-
-        # Thomas solve — forward sweep (uses precomputed w, c_prime)
-        d_prime[0] = rhs[0] / w[0]
-        for i in range(1, n_z):
-            d_prime[i] = (rhs[i] - a_diag[i] * d_prime[i - 1]) / w[i]
-
-        # Back substitution
-        x[-1] = d_prime[-1]
-        for i in range(n_z - 2, -1, -1):
-            x[i] = d_prime[i] - c_prime[i] * x[i + 1]
-
-        T_current[:] = x
-
-        # Store output (after spinup)
-        out_idx = n - n_spinup * config.dt_per_sol
-        if out_idx >= 0:
-            T_out[out_idx] = T_current
-
-    t_out = np.arange(n_t_out) * dt
-    return T_out, z, t_out
-
-
-def generate_synthetic_dataset(
-    k_profile_fn=None,
-    config: SyntheticConfig | None = None,
-    n_surface_obs: int = 3000,
-    n_colloc: int = 8000,
-    seed: int = 42,
-) -> dict:
-    """
-    Generate synthetic dataset for PINN validation.
-
-    Returns dict with dual time coordinates:
-        - z, t, T_full, k_true: ground truth
-        - t_obs, T_obs: surface observations (physical time + temperature)
-        - t_obs_diurnal, t_obs_seasonal: dual phase coordinates for obs
-        - z_colloc, t_colloc_diurnal, t_colloc_seasonal: collocation points
-    """
-    if config is None:
-        config = SyntheticConfig()
-
+def generate_synthetic_dataset(k_profile_fn=None, config=None,
+                                n_surface_obs=3000, n_colloc=8000,
+                                subsurface_depths=None,
+                                subsurface_obs_per_depth=200, seed=42):
+    if config is None: config = SyntheticConfig()
     z = np.linspace(0, config.z_max, config.n_z)
-
-    if k_profile_fn is None:
-        k_profile_fn = two_layer_k_profile
+    if k_profile_fn is None: k_profile_fn = two_layer_k_profile
     k_true = k_profile_fn(z)
 
-    logger.info("Solving heat equation (n_z=%d, n_sols=%d, spinup=%d, dt=%d/sol)...",
-                config.n_z, config.n_sols, config.spinup_sols, config.dt_per_sol)
-    T_full, z, t = solve_heat_equation(k_true, config)
-    logger.info("Solution shape: %s, T range: %.1f - %.1f K",
-                T_full.shape, T_full.min(), T_full.max())
+    logger.info("FDM solve (nz=%d, sols=%d+%d spinup)...", config.n_z, config.n_sols, config.spinup_sols)
+    Tf, z, t = solve_heat_equation(k_true, config)
+    logger.info("T range: %.1f-%.1f K, shape=%s", Tf.min(), Tf.max(), Tf.shape)
 
-    # Sample surface observations (uniform over full time range)
-    rng = np.random.default_rng(seed)
-    n_t = len(t)
-    obs_idx = rng.choice(n_t, size=min(n_surface_obs, n_t), replace=False)
-    obs_idx.sort()
-    t_obs = t[obs_idx]
-    T_obs = T_full[obs_idx, 0]  # surface temperature
+    rng = np.random.default_rng(seed); nt = len(t)
+    oi = rng.choice(nt, size=min(n_surface_obs,nt), replace=False); oi.sort()
+    t_obs, T_obs, z_obs = t[oi], Tf[oi,0], np.zeros(len(oi))
 
-    # Compute dual time coordinates for observations
-    t_obs_diurnal = (t_obs % MARS_SOL) / MARS_SOL       # diurnal phase [0, 1)
-    t_obs_seasonal = t_obs / MARS_YEAR_SEC                # seasonal phase [0, ~1]
+    if subsurface_depths:
+        for d in subsurface_depths:
+            zi = np.argmin(np.abs(z-d))
+            si = rng.choice(nt, size=min(subsurface_obs_per_depth,nt), replace=False); si.sort()
+            t_obs = np.concatenate([t_obs, t[si]])
+            T_obs = np.concatenate([T_obs, Tf[si,zi]])
+            z_obs = np.concatenate([z_obs, np.full(len(si), z[zi])])
+            logger.info("  Sub z=%.2fm: %d pts T=%.1f-%.1f K", z[zi], len(si), Tf[si,zi].min(), Tf[si,zi].max())
 
-    # Generate collocation points for physics loss
-    # Non-uniform z: beta(2,5) biased toward surface where gradients are strongest
-    z_colloc_raw = rng.beta(2, 5, n_colloc)  # ∈ [0,1], concentrated near 0
-    z_colloc = (z_colloc_raw * config.z_max).astype(np.float32)
+    td = (t_obs%MARS_SOL)/MARS_SOL; ts = t_obs/MARS_YEAR_SEC
 
-    # Independent diurnal and seasonal phases for collocation
-    t_d_colloc = rng.uniform(0, 1, n_colloc).astype(np.float32)
-    n_years = config.n_sols / MARS_YEAR_SOLS
-    t_s_colloc = rng.uniform(0, n_years, n_colloc).astype(np.float32)
+    nh = n_colloc//2
+    zc = np.concatenate([rng.beta(2,5,nh)*config.z_max,
+                         rng.uniform(0,config.z_max,n_colloc-nh)]).astype(np.float32)
+    tdc = rng.uniform(0,1,n_colloc).astype(np.float32)
+    ny = config.n_sols/MARS_YEAR_SOLS
+    tsc = rng.uniform(0,ny,n_colloc).astype(np.float32)
 
-    TI_upper = np.sqrt(k_true[0] * config.rho * config.c_p)
-    TI_lower = np.sqrt(k_true[-1] * config.rho * config.c_p)
-    logger.info("Ground truth: TI_upper=%.0f, TI_lower=%.0f tiu",
-                TI_upper, TI_lower)
-    logger.info("Surface obs: %d points, T range: %.1f - %.1f K",
-                len(T_obs), T_obs.min(), T_obs.max())
-    logger.info("Seasonal coverage: %.2f - %.2f Mars years",
-                t_obs_seasonal.min(), t_obs_seasonal.max())
+    logger.info("TI: upper=%.0f lower=%.0f | Obs: %d total",
+                np.sqrt(k_true[0]*config.rho*config.c_p),
+                np.sqrt(k_true[-1]*config.rho*config.c_p), len(T_obs))
 
-    return {
-        "z": z.astype(np.float32),
-        "t": t.astype(np.float32),
-        "T_full": T_full.astype(np.float32),
-        "k_true": k_true.astype(np.float32),
-        "t_obs": t_obs.astype(np.float32),
-        "T_obs": T_obs.astype(np.float32),
-        "t_obs_diurnal": t_obs_diurnal.astype(np.float32),
-        "t_obs_seasonal": t_obs_seasonal.astype(np.float32),
-        "z_colloc": z_colloc,
-        "t_colloc_diurnal": t_d_colloc,
-        "t_colloc_seasonal": t_s_colloc,
-        "config": config,
-    }
+    return {"z":z.astype(np.float32), "t":t.astype(np.float32),
+            "T_full":Tf.astype(np.float32), "k_true":k_true.astype(np.float32),
+            "t_obs":t_obs.astype(np.float32), "T_obs":T_obs.astype(np.float32),
+            "z_obs":z_obs.astype(np.float32),
+            "t_obs_diurnal":td.astype(np.float32), "t_obs_seasonal":ts.astype(np.float32),
+            "z_colloc":zc, "t_colloc_diurnal":tdc, "t_colloc_seasonal":tsc,
+            "config":config}
