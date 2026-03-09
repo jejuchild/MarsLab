@@ -1,0 +1,502 @@
+[
+  {
+    "local_time": 16.8928,
+    "solar_lon": 82.9863,
+    "bt_kelvin": 259.9790394341757,
+    "bt_raw": 247.8184814453125,
+    "product_id": "I03739034BTR",
+    "is_night": false,
+    "center_lat": 59.5284,
+    "center_lon": 174.899
+  },
+  {
+    "local_time": 4.65694,
+    "solar_lon": 130.459,
+    "bt_kelvin": 180.91968376283376,
+    "bt_raw": 188.36111450195312,
+    "product_id": "I05006014BTR",
+    "is_night": true,
+    "center_lat": 56.3338,
+    "center_lon": 173.14
+  },
+  {
+    "local_time": 5.08611,
+    "solar_lon": 211.658,
+    "bt_kelvin": 87.73198114050678,
+    "bt_raw": 151.8369903564453,
+    "product_id": "I06816031BTR",
+    "is_night": true,
+    "center_lat": 55.3722,
+    "center_lon": 174.962
+  },
+  {
+    "local_time": 4.09444,
+    "solar_lon": 287.699,
+    "bt_kelvin": 145.81384461952572,
+    "bt_raw": 144.7077178955078,
+    "product_id": "I08289010BTR",
+    "is_night": true,
+    "center_lat": 59.8379,
+    "center_lon": 173.814
+  },
+  {
+    "local_time": 3.98694,
+    "solar_lon": 359.335,
+    "bt_kelvin": 151.91293679161146,
+    "bt_raw": 171.82423400878906,
+    "product_id": "I09849016BTR",
+    "is_night": true,
+    "center_lat": 53.9771,
+    "center_lon": 177.087
+  },
+  {
+    "local_time": 5.27445,
+    "solar_lon": 166.832,
+    "bt_kelvin": 154.16903495869852,
+    "bt_raw": 172.95855712890625,
+    "product_id": "I14217008BTR",
+    "is_night": true,
+    "center_lat": 59.0687,
+    "center_lon": 172.583
+  },
+  {
+    "local_time": 5.30417,
+    "solar_lon": 179.878,
+    "bt_kelvin": 153.36081856977307,
+    "bt_raw": 172.54901123046875,
+    "product_id": "I14504012BTR",
+    "is_night": true,
+    "center_lat": 59.7053,
+    "center_lon": 173.413
+  },
+  {
+    "local_time": 5.30833,
+    "solar_lon": 210.025,
+    "bt_kelvin": 107.6799347701376,
+    "bt_raw": 155.55735778808594,
+    "product_id": "I15128035BTR",
+    "is_night": true,
+    "center_lat": 55.3873,
+    "center_lon": 174.209
+  },
+  {
+    "local_time": 4.4475,
+    "solar_lon": 270.675,
+    "bt_kelvin": 128.18645627918883,
+    "bt_raw": 161.65859985351562,
+    "product_id": "I16301005BTR",
+    "is_night": true,
+    "center_lat": 58.3587,
+    "center_lon": 175.985
+  },
+  {
+    "local_time": 4.425,
+    "solar_lon": 271.968,
+    "bt_kelvin": 126.92237600811781,
+    "bt_raw": 161.21051025390625,
+    "product_id": "I16326009BTR",
+    "is_night": true,
+    "center_lat": 58.3262,
+    "center_lon": 174.815
+  },
+  {
+    "local_time": 3.99917,
+    "solar_lon": 303.434,
+    "bt_kelvin": 97.27662939335274,
+    "bt_raw": 153.3687286376953,
+    "product_id": "I16950033BTR",
+    "is_night": true,
+    "center_lat": 55.4036,
+    "center_lon": 175.089
+  },
+  {
+    "local_time": 17.2167,
+    "solar_lon": 43.695,
+    "bt_kelvin": 236.379035713254,
+    "bt_raw": 228.6315460205078,
+    "product_id": "I19340033BTR",
+    "is_night": false,
+    "center_lat": 59.5322,
+    "center_lon": 175.414
+  },
+  {
+    "local_time": 17.2275,
+    "solar_lon": 45.5306,
+    "bt_kelvin": 225.5656142063869,
+    "bt_raw": 220.1558074951172,
+    "product_id": "I19390007BTR",
+    "is_night": false,
+    "center_lat": 58.6433,
+    "center_lon": 172.869
+  },
+  {
+    "local_time": 4.66,
+    "solar_lon": 48.4864,
+    "bt_kelvin": 179.56376115172193,
+    "bt_raw": 187.50152587890625,
+    "product_id": "I19471002BTR",
+    "is_night": true,
+    "center_lat": 54.5963,
+    "center_lon": 172.646
+  },
+  {
+    "local_time": 5.36806,
+    "solar_lon": 153.476,
+    "bt_kelvin": 169.8328989347586,
+    "bt_raw": 181.56544494628906,
+    "product_id": "I22254031BTR",
+    "is_night": true,
+    "center_lat": 56.6268,
+    "center_lon": 171.693
+  },
+  {
+    "local_time": 18.0658,
+    "solar_lon": 162.399,
+    "bt_kelvin": 206.9840443559582,
+    "bt_raw": 206.20220947265625,
+    "product_id": "I22460009BTR",
+    "is_night": true,
+    "center_lat": 60.4806,
+    "center_lon": 173.66
+  },
+  {
+    "local_time": 18.0231,
+    "solar_lon": 171.851,
+    "bt_kelvin": 209.4433487623437,
+    "bt_raw": 207.99813842773438,
+    "product_id": "I22672010BTR",
+    "is_night": true,
+    "center_lat": 53.4749,
+    "center_lon": 175.973
+  },
+  {
+    "local_time": 4.18444,
+    "solar_lon": 302.467,
+    "bt_kelvin": 97.72780913974968,
+    "bt_raw": 153.45196533203125,
+    "product_id": "I25274031BTR",
+    "is_night": true,
+    "center_lat": 55.3772,
+    "center_lon": 173.183
+  },
+  {
+    "local_time": 4.86972,
+    "solar_lon": 49.1202,
+    "bt_kelvin": 177.4769009938793,
+    "bt_raw": 186.19358825683594,
+    "product_id": "I27832031BTR",
+    "is_night": true,
+    "center_lat": 55.4446,
+    "center_lon": 177.549
+  },
+  {
+    "local_time": 17.6528,
+    "solar_lon": 68.7511,
+    "bt_kelvin": 246.51288534865367,
+    "bt_raw": 236.7671661376953,
+    "product_id": "I28375043BTR",
+    "is_night": false,
+    "center_lat": 54.5284,
+    "center_lon": 174.964
+  },
+  {
+    "local_time": 5.1025,
+    "solar_lon": 70.7567,
+    "bt_kelvin": 195.0223354636249,
+    "bt_raw": 197.72486877441406,
+    "product_id": "I28431031BTR",
+    "is_night": true,
+    "center_lat": 55.422,
+    "center_lon": 176.543
+  },
+  {
+    "local_time": 17.7394,
+    "solar_lon": 79.0708,
+    "bt_kelvin": 249.11926739240675,
+    "bt_raw": 238.88616943359375,
+    "product_id": "I28662037BTR",
+    "is_night": false,
+    "center_lat": 54.4762,
+    "center_lon": 175.045
+  },
+  {
+    "local_time": 5.3925,
+    "solar_lon": 115.579,
+    "bt_kelvin": 183.64243747783502,
+    "bt_raw": 190.10984802246094,
+    "product_id": "I29654031BTR",
+    "is_night": true,
+    "center_lat": 55.4484,
+    "center_lon": 172.555
+  },
+  {
+    "local_time": 18.0064,
+    "solar_lon": 143.491,
+    "bt_kelvin": 232.49728402768525,
+    "bt_raw": 225.56272888183594,
+    "product_id": "I30359034BTR",
+    "is_night": true,
+    "center_lat": 59.5135,
+    "center_lon": 173.375
+  },
+  {
+    "local_time": 5.15333,
+    "solar_lon": 186.799,
+    "bt_kelvin": 136.4519883794277,
+    "bt_raw": 164.82461547851562,
+    "product_id": "I31338036BTR",
+    "is_night": true,
+    "center_lat": 55.4234,
+    "center_lon": 174.684
+  },
+  {
+    "local_time": 17.3956,
+    "solar_lon": 204.648,
+    "bt_kelvin": 159.62036138358164,
+    "bt_raw": 175.8120880126953,
+    "product_id": "I31706040BTR",
+    "is_night": false,
+    "center_lat": 54.4963,
+    "center_lon": 174.742
+  },
+  {
+    "local_time": 3.56139,
+    "solar_lon": 62.385,
+    "bt_kelvin": 187.67093788033526,
+    "bt_raw": 192.7507781982422,
+    "product_id": "I36541013BTR",
+    "is_night": true,
+    "center_lat": 54.1046,
+    "center_lon": 176.863
+  },
+  {
+    "local_time": 3.57722,
+    "solar_lon": 65.085,
+    "bt_kelvin": 182.23865536352375,
+    "bt_raw": 189.2045135498047,
+    "product_id": "I36616010BTR",
+    "is_night": true,
+    "center_lat": 55.0859,
+    "center_lon": 173.008
+  },
+  {
+    "local_time": 3.56778,
+    "solar_lon": 65.9844,
+    "bt_kelvin": 181.11907719176259,
+    "bt_raw": 188.4881591796875,
+    "product_id": "I36641031BTR",
+    "is_night": true,
+    "center_lat": 56.684,
+    "center_lon": 171.404
+  },
+  {
+    "local_time": 3.65333,
+    "solar_lon": 76.3012,
+    "bt_kelvin": 183.3754528240052,
+    "bt_raw": 189.9370574951172,
+    "product_id": "I36928031BTR",
+    "is_night": true,
+    "center_lat": 56.6632,
+    "center_lon": 172.075
+  },
+  {
+    "local_time": 16.3206,
+    "solar_lon": 81.9258,
+    "bt_kelvin": 256.9364657221909,
+    "bt_raw": 245.30003356933594,
+    "product_id": "I37084016BTR",
+    "is_night": false,
+    "center_lat": 58.8438,
+    "center_lon": 175.949
+  },
+  {
+    "local_time": 16.3261,
+    "solar_lon": 82.8278,
+    "bt_kelvin": 261.88550218886166,
+    "bt_raw": 249.4024200439453,
+    "product_id": "I37109016BTR",
+    "is_night": false,
+    "center_lat": 58.8572,
+    "center_lon": 174.748
+  },
+  {
+    "local_time": 4.00333,
+    "solar_lon": 140.328,
+    "bt_kelvin": 168.22425523331822,
+    "bt_raw": 180.62548828125,
+    "product_id": "I38625031BTR",
+    "is_night": true,
+    "center_lat": 56.7196,
+    "center_lon": 175.191
+  },
+  {
+    "local_time": 16.6892,
+    "solar_lon": 161.172,
+    "bt_kelvin": 242.39082257335534,
+    "bt_raw": 233.4373779296875,
+    "product_id": "I39118037BTR",
+    "is_night": false,
+    "center_lat": 54.4866,
+    "center_lon": 175.247
+  },
+  {
+    "local_time": 4.1275,
+    "solar_lon": 162.522,
+    "bt_kelvin": 174.39883791767747,
+    "bt_raw": 184.29856872558594,
+    "product_id": "I39149010BTR",
+    "is_night": true,
+    "center_lat": 55.6928,
+    "center_lon": 178.06
+  },
+  {
+    "local_time": 16.7503,
+    "solar_lon": 173.983,
+    "bt_kelvin": 224.27154971384243,
+    "bt_raw": 219.15745544433594,
+    "product_id": "I39405009BTR",
+    "is_night": false,
+    "center_lat": 55.6579,
+    "center_lon": 175.664
+  },
+  {
+    "local_time": 3.14944,
+    "solar_lon": 1.68038,
+    "bt_kelvin": 155.2432557313988,
+    "bt_raw": 173.50836181640625,
+    "product_id": "I43280031BTR",
+    "is_night": true,
+    "center_lat": 55.6048,
+    "center_lon": 174.328
+  },
+  {
+    "local_time": 16.0822,
+    "solar_lon": 61.4537,
+    "bt_kelvin": 253.24376637733303,
+    "bt_raw": 242.25970458984375,
+    "product_id": "I44859006BTR",
+    "is_night": false,
+    "center_lat": 56.4758,
+    "center_lon": 177.136
+  },
+  {
+    "local_time": 16.1331,
+    "solar_lon": 64.1533,
+    "bt_kelvin": 260.0606937620072,
+    "bt_raw": 247.88623046875,
+    "product_id": "I44934036BTR",
+    "is_night": false,
+    "center_lat": 59.606,
+    "center_lon": 174.813
+  },
+  {
+    "local_time": 16.2556,
+    "solar_lon": 65.0531,
+    "bt_kelvin": 256.9905666632683,
+    "bt_raw": 245.34471130371094,
+    "product_id": "I44959007BTR",
+    "is_night": false,
+    "center_lat": 54.3314,
+    "center_lon": 175.122
+  },
+  {
+    "local_time": 16.2897,
+    "solar_lon": 65.9518,
+    "bt_kelvin": 253.8943174542733,
+    "bt_raw": 242.7939910888672,
+    "product_id": "I44984009BTR",
+    "is_night": false,
+    "center_lat": 56.682,
+    "center_lon": 174.718
+  },
+  {
+    "local_time": 16.4317,
+    "solar_lon": 79.8622,
+    "bt_kelvin": 259.478596374384,
+    "bt_raw": 247.4034423828125,
+    "product_id": "I45371010BTR",
+    "is_night": false,
+    "center_lat": 58.7837,
+    "center_lon": 174.524
+  },
+  {
+    "local_time": 3.81694,
+    "solar_lon": 81.8734,
+    "bt_kelvin": 189.07070096512405,
+    "bt_raw": 193.68284606933594,
+    "product_id": "I45427031BTR",
+    "is_night": true,
+    "center_lat": 56.6731,
+    "center_lon": 175.376
+  },
+  {
+    "local_time": 16.4847,
+    "solar_lon": 90.2383,
+    "bt_kelvin": 259.6785243640789,
+    "bt_raw": 247.5692138671875,
+    "product_id": "I45658012BTR",
+    "is_night": false,
+    "center_lat": 57.4866,
+    "center_lon": 177.521
+  },
+  {
+    "local_time": 16.6608,
+    "solar_lon": 120.98,
+    "bt_kelvin": 261.9163680724551,
+    "bt_raw": 249.4281005859375,
+    "product_id": "I46482007BTR",
+    "is_night": false,
+    "center_lat": 58.1308,
+    "center_lon": 174.632
+  },
+  {
+    "local_time": 16.8456,
+    "solar_lon": 150.145,
+    "bt_kelvin": 239.16172633611185,
+    "bt_raw": 230.84829711914062,
+    "product_id": "I47206010BTR",
+    "is_night": false,
+    "center_lat": 59.4965,
+    "center_lon": 175.714
+  },
+  {
+    "local_time": 16.895,
+    "solar_lon": 168.033,
+    "bt_kelvin": 233.9506713858625,
+    "bt_raw": 226.7084503173828,
+    "product_id": "I47618044BTR",
+    "is_night": false,
+    "center_lat": 54.5465,
+    "center_lon": 174.725
+  },
+  {
+    "local_time": 4.42417,
+    "solar_lon": 192.039,
+    "bt_kelvin": 150.60981632335145,
+    "bt_raw": 171.18177795410156,
+    "product_id": "I48136031BTR",
+    "is_night": true,
+    "center_lat": 55.4135,
+    "center_lon": 175.926
+  },
+  {
+    "local_time": 17.08,
+    "solar_lon": 212.014,
+    "bt_kelvin": 142.7496059418201,
+    "bt_raw": 167.5092315673828,
+    "product_id": "I48542036BTR",
+    "is_night": false,
+    "center_lat": 59.4838,
+    "center_lon": 174.473
+  },
+  {
+    "local_time": 4.41305,
+    "solar_lon": 214.827,
+    "bt_kelvin": 121.76569558651919,
+    "bt_raw": 159.48178100585938,
+    "product_id": "I48598026BTR",
+    "is_night": true,
+    "center_lat": 55.4606,
+    "center_lon": 175.268
+  }
+]
