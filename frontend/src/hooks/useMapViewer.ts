@@ -832,9 +832,15 @@ export default function useMapViewer({
           return;
         }
 
-        // Handle SHARAD_HIGHRES - open radargram inspector
+        // Handle SHARAD_HIGHRES - open radargram inspector + Inspector panel
         if (instrument === "SHARAD_HIGHRES") {
           onSharadHiresClickRef.current?.(productId);
+          onSelect({
+            instrument,
+            productId,
+            lat: clickLat,
+            lon: clickLon,
+          });
           return;
         }
 
@@ -876,6 +882,13 @@ export default function useMapViewer({
               ? pickedPrimitiveMetadata.properties.title
               : undefined);
           onHiRiseDTMClickRef.current?.(productId, dtmLat, dtmLon, dtmTitle);
+          onSelect({
+            instrument,
+            productId,
+            lat: dtmLat,
+            lon: dtmLon,
+            title: dtmTitle,
+          });
 
           // Load elevation grid for hover (async, non-blocking)
           activeDTMProductRef.current = productId;
@@ -887,7 +900,7 @@ export default function useMapViewer({
           return;
         }
 
-        // Handle SHARAD separately - show popup instead of Inspector
+        // Handle SHARAD - show popup AND open Inspector
         if (instrument === "SHARAD") {
           const startLat = Number(getPickedProperty("start_lat") ?? 0);
           const startLon = Number(getPickedProperty("start_lon") ?? 0);
@@ -902,20 +915,30 @@ export default function useMapViewer({
             stopLat,
             stopLon,
           });
+          onSelect({
+            instrument,
+            productId,
+            lat: (startLat + stopLat) / 2,
+            lon: (startLon + stopLon) / 2,
+          });
           return;
         }
 
-        // Handle CTX - toggle tile overlay directly (no Inspector)
+        // Handle CTX - toggle tile overlay + open Inspector
         if (instrument === "CTX") {
           const isActive = quickviewOverlaysRef.current.includes(productId);
           onToggleOverlayRef.current?.(productId, isActive ? null : "quickview");
 
-          // Fly to footprint bounds
+          // Compute footprint center for Inspector + fly to bounds
+          let ctxLat = clickLat;
+          let ctxLon = clickLon;
           const rectEnt = viewer.entities.getById(`CTX_FP_${productId}`);
           if (rectEnt?.rectangle?.coordinates) {
             const rect = rectEnt.rectangle.coordinates.getValue(
               Cesium.JulianDate.now(),
             ) as Cesium.Rectangle;
+            ctxLat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
+            ctxLon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
             viewer.camera.flyTo({
               destination: paddedRectangle(rect, 0.3),
               duration: 0.6,
@@ -923,6 +946,8 @@ export default function useMapViewer({
           } else {
             const bounds = footprintManagerRef.current?.getFeatureBounds(`CTX_FP_${productId}`);
             if (bounds) {
+              ctxLat = (bounds.south + bounds.north) / 2;
+              ctxLon = (bounds.west + bounds.east) / 2;
               viewer.camera.flyTo({
                 destination: paddedRectangle(
                   Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north),
@@ -932,6 +957,12 @@ export default function useMapViewer({
               });
             }
           }
+          onSelect({
+            instrument,
+            productId,
+            lat: ctxLat,
+            lon: ctxLon,
+          });
           return;
         }
 
