@@ -8,3 +8,5 @@ peft>=0.7
 Pillow>=9.0
 numpy>=1.24
 tqdm
+rasterio>=1.3
+scipy>=1.10
