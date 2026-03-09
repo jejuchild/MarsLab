@@ -261,6 +261,11 @@ export default function InspectorPanel({
         {/* DTM */}
         {isDTM && <MetadataTab selected={selected} metadata={metadata} metadataLoading={metadataLoading} hasHighResData={hasHighResData} />}
 
+        {/* Generic instruments (SHARAD, SHARAD_HIGHRES, CTX) */}
+        {!isHiRISE && !isCRISM && !isCustom && !isDTM && (
+          <MetadataTab selected={selected} metadata={metadata} metadataLoading={metadataLoading} hasHighResData={false} />
+        )}
+
         {/* ── Overlay Controls (default OPEN) ── */}
         <div className="mt-4">
           <OverlayControls

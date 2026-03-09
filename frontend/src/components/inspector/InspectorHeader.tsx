@@ -68,6 +68,11 @@ export default function InspectorHeader({
           <TabButton label="HiRISE DTM" active onClick={() => {}} accentColor="amber" />
         )}
 
+        {/* Generic instruments (SHARAD, SHARAD_HIGHRES, CTX) */}
+        {!isHiRISE && !isCRISM && !isCustom && !isDTM && (
+          <TabButton label="Metadata" active onClick={() => {}} />
+        )}
+
         {/* Panel controls */}
         <div className="flex items-center shrink-0 ml-auto">
           {onCollapse && (
