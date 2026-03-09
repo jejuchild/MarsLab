@@ -176,9 +176,15 @@ def extract_observations(target_lat: float, target_lon: float,
 # ── SWIM CT comparison ──────────────────────────────────────────
 
 def load_swim_ct(target_lat: float, target_lon: float):
-    """Load SWIM CT thermal consistency score at target location."""
+    """Load SWIM CT thermal consistency score at target location.
+
+    SWIM2_T.tif uses Mars equicylindrical projection (meters):
+        x = lon_rad * Mars_radius
+        y = lat_rad * Mars_radius
+    """
     try:
         import rasterio
+        import math
 
         ct_path = SWIM_DIR / "SWIM2_T.tif"
         if not ct_path.exists():
@@ -187,22 +193,24 @@ def load_swim_ct(target_lat: float, target_lon: float):
             logger.warning("SWIM CT file not found")
             return None
 
+        MARS_RADIUS = 3396190.0  # IAU Mars sphere radius (m)
+
         with rasterio.open(ct_path) as ds:
-            # SWIM uses 0-360 lon, -90 to 90 lat, simple cylindrical
-            # Transform target coords
+            # Convert lat/lon (degrees) to projected x,y (meters)
             lon_360 = target_lon if target_lon >= 0 else target_lon + 360
-            row, col = ds.index(lon_360, target_lat)
+            x = math.radians(lon_360) * MARS_RADIUS
+            y = math.radians(target_lat) * MARS_RADIUS
+            row, col = ds.index(x, y)
             data = ds.read(1)
             if 0 <= row < data.shape[0] and 0 <= col < data.shape[1]:
                 val = float(data[row, col])
-                if val == ds.nodata or np.isnan(val):
+                if val == ds.nodata or np.isnan(val) or val < -1e30:
                     return None
                 return val
         return None
     except Exception as e:
         logger.warning("Could not load SWIM CT: %s", e)
         return None
-
 
 def k_to_ct_score(k_upper, k_lower, boundary):
     """

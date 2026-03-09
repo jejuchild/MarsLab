@@ -1314,6 +1314,7 @@ export default function MainPage() {
 
   // When a product is selected, clear terrain point
   const handleSelect = useCallback((ctx: InspectorContext | null) => {
+    console.log('[INSPECTOR] handleSelect called with:', ctx);
     setSelected(ctx);
     if (ctx) {
       setTerrainPoint(null);

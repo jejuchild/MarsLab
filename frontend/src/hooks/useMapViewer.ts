@@ -513,9 +513,11 @@ export default function useMapViewer({
     const clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     clickHandler.setInputAction(
       async (m: Cesium.ScreenSpaceEventHandler.PositionedEvent) => {
+        console.log('[CLICK] handler fired at position', m.position);
         // Get click position in lat/lon FIRST
         const clickCart = viewer.camera.pickEllipsoid(m.position, marsEllipsoid);
         if (!clickCart) return;
+        console.log('[CLICK] no clickCart — returning early');
 
         const clickCarto = Cesium.Cartographic.fromCartesian(clickCart);
         const clickLon = Cesium.Math.toDegrees(clickCarto.longitude);
@@ -548,6 +550,7 @@ export default function useMapViewer({
           }
         }
 
+        console.log('[CLICK] lat/lon:', clickLat, clickLon);
         // PRIORITY 1: Check if click is within any active overlay bounds
         // This is more reliable than Cesium picking for image overlays
         let overlayProduct: { productId: string; instrument: InstrumentType } | null = null;
@@ -598,6 +601,8 @@ export default function useMapViewer({
 
         // If we found an overlay, use it
         if (overlayProduct) {
+          console.log('[CLICK] PRIORITY 1: overlay matched', overlayProduct);
+        }
           const { productId, instrument } = overlayProduct;
 
           // For CRISM, calculate pixel coordinates
@@ -742,6 +747,7 @@ export default function useMapViewer({
 
         // PRIORITY 2: No overlay clicked, try Cesium entity picking for footprints
         const pickedList = viewer.scene.drillPick(m.position);
+        console.log('[CLICK] PRIORITY 2: drillPick returned', pickedList.length, 'items', pickedList.map((p: any) => ({ id: p?.id, type: typeof p?.id, constructorName: p?.id?.constructor?.name })));
 
         // PRIORITY 2a: Check for field note markers first
         const pickedFieldNote = pickedList.find((p: any) => {
@@ -774,6 +780,7 @@ export default function useMapViewer({
           ? (footprintManagerRef.current?.getFeatureMetadata(pickedPrimitiveId) ?? null)
           : null;
 
+        console.log('[CLICK] picked entity:', !!picked, 'pickedPrimitiveId:', pickedPrimitiveId, 'metadata:', !!pickedPrimitiveMetadata);
         if ((!picked || !(picked.id instanceof Cesium.Entity)) && !pickedPrimitiveMetadata) {
           onTerrainClickRef.current?.(clickLat, clickLon);
           return;
@@ -797,6 +804,7 @@ export default function useMapViewer({
           ?? (pickedPrimitiveMetadata?.instrument as InstrumentType | undefined);
 
         if (!productId || !instrument) return;
+        console.log('[CLICK] productId:', productId, 'instrument:', instrument, '— calling onSelect');
 
         // Handle CUSTOM datasets - fly to bounds
         if (instrument === "CUSTOM") {
