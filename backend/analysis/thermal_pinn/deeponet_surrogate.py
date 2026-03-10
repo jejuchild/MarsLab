@@ -44,7 +44,7 @@ class DeepONetConfig:
 
     # Training data generation
     n_samples: int = 20000
-    query_stride: int = 48  # subsample FDM output: 16032/48 ≈ 334 query points
+    query_stride: int = 11  # subsample FDM output: 16032/11 ≈ 1457 query points (MUST be coprime to 24 to sample all local times)
     ice_oversample_frac: float = 0.3  # 30% samples from ice-like regime
     hot_oversample_frac: float = 0.2  # 20% samples from hot-surface regime
     # k(z) parameter sampling ranges (log10 scale for k values)
