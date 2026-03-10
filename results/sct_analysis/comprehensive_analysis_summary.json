@@ -1,0 +1,53 @@
+{
+  "pair": "PSP_007173_2245 \u2192 ESP_077815_2245",
+  "baseline_mars_yr": 8.01,
+  "analyses": [
+    {
+      "method": "Phase correlation",
+      "result_m": 0.38,
+      "rate_m_my": 0.048,
+      "p": 3.2e-05,
+      "verdict": "SIGNIFICANT"
+    },
+    {
+      "method": "Scarp-normal projection",
+      "result_m": 0.34,
+      "rate_m_my": 0.042,
+      "p": 1e-20,
+      "verdict": "SIGNIFICANT"
+    },
+    {
+      "method": "Shadow edge shift",
+      "delta_H_m": -0.2,
+      "rate_m_my": 0.044,
+      "p": 1e-07,
+      "verdict": "SIGNIFICANT (independent)"
+    },
+    {
+      "method": "Moran's I",
+      "I_scarp": 0.47,
+      "I_stable": 0.35,
+      "verdict": "INCONCLUSIVE"
+    },
+    {
+      "method": "Gradient quintile",
+      "spearman_r": 0.4,
+      "p": 0.5,
+      "verdict": "INCONCLUSIVE"
+    },
+    {
+      "method": "Profile shift",
+      "shift_m": -0.07,
+      "p": 0.002,
+      "verdict": "AMBIGUOUS"
+    }
+  ],
+  "convergent_rate_m_per_mars_yr": "0.04\u20130.05",
+  "confidence": "MODERATE (probable detection, not definitive)",
+  "caveats": [
+    "noise (1.02m) > signal (0.38m)",
+    "RANSAC inlier 33%: incomplete distortion correction",
+    "Dundas model predicts 50-500\u00d7 slower rate",
+    "Single pair \u2014 needs multi-pair validation"
+  ]
+}

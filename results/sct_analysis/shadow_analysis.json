@@ -1,0 +1,24 @@
+{
+  "n_measurements_binary": 399,
+  "n_measurements_subpixel": 36997,
+  "solar_geometry": {
+    "elev_a_deg": 43.78,
+    "elev_b_deg": 42.89,
+    "az_a_deg": 148.8,
+    "az_b_deg": 153.1,
+    "shadow_azimuth_deg": 330.95
+  },
+  "binary_result": {
+    "mean_delta_shadow_m": -1.3176691729323309,
+    "corrected_delta_m": -1.4590624139613788,
+    "corrected_std_m": 2.57465757768025,
+    "ttest_p": 6.855111578874698e-26
+  },
+  "subpixel_result": {
+    "mean_delta_m": -0.01765385657600496,
+    "corrected_mean_m": -0.2561732817249788,
+    "corrected_std_m": 7.308258013995461,
+    "ttest_p": 2.2437151339459514e-08,
+    "n_quality": 27747
+  }
+}

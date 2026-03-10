@@ -1,0 +1,16 @@
+{
+  "scarp_normal_decomposition": {
+    "n_scarp_chips": 894,
+    "n_stable_chips": 82,
+    "scarp_normal_mean_m": 0.339120160680666,
+    "scarp_normal_std_m": 1.0254396619540305,
+    "stable_normal_mean_m": 0.21238179873618102,
+    "stable_normal_std_m": 0.9764826849360064,
+    "ttest_scarp_normal_gt0_p": 3.1477565889587044e-22
+  },
+  "profile_analysis": {
+    "n_profiles": 1740,
+    "mean_shift_m": -0.06991610720148052,
+    "std_shift_m": 0.9344657060256236
+  }
+}
