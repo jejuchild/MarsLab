@@ -53,9 +53,10 @@ class DeepONetConfig:
     boundary_range: tuple = (0.05, 2.5)  # meters
     width_range: tuple = (-2.3, -0.3)    # log10(meters): 0.005–0.5
     latitude_range: tuple = (35.0, 65.0) # degrees N
+    albedo_range: tuple = (0.08, 0.35)   # surface albedo (low = hotter peak T)
 
     # Network architecture
-    branch_dim: int = 5   # (log_k_upper, log_k_lower, boundary, log_width, latitude)
+    branch_dim: int = 6   # (log_k_upper, log_k_lower, boundary, log_width, latitude, albedo)
     trunk_dim: int = 4    # (sin_Ls, cos_Ls, sin_lt, cos_lt)
     hidden_dim: int = 256
     latent_dim: int = 128
@@ -73,7 +74,6 @@ class DeepONetConfig:
     sim_sols: int = 668
     spinup_sols: int = 668
     n_workers: int = 0  # 0 = auto (cpu_count)
-
 # ── Helper functions ─────────────────────────────────────────────
 
 
@@ -99,12 +99,12 @@ def encode_trunk(Ls: np.ndarray, lt: np.ndarray) -> np.ndarray:
 
 def _generate_one_sample(args):
     """Generate one (k_params → T_surface) training sample."""
-    idx, k_upper, k_lower, boundary, width, latitude, query_indices, fdm_cfg = args
+    idx, k_upper, k_lower, boundary, width, latitude, albedo, query_indices, fdm_cfg = args
     try:
         cfg = EBBCConfig(
             nz=fdm_cfg["nz"], z_max=fdm_cfg["z_max"],
             sim_sols=fdm_cfg["sim_sols"], spinup_sols=fdm_cfg["spinup_sols"],
-            latitude=latitude, Ls_start=0.0,
+            latitude=latitude, Ls_start=0.0, albedo=albedo,
         )
         z = np.linspace(0, cfg.z_max, cfg.nz)
         k_z = k_z_from_params(k_upper, k_lower, boundary, width, z)
@@ -125,14 +125,13 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     """
     Generate training dataset by running FDM with random k(z) parameters.
 
-    Uses importance sampling: a fraction of samples (ice_oversample_frac) is
-    drawn from ice-like parameter regime (high k_lower, low k_upper, shallow
-    boundary) to improve surrogate accuracy in the physically important region.
+    Uses importance sampling for ice regime and variable albedo to cover
+    the full surface temperature range (67–280K).
 
     Returns dict with:
-        branch_data: (N, 5) — k_params + latitude
+        branch_data: (N, 6) — k_params + latitude + albedo
         query_T: (N, Q) — T_surface at query points
-        trunk_enc: (Q, 4) — sin/cos encoded (Ls, local_time) at query points
+        trunk_enc: (Q, 4) — sin/cos encoded (Ls, local_time)
         query_Ls: (Q,) — raw Ls values
         query_lt: (Q,) — raw local_time values
     """
@@ -147,15 +146,15 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     boundaries_u = rng.uniform(*cfg.boundary_range, size=n_uniform)
     log_widths_u = rng.uniform(*cfg.width_range, size=n_uniform)
     latitudes_u = rng.uniform(*cfg.latitude_range, size=n_uniform)
+    albedos_u = rng.uniform(*cfg.albedo_range, size=n_uniform)
 
     # ── Ice-regime importance sampling ──
-    # High k_lower (0.5–10 W/m/K), low k_upper (0.003–0.05), shallow boundary (0.05–1.0m)
-    # High latitude (50–65°N) where ice is most likely
-    log_k_upper_i = rng.uniform(-2.5, -1.3, size=n_ice)    # 0.003–0.05
-    log_k_lower_i = rng.uniform(-0.3, 1.0, size=n_ice)     # 0.5–10
-    boundaries_i = rng.uniform(0.05, 1.0, size=n_ice)       # shallow
-    log_widths_i = rng.uniform(-2.3, -0.7, size=n_ice)      # narrow transitions
-    latitudes_i = rng.uniform(48.0, 65.0, size=n_ice)       # high latitude
+    log_k_upper_i = rng.uniform(-2.5, -1.3, size=n_ice)
+    log_k_lower_i = rng.uniform(-0.3, 1.0, size=n_ice)
+    boundaries_i = rng.uniform(0.05, 1.0, size=n_ice)
+    log_widths_i = rng.uniform(-2.3, -0.7, size=n_ice)
+    latitudes_i = rng.uniform(48.0, 65.0, size=n_ice)
+    albedos_i = rng.uniform(*cfg.albedo_range, size=n_ice)
 
     # Concatenate
     log_k_upper = np.concatenate([log_k_upper_u, log_k_upper_i])
@@ -163,6 +162,7 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     boundaries = np.concatenate([boundaries_u, boundaries_i])
     log_widths = np.concatenate([log_widths_u, log_widths_i])
     latitudes = np.concatenate([latitudes_u, latitudes_i])
+    albedos = np.concatenate([albedos_u, albedos_i])
 
     k_uppers = 10 ** log_k_upper
     k_lowers = 10 ** log_k_lower
@@ -171,13 +171,13 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     logger.info("Sampling: %d uniform + %d ice-regime = %d total",
                 n_uniform, n_ice, cfg.n_samples)
 
-    # Branch data (stored in log/linear scale matching network input)
+    # Branch data: 6 features (log_k_upper, log_k_lower, boundary, log_width, lat, albedo)
     branch_data = np.column_stack([
-        log_k_upper, log_k_lower, boundaries, log_widths, latitudes,
+        log_k_upper, log_k_lower, boundaries, log_widths, latitudes, albedos,
     ]).astype(np.float32)
 
     # Query indices (subsample FDM output)
-    n_sim_steps = cfg.sim_sols * 24  # dt_per_sol = 24
+    n_sim_steps = cfg.sim_sols * 24
     query_indices = np.arange(0, n_sim_steps, cfg.query_stride)
     n_query = len(query_indices)
     logger.info("Generating %d samples, %d query points each (stride=%d)",
@@ -189,13 +189,12 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
         "sim_sols": cfg.sim_sols, "spinup_sols": cfg.spinup_sols,
     }
 
-    # Build task args
+    # Build task args (now includes albedo)
     tasks = [
         (i, k_uppers[i], k_lowers[i], boundaries[i], widths[i],
-         latitudes[i], query_indices, fdm_cfg)
+         latitudes[i], albedos[i], query_indices, fdm_cfg)
         for i in range(cfg.n_samples)
     ]
-
     # Run with multiprocessing
     n_workers = cfg.n_workers if cfg.n_workers > 0 else min(cpu_count(), 20)
     logger.info("Using %d workers for data generation", n_workers)
@@ -455,31 +454,48 @@ def run_inversion_deeponet(
     model: DeepONet,
     latitude: float,
     cfg: DeepONetConfig | None = None,
-    n_steps: int = 300,
-    lr: float = 0.05,
+    n_steps: int = 500,
+    lr: float = 0.03,
+    albedo_init: float = 0.20,
 ) -> InversionResult:
     """
     Gradient-based inversion using trained DeepONet surrogate.
 
-    Optimizes k(z) parameters to match observed T_surface values.
-    Each step is ~1ms (vs ~10s for FDM), giving ~1000x speedup.
+    Parameters are constrained to stay within the training distribution
+    via sigmoid reparameterization. Albedo is co-optimized as 6th parameter.
     """
     if cfg is None:
         cfg = DeepONetConfig()
 
     device = next(model.parameters()).device
 
-    # Learnable k(z) parameters (in log/raw space)
-    log_k_upper = torch.tensor(-1.0, dtype=torch.float32, requires_grad=True, device=device)
-    log_k_lower = torch.tensor(-0.5, dtype=torch.float32, requires_grad=True, device=device)
+    # Sigmoid-parameterized learnable variables
+    raw_k_upper = torch.tensor(0.0, dtype=torch.float32, requires_grad=True, device=device)
+    raw_k_lower = torch.tensor(0.0, dtype=torch.float32, requires_grad=True, device=device)
     raw_boundary = torch.tensor(0.0, dtype=torch.float32, requires_grad=True, device=device)
-    log_width = torch.tensor(-1.0, dtype=torch.float32, requires_grad=True, device=device)
+    raw_width = torch.tensor(0.0, dtype=torch.float32, requires_grad=True, device=device)
+    raw_albedo = torch.tensor(0.0, dtype=torch.float32, requires_grad=True, device=device)
 
-    params = [log_k_upper, log_k_lower, raw_boundary, log_width]
+    params = [raw_k_upper, raw_k_lower, raw_boundary, raw_width, raw_albedo]
     optimizer = torch.optim.Adam(params, lr=lr)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=150, gamma=0.5)
 
-    # Prepare observation trunk inputs (fixed)
+    # Ranges
+    ku_lo, ku_hi = cfg.k_upper_range
+    kl_lo, kl_hi = cfg.k_lower_range
+    bd_lo, bd_hi = cfg.boundary_range
+    w_lo, w_hi = cfg.width_range
+    al_lo, al_hi = cfg.albedo_range
+
+    def to_physical(raw_ku, raw_kl, raw_bd, raw_w, raw_al):
+        log_ku = ku_lo + (ku_hi - ku_lo) * torch.sigmoid(raw_ku)
+        log_kl = kl_lo + (kl_hi - kl_lo) * torch.sigmoid(raw_kl)
+        bd = bd_lo + (bd_hi - bd_lo) * torch.sigmoid(raw_bd)
+        log_w = w_lo + (w_hi - w_lo) * torch.sigmoid(raw_w)
+        albedo = al_lo + (al_hi - al_lo) * torch.sigmoid(raw_al)
+        return log_ku, log_kl, bd, log_w, albedo
+
+    # Trunk inputs (fixed)
     trunk_data = []
     for obs in observations:
         Ls = obs["solar_lon"]
@@ -503,14 +519,14 @@ def run_inversion_deeponet(
     for step in range(n_steps):
         optimizer.zero_grad()
 
-        # Transform parameters to physical values
-        boundary = torch.sigmoid(raw_boundary) * cfg.boundary_range[1]
-        # Build branch input: (log_k_upper, log_k_lower, boundary, log_width, latitude)
-        branch_single = torch.stack([log_k_upper, log_k_lower, boundary, log_width, lat_tensor])
-        # Expand for all observations
+        log_ku, log_kl, boundary, log_w, albedo = to_physical(
+            raw_k_upper, raw_k_lower, raw_boundary, raw_width, raw_albedo)
+
+        # Branch: (log_ku, log_kl, boundary, log_w, latitude, albedo)
+        branch_single = torch.stack([log_ku, log_kl, boundary, log_w,
+                                      lat_tensor, albedo])
         branch_input = branch_single.unsqueeze(0).expand(n_obs, -1)
 
-        # Predict T_surface at observation points
         T_pred = model(branch_input, trunk_input)
 
         loss = ((T_pred - T_obs) ** 2).mean()
@@ -518,45 +534,46 @@ def run_inversion_deeponet(
         optimizer.step()
         scheduler.step()
 
-        # Record history
         with torch.no_grad():
-            ku = 10 ** log_k_upper.item()
-            kl = 10 ** log_k_lower.item()
-            bd = torch.sigmoid(raw_boundary).item() * cfg.boundary_range[1]
-            w = 10 ** log_width.item()
+            ku_val = 10 ** log_ku.item()
+            kl_val = 10 ** log_kl.item()
+            bd_val = boundary.item()
+            w_val = 10 ** log_w.item()
+            al_val = albedo.item()
 
         result.loss_history.append(loss.item())
-        result.k_upper_history.append(ku)
-        result.k_lower_history.append(kl)
-        result.boundary_history.append(bd)
+        result.k_upper_history.append(ku_val)
+        result.k_lower_history.append(kl_val)
+        result.boundary_history.append(bd_val)
 
         if (step + 1) % 50 == 0 or step == 0:
             logger.info(
-                "Step %3d: loss=%.2f K²  k_u=%.4f k_l=%.4f bd=%.3fm w=%.4fm",
-                step + 1, loss.item(), ku, kl, bd, w,
+                "Step %3d: loss=%.2f K²  k_u=%.4f k_l=%.4f bd=%.3fm al=%.3f",
+                step + 1, loss.item(), ku_val, kl_val, bd_val, al_val,
             )
 
     elapsed = time.time() - t0
 
-    # Final parameters
     with torch.no_grad():
-        ku = 10 ** log_k_upper.item()
-        kl = 10 ** log_k_lower.item()
-        bd = torch.sigmoid(raw_boundary).item() * cfg.boundary_range[1]
-        w = 10 ** log_width.item()
+        log_ku, log_kl, boundary, log_w, albedo_final = to_physical(
+            raw_k_upper, raw_k_lower, raw_boundary, raw_width, raw_albedo)
+        ku_val = 10 ** log_ku.item()
+        kl_val = 10 ** log_kl.item()
+        bd_val = boundary.item()
+        w_val = 10 ** log_w.item()
 
-    result.k_upper = ku
-    result.k_lower = kl
-    result.boundary = bd
-    result.width = w
-    result.TI_upper = np.sqrt(ku * RHO * C_P)
-    result.TI_lower = np.sqrt(kl * RHO * C_P)
+    result.k_upper = ku_val
+    result.k_lower = kl_val
+    result.boundary = bd_val
+    result.width = w_val
+    result.TI_upper = np.sqrt(ku_val * RHO * C_P)
+    result.TI_lower = np.sqrt(kl_val * RHO * C_P)
     result.loss_final = result.loss_history[-1]
     result.elapsed = elapsed
 
     logger.info("DeepONet inversion done in %.2fs (%d steps)", elapsed, n_steps)
-    logger.info("  k_upper=%.5f (TI=%.0f), k_lower=%.4f (TI=%.0f), boundary=%.3fm",
+    logger.info("  k_upper=%.5f (TI=%.0f), k_lower=%.4f (TI=%.0f), boundary=%.3fm, albedo=%.3f",
                 result.k_upper, result.TI_upper, result.k_lower, result.TI_lower,
-                result.boundary)
+                result.boundary, albedo_final.item())
 
     return result
