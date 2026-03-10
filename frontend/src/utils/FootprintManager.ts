@@ -77,7 +77,7 @@ export class FootprintManager {
   // Store the bbox that was used when loading each instrument's footprints
   private loadedBboxes: Map<InstrumentType, [number, number, number, number]> = new Map();
 
-  private fillPrimitives: Map<InstrumentType, Cesium.GroundPrimitive> = new Map();
+  private fillPrimitives: Map<InstrumentType, Cesium.Primitive> = new Map();
   private outlineCollections: Map<InstrumentType, Cesium.PolylineCollection> = new Map();
 
   private featureMetadata: Map<string, FeatureMetadata> = new Map();
@@ -543,14 +543,13 @@ export class FootprintManager {
     }
 
     if (geometryInstances.length > 0) {
-      const primitive = new Cesium.GroundPrimitive({
+      const primitive = new Cesium.Primitive({
         geometryInstances,
         appearance: new Cesium.PerInstanceColorAppearance({
           flat: true,
           translucent: true,
         }),
         asynchronous: true,
-        classificationType: Cesium.ClassificationType.BOTH,
       });
       this.viewer.scene.primitives.add(primitive);
       this.fillPrimitives.set(instrument, primitive);

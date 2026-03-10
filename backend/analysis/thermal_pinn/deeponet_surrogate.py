@@ -43,8 +43,9 @@ class DeepONetConfig:
     """Configuration for DeepONet surrogate training and inference."""
 
     # Training data generation
-    n_samples: int = 5000
-    query_stride: int = 80  # subsample FDM output: 16032/80 ≈ 200 query points
+    n_samples: int = 20000
+    query_stride: int = 48  # subsample FDM output: 16032/48 ≈ 334 query points
+    ice_oversample_frac: float = 0.4  # 40% samples from ice-like regime
 
     # k(z) parameter sampling ranges (log10 scale for k values)
     k_upper_range: tuple = (-2.5, -0.3)  # log10(W/m/K): 0.003–0.5
@@ -56,13 +57,13 @@ class DeepONetConfig:
     # Network architecture
     branch_dim: int = 5   # (log_k_upper, log_k_lower, boundary, log_width, latitude)
     trunk_dim: int = 4    # (sin_Ls, cos_Ls, sin_lt, cos_lt)
-    hidden_dim: int = 128
-    latent_dim: int = 64
-    n_layers: int = 3
+    hidden_dim: int = 256
+    latent_dim: int = 128
+    n_layers: int = 4
 
     # Training hyperparameters
     lr: float = 1e-3
-    epochs: int = 200
+    epochs: int = 300
     batch_size: int = 4096
     weight_decay: float = 1e-5
 
@@ -72,7 +73,6 @@ class DeepONetConfig:
     sim_sols: int = 668
     spinup_sols: int = 668
     n_workers: int = 0  # 0 = auto (cpu_count)
-
 
 # ── Helper functions ─────────────────────────────────────────────
 
@@ -125,6 +125,10 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     """
     Generate training dataset by running FDM with random k(z) parameters.
 
+    Uses importance sampling: a fraction of samples (ice_oversample_frac) is
+    drawn from ice-like parameter regime (high k_lower, low k_upper, shallow
+    boundary) to improve surrogate accuracy in the physically important region.
+
     Returns dict with:
         branch_data: (N, 5) — k_params + latitude
         query_T: (N, Q) — T_surface at query points
@@ -134,16 +138,38 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     """
     rng = np.random.RandomState(seed)
 
-    # Sample k_params
-    log_k_upper = rng.uniform(*cfg.k_upper_range, size=cfg.n_samples)
-    log_k_lower = rng.uniform(*cfg.k_lower_range, size=cfg.n_samples)
-    boundaries = rng.uniform(*cfg.boundary_range, size=cfg.n_samples)
-    log_widths = rng.uniform(*cfg.width_range, size=cfg.n_samples)
-    latitudes = rng.uniform(*cfg.latitude_range, size=cfg.n_samples)
+    n_ice = int(cfg.n_samples * cfg.ice_oversample_frac)
+    n_uniform = cfg.n_samples - n_ice
+
+    # ── Uniform sampling (covers full parameter space) ──
+    log_k_upper_u = rng.uniform(*cfg.k_upper_range, size=n_uniform)
+    log_k_lower_u = rng.uniform(*cfg.k_lower_range, size=n_uniform)
+    boundaries_u = rng.uniform(*cfg.boundary_range, size=n_uniform)
+    log_widths_u = rng.uniform(*cfg.width_range, size=n_uniform)
+    latitudes_u = rng.uniform(*cfg.latitude_range, size=n_uniform)
+
+    # ── Ice-regime importance sampling ──
+    # High k_lower (0.5–10 W/m/K), low k_upper (0.003–0.05), shallow boundary (0.05–1.0m)
+    # High latitude (50–65°N) where ice is most likely
+    log_k_upper_i = rng.uniform(-2.5, -1.3, size=n_ice)    # 0.003–0.05
+    log_k_lower_i = rng.uniform(-0.3, 1.0, size=n_ice)     # 0.5–10
+    boundaries_i = rng.uniform(0.05, 1.0, size=n_ice)       # shallow
+    log_widths_i = rng.uniform(-2.3, -0.7, size=n_ice)      # narrow transitions
+    latitudes_i = rng.uniform(48.0, 65.0, size=n_ice)       # high latitude
+
+    # Concatenate
+    log_k_upper = np.concatenate([log_k_upper_u, log_k_upper_i])
+    log_k_lower = np.concatenate([log_k_lower_u, log_k_lower_i])
+    boundaries = np.concatenate([boundaries_u, boundaries_i])
+    log_widths = np.concatenate([log_widths_u, log_widths_i])
+    latitudes = np.concatenate([latitudes_u, latitudes_i])
 
     k_uppers = 10 ** log_k_upper
     k_lowers = 10 ** log_k_lower
     widths = 10 ** log_widths
+
+    logger.info("Sampling: %d uniform + %d ice-regime = %d total",
+                n_uniform, n_ice, cfg.n_samples)
 
     # Branch data (stored in log/linear scale matching network input)
     branch_data = np.column_stack([
