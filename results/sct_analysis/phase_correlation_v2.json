@@ -1,0 +1,26 @@
+{
+  "pair": "PSP_007173_2245 \u2192 ESP_077815_2245",
+  "date_a": "2008-02-06",
+  "date_b": "2023-03-03",
+  "gap_mars_yr": 8.01,
+  "Ls_a": 28.1,
+  "Ls_b": 32.0,
+  "pixel_scale_m": 0.25,
+  "chip_size_px": 256,
+  "step_px": 128,
+  "total_chips": 1936,
+  "global_ncc": 0.7361865117273284,
+  "coarse_offset_px": [
+    1497,
+    1657
+  ],
+  "fine_offset_px": [
+    35,
+    -33
+  ],
+  "total_offset_px": [
+    1532,
+    1624
+  ],
+  "alignment_ncc": 0.8418966781886419
+}
