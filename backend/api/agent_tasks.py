@@ -3235,7 +3235,7 @@ def synthesize_results(
             "class_distribution": lfc.get("class_distribution", {}),
             "has_ice_landforms": any(
                 c in lfc.get("class_distribution", {})
-                for c in ("LDA", "LVF", "CCF")
+                for c in ("LDA", "LVF", "CCF", "SCT")
             ),
             "top_entries": lfc.get("entries", [])[:5],
         }
@@ -4415,7 +4415,7 @@ def query_landform_classifications(
 ) -> TaskResult:
     """Query the HiRISE landform classification cache for a region.
 
-    Returns classified HiRISE observations (LDA/LVF/CCF) within the region bbox.
+    Returns classified HiRISE observations (LDA/LVF/CCF/SCT) within the region bbox.
     Optionally filter by dominant_class.
     """
     try:

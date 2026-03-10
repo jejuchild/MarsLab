@@ -67,7 +67,7 @@ def _parse_weights(
 def get_accessibility_score(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
-    landform: Optional[str] = Query(None, description="Landform class: LDA, LVF, CCF, OTHER"),
+    landform: Optional[str] = Query(None, description="Landform class: LDA, LVF, CCF, SCT, OTHER"),
     landform_confidence: float = Query(1.0, ge=0, le=1),
     w_ice_landform: Optional[float] = Query(None, ge=0, le=1),
     w_water_mineral: Optional[float] = Query(None, ge=0, le=1),
@@ -78,7 +78,7 @@ def get_accessibility_score(
     """Query ISRU accessibility score at a single point."""
     pipeline = _get_pipeline()
     weights = _parse_weights(w_ice_landform, w_water_mineral, w_surface_ice, w_excavation, w_landing)
-    valid_landforms = {"LDA", "LVF", "CCF", "OTHER"}
+    valid_landforms = {"LDA", "LVF", "CCF", "SCT", "OTHER"}
     lf = landform.upper() if landform else None
     if lf and lf not in valid_landforms:
         lf = None
@@ -181,7 +181,7 @@ def get_default_weights():
     return JSONResponse(content={
         "weights": DEFAULT_WEIGHTS,
         "description": {
-            "ice_landform": "Ice-rich landform indicator from HiRISE classification (LDA/LVF/CCF)",
+            "ice_landform": "Ice-rich landform indicator from HiRISE classification (LDA/LVF/CCF/SCT)",
             "water_mineral": "Water-related mineral signal from CRISM classification",
             "surface_ice": "Surface H2O ice detection from CRISM",
             "excavation": "How easy to dig (based on TES thermal inertia)",
@@ -328,7 +328,7 @@ def _fallback_explanation(result: dict) -> str:
 def get_accessibility_explanation(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
-    landform: Optional[str] = Query(None, description="Landform class: LDA, LVF, CCF, OTHER"),
+    landform: Optional[str] = Query(None, description="Landform class: LDA, LVF, CCF, SCT, OTHER"),
     landform_confidence: float = Query(1.0, ge=0, le=1),
     w_ice_landform: Optional[float] = Query(None, ge=0, le=1),
     w_water_mineral: Optional[float] = Query(None, ge=0, le=1),
@@ -339,7 +339,7 @@ def get_accessibility_explanation(
     """ISRU score + LLM natural-language explanation for a point."""
     pipeline = _get_pipeline()
     weights = _parse_weights(w_ice_landform, w_water_mineral, w_surface_ice, w_excavation, w_landing)
-    valid_landforms = {"LDA", "LVF", "CCF", "OTHER"}
+    valid_landforms = {"LDA", "LVF", "CCF", "SCT", "OTHER"}
     lf = landform.upper() if landform else None
     if lf and lf not in valid_landforms:
         lf = None
@@ -368,7 +368,7 @@ def get_accessibility_explanation(
 
 @router.get("/landform-cache/search")
 async def search_landform_cache(
-    dominant_class: Optional[str] = Query(None, description="Filter by class: LDA, LVF, CCF, OTHER"),
+    dominant_class: Optional[str] = Query(None, description="Filter by class: LDA, LVF, CCF, SCT, OTHER"),
     lat_min: Optional[float] = Query(None, description="Southern bound"),
     lat_max: Optional[float] = Query(None, description="Northern bound"),
     lon_min: Optional[float] = Query(None, description="Western bound"),

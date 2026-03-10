@@ -251,7 +251,7 @@ def _get_hirise_landform_cache():
 def _find_hirise_classified_landforms(
     lat: float, lon: float, landform_type: str, radius_km: float = LANDFORM_PROXIMITY_KM,
 ) -> list[dict]:
-    """Find HiRISE-classified landforms (LDA/LVF/CCF) near (lat, lon).
+    """Find HiRISE-classified landforms (LDA/LVF/CCF/SCT) near (lat, lon).
 
     Returns list of dicts compatible with compound_search result format.
     """
@@ -260,7 +260,7 @@ def _find_hirise_classified_landforms(
         return []
 
     class_map = {"lda": "LDA", "lvf": "LVF", "ccf": "CCF",
-                 "lobate_debris": "LDA"}
+                 "sct": "SCT", "scalloped": "SCT", "lobate_debris": "LDA"}
     target_class = class_map.get(landform_type.lower())
     if not target_class:
         return []

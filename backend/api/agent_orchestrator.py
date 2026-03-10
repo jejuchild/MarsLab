@@ -1214,8 +1214,8 @@ AGENT_TOOLS: Dict[str, Dict[str, Any]] = {
         "executor": _tool_terrain_epsilon,
     },
     "query_landform_classification": {
-        "description": "Query HiRISE landform classification cache. Returns classified observations (LDA/LVF/CCF) in region with confidence scores and spatial distribution.",
-        "params": {"class_filter": "str, optional — filter by class: LDA, LVF, CCF, OTHER"},
+        "description": "Query HiRISE landform classification cache. Returns classified observations (LDA/LVF/CCF/SCT) in region with confidence scores and spatial distribution.",
+        "params": {"class_filter": "str, optional — filter by class: LDA, LVF, CCF, SCT, OTHER"},
         "executor": _tool_landform_classification,
     },
     "respond": {
