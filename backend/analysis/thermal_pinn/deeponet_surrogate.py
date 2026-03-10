@@ -45,8 +45,8 @@ class DeepONetConfig:
     # Training data generation
     n_samples: int = 20000
     query_stride: int = 48  # subsample FDM output: 16032/48 ≈ 334 query points
-    ice_oversample_frac: float = 0.4  # 40% samples from ice-like regime
-
+    ice_oversample_frac: float = 0.3  # 30% samples from ice-like regime
+    hot_oversample_frac: float = 0.2  # 20% samples from hot-surface regime
     # k(z) parameter sampling ranges (log10 scale for k values)
     k_upper_range: tuple = (-2.5, -0.3)  # log10(W/m/K): 0.003–0.5
     k_lower_range: tuple = (-2.0, 1.0)   # log10(W/m/K): 0.01–10
@@ -125,8 +125,11 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     """
     Generate training dataset by running FDM with random k(z) parameters.
 
-    Uses importance sampling for ice regime and variable albedo to cover
-    the full surface temperature range (67–280K).
+    Uses THREE sampling regimes:
+      1. Uniform — covers full parameter space
+      2. Ice-regime — oversamples ice-like (low k_upper, high k_lower, high lat)
+      3. Hot-surface — oversamples low k_upper + low albedo combos that produce
+         high daytime T_surf (240-260K), critical for matching real observations
 
     Returns dict with:
         branch_data: (N, 6) — k_params + latitude + albedo
@@ -138,7 +141,8 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     rng = np.random.RandomState(seed)
 
     n_ice = int(cfg.n_samples * cfg.ice_oversample_frac)
-    n_uniform = cfg.n_samples - n_ice
+    n_hot = int(cfg.n_samples * cfg.hot_oversample_frac)
+    n_uniform = cfg.n_samples - n_ice - n_hot
 
     # ── Uniform sampling (covers full parameter space) ──
     log_k_upper_u = rng.uniform(*cfg.k_upper_range, size=n_uniform)
@@ -149,6 +153,7 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     albedos_u = rng.uniform(*cfg.albedo_range, size=n_uniform)
 
     # ── Ice-regime importance sampling ──
+    # Low k_upper (insulating regolith), high k_lower (ice), high latitude
     log_k_upper_i = rng.uniform(-2.5, -1.3, size=n_ice)
     log_k_lower_i = rng.uniform(-0.3, 1.0, size=n_ice)
     boundaries_i = rng.uniform(0.05, 1.0, size=n_ice)
@@ -156,20 +161,32 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     latitudes_i = rng.uniform(48.0, 65.0, size=n_ice)
     albedos_i = rng.uniform(*cfg.albedo_range, size=n_ice)
 
-    # Concatenate
-    log_k_upper = np.concatenate([log_k_upper_u, log_k_upper_i])
-    log_k_lower = np.concatenate([log_k_lower_u, log_k_lower_i])
-    boundaries = np.concatenate([boundaries_u, boundaries_i])
-    log_widths = np.concatenate([log_widths_u, log_widths_i])
-    latitudes = np.concatenate([latitudes_u, latitudes_i])
-    albedos = np.concatenate([albedos_u, albedos_i])
+    # ── Hot-surface importance sampling ──
+    # Low k_upper (high daytime peak) + low albedo (absorbs more solar flux)
+    # This regime produces T_surf up to 250K at 57N, matching real observations.
+    # Without this, training data T_max caps at ~205K and the DeepONet
+    # cannot represent the observation range (observations reach 262K).
+    log_k_upper_h = rng.uniform(-2.5, -1.3, size=n_hot)  # 0.003-0.05 W/m/K
+    log_k_lower_h = rng.uniform(-2.0, 0.0, size=n_hot)   # 0.01-1.0 (includes non-ice)
+    boundaries_h = rng.uniform(0.3, 2.5, size=n_hot)     # deeper boundary → more low-k material
+    log_widths_h = rng.uniform(-2.3, -0.7, size=n_hot)
+    latitudes_h = rng.uniform(*cfg.latitude_range, size=n_hot)  # full range
+    albedos_h = rng.uniform(0.08, 0.18, size=n_hot)      # low albedo → hotter surface
+
+    # Concatenate all three regimes
+    log_k_upper = np.concatenate([log_k_upper_u, log_k_upper_i, log_k_upper_h])
+    log_k_lower = np.concatenate([log_k_lower_u, log_k_lower_i, log_k_lower_h])
+    boundaries = np.concatenate([boundaries_u, boundaries_i, boundaries_h])
+    log_widths = np.concatenate([log_widths_u, log_widths_i, log_widths_h])
+    latitudes = np.concatenate([latitudes_u, latitudes_i, latitudes_h])
+    albedos = np.concatenate([albedos_u, albedos_i, albedos_h])
 
     k_uppers = 10 ** log_k_upper
     k_lowers = 10 ** log_k_lower
     widths = 10 ** log_widths
 
-    logger.info("Sampling: %d uniform + %d ice-regime = %d total",
-                n_uniform, n_ice, cfg.n_samples)
+    logger.info("Sampling: %d uniform + %d ice-regime + %d hot-surface = %d total",
+                n_uniform, n_ice, n_hot, cfg.n_samples)
 
     # Branch data: 6 features (log_k_upper, log_k_lower, boundary, log_width, lat, albedo)
     branch_data = np.column_stack([
@@ -223,6 +240,15 @@ def generate_training_data(cfg: DeepONetConfig, seed: int = 42):
     elapsed = time.time() - t0
     logger.info("Generated %d/%d samples in %.1fs (%.2fs/sample)",
                 n_ok, cfg.n_samples, elapsed, elapsed / max(n_ok, 1))
+
+    # Log temperature coverage diagnostics
+    T_all = query_T[:n_ok]
+    logger.info("  T range: %.1f – %.1f K (need >250K for observation coverage)",
+                T_all.min(), T_all.max())
+    logger.info("  Samples with T > 240K: %d/%d",
+                (T_all.max(axis=1) > 240).sum(), n_ok)
+    logger.info("  Samples with T > 250K: %d/%d",
+                (T_all.max(axis=1) > 250).sum(), n_ok)
 
     # Encode trunk
     trunk_enc = encode_trunk(query_Ls, query_lt).astype(np.float32)

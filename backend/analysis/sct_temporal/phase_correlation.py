@@ -1,0 +1,355 @@
+"""
+COSI-Corr-style phase correlation for sub-pixel displacement measurement.
+
+Based on Leprince et al. (2007) IEEE TGRS 45(6):1529-1558 with band-pass
+frequency masking for illumination robustness. Sub-pixel refinement via
+Guizar-Sicairos et al. (2008) upsampled DFT method.
+
+At HiRISE 25 cm/px with upsample_factor=100: precision ~2.5 mm.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+from numpy.fft import fft2, ifft2, fftfreq
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CorrelationResult:
+    """Result of a single chip-pair phase correlation."""
+
+    row_shift: float  # pixels (positive = downward)
+    col_shift: float  # pixels (positive = rightward)
+    snr: float  # peak-to-background ratio
+    error: float  # RMS correlation error (0=perfect)
+    valid: bool  # passes SNR + error thresholds
+
+
+@dataclass
+class DisplacementField:
+    """Dense displacement field from sliding-window correlation."""
+
+    row_centers: np.ndarray  # pixel coordinates of window centers
+    col_centers: np.ndarray
+    row_disp: np.ndarray  # displacement in pixels (2D array)
+    col_disp: np.ndarray
+    magnitude: np.ndarray  # sqrt(row² + col²)
+    snr: np.ndarray
+    error: np.ndarray
+    valid_mask: np.ndarray  # boolean
+    pixel_scale_m: float  # meters per pixel (e.g. 0.25 for HiRISE)
+
+    @property
+    def row_disp_m(self) -> np.ndarray:
+        return self.row_disp * self.pixel_scale_m
+
+    @property
+    def col_disp_m(self) -> np.ndarray:
+        return self.col_disp * self.pixel_scale_m
+
+    @property
+    def magnitude_m(self) -> np.ndarray:
+        return self.magnitude * self.pixel_scale_m
+
+    @property
+    def valid_count(self) -> int:
+        return int(np.sum(self.valid_mask))
+
+    @property
+    def valid_fraction(self) -> float:
+        return float(np.mean(self.valid_mask))
+
+
+def _upsampled_dft(
+    data: np.ndarray,
+    region_size: int,
+    upsample_factor: int,
+    offsets: np.ndarray,
+) -> np.ndarray:
+    """
+    Compute upsampled DFT in a small region via matrix multiplication.
+
+    Guizar-Sicairos et al. (2008) Optics Letters 33:156-158.
+    O(N*M) where M = region_size, vs O(N*upsample_factor^2) for zero-pad.
+    """
+    rows, cols = data.shape
+    row_kern = np.exp(
+        -1j * 2 * np.pi
+        * (np.arange(region_size)[:, None] - offsets[0])
+        * fftfreq(rows)[None, :]
+        / upsample_factor
+    )
+    col_kern = np.exp(
+        -1j * 2 * np.pi
+        * fftfreq(cols)[:, None]
+        * (np.arange(region_size)[None, :] - offsets[1])
+        / upsample_factor
+    )
+    return row_kern @ data @ col_kern
+
+
+def cosicorr_phase_correlation(
+    chip1: np.ndarray,
+    chip2: np.ndarray,
+    upsample_factor: int = 100,
+    freq_low: float = 0.02,
+    freq_high: float = 0.80,
+    snr_threshold: float = 3.0,
+    use_window: bool = False,
+) -> CorrelationResult:
+    """
+    COSI-Corr-style phase correlation with band-pass frequency masking.
+
+    Parameters
+    ----------
+    chip1, chip2 : 2D float arrays, same shape (power-of-2 recommended)
+        Reference and secondary image chips.
+    upsample_factor : int
+        Sub-pixel precision = 1/upsample_factor pixels.
+        100 -> 0.01 px = 2.5 mm at HiRISE 25cm/px.
+    freq_low : float
+        Low-frequency cutoff (fraction of max freq).
+    freq_high : float
+        High-frequency cutoff.
+    snr_threshold : float
+        Minimum SNR for valid measurement.
+    use_window : bool
+        Apply Tukey window (reduces edge artifacts, slight accuracy cost).
+
+    Returns
+    -------
+    CorrelationResult with displacement (row, col), SNR, error, validity.
+    Sign convention: positive row_shift = content moved downward in img2.
+    """
+    if chip1.shape != chip2.shape:
+        raise ValueError(f"Chip shapes must match: {chip1.shape} vs {chip2.shape}")
+    if chip1.ndim != 2:
+        raise ValueError(f"Expected 2D arrays, got {chip1.ndim}D")
+
+    rows, cols = chip1.shape
+    c1 = chip1.astype(np.float64)
+    c2 = chip2.astype(np.float64)
+
+    if use_window:
+        from scipy.signal import windows
+        wy = windows.tukey(rows, alpha=0.2)
+        wx = windows.tukey(cols, alpha=0.2)
+        window = np.outer(wy, wx)
+        c1 = c1 * window
+        c2 = c2 * window
+
+    F1 = fft2(c1)
+    F2 = fft2(c2)
+    cross = F1 * np.conj(F2)
+    eps = np.finfo(np.float64).eps
+
+    if freq_low > 0 or freq_high < 0.5:
+        u = fftfreq(rows)
+        v = fftfreq(cols)
+        U, V = np.meshgrid(u, v, indexing="ij")
+        freq_r = np.sqrt(U**2 + V**2)
+        band_mask = (freq_r >= freq_low) & (freq_r <= freq_high)
+        cross *= band_mask
+
+    cross /= np.maximum(np.abs(cross), 100 * eps)
+
+    cc = ifft2(cross)
+    cc_abs = np.abs(cc)
+    peak_idx = np.unravel_index(np.argmax(cc_abs), cc_abs.shape)
+    peak_val = float(cc_abs[peak_idx])
+
+    bg = cc_abs.copy()
+    for dr in range(-2, 3):
+        for dc in range(-2, 3):
+            bg[(peak_idx[0] + dr) % rows, (peak_idx[1] + dc) % cols] = 0
+    bg_mean = float(bg[bg > 0].mean()) if np.any(bg > 0) else eps
+    snr = peak_val / (bg_mean + eps)
+
+    shape = np.array([rows, cols], dtype=np.float64)
+    midpoint = shape / 2.0
+    shift = np.array(peak_idx, dtype=np.float64)
+    shift[shift > midpoint] -= shape[shift > midpoint]
+
+    if upsample_factor > 1:
+        region_size = int(np.ceil(upsample_factor * 1.5))
+        dftshift = np.trunc(region_size / 2.0)
+        offsets = np.array([
+            dftshift - shift[0] * upsample_factor,
+            dftshift - shift[1] * upsample_factor,
+        ])
+
+        cc_up = np.conj(
+            _upsampled_dft(np.conj(cross), region_size, upsample_factor, offsets)
+        )
+        up_abs = np.abs(cc_up)
+        up_peak = np.unravel_index(np.argmax(up_abs), up_abs.shape)
+        shift[0] += (up_peak[0] - dftshift) / upsample_factor
+        shift[1] += (up_peak[1] - dftshift) / upsample_factor
+
+    # Negate: cross-corr gives alignment shift, we want displacement
+    displacement = -shift
+    error_val = max(0.0, 1.0 - peak_val)
+
+    valid = snr >= snr_threshold and peak_val >= 0.3
+
+    return CorrelationResult(
+        row_shift=float(displacement[0]),
+        col_shift=float(displacement[1]),
+        snr=float(snr),
+        error=float(error_val),
+        valid=valid,
+    )
+
+
+def sliding_window_correlation(
+    img1: np.ndarray,
+    img2: np.ndarray,
+    chip_size: int = 64,
+    step_size: int = 16,
+    upsample_factor: int = 100,
+    snr_threshold: float = 3.0,
+    pixel_scale_m: float = 0.25,
+    stable_mask: Optional[np.ndarray] = None,
+    remove_bulk_offset: bool = True,
+) -> DisplacementField:
+    """
+    Dense displacement field via sliding-window phase correlation.
+
+    Parameters
+    ----------
+    img1, img2 : 2D arrays (float)
+        Co-registered reference and secondary images.
+    chip_size : int
+        Window size in pixels. 64 px @ 25cm/px = 16m.
+        Must be >= 4× expected max displacement.
+    step_size : int
+        Stride between windows. Overlap = (chip_size - step_size) / chip_size.
+        16 on 64 → 75% overlap.
+    upsample_factor : int
+        Sub-pixel precision. 100 → 0.01 px = 2.5 mm @ HiRISE.
+    snr_threshold : float
+        Reject windows with SNR below this.
+    error_threshold : float
+        Reject windows with RMS error above this.
+    pixel_scale_m : float
+        Ground sampling distance in meters. 0.25 for HiRISE RED.
+    stable_mask : optional 2D bool array, same shape as img1
+        True = stable terrain (use for bulk offset removal).
+        If None, all valid measurements used for bulk offset.
+    remove_bulk_offset : bool
+        Whether to subtract median displacement from stable terrain
+        to remove residual co-registration error.
+
+    Returns
+    -------
+    DisplacementField with displacement maps, SNR, validity mask.
+    """
+    if img1.shape != img2.shape:
+        raise ValueError(f"Image shapes must match: {img1.shape} vs {img2.shape}")
+
+    H, W = img1.shape
+    half = chip_size // 2
+
+    row_centers = np.arange(half, H - half, step_size)
+    col_centers = np.arange(half, W - half, step_size)
+    nr, nc = len(row_centers), len(col_centers)
+
+    if nr == 0 or nc == 0:
+        raise ValueError(
+            f"Image too small ({H}×{W}) for chip_size={chip_size}. "
+            f"Need at least {chip_size} pixels in each dimension."
+        )
+
+    row_disp = np.full((nr, nc), np.nan, dtype=np.float64)
+    col_disp = np.full_like(row_disp, np.nan)
+    snr_map = np.full_like(row_disp, np.nan)
+    err_map = np.full_like(row_disp, np.nan)
+
+    total = nr * nc
+    logged_pct = -1
+
+    for i, r in enumerate(row_centers):
+        for j, c in enumerate(col_centers):
+            r0, r1 = r - half, r + half
+            c0, c1 = c - half, c + half
+
+            chip1 = img1[r0:r1, c0:c1].astype(np.float64)
+            chip2 = img2[r0:r1, c0:c1].astype(np.float64)
+
+            # Skip invalid chips
+            if not np.all(np.isfinite(chip1)) or not np.all(np.isfinite(chip2)):
+                continue
+            if chip1.std() < 1e-6 or chip2.std() < 1e-6:
+                continue
+
+            result = cosicorr_phase_correlation(
+                chip1,
+                chip2,
+                upsample_factor=upsample_factor,
+                snr_threshold=snr_threshold,
+            )
+
+            if result.valid:
+                row_disp[i, j] = result.row_shift
+                col_disp[i, j] = result.col_shift
+                snr_map[i, j] = result.snr
+                err_map[i, j] = result.error
+
+        # Progress logging
+        pct = int(100 * (i + 1) / nr)
+        if pct >= logged_pct + 10:
+            logged_pct = pct
+            logger.info(f"Phase correlation: {pct}% ({i+1}/{nr} rows)")
+
+    valid_mask = np.isfinite(row_disp)
+
+    # Remove bulk co-registration offset using stable terrain
+    if remove_bulk_offset and np.any(valid_mask):
+        if stable_mask is not None:
+            # Build stable terrain indicator at window centers
+            stable_at_centers = np.zeros((nr, nc), dtype=bool)
+            for i, r in enumerate(row_centers):
+                for j, c in enumerate(col_centers):
+                    r0, r1 = r - half, r + half
+                    c0, c1 = c - half, c + half
+                    patch = stable_mask[r0:r1, c0:c1]
+                    stable_at_centers[i, j] = patch.mean() > 0.8
+            use_for_offset = valid_mask & stable_at_centers
+        else:
+            use_for_offset = valid_mask
+
+        if np.sum(use_for_offset) >= 10:
+            bulk_row = np.nanmedian(row_disp[use_for_offset])
+            bulk_col = np.nanmedian(col_disp[use_for_offset])
+            row_disp[valid_mask] -= bulk_row
+            col_disp[valid_mask] -= bulk_col
+            logger.info(
+                f"Removed bulk offset: Δrow={bulk_row:.3f} px, Δcol={bulk_col:.3f} px "
+                f"({bulk_row * pixel_scale_m:.4f} m, {bulk_col * pixel_scale_m:.4f} m) "
+                f"from {int(np.sum(use_for_offset))} stable points"
+            )
+        else:
+            logger.warning(
+                f"Only {int(np.sum(use_for_offset))} stable points — "
+                "skipping bulk offset removal"
+            )
+
+    magnitude = np.sqrt(row_disp**2 + col_disp**2)
+
+    return DisplacementField(
+        row_centers=row_centers,
+        col_centers=col_centers,
+        row_disp=row_disp,
+        col_disp=col_disp,
+        magnitude=magnitude,
+        snr=snr_map,
+        error=err_map,
+        valid_mask=valid_mask,
+        pixel_scale_m=pixel_scale_m,
+    )
