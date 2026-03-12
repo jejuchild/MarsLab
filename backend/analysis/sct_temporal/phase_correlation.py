@@ -196,7 +196,7 @@ def cosicorr_phase_correlation(
     displacement = -shift
     error_val = max(0.0, 1.0 - peak_val)
 
-    valid = snr >= snr_threshold and peak_val >= 0.3
+    valid = snr >= snr_threshold and peak_val >= 0.05
 
     return CorrelationResult(
         row_shift=float(displacement[0]),

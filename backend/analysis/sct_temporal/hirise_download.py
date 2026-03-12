@@ -1,23 +1,24 @@
 """
 Download full-resolution HiRISE RDR products for temporal analysis.
 
-Uses ODE PRODUCTFILES API to discover JP2 URLs, downloads via aiohttp,
-and converts to GeoTIFF via GDAL for rasterio-compatible I/O.
+Primary method: direct download from hirise.lpl.arizona.edu using
+predictable URL patterns. Fallback: ODE PRODUCTFILES API (XML).
+Returns JP2 path directly (rasterio opens JP2 natively).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import subprocess
+
 from pathlib import Path
 from typing import Optional
 
 import aiohttp
-import defusedxml.ElementTree as ET
 
 logger = logging.getLogger(__name__)
 
+HIRISE_BASE_URL = "https://hirise.lpl.arizona.edu/PDS"
 ODE_PRODUCTFILES_URL = "https://ode.rsl.wustl.edu/mars/productfiles.aspx"
 
 DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[3] / "Data" / "HiRISE" / "rdr_cache"
@@ -30,66 +31,71 @@ async def download_hirise_rdr(
     force: bool = False,
 ) -> Optional[Path]:
     """
-    Download a HiRISE RDR product and convert to GeoTIFF.
-
-    Parameters
-    ----------
-    product_id : str
-        HiRISE product ID, e.g. "ESP_016142_2240" (observation ID).
-        Will search for the RED channel RDR product.
-    cache_dir : Path, optional
-        Directory to store downloaded files. Default: Data/HiRISE/rdr_cache/
-    force : bool
-        Re-download even if cached file exists.
-
-    Returns
-    -------
-    Path to the GeoTIFF file, or None if download failed.
+    Download a HiRISE RDR JP2 product.
+    Returns Path to JP2 file, or None if download failed.
     """
     if cache_dir is None:
         cache_dir = DEFAULT_CACHE_DIR
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     obs_id = product_id.replace("_RED", "").strip()
-    tif_path = cache_dir / f"{obs_id}_RED.tif"
+    jp2_path = cache_dir / f"{obs_id}_RED.JP2"
 
-    if tif_path.exists() and not force:
-        logger.info(f"Using cached: {tif_path}")
-        return tif_path
+    if jp2_path.exists() and not force:
+        logger.info(f"Using cached JP2: {jp2_path.name}")
+        return jp2_path
 
-    # Discover JP2 URL from ODE
-    jp2_url = await _resolve_jp2_url(obs_id, session)
-    if jp2_url is None:
-        logger.error(f"Could not resolve JP2 URL for {obs_id}")
+    jp2_url = _build_direct_url(obs_id)
+    success = _download_file_wget(jp2_url, jp2_path)
+
+    if not success:
+        jp2_url_ode = await _resolve_jp2_url_ode(obs_id, session)
+        if jp2_url_ode is not None:
+            success = _download_file_wget(jp2_url_ode, jp2_path)
+
+    if not success:
+        logger.error(f"All download methods failed for {obs_id}")
         return None
 
-    # Download JP2
-    jp2_path = cache_dir / f"{obs_id}_RED.JP2"
-    if not jp2_path.exists() or force:
-        success = await _download_file(jp2_url, jp2_path, session)
-        if not success:
-            return None
-
-    # Convert JP2 → GeoTIFF via GDAL
-    if not tif_path.exists() or force:
-        success = _jp2_to_geotiff(jp2_path, tif_path)
-        if not success:
-            return None
-
-    return tif_path
+    return jp2_path
 
 
-async def _resolve_jp2_url(
+def _build_direct_url(obs_id: str) -> str:
+    """
+    Build direct download URL for HiRISE RDR JP2 from observation ID.
+
+    URL pattern:
+      https://hirise.lpl.arizona.edu/PDS/RDR/{PHASE}/ORB_{LO}_{HI}/{OBS_ID}/{OBS_ID}_RED.JP2
+
+    where PHASE = PSP or ESP, orbit range = floor/ceil to nearest 100.
+    """
+    parts = obs_id.split("_")
+    phase = parts[0]
+    orbit = int(parts[1])
+
+    orb_lo = (orbit // 100) * 100
+    orb_hi = orb_lo + 99
+
+    return (
+        f"{HIRISE_BASE_URL}/RDR/{phase}/"
+        f"ORB_{orb_lo:06d}_{orb_hi:06d}/{obs_id}/{obs_id}_RED.JP2"
+    )
+
+
+async def _resolve_jp2_url_ode(
     obs_id: str,
     session: Optional[aiohttp.ClientSession] = None,
 ) -> Optional[str]:
-    """Resolve the JP2 download URL for a HiRISE observation via ODE PRODUCTFILES."""
+    """Fallback: resolve JP2 URL via ODE PRODUCTFILES API."""
     close_session = session is None
     if session is None:
         session = aiohttp.ClientSession()
 
     try:
-        url = f"{ODE_PRODUCTFILES_URL}?ihid=MRO&iid=HIRISE&productid={obs_id}_RED*&output=XML"
+        url = (
+            f"{ODE_PRODUCTFILES_URL}?ihid=MRO&iid=HIRISE"
+            f"&productid={obs_id}_RED&output=XML"
+        )
         logger.info(f"Querying ODE PRODUCTFILES: {obs_id}")
 
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
@@ -104,14 +110,15 @@ async def _resolve_jp2_url(
         if close_session:
             await session.close()
 
-    # Parse XML for JP2 URL
+
     try:
+        import defusedxml.ElementTree as ET
+
         root = ET.fromstring(xml_text)
-    except ET.ParseError as e:
-        logger.error(f"Failed to parse ODE XML: {e}")
+    except Exception as e:
+        logger.warning(f"ODE returned non-XML response: {e}")
         return None
 
-    # Look for the main JP2 file (not QLOOK, not NOMAP)
     for product_file in root.iter("Product_file"):
         url_elem = product_file.find("URL")
         fname_elem = product_file.find("FileName")
@@ -127,96 +134,41 @@ async def _resolve_jp2_url(
             and "QLOOK" not in fname.upper()
             and "NOMAP" not in fname.upper()
         ):
-            logger.info(f"Found JP2: {fname} ({file_url[:80]}...)")
+            logger.info(f"Found JP2 via ODE: {fname}")
             return file_url
 
-    logger.warning(f"No JP2 file found for {obs_id}")
+    logger.warning(f"No JP2 file found via ODE for {obs_id}")
     return None
 
 
-async def _download_file(
-    url: str,
-    dest: Path,
-    session: Optional[aiohttp.ClientSession] = None,
-    chunk_size: int = 1024 * 1024,  # 1MB chunks
-) -> bool:
-    """Download a file with progress logging."""
-    close_session = session is None
-    if session is None:
-        session = aiohttp.ClientSession()
+def _download_file_wget(url: str, dest: Path, retries: int = 3) -> bool:
+    """Download via wget with retry and resume support for large HiRISE files (~1 GB)."""
+    import subprocess
 
-    try:
-        logger.info(f"Downloading: {url.split('/')[-1]}")
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=3600)) as resp:
-            if resp.status != 200:
-                logger.error(f"Download failed: HTTP {resp.status}")
-                return False
-
-            total = int(resp.headers.get("Content-Length", 0))
-            downloaded = 0
-            logged_pct = -1
-
-            with open(dest, "wb") as f:
-                async for chunk in resp.content.iter_chunked(chunk_size):
-                    f.write(chunk)
-                    downloaded += len(chunk)
-
-                    if total > 0:
-                        pct = int(100 * downloaded / total)
-                        if pct >= logged_pct + 10:
-                            logged_pct = pct
-                            logger.info(
-                                f"  {pct}% ({downloaded / 1e6:.1f} / {total / 1e6:.1f} MB)"
-                            )
-
-        logger.info(f"Downloaded: {dest.name} ({downloaded / 1e6:.1f} MB)")
-        return True
-
-    except Exception as e:
-        logger.error(f"Download error: {e}")
-        if dest.exists():
-            dest.unlink()
-        return False
-    finally:
-        if close_session:
-            await session.close()
-
-
-def _jp2_to_geotiff(jp2_path: Path, tif_path: Path) -> bool:
-    """Convert JPEG2000 to GeoTIFF using GDAL."""
-    try:
+    for attempt in range(1, retries + 1):
+        logger.info(f"wget attempt {attempt}/{retries}: {url.split('/')[-1]}")
         result = subprocess.run(
             [
-                "gdal_translate",
-                "-of", "GTiff",
-                "-co", "COMPRESS=LZW",
-                "-co", "TILED=YES",
-                "-co", "BIGTIFF=IF_SAFER",
-                str(jp2_path),
-                str(tif_path),
+                "wget", "-c",
+                "-t", "3",
+                "--timeout=60",
+                "--waitretry=10",
+                "-q", "--show-progress",
+                "-O", str(dest),
+                url,
             ],
             capture_output=True,
             text=True,
-            timeout=600,
+            timeout=7200,
         )
-
+        if result.returncode == 0 and dest.exists() and dest.stat().st_size > 1_000_000:
+            logger.info(f"Downloaded: {dest.name} ({dest.stat().st_size / 1e6:.0f} MB)")
+            return True
         if result.returncode != 0:
-            logger.error(f"gdal_translate failed: {result.stderr[:500]}")
-            return False
+            logger.warning(f"wget exit {result.returncode}: {result.stderr[:200]}")
 
-        logger.info(f"Converted to GeoTIFF: {tif_path.name}")
+    if dest.exists() and dest.stat().st_size < 1_000_000:
+        dest.unlink()
+    return False
 
-        # Optionally remove JP2 to save disk space
-        # jp2_path.unlink()
 
-        return True
-
-    except FileNotFoundError:
-        logger.error(
-            "gdal_translate not found. Install GDAL: "
-            "apt-get install gdal-bin or conda install gdal"
-        )
-        return False
-    except subprocess.TimeoutExpired:
-        logger.error("gdal_translate timed out (>600s)")
-        return False
