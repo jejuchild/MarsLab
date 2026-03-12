@@ -306,18 +306,30 @@ class HiriseLandformPipeline:
                 dominant_confidence = float(agent_reasoning.confidence)
 
         # MOLA-pixel accessibility (reference algorithm)
+        # Use actual PDS image extent (not tile-center bounds) for correct overlay alignment
         mean_acc = 0.0
         acc_dist: dict[str, int] = {}
         acc_heatmap_url: str | None = None
         acc_metadata: dict = {}
         if request.lat and request.lon and tile_predictions:
-            lats = [tp.lat for tp in tile_predictions]
-            lons = [tp.lon for tp in tile_predictions]
-            lat_min, lat_max = min(lats), max(lats)
-            lon_min, lon_max = min(lons), max(lons)
             try:
                 from .mola_accessibility import compute_mola_accessibility
                 from .preprocessing import MOLA_DEM_PATH
+
+                # Try to get actual image extent from PDS label
+                pds_extent = self._resolve_pds_extent(request.product_id)
+                if pds_extent is not None:
+                    lat_min, lat_max, lon_min, lon_max = pds_extent
+                    logger.info('Using PDS extent: lat=[%.4f, %.4f] lon=[%.4f, %.4f]',
+                                lat_min, lat_max, lon_min, lon_max)
+                else:
+                    # Fallback: tile-center bounds (less accurate)
+                    lats = [tp.lat for tp in tile_predictions]
+                    lons = [tp.lon for tp in tile_predictions]
+                    lat_min, lat_max = min(lats), max(lats)
+                    lon_min, lon_max = min(lons), max(lons)
+                    logger.warning('PDS extent unavailable, using tile-center bounds')
+
                 scores_grid, cats_grid, acc_metadata = compute_mola_accessibility(
                     lat_min, lat_max, lon_min, lon_max, str(MOLA_DEM_PATH),
                 )
@@ -743,6 +755,21 @@ class HiriseLandformPipeline:
         except Exception as exc:
             logger.warning("VLM agent failed: %s", exc, exc_info=True)
             return AgentReasoningResult(enabled=True, mode="agent", error=str(exc))
+
+    @staticmethod
+    def _resolve_pds_extent(product_id: str) -> tuple[float, float, float, float] | None:
+        """Get actual image (lat_min, lat_max, lon_min, lon_max) from PDS LBL."""
+        try:
+            import sys
+            # resolve_image_extent is in the hirise-api layer
+            for p in sys.path:
+                if 'hirise-api' in p:
+                    break
+            from core.classifier import resolve_image_extent
+            return resolve_image_extent(product_id)
+        except Exception as exc:
+            logger.debug('PDS extent resolution failed: %s', exc)
+            return None
 
     def _compute_tile_latlon(
         self,
