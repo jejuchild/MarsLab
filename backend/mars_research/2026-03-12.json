@@ -1,0 +1,30 @@
+{
+  "date": "2026-03-12",
+  "generated_at": "2026-03-11T22:10:09.424694+00:00",
+  "topic": {
+    "focus": "Polar Science",
+    "keywords": [
+      "polar layered deposits",
+      "south polar",
+      "CO2 ice",
+      "stratigraphy",
+      "polar cap"
+    ]
+  },
+  "papers": [
+    {
+      "title": "High-performance and stable MgFe-layered double hydroxide catalysts for green synthesis of dimethyl carbonate",
+      "authors": "Cui Qiao, Yunong Li, Qian Su, Yong Li, Ying Liu, Xiaoling Gao et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper focuses on the development of high-performance and stable MgFe-layered double hydroxide catalysts for the green synthesis of dimethyl carbonate. The main contribution is the creation of a catalyst that can efficiently synthesize dimethyl carbonate, a valuable chemical compound.",
+      "methodology": "The authors used a combination of experimental and analytical techniques, including synthesis, characterization, and performance evaluation of the catalysts.",
+      "relevance": "This paper does not have direct relevance to MarsLab's Mars exploration goals, particularly in the area of polar science.",
+      "category": "Not Relevant",
+      "url": "https://doi.org/10.1016/j.fuel.2026.138922",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "Based on the provided paper, there is no clear trend analysis that can be made in relation to MarsLab's polar science research goals, as the paper does not pertain to the topic. However, it can be noted that the development of efficient catalysts is a growing area of research, with potential applications in various fields. Further analysis of papers related to polar science would be necessary to identify trends in this area. The lack of relevant papers in the provided list limits the ability to conduct a meaningful trend analysis.",
+  "connections_to_marslab": "The findings of this paper do not have a direct connection to MarsLab's mission, as it does not relate to mineral classification, ice detection, Arcadia Planitia site selection, or human exploration planning. To establish connections to MarsLab's goals, papers related to polar science, such as those focusing on polar layered deposits, the south polar ice cap, CO2 ice, or polar stratigraphy, would be necessary."
+}

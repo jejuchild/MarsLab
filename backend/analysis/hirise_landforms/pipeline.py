@@ -13,7 +13,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-from .heatmap import generate_class_map, save_heatmap
+from .heatmap import generate_class_map, generate_mola_accessibility_map, save_heatmap
 from .models import (
     AgentReasoningResult,
     AgentReasoningStep,
@@ -32,6 +32,7 @@ V3_TILE_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "best_t
 V4B_FILM_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "marslandform_v4b_deploy.pt"
 V5_FILM_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "marslandform_v5_deploy.pt"
 SSL_LORA_WEIGHTS = ROOT / "Data" / "HiRISE" / "v2_output" / "ssl_lora_weights" / "best_model.pt"
+TES_TI_PATH = ROOT / "backend" / "data" / "tes_thermal_inertia.npy"
 
 V3_CLASSES = ["LDA", "LVF", "CCF", "OTHER", "SCT"]
 CONFIDENCE_THRESHOLD = 0.7
@@ -57,6 +58,8 @@ class HiriseLandformPipeline:
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._models: LoadedModels | None = None
         self._loading = False
+        self._tes_ti_grid: np.ndarray | None = None
+        self._tes_ti_loaded = False
 
     @property
     def device(self) -> str:
@@ -302,6 +305,34 @@ class HiriseLandformPipeline:
                 dominant_class = agent_reasoning.landform_class
                 dominant_confidence = float(agent_reasoning.confidence)
 
+        # MOLA-pixel accessibility (reference algorithm)
+        mean_acc = 0.0
+        acc_dist: dict[str, int] = {}
+        acc_heatmap_url: str | None = None
+        acc_metadata: dict = {}
+        if request.lat and request.lon and tile_predictions:
+            lats = [tp.lat for tp in tile_predictions]
+            lons = [tp.lon for tp in tile_predictions]
+            lat_min, lat_max = min(lats), max(lats)
+            lon_min, lon_max = min(lons), max(lons)
+            try:
+                from .mola_accessibility import compute_mola_accessibility
+                from .preprocessing import MOLA_DEM_PATH
+                scores_grid, cats_grid, acc_metadata = compute_mola_accessibility(
+                    lat_min, lat_max, lon_min, lon_max, str(MOLA_DEM_PATH),
+                )
+                mean_acc = acc_metadata.get('mean_score', 0.0)
+                for cat in ('excellent', 'good', 'moderate', 'challenging', 'inaccessible'):
+                    n = acc_metadata.get(f'n_{cat}', 0)
+                    if n > 0:
+                        acc_dist[cat] = n
+                # Generate accessibility heatmap overlay
+                if request.include_heatmap:
+                    acc_heatmap = generate_mola_accessibility_map(image, scores_grid)
+                    acc_heatmap_url = save_heatmap(acc_heatmap, f'{request.product_id}_accessibility')
+            except Exception as exc:
+                logger.warning('MOLA accessibility failed: %s', exc, exc_info=True)
+
         return ClassifyResult(
             product_id=request.product_id,
             model_used=models.model_version,
@@ -314,6 +345,9 @@ class HiriseLandformPipeline:
             agent_reasoning=agent_reasoning,
             num_tiles=num_tiles,
             device=str(self._device),
+            mean_accessibility=mean_acc,
+            accessibility_distribution=acc_dist,
+            accessibility_heatmap_url=acc_heatmap_url,
         )
 
     @property
@@ -394,6 +428,127 @@ class HiriseLandformPipeline:
         rel_elev = (base_arr[:, 21] - mean_elev).reshape(-1, 1)
         rel_slope = (base_arr[:, 0] - mean_slope).reshape(-1, 1)
         return np.concatenate([base_arr, rel_elev, rel_slope], axis=1).astype(np.float32)
+
+    # ------------------------------------------------------------------
+    # TES Thermal Inertia (lazy-loaded for accessibility scoring)
+    # ------------------------------------------------------------------
+
+    def _load_tes_ti(self) -> None:
+        """Load TES thermal inertia grid (7200×3600, 20ppd, 0-360°E)."""
+        if self._tes_ti_loaded:
+            return
+        self._tes_ti_loaded = True
+        if not TES_TI_PATH.exists():
+            logger.debug("TES TI not found: %s", TES_TI_PATH)
+            return
+        try:
+            self._tes_ti_grid = np.load(TES_TI_PATH).astype(np.float32)
+            logger.info("Loaded TES TI grid: %s", self._tes_ti_grid.shape)
+        except Exception as exc:
+            logger.warning("Failed to load TES TI: %s", exc)
+
+    def _sample_tes_ti(self, lat: float, lon: float) -> float | None:
+        """Sample TES thermal inertia at (lat, lon). Returns None if unavailable."""
+        self._load_tes_ti()
+        if self._tes_ti_grid is None:
+            return None
+        if lat < -60.0 or lat > 60.0:
+            return None  # TES coverage ±60°
+        lon360 = lon % 360
+        row = int((90.0 - lat) * 20)  # 20 ppd
+        col = int(lon360 * 20)
+        row = max(0, min(row, self._tes_ti_grid.shape[0] - 1))
+        col = max(0, min(col, self._tes_ti_grid.shape[1] - 1))
+        val = float(self._tes_ti_grid[row, col])
+        if not np.isfinite(val) or val <= 0 or val > 2000:
+            return None
+        return val
+
+    # ------------------------------------------------------------------
+    # ISRU Accessibility (per-tile)
+    # ------------------------------------------------------------------
+
+    def _compute_tile_accessibility(
+        self,
+        tile_predictions: list[TilePrediction],
+        mola_features: np.ndarray,
+    ) -> tuple[float, dict[str, int]]:
+        """Compute ISRU accessibility score per tile.
+
+        Uses analysis.accessibility.algorithm.compute_accessibility() with:
+          - Landform class + confidence (from tile classification)
+          - Slope, elevation, TRI (from MOLA 25-dim features)
+          - TES thermal inertia (lazy-loaded, optional)
+
+        Returns:
+            mean_accessibility: float (average score across all tiles)
+            distribution: dict mapping category → tile count
+        """
+        if not tile_predictions:
+            return 0.0, {}
+
+        from ..accessibility.algorithm import compute_accessibility
+
+        scores: list[float] = []
+        for i, tp in enumerate(tile_predictions):
+            mola = mola_features[i] if i < len(mola_features) else np.zeros(25, dtype=np.float32)
+
+            # MOLA 25-dim indices: slope_mean(0), TRI(4), elevation_mean(21)
+            slope_val = float(mola[0])
+            tri_val = float(mola[4])
+            elev_val = float(mola[21])
+
+            # TES thermal inertia (None if outside ±60° or data missing)
+            tes_ti = self._sample_tes_ti(tp.lat, tp.lon)
+
+            # Landform for ice indicator scoring
+            landform = tp.raw_class if tp.raw_class else tp.predicted_class
+            if landform == UNCERTAIN_CLASS:
+                landform = "OTHER"
+
+            result = compute_accessibility(
+                thermal_inertia=tes_ti,
+                elevation=elev_val,
+                slope=slope_val,
+                tri=tri_val,
+                lat=tp.lat,
+                lon=tp.lon,
+                landform=landform,
+                landform_confidence=tp.confidence,
+            )
+
+            tp.accessibility_score = result.score
+            tp.accessibility_subscores = {
+                "ice_landform": result.ice_landform,
+                "excavation": result.excavation,
+                "landing": result.landing,
+            }
+            tp.accessibility_confidence = result.confidence
+            scores.append(result.score)
+
+        # Summary statistics
+        mean_score = float(np.mean(scores)) if scores else 0.0
+
+        # Categorize tiles by accessibility score
+        distribution: dict[str, int] = {}
+        for s in scores:
+            if s >= 0.7:
+                cat = "excellent"
+            elif s >= 0.5:
+                cat = "good"
+            elif s >= 0.3:
+                cat = "moderate"
+            elif s > 0.1:
+                cat = "challenging"
+            else:
+                cat = "inaccessible"
+            distribution[cat] = distribution.get(cat, 0) + 1
+
+        logger.info(
+            "Accessibility: mean=%.3f, distribution=%s",
+            mean_score, distribution,
+        )
+        return round(mean_score, 4), distribution
 
     @torch.no_grad()
     def _run_tile_classifier(

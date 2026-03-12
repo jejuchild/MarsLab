@@ -38,6 +38,10 @@ class TilePrediction(BaseModel):
     probabilities: dict[str, float] = Field(default_factory=dict)
     lat: float
     lon: float
+    # ISRU Accessibility (computed from landform + MOLA + TES)
+    accessibility_score: float = 0.0
+    accessibility_subscores: dict[str, float] = Field(default_factory=dict)
+    accessibility_confidence: str = "insufficient"
 
 
 class ClassSummary(BaseModel):
@@ -81,6 +85,10 @@ class ClassifyResult(BaseModel):
     agent_reasoning: AgentReasoningResult | None = None
     num_tiles: int = 0
     device: str = "cpu"
+    # ISRU Accessibility summary (across all tiles)
+    mean_accessibility: float = 0.0
+    accessibility_distribution: dict[str, int] = Field(default_factory=dict)
+    accessibility_heatmap_url: str | None = None
 
 
 class JobStatus(BaseModel):
