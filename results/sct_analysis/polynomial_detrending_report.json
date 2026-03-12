@@ -1,0 +1,349 @@
+{
+  "description": "Polynomial detrending comparison for SCT temporal pair",
+  "pair": "PSP_007173_2245 \u2192 ESP_077815_2245",
+  "baseline_mars_yr": 8.01,
+  "input_data": "/disk1/cspark/MarsLab/results/sct_analysis/affine_corrected_displacement.npz",
+  "detrend_results": {
+    "order_0": {
+      "model": {
+        "type": "median",
+        "n_stable": 82
+      },
+      "stable_terrain": {
+        "n_chips": 82,
+        "mean_dx_m": 0.0183,
+        "mean_dy_m": 0.1767,
+        "mean_mag_m": 1.0106,
+        "std_dx_m": 0.7624,
+        "std_dy_m": 1.0516,
+        "std_mag_m": 0.8351,
+        "median_mag_m": 0.8054,
+        "p95_mag_m": 2.3385
+      },
+      "scarp_terrain": {
+        "n_chips": 894,
+        "mean_dx_m": 0.4367,
+        "mean_dy_m": -0.2123,
+        "mean_mag_m": 1.3844,
+        "std_dx_m": 0.6808,
+        "std_dy_m": 1.3475,
+        "std_mag_m": 0.7736,
+        "median_mag_m": 1.3399,
+        "p95_mag_m": 2.8352
+      },
+      "other_terrain": {
+        "n_chips": 551,
+        "mean_dx_m": 0.3957,
+        "mean_dy_m": -0.6328,
+        "mean_mag_m": 1.2539,
+        "std_dx_m": 0.6185,
+        "std_dy_m": 1.099,
+        "std_mag_m": 0.7584,
+        "median_mag_m": 1.2094,
+        "p95_mag_m": 2.6638
+      },
+      "statistical_tests": {
+        "mann_whitney_u": {
+          "statistic": 46284.0,
+          "p_value": 4.047170068524145e-05
+        },
+        "ks_test": {
+          "statistic": 0.28646259616958586,
+          "p_value": 6.014316094933625e-06
+        }
+      },
+      "retreat_measurement": {
+        "excess_displacement_m": 0.3738,
+        "retreat_rate_m_per_mars_yr": 0.0467,
+        "retreat_rate_cm_per_mars_yr": 4.67,
+        "noise_floor_2sigma_m": 1.6702,
+        "min_detectable_rate_m_per_mars_yr": 0.2085,
+        "scarp_chips_above_noise": "72/894",
+        "scarp_above_noise_pct": 8.1,
+        "signal_to_noise": 0.224
+      }
+    },
+    "order_1": {
+      "model": {
+        "type": "polynomial_order_1",
+        "n_stable": 82,
+        "n_coefficients": 3,
+        "dx_coeffs": [
+          0.6586547470852526,
+          -0.2525154200261695,
+          0.9511933861064592
+        ],
+        "dy_coeffs": [
+          -0.7090232476176211,
+          0.14025071700415848,
+          -1.397326235504737
+        ]
+      },
+      "stable_terrain": {
+        "n_chips": 82,
+        "mean_dx_m": 0.0405,
+        "mean_dy_m": 0.0064,
+        "mean_mag_m": 0.4389,
+        "std_dx_m": 0.3277,
+        "std_dy_m": 0.4048,
+        "std_mag_m": 0.2833,
+        "median_mag_m": 0.3662,
+        "p95_mag_m": 1.1441
+      },
+      "scarp_terrain": {
+        "n_chips": 894,
+        "mean_dx_m": -0.0591,
+        "mean_dy_m": 0.2849,
+        "mean_mag_m": 0.7401,
+        "std_dx_m": 0.5752,
+        "std_dy_m": 0.5408,
+        "std_mag_m": 0.4004,
+        "median_mag_m": 0.6925,
+        "p95_mag_m": 1.4477
+      },
+      "other_terrain": {
+        "n_chips": 551,
+        "mean_dx_m": -0.2052,
+        "mean_dy_m": 0.0957,
+        "mean_mag_m": 0.644,
+        "std_dx_m": 0.5541,
+        "std_dy_m": 0.4755,
+        "std_mag_m": 0.4119,
+        "median_mag_m": 0.5396,
+        "p95_mag_m": 1.3878
+      },
+      "statistical_tests": {
+        "mann_whitney_u": {
+          "statistic": 54618.0,
+          "p_value": 9.697651412967772e-14
+        },
+        "ks_test": {
+          "statistic": 0.41305178152452665,
+          "p_value": 4.421855846611714e-12
+        }
+      },
+      "retreat_measurement": {
+        "excess_displacement_m": 0.3012,
+        "retreat_rate_m_per_mars_yr": 0.0376,
+        "retreat_rate_cm_per_mars_yr": 3.76,
+        "noise_floor_2sigma_m": 0.5666,
+        "min_detectable_rate_m_per_mars_yr": 0.0707,
+        "scarp_chips_above_noise": "198/894",
+        "scarp_above_noise_pct": 22.1,
+        "signal_to_noise": 0.532
+      }
+    },
+    "order_2": {
+      "model": {
+        "type": "polynomial_order_2",
+        "n_stable": 82,
+        "n_coefficients": 6,
+        "dx_coeffs": [
+          0.7581959239336787,
+          -0.32445311458991327,
+          0.8495908182974466,
+          -0.024149174234959783,
+          -0.17043705490231084,
+          -0.20588118079107653
+        ],
+        "dy_coeffs": [
+          -0.4007059915940523,
+          0.15456578992144782,
+          -1.313630466654732,
+          -0.2735557746788859,
+          -0.035226842273664495,
+          0.03438981079235376
+        ]
+      },
+      "stable_terrain": {
+        "n_chips": 82,
+        "mean_dx_m": 0.0307,
+        "mean_dy_m": 0.0099,
+        "mean_mag_m": 0.3806,
+        "std_dx_m": 0.3148,
+        "std_dy_m": 0.3376,
+        "std_mag_m": 0.2631,
+        "median_mag_m": 0.3461,
+        "p95_mag_m": 0.9447
+      },
+      "scarp_terrain": {
+        "n_chips": 894,
+        "mean_dx_m": -0.0115,
+        "mean_dy_m": 0.2057,
+        "mean_mag_m": 0.6858,
+        "std_dx_m": 0.5431,
+        "std_dy_m": 0.5368,
+        "std_mag_m": 0.394,
+        "median_mag_m": 0.6254,
+        "p95_mag_m": 1.3665
+      },
+      "other_terrain": {
+        "n_chips": 551,
+        "mean_dx_m": -0.12,
+        "mean_dy_m": 0.0297,
+        "mean_mag_m": 0.5418,
+        "std_dx_m": 0.5071,
+        "std_dy_m": 0.4092,
+        "std_mag_m": 0.3826,
+        "median_mag_m": 0.4478,
+        "p95_mag_m": 1.3315
+      },
+      "statistical_tests": {
+        "mann_whitney_u": {
+          "statistic": 55212.0,
+          "p_value": 1.5266741459057075e-14
+        },
+        "ks_test": {
+          "statistic": 0.4500736618104436,
+          "p_value": 2.349876684825977e-14
+        }
+      },
+      "retreat_measurement": {
+        "excess_displacement_m": 0.3052,
+        "retreat_rate_m_per_mars_yr": 0.0381,
+        "retreat_rate_cm_per_mars_yr": 3.81,
+        "noise_floor_2sigma_m": 0.5262,
+        "min_detectable_rate_m_per_mars_yr": 0.0657,
+        "scarp_chips_above_noise": "224/894",
+        "scarp_above_noise_pct": 25.1,
+        "signal_to_noise": 0.58
+      }
+    },
+    "order_3": {
+      "model": {
+        "type": "polynomial_order_3",
+        "n_stable": 82,
+        "n_coefficients": 10,
+        "dx_coeffs": [
+          0.8927355510692235,
+          -0.08543127877682524,
+          0.8765252105569625,
+          0.08699891877715468,
+          -0.03342848646754356,
+          -1.0357764148372814,
+          -0.1568760142882431,
+          0.05583003613990598,
+          0.11200462527446468,
+          -0.5004985422129972
+        ],
+        "dy_coeffs": [
+          -0.5419871190120711,
+          0.3387875534048182,
+          -1.5116067641826374,
+          -0.027227124228368742,
+          -0.1115660899766828,
+          -0.3144454359371963,
+          -0.18339564234210598,
+          0.21817784885242208,
+          0.07524083799929338,
+          -0.13484987430508827
+        ]
+      },
+      "stable_terrain": {
+        "n_chips": 82,
+        "mean_dx_m": 0.0058,
+        "mean_dy_m": 0.0246,
+        "mean_mag_m": 0.2986,
+        "std_dx_m": 0.266,
+        "std_dy_m": 0.2969,
+        "std_mag_m": 0.2653,
+        "median_mag_m": 0.2116,
+        "p95_mag_m": 0.98
+      },
+      "scarp_terrain": {
+        "n_chips": 894,
+        "mean_dx_m": 0.2904,
+        "mean_dy_m": 0.2726,
+        "mean_mag_m": 0.7149,
+        "std_dx_m": 0.7217,
+        "std_dy_m": 0.5578,
+        "std_mag_m": 0.6925,
+        "median_mag_m": 0.5564,
+        "p95_mag_m": 1.8957
+      },
+      "other_terrain": {
+        "n_chips": 551,
+        "mean_dx_m": 0.2861,
+        "mean_dy_m": 0.2631,
+        "mean_mag_m": 0.7098,
+        "std_dx_m": 0.8057,
+        "std_dy_m": 0.5215,
+        "std_mag_m": 0.7539,
+        "median_mag_m": 0.4212,
+        "p95_mag_m": 2.3222
+      },
+      "statistical_tests": {
+        "mann_whitney_u": {
+          "statistic": 56271.0,
+          "p_value": 4.893033167317618e-16
+        },
+        "ks_test": {
+          "statistic": 0.46237791236972775,
+          "p_value": 3.657452260263533e-15
+        }
+      },
+      "retreat_measurement": {
+        "excess_displacement_m": 0.4163,
+        "retreat_rate_m_per_mars_yr": 0.052,
+        "retreat_rate_cm_per_mars_yr": 5.2,
+        "noise_floor_2sigma_m": 0.5306,
+        "min_detectable_rate_m_per_mars_yr": 0.0662,
+        "scarp_chips_above_noise": "234/894",
+        "scarp_above_noise_pct": 26.2,
+        "signal_to_noise": 0.785
+      }
+    }
+  },
+  "comparison": {
+    "by_order": [
+      {
+        "order": 0,
+        "stable_mean_mag_m": 1.0106,
+        "stable_std_mag_m": 0.8351,
+        "scarp_mean_mag_m": 1.3844,
+        "excess_m": 0.3738,
+        "retreat_rate_m_my": 0.0467,
+        "noise_2sigma_m": 1.6702,
+        "snr": 0.224,
+        "mann_whitney_p": 4.047170068524145e-05,
+        "above_noise_pct": 8.1
+      },
+      {
+        "order": 1,
+        "stable_mean_mag_m": 0.4389,
+        "stable_std_mag_m": 0.2833,
+        "scarp_mean_mag_m": 0.7401,
+        "excess_m": 0.3012,
+        "retreat_rate_m_my": 0.0376,
+        "noise_2sigma_m": 0.5666,
+        "snr": 0.532,
+        "mann_whitney_p": 9.697651412967772e-14,
+        "above_noise_pct": 22.1
+      },
+      {
+        "order": 2,
+        "stable_mean_mag_m": 0.3806,
+        "stable_std_mag_m": 0.2631,
+        "scarp_mean_mag_m": 0.6858,
+        "excess_m": 0.3052,
+        "retreat_rate_m_my": 0.0381,
+        "noise_2sigma_m": 0.5262,
+        "snr": 0.58,
+        "mann_whitney_p": 1.5266741459057075e-14,
+        "above_noise_pct": 25.1
+      },
+      {
+        "order": 3,
+        "stable_mean_mag_m": 0.2986,
+        "stable_std_mag_m": 0.2653,
+        "scarp_mean_mag_m": 0.7149,
+        "excess_m": 0.4163,
+        "retreat_rate_m_my": 0.052,
+        "noise_2sigma_m": 0.5306,
+        "snr": 0.785,
+        "mann_whitney_p": 4.893033167317618e-16,
+        "above_noise_pct": 26.2
+      }
+    ]
+  }
+}

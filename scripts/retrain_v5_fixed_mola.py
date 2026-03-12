@@ -62,8 +62,8 @@ DEM_RESOLUTION_M = 200.0
 # Phase 1: Fetch PDS extents
 # ============================================================================
 
-def fetch_pds_extent(product_id: str) -> Optional[dict]:
-    """Fetch lat/lon extent from Arizona PDS LBL for one image."""
+def fetch_pds_extent(product_id: str, max_retries: int = 3) -> Optional[dict]:
+    """Fetch lat/lon extent from Arizona PDS LBL for one image (with retries)."""
     base_id = re.sub(r"_(RED|COLOR|BG|IR)$", "", product_id)
     parts = base_id.split("_")
     if len(parts) < 3:
@@ -81,14 +81,21 @@ def fetch_pds_extent(product_id: str) -> Optional[dict]:
         f"{orbit_dir}/{base_id}/{base_id}_RED.LBL"
     )
 
-    try:
-        resp = requests.get(lbl_url, timeout=15)
-        if resp.status_code != 200:
-            return None
-        return _parse_extent(resp.text, base_id)
-    except Exception:
-        return None
-
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(lbl_url, timeout=30)
+            if resp.status_code == 200:
+                return _parse_extent(resp.text, base_id)
+            if resp.status_code == 404:
+                return None  # No point retrying 404
+            # Server error (5xx) — retry
+        except (requests.Timeout, requests.ConnectionError):
+            pass  # Retry on network errors
+        except Exception:
+            return None  # Unexpected error — don't retry
+        if attempt < max_retries - 1:
+            time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s
+    return None
 
 def _parse_extent(lbl_text: str, product_id: str) -> Optional[dict]:
     """Parse lat/lon bounds from PDS LBL text."""
@@ -112,7 +119,7 @@ def _parse_extent(lbl_text: str, product_id: str) -> Optional[dict]:
     return None
 
 
-def phase1_fetch_extents(image_ids: list[str], cache_path: Path, workers: int = 16) -> dict:
+def phase1_fetch_extents(image_ids: list[str], cache_path: Path, workers: int = 4) -> dict:
     """Fetch PDS extents for all images. Returns {image_id: extent_dict}."""
     if cache_path.exists():
         logger.info(f"Phase 1: Loading cached extents from {cache_path}")
@@ -154,7 +161,14 @@ def phase1_fetch_extents(image_ids: list[str], cache_path: Path, workers: int = 
                     f"[{rate:.0f}/s, ETA {eta/60:.0f}m]"
                 )
 
-    # Save checkpoint
+            # Incremental save every 500 fetches
+            if i % 500 == 0:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(cache_path, "w") as f:
+                    json.dump(results, f, indent=2)
+                logger.info(f"  Checkpoint saved: {len(results)} extents")
+
+    # Final save
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with open(cache_path, "w") as f:
         json.dump(results, f, indent=2)
@@ -650,7 +664,7 @@ def phase5_train(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-phase", type=int, default=1, help="Start from phase N")
-    parser.add_argument("--workers", type=int, default=16, help="HTTP fetch parallelism")
+    parser.add_argument("--workers", type=int, default=4, help="HTTP fetch parallelism (default: 4)")
     parser.add_argument("--batch-size", type=int, default=32, help="DINOv2 batch size")
     args = parser.parse_args()
 

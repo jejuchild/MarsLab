@@ -1,0 +1,261 @@
+{
+  "config": {
+    "img_size": 2048,
+    "chip_size": 256,
+    "step_size": 128,
+    "pixel_scale_m": 0.25
+  },
+  "tests": [
+    {
+      "injected_px": {
+        "dx": 0.0,
+        "dy": 0.0,
+        "mag": 0.0
+      },
+      "scarp_recovery": {
+        "dx_pct": 100.0,
+        "dy_pct": 100.0,
+        "mag_pct": 100.0,
+        "n_valid": 25,
+        "mean_dx_px": 0.0,
+        "mean_dy_px": 0.0,
+        "std_dx_px": 0.0,
+        "std_dy_px": 0.0
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0,
+        "mean_dy_px": 0.0,
+        "mean_mag_px": 0.0,
+        "n_valid": 121,
+        "std_dx_px": 0.0,
+        "std_dy_px": 0.0
+      },
+      "discrimination_snr": 0.0,
+      "test_name": "null_test"
+    },
+    {
+      "injected_px": {
+        "dx": 0.1,
+        "dy": 0.0,
+        "mag": 0.1
+      },
+      "scarp_recovery": {
+        "dx_pct": 42.8,
+        "dy_pct": 100.0,
+        "mag_pct": 42.8,
+        "n_valid": 25,
+        "mean_dx_px": 0.0428,
+        "mean_dy_px": 0.0,
+        "std_dx_px": 0.0128,
+        "std_dy_px": 0.0
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0,
+        "mean_dy_px": 0.0,
+        "mean_mag_px": 0.0,
+        "n_valid": 121,
+        "std_dx_px": 0.0,
+        "std_dy_px": 0.0
+      },
+      "discrimination_snr": 42800.0,
+      "test_name": "tiny_0.1px"
+    },
+    {
+      "injected_px": {
+        "dx": 0.25,
+        "dy": 0.0,
+        "mag": 0.25
+      },
+      "scarp_recovery": {
+        "dx_pct": 42.6,
+        "dy_pct": 100.0,
+        "mag_pct": 42.6,
+        "n_valid": 25,
+        "mean_dx_px": 0.1064,
+        "mean_dy_px": 0.0,
+        "std_dx_px": 0.0317,
+        "std_dy_px": 0.0
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0003,
+        "mean_dy_px": 0.0,
+        "mean_mag_px": 0.0003,
+        "n_valid": 121,
+        "std_dx_px": 0.0018,
+        "std_dy_px": 0.0
+      },
+      "discrimination_snr": 59.33,
+      "test_name": "small_0.25px"
+    },
+    {
+      "injected_px": {
+        "dx": 0.5,
+        "dy": 0.0,
+        "mag": 0.5
+      },
+      "scarp_recovery": {
+        "dx_pct": 42.1,
+        "dy_pct": 100.0,
+        "mag_pct": 42.1,
+        "n_valid": 25,
+        "mean_dx_px": 0.2104,
+        "mean_dy_px": 0.0,
+        "std_dx_px": 0.0707,
+        "std_dy_px": 0.0028
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0006,
+        "mean_dy_px": 0.0,
+        "mean_mag_px": 0.0006,
+        "n_valid": 121,
+        "std_dx_px": 0.0027,
+        "std_dy_px": 0.0
+      },
+      "discrimination_snr": 78.73,
+      "test_name": "medium_0.5px"
+    },
+    {
+      "injected_px": {
+        "dx": 1.0,
+        "dy": 0.0,
+        "mag": 1.0
+      },
+      "scarp_recovery": {
+        "dx_pct": 39.0,
+        "dy_pct": 100.0,
+        "mag_pct": 39.0,
+        "n_valid": 25,
+        "mean_dx_px": 0.3904,
+        "mean_dy_px": -0.0012,
+        "std_dx_px": 0.2158,
+        "std_dy_px": 0.0059
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0004,
+        "mean_dy_px": 0.0,
+        "mean_mag_px": 0.0004,
+        "n_valid": 121,
+        "std_dx_px": 0.002,
+        "std_dy_px": 0.0
+      },
+      "discrimination_snr": 195.97,
+      "test_name": "large_1.0px"
+    },
+    {
+      "injected_px": {
+        "dx": 0.25,
+        "dy": 0.25,
+        "mag": 0.3536
+      },
+      "scarp_recovery": {
+        "dx_pct": 42.4,
+        "dy_pct": 42.1,
+        "mag_pct": 42.3,
+        "n_valid": 25,
+        "mean_dx_px": 0.106,
+        "mean_dy_px": 0.1052,
+        "std_dx_px": 0.0322,
+        "std_dy_px": 0.0316
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0003,
+        "mean_dy_px": 0.0002,
+        "mean_mag_px": 0.0004,
+        "n_valid": 121,
+        "std_dx_px": 0.0018,
+        "std_dy_px": 0.0016
+      },
+      "discrimination_snr": 62.97,
+      "test_name": "diagonal_0.35px"
+    },
+    {
+      "injected_px": {
+        "dx": 0.19,
+        "dy": 0.0,
+        "mag": 0.19
+      },
+      "scarp_recovery": {
+        "dx_pct": 42.7,
+        "dy_pct": 100.0,
+        "mag_pct": 42.7,
+        "n_valid": 25,
+        "mean_dx_px": 0.0812,
+        "mean_dy_px": 0.0,
+        "std_dx_px": 0.0242,
+        "std_dy_px": 0.0
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0002,
+        "mean_dy_px": 0.0,
+        "mean_mag_px": 0.0002,
+        "n_valid": 121,
+        "std_dx_px": 0.0013,
+        "std_dy_px": 0.0
+      },
+      "discrimination_snr": 63.56,
+      "test_name": "realistic_scarp_retreat"
+    },
+    {
+      "injected_px": {
+        "dx": 0.0,
+        "dy": 0.5,
+        "mag": 0.5
+      },
+      "scarp_recovery": {
+        "dx_pct": 100.0,
+        "dy_pct": 42.6,
+        "mag_pct": 42.6,
+        "n_valid": 25,
+        "mean_dx_px": -0.0008,
+        "mean_dy_px": 0.2128,
+        "std_dx_px": 0.0027,
+        "std_dy_px": 0.0668
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0,
+        "mean_dy_px": 0.0006,
+        "mean_mag_px": 0.0006,
+        "n_valid": 121,
+        "std_dx_px": 0.0,
+        "std_dy_px": 0.0027
+      },
+      "discrimination_snr": 79.63,
+      "test_name": "y_only_0.5px"
+    },
+    {
+      "injected_px": {
+        "dx": 0.35,
+        "dy": 0.35,
+        "mag": 0.495
+      },
+      "scarp_recovery": {
+        "dx_pct": 41.3,
+        "dy_pct": 41.3,
+        "mag_pct": 41.3,
+        "n_valid": 25,
+        "mean_dx_px": 0.1444,
+        "mean_dy_px": 0.1444,
+        "std_dx_px": 0.0501,
+        "std_dy_px": 0.0463
+      },
+      "stable_noise": {
+        "mean_dx_px": 0.0005,
+        "mean_dy_px": 0.0004,
+        "mean_mag_px": 0.0007,
+        "n_valid": 121,
+        "std_dx_px": 0.0022,
+        "std_dy_px": 0.002
+      },
+      "discrimination_snr": 69.26,
+      "test_name": "oblique_0.5px"
+    }
+  ],
+  "verdict": {
+    "null_test": "PASS",
+    "mean_recovery_pct": 41.2,
+    "recovery_test": "FAIL",
+    "noise_floor_2sigma_px": 0.0,
+    "noise_floor_2sigma_m": 0.0,
+    "overall": "NEEDS INVESTIGATION"
+  }
+}
