@@ -463,9 +463,17 @@ def phase5_train(
 
     # Load labels & splits
     with open(labels_path) as f:
-        labels_raw = json.load(f)
+        labels_list = json.load(f)
     with open(splits_path) as f:
         splits = json.load(f)
+
+    # Build label lookup: labels file is a list of dicts with image_id, tile_row, tile_col, label
+    # tile_index keys are formatted as '{image_id}_{row}_{col}'
+    labels_raw = {}
+    for entry in labels_list:
+        key = f"{entry['image_id']}_{entry['tile_row']}_{entry['tile_col']}"
+        labels_raw[key] = entry.get('label', 'OTHER')
+    logger.info(f"  Labels loaded: {len(labels_raw)} entries")
 
     CLASS_NAMES = ["LDA", "LVF", "CCF", "OTHER"]
     class_to_idx = {c: i for i, c in enumerate(CLASS_NAMES)}
@@ -475,6 +483,7 @@ def phase5_train(
     n = len(tile_keys)
     mola_arr = np.zeros((n, 25), dtype=np.float32)
     label_arr = np.full(n, -1, dtype=np.int64)
+    label_matched = 0
 
     for i, key in enumerate(tile_keys):
         # Parse image_id and row_col
@@ -488,17 +497,15 @@ def phase5_train(
 
         # Labels
         if key in labels_raw:
-            label_info = labels_raw[key]
-            if isinstance(label_info, dict):
-                cls = label_info.get("class", label_info.get("label", "OTHER"))
-            else:
-                cls = str(label_info)
+            cls = labels_raw[key]
             label_arr[i] = class_to_idx.get(cls, class_to_idx["OTHER"])
+            label_matched += 1
 
-    # Split indices
-    train_idx = [i for i, k in enumerate(tile_keys) if k in set(splits.get("train", []))]
-    val_idx = [i for i, k in enumerate(tile_keys) if k in set(splits.get("val", []))]
-    test_idx = [i for i, k in enumerate(tile_keys) if k in set(splits.get("test", []))]
+    logger.info(f"  Labels matched: {label_matched}/{n}")
+    # Split indices — splits file contains integer indices into tile_keys
+    train_idx = [int(i) for i in splits.get('train', []) if int(i) < n]
+    val_idx = [int(i) for i in splits.get('val', []) if int(i) < n]
+    test_idx = [int(i) for i in splits.get('test', []) if int(i) < n]
 
     logger.info(f"  Split: train={len(train_idx)}, val={len(val_idx)}, test={len(test_idx)}")
 
@@ -516,8 +523,9 @@ def phase5_train(
         visual_dim=768,
         mola_dim=25,
         num_classes=len(CLASS_NAMES),
-        hidden_dim=256,
-        dropout=0.3,
+        film_hidden=64,
+        head_hidden=128,
+        dropout=0.4,
     )
     device = torch.device("cpu")
     model.to(device)
@@ -724,8 +732,8 @@ def main():
         embeddings=embeddings,
         mola_features=mola,
         tile_index=tile_index,
-        labels_path=V4_DIR / "tile_labels_v4.json",
-        splits_path=V4_DIR / "tile_splits_v4.json",
+        labels_path=OUTPUT_DIR / "tile_labels_v5.json",
+        splits_path=OUTPUT_DIR / "tile_splits_v5.json",
         output_dir=OUTPUT_DIR,
     )
 
