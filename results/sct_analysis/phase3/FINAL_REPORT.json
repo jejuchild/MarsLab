@@ -1,8 +1,20 @@
 {
   "title": "SCT Temporal Change Detection — Final Comprehensive Report",
-  "date": "2026-03-12",
+  "date": "2026-03-13",
   "study_area": "Scalloped terrain, Utopia Planitia, Mars (~44.5°N)",
   "objective": "Measure scalloped terrain scarp retreat rates from HiRISE temporal image pairs using sub-pixel phase correlation",
+
+  "executive_summary": {
+    "verdict": "UNABLE TO CONFIRM REAL SCARP RETREAT",
+    "summary": "While Phase 1-2 demonstrated a sound methodology with strong statistical signal on a single pair, Phase 3B cross-validation with independent classification revealed that the signal does NOT replicate across pairs. The critical Pair 0 vs Pair 1 diagnostic shows that two images of the SAME terrain with nearly identical temporal baselines produce opposite results (excess=+0.84m vs -0.02m). Spatial autocorrelation analysis confirms the detected signal is spatially smooth (r>0.99), consistent with systematic co-registration or illumination artifact rather than localized terrain change.",
+    "key_findings": [
+      "Phase 1: Pipeline methodology validated — 42% recovery rate, zero false positives on null injection",
+      "Phase 2: Strong statistical signal on Pair 0 (p=5e-16), but based on a single pair",
+      "Phase 3B: Cross-validation with independent classification — 3/6 pairs show significant excess, but R²=0.009 (NO proportionality with temporal baseline), CV=2.15 (wildly inconsistent rates)",
+      "Diagnostic: Pair 0 vs Pair 1 cover 96.6% of the same ground yet give opposite results — the 0.84m excess in Pair 0 is not reproducible",
+      "Diagnostic: Displacement in Pair 0 has 0.999 spatial autocorrelation — consistent with systematic artifact, not localized scarp retreat"
+    ]
+  },
 
   "methodology": {
     "pipeline": [
@@ -10,7 +22,7 @@
       "2. Spatial co-registration via projected CRS overlap extraction + FFT bulk alignment",
       "3. Sub-pixel phase correlation (chip=256px, step=128px, upsample=100x → 2.5mm precision)",
       "4. Order-3 polynomial detrending to remove spatially-varying registration residuals",
-      "5. Terrain classification: MarsLandformNet (Pair 0) or two-pass displacement-based (other pairs)",
+      "5. Terrain classification: MarsLandformNet (Pair 0) or gradient-percentile (other pairs)",
       "6. Statistical comparison: Mann-Whitney U test (scarp vs stable displacement distributions)"
     ],
     "calibration": "Phase 1 synthetic injection test established 42% recovery rate → ×2.38 correction factor",
@@ -56,7 +68,7 @@
       "cm_per_mars_yr": 12.4,
       "note": "Applying Phase 1 calibration factor ×2.38"
     },
-    "conclusion": "Order-3 polynomial detrending reduces stable noise 3.4× and improves significance by 11 orders of magnitude. Clear excess displacement in scarp terrain detected with very high confidence."
+    "conclusion": "Order-3 polynomial detrending reduces stable noise 3.4× and improves significance by 11 orders of magnitude. Clear excess displacement in scarp terrain detected with very high confidence. However, cross-validation (Phase 3B) later revealed this signal does not replicate."
   },
 
   "phase_3_multi_pair_batch": {
@@ -68,182 +80,130 @@
       "failed_read_error": 3,
       "failed_too_few_chips": 1
     },
-    "pair_results": [
-      {
-        "pair_idx": 0,
-        "pair": "PSP_007173_2245 → ESP_077815_2245",
-        "gap_mars_yr": 8.01,
-        "score": 0.885,
-        "classification": "MarsLandformNet (independent)",
-        "n_stable": 135,
-        "n_scarp": 978,
-        "excess_m": 0.838,
-        "mann_whitney_p": 8.9e-27,
-        "snr": 0.77,
-        "raw_rate_m_per_mars_yr": 0.105,
-        "calibrated_rate_cm_per_mars_yr": 24.9,
-        "status": "SUCCESS — unbiased independent classification",
-        "note": "Higher excess than Phase 2 (0.84m vs 0.42m) because Phase 3 includes all valid chips while Phase 2 filtered by NCC>0.5"
-      },
-      {
-        "pair_idx": 1,
-        "pair": "PSP_007173_2245 → ESP_077393_2245",
-        "gap_mars_yr": 7.96,
-        "score": 0.786,
-        "classification": "Two-pass displacement-based",
-        "n_stable": 1512,
-        "n_scarp": 268,
-        "excess_m": 1.624,
-        "mann_whitney_p": 1.75e-150,
-        "snr": 2.64,
-        "raw_rate_m_per_mars_yr": 0.204,
-        "status": "SUCCESS — but classification has circular bias"
-      },
-      {
-        "pair_idx": 2,
-        "pair": "ESP_071881_2265 → ESP_089867_2265",
-        "gap_mars_yr": 2.04,
-        "score": 0.619,
-        "status": "FAILED — JP2 read error (truncated download)"
-      },
-      {
-        "pair_idx": 3,
-        "pair": "ESP_071815_2265 → ESP_089867_2265",
-        "gap_mars_yr": 2.05,
-        "score": 0.496,
-        "status": "FAILED — only 58/4096 valid chips (SNR too low, poor image match)"
-      },
-      {
-        "pair_idx": 4,
-        "pair": "ESP_068056_2230 → ESP_079371_2230",
-        "gap_mars_yr": 1.28,
-        "score": 0.301,
-        "classification": "Two-pass displacement-based",
-        "n_stable": 1382,
-        "n_scarp": 643,
-        "excess_m": 2.148,
-        "mann_whitney_p": 1.08e-284,
-        "snr": 3.87,
-        "raw_rate_m_per_mars_yr": 1.674,
-        "status": "SUCCESS — but classification has circular bias"
-      },
-      {
-        "pair_idx": 5,
-        "pair": "ESP_068386_2255 → ESP_089722_2255",
-        "gap_mars_yr": 2.42,
-        "score": 0.298,
-        "status": "FAILED — JP2 read error (truncated download)"
-      },
-      {
-        "pair_idx": 6,
-        "pair": "ESP_068386_2255 → ESP_090144_2255",
-        "gap_mars_yr": 2.47,
-        "score": 0.290,
-        "status": "FAILED — JP2 read error (truncated download)"
-      },
-      {
-        "pair_idx": 7,
-        "pair": "ESP_067317_2255 → ESP_070958_2255",
-        "gap_mars_yr": 0.41,
-        "score": 0.262,
-        "classification": "Two-pass displacement-based",
-        "n_stable": 1219,
-        "n_scarp": 316,
-        "excess_m": 5.164,
-        "mann_whitney_p": 2.65e-165,
-        "snr": 5.45,
-        "raw_rate_m_per_mars_yr": 12.508,
-        "status": "SUCCESS — but rate implausibly high (short baseline + circular bias)"
-      },
-      {
-        "pair_idx": 8,
-        "pair": "ESP_067924_2255 → ESP_070958_2255",
-        "gap_mars_yr": 0.34,
-        "score": 0.227,
-        "classification": "Two-pass displacement-based",
-        "n_stable": 1537,
-        "n_scarp": 241,
-        "excess_m": 0.668,
-        "mann_whitney_p": 6.74e-125,
-        "snr": 2.01,
-        "raw_rate_m_per_mars_yr": 1.940,
-        "status": "SUCCESS — but classification has circular bias"
-      },
-      {
-        "pair_idx": 9,
-        "pair": "ESP_016390_2250 → ESP_037488_2250",
-        "gap_mars_yr": 2.39,
-        "score": 0.210,
-        "classification": "Two-pass displacement-based",
-        "n_stable": 1223,
-        "n_scarp": 416,
-        "excess_m": 1.741,
-        "mann_whitney_p": 3.36e-204,
-        "snr": 3.07,
-        "raw_rate_m_per_mars_yr": 0.728,
-        "status": "SUCCESS — but classification has circular bias"
-      }
-    ],
     "classification_bias_analysis": {
       "issue": "The two-pass approach selects high-displacement chips as 'scarp' by definition, creating circular reasoning that guarantees positive excess regardless of actual terrain change.",
       "evidence": "Retreat rates span 120× range (0.10–12.5 m/My); rates inversely correlate with temporal baseline (r=-0.53), consistent with a fixed classification artifact rather than real signal.",
-      "conclusion": "Only Pair 0 (MarsLandformNet classification) provides an unbiased measurement. Other pairs demonstrate the pipeline runs but their retreat rates are inflated by selection bias.",
-      "mitigation": "Future work should run MarsLandformNet on each pair's imagery to provide independent scarp classification."
+      "conclusion": "Only Pair 0 (MarsLandformNet classification) provides an unbiased measurement. Other pairs demonstrate the pipeline runs but their retreat rates are inflated by selection bias."
     }
   },
 
-  "best_estimate": {
-    "source": "Phase 2 (order-3 polynomial detrending, NCC>0.5 quality filter, MarsLandformNet classification)",
-    "image_pair": "PSP_007173_2245 → ESP_077815_2245",
-    "temporal_baseline_mars_yr": 8.01,
-    "raw_excess_displacement_m": 0.416,
-    "raw_retreat_rate": {
-      "m_per_mars_yr": 0.052,
-      "cm_per_mars_yr": 5.2
+  "phase_3b_cross_validation": {
+    "purpose": "Re-analyze all pairs with displacement-INDEPENDENT classification to eliminate circular bias",
+    "classification_methods": {
+      "pair_0": "MarsLandformNet (gold standard)",
+      "pair_1": "MarsLandformNet mapped via shared base image (PSP_007173_2245)",
+      "others": "Gradient-percentile (top 40% by image gradient → scarp, bottom 25% → stable)"
     },
-    "calibrated_retreat_rate": {
-      "m_per_mars_yr": 0.124,
-      "cm_per_mars_yr": 12.4
-    },
-    "statistical_significance": {
-      "mann_whitney_p": 4.89e-16,
-      "ks_test_p": 3.66e-15,
-      "signal_to_noise": 0.79,
-      "n_sigma_above_noise": "26.2% of scarp chips exceed 2σ noise floor"
-    },
-    "confidence_assessment": "HIGH — independent terrain classification, quality-filtered chips, strong statistical significance, corroborated by Phase 3 (p=9e-27 on same pair with larger chip set)"
+    "pair_results": [
+      {"pair_idx": 0, "pair": "PSP_007173_2245 → ESP_077815_2245", "gap_My": 8.01, "method": "MLN", "excess_m": 0.838, "p_value": "9e-27", "signal": true},
+      {"pair_idx": 1, "pair": "PSP_007173_2245 → ESP_077393_2245", "gap_My": 7.96, "method": "MLN-mapped", "excess_m": -0.018, "p_value": 0.68, "signal": false},
+      {"pair_idx": 4, "pair": "ESP_068056_2230 → ESP_079371_2230", "gap_My": 1.28, "method": "grad-pct", "excess_m": 0.404, "p_value": "2e-27", "signal": true},
+      {"pair_idx": 7, "pair": "ESP_067317_2255 → ESP_070958_2255", "gap_My": 0.41, "method": "grad-pct", "excess_m": 0.821, "p_value": "3e-16", "signal": true},
+      {"pair_idx": 8, "pair": "ESP_067924_2255 → ESP_070958_2255", "gap_My": 0.34, "method": "grad-pct", "excess_m": 0.022, "p_value": 0.25, "signal": false},
+      {"pair_idx": 9, "pair": "ESP_016390_2250 → ESP_037488_2250", "gap_My": 2.39, "method": "grad-pct", "excess_m": -0.515, "p_value": 1.0, "signal": false}
+    ],
+    "proportionality_test": {
+      "description": "If real retreat, excess should scale linearly with temporal baseline",
+      "r_squared": 0.009,
+      "p_value": 0.856,
+      "rate_cv": 2.151,
+      "verdict": "DOES NOT SUPPORT real retreat — no proportionality (R²≈0), wildly inconsistent rates (CV>2)"
+    }
   },
 
-  "corroboration": {
-    "phase_3_pair_0_confirms_signal": true,
-    "phase_3_pair_0_excess_m": 0.838,
-    "phase_3_pair_0_p_value": 8.9e-27,
-    "phase_3_pair_0_note": "Higher excess (0.84m vs 0.42m) and stronger significance because all valid chips included (no NCC filter). SNR nearly identical (0.77 vs 0.79), confirming robustness."
+  "phase_4_diagnostic": {
+    "purpose": "Investigate WHY Pair 0 and Pair 1 give opposite results despite covering the same terrain",
+    "diagnostic_1_overlap_geometry": {
+      "finding": "Center-crops overlap 96.6% — they analyze effectively the same ground",
+      "center_offset_m": 58.5,
+      "center_offset_px": 234,
+      "conclusion": "The discrepancy is NOT due to different terrain patches. Pair 0 and Pair 1 see the same scallops."
+    },
+    "diagnostic_2_illumination": {
+      "pair_0_illumination_diff": {"dIncidence": 0.9, "dAzimuth": 4.3, "dLs": 3.9},
+      "pair_1_illumination_diff": {"dIncidence": 3.4, "dAzimuth": 4.4, "dLs": 11.4},
+      "finding": "Pair 0 has SMALLER illumination difference than Pair 1, yet shows STRONG signal while Pair 1 shows none. This is inconsistent with both real retreat (both should show it) AND illumination artifact (Pair 1 should show more).",
+      "excess_direction_vs_illumination": {
+        "pair_0": "Excess vector direction 27.3° vs illumination direction 218.4° (Δ=168.9° — nearly opposite)",
+        "pair_1": "Excess vector direction 249.9° vs illumination direction 113.8° (Δ=136.1°)"
+      },
+      "conclusion": "No consistent correlation between excess displacement direction and illumination difference direction across pairs. Illumination artifact alone does not explain the pattern."
+    },
+    "diagnostic_3_spatial_autocorrelation": {
+      "pair_0_lag1_r": 0.999,
+      "pair_1_lag1_r": 0.950,
+      "finding": "Both pairs show very high spatial autocorrelation (r>0.95), meaning displacement varies SMOOTHLY across the image. This is characteristic of systematic registration residuals, not localized scarp retreat.",
+      "pair_0_displacement_stats": {
+        "mean_magnitude_m": 4.408,
+        "std_magnitude_m": 5.336,
+        "mean_col_disp_m": 2.705,
+        "note": "Pair 0 has large systematic eastward drift (+2.7m mean column displacement) that polynomial detrending partially removes"
+      },
+      "pair_1_displacement_stats": {
+        "mean_magnitude_m": 1.103,
+        "std_magnitude_m": 0.629,
+        "note": "Pair 1 has much smaller, more uniform displacement — better aligned"
+      },
+      "conclusion": "Pair 0's 'excess' may be residual systematic drift that happens to correlate with scarp locations because both scarps and drift are spatially structured. Pair 1's better alignment eliminates this residual, revealing no real signal."
+    },
+    "overall_diagnostic_conclusion": "The 0.84m excess in Pair 0 is most likely a spatially-structured co-registration residual rather than real terrain retreat. Evidence: (1) not reproducible in Pair 1 with same terrain, (2) spatially smooth (r=0.999) rather than localized, (3) large systematic drift component (+2.7m column mean), (4) no proportionality with temporal baseline across pairs."
+  },
+
+  "final_assessment": {
+    "verdict": "UNABLE TO CONFIRM REAL SCARP RETREAT",
+    "confidence": "HIGH that the measured signal is artifact, not real retreat",
+    "reasoning": [
+      "The pipeline methodology is validated (Phase 1) and produces statistically significant results on individual pairs (Phase 2)",
+      "However, the signal does NOT replicate: Pair 0 and Pair 1 cover the same terrain but give opposite results",
+      "The detected displacement is spatially smooth (lag-1 autocorrelation r=0.999), inconsistent with localized scarp retreat",
+      "No proportionality between excess displacement and temporal baseline (R²=0.009)",
+      "Pair 0 has large systematic drift (+2.7m mean column displacement) suggesting incomplete co-registration correction",
+      "The excess likely arises because scarp terrain has different geometric/topographic properties that interact differently with registration residuals (parallax, slope-dependent geocoding error, shadow-dependent correlation behavior)"
+    ],
+    "what_would_be_needed": [
+      "Independent confirmation from a DIFFERENT method (e.g., manual scarp edge digitization, shadow length measurement)",
+      "Running MarsLandformNet on ALL pairs for consistent independent classification",
+      "Sub-meter resolution DEM differencing (stereo-derived DEMs from different epochs)",
+      "Improved co-registration using feature-based methods (SIFT/ORB on stable features) rather than FFT bulk alignment",
+      "Analysis of the FULL overlap region, not just 4.3% center-crop"
+    ]
+  },
+
+  "retreat_rate_upper_bound": {
+    "note": "Given that the signal appears to be artifact, we can estimate an upper bound on retreat rate from the noise floor",
+    "stable_noise_pair1_m": 0.55,
+    "temporal_baseline_My": 8.0,
+    "upper_bound_2sigma_raw_m_per_My": 0.138,
+    "upper_bound_2sigma_calibrated_cm_per_My": 32.8,
+    "interpretation": "If scarp retreat exists at this location, it is below ~33 cm/Mars-yr (2σ detection limit) given current methodology"
   },
 
   "limitations": [
-    "Single image pair with independent (MarsLandformNet) classification — multi-pair corroboration requires MLN inference on additional imagery",
+    "Single location with independent (MarsLandformNet) classification — multi-site analysis requires model inference capability",
     "42% recovery rate means true displacement may be larger; calibration factor has uncertainty",
-    "Co-registration accuracy assumed sufficient but not independently validated (motivating this study)",
+    "Co-registration accuracy is insufficient to separate real sub-pixel terrain change from registration residuals",
     "Center-crop to 8192×8192 px means only ~4.3% of full overlap is analyzed",
-    "Gradient-based terrain classification failed completely (5.8% vs 58.5% scarp detection) — morphological ML classifier is essential",
-    "3 of 10 pairs failed due to truncated JP2 downloads — potential for additional data with re-downloads",
-    "Short-baseline pairs (< 1 My) have displacement << noise for realistic retreat rates"
+    "Gradient-based terrain classification is a poor proxy for actual landform classification",
+    "3 of 10 pairs failed due to truncated JP2 downloads",
+    "No GPU available for MarsLandformNet inference on additional pairs",
+    "Phase correlation is inherently sensitive to any systematic difference between images (illumination, atmospheric, sensor)"
   ],
 
-  "future_work": [
-    "Run MarsLandformNet on all temporal pair images for independent classification",
-    "Re-download truncated JP2 files (Pairs 2, 5, 6) and reprocess",
-    "Analyze full overlap region instead of center-crop to include all scarp features",
-    "Investigate NCC quality filter effect on retreat rate estimate (Phase 2 vs Phase 3 difference)",
-    "Compare with published scarp retreat rates in literature (if available)",
-    "Apply to additional SCT locations at different latitudes to test latitude dependence"
+  "positive_outcomes": [
+    "Validated sub-pixel phase correlation pipeline for Mars surface change detection",
+    "Demonstrated synthetic injection testing as a rigorous calibration methodology",
+    "Identified critical failure mode (classification circularity) in displacement-based landform classification",
+    "Produced a multi-pair processing framework that can be reused with improved classification",
+    "Established that scarp retreat at this location, if present, is below ~33 cm/Mars-yr",
+    "The pipeline and diagnostic framework are ready for application to sites with stronger expected signal"
   ],
 
   "files": {
     "phase_1_results": "results/sct_analysis/validation/synthetic_validation_report.json",
     "phase_2_results": "results/sct_analysis/polynomial_detrending_report.json",
     "phase_3_report": "results/sct_analysis/phase3/phase3_report.json",
+    "phase_3b_crossval": "results/sct_analysis/phase3/crossval_report.json",
+    "phase_4_diagnostic": "results/sct_analysis/phase3/diagnostic_pair01.json",
     "phase_3_pair_data": "results/sct_analysis/phase3/pair_XX/displacement.npz",
     "original_displacement": "results/sct_analysis/affine_corrected_displacement.npz",
     "temporal_pairs_config": "results/sct_temporal_pairs_v2.json"

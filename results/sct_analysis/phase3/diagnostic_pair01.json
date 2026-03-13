@@ -1,0 +1,36 @@
+{
+  "description": "Diagnostic analysis: Pair 0 vs Pair 1 discrepancy",
+  "pair_0": "PSP_007173_2245 \u2192 ESP_077815_2245 (excess=+0.84m)",
+  "pair_1": "PSP_007173_2245 \u2192 ESP_077393_2245 (excess=-0.02m)",
+  "overlap_geometry": {
+    "center_offset_m": 58.5,
+    "center_offset_px": 234,
+    "crop_overlap_pct": 96.6,
+    "pair_0_crop": {
+      "left": -4188757.0625,
+      "bottom": 2609391.3125,
+      "right": -4186709.0625,
+      "top": 2611439.3125,
+      "width_px": 8192,
+      "height_px": 8192,
+      "center_x": -4187733.0625,
+      "center_y": 2610415.3125
+    },
+    "pair_1_crop": {
+      "left": -4188770.6875,
+      "bottom": 2609448.25,
+      "right": -4186722.6875,
+      "top": 2611496.25,
+      "width_px": 8192,
+      "height_px": 8192,
+      "center_x": -4187746.6875,
+      "center_y": 2610472.25
+    }
+  },
+  "illumination": {
+    "pair_0_dInc": 0.8929000000000045,
+    "pair_0_dAz": 4.299900000000008,
+    "pair_1_dInc": 3.389099999999999,
+    "pair_1_dAz": 4.3851999999999975
+  }
+}

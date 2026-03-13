@@ -50,8 +50,8 @@ class LoadedModels:
     backbone: Any
     classifier: Any
     device: torch.device
-    model_version: str  # 'v3-concat' or 'v4b-film'
-
+    model_version: str  # 'v3-concat' or 'v4b-film' or 'v5c-film'
+    logit_bias: np.ndarray | None  # per-class logit bias from threshold optimization
 
 class HiriseLandformPipeline:
     def __init__(self) -> None:
@@ -133,20 +133,20 @@ class HiriseLandformPipeline:
         backbone.eval()
         backbone = backbone.to(device)
 
-        # --- Load classifier (auto-detect V4b FiLM vs V3 concat) ---
-        classifier, model_version = self._load_classifier(device)
+        # --- Load classifier (auto-detect V5c/V4b FiLM vs V3 concat) ---
+        classifier, model_version, logit_bias = self._load_classifier(device)
 
-        logger.info("Loaded landform model: %s on %s", model_version, device)
-        return LoadedModels(backbone=backbone, classifier=classifier, device=device, model_version=model_version)
+        logger.info("Loaded landform model: %s on %s (logit_bias=%s)", model_version, device, logit_bias)
+        return LoadedModels(backbone=backbone, classifier=classifier, device=device, model_version=model_version, logit_bias=logit_bias)
 
-    def _load_classifier(self, device: torch.device) -> tuple[Any, str]:
+    def _load_classifier(self, device: torch.device) -> tuple[Any, str, np.ndarray | None]:
         """Auto-detect and load the best available classifier checkpoint."""
         import sys
 
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
 
-        # Priority 1: V5 FiLM model (5-class, SCT expansion)
+        # Priority 1: V5c FiLM model (4-class, PDS extent-corrected, balanced training)
         if V5_FILM_CHECKPOINT.exists():
             return self._load_film_classifier(V5_FILM_CHECKPOINT, device)
 
@@ -175,10 +175,10 @@ class HiriseLandformPipeline:
             "No tile classifier checkpoint found. Checked: %s, %s",
             V4B_FILM_CHECKPOINT, V3_TILE_CHECKPOINT,
         )
-        return None, "none"
+        return None, "none", None
 
-    def _load_film_classifier(self, ckpt_path: Path, device: torch.device) -> tuple[Any, str]:
-        """Load V4b FiLM classifier from checkpoint."""
+    def _load_film_classifier(self, ckpt_path: Path, device: torch.device) -> tuple[Any, str, np.ndarray | None]:
+        """Load FiLM classifier from checkpoint. Returns (classifier, version, logit_bias)."""
         film_module = importlib.import_module("scripts.marslandform_v2.models.film_classifier")
         FiLMClassifier = getattr(film_module, "FiLMClassifier")
 
@@ -193,9 +193,9 @@ class HiriseLandformPipeline:
                 head_state[k] = v
 
         classifier = FiLMClassifier(
-            visual_dim=int(cfg_data.get("hidden_dim", 768)),
+            visual_dim=int(cfg_data.get("visual_dim", cfg_data.get("hidden_dim", 768))),
             mola_dim=int(cfg_data.get("mola_dim", 25)),
-            film_hidden=64,
+            film_hidden=int(cfg_data.get("film_hidden", 64)),
             head_hidden=int(cfg_data.get("head_hidden", 128)),
             num_classes=int(cfg_data.get("num_classes", 4)),
             dropout=float(cfg_data.get("dropout", 0.4)),
@@ -211,10 +211,18 @@ class HiriseLandformPipeline:
         classifier = classifier.to(device)
         epoch = tile_ckpt.get("epoch", "?")
         val_f1 = tile_ckpt.get("val_f1", tile_ckpt.get("test_f1", "?"))
-        logger.info("Loaded V4b FiLM classifier from %s (epoch=%s, F1=%s)", ckpt_path.name, epoch, val_f1)
-        return classifier, "v4b-film"
+        logger.info("Loaded FiLM classifier from %s (epoch=%s, F1=%s)", ckpt_path.name, epoch, val_f1)
 
-    def _load_concat_classifier(self, tile_ckpt: dict[str, Any], device: torch.device) -> tuple[Any, str]:
+        # Load logit bias for threshold-optimized inference
+        raw_bias = tile_ckpt.get("logit_bias", None)
+        logit_bias = np.array(raw_bias, dtype=np.float32) if raw_bias is not None else None
+        if logit_bias is not None:
+            logger.info("Loaded logit bias: %s", logit_bias.tolist())
+
+        version = tile_ckpt.get("version", "v4b-film")
+        return classifier, version, logit_bias
+
+    def _load_concat_classifier(self, tile_ckpt: dict[str, Any], device: torch.device) -> tuple[Any, str, np.ndarray | None]:
         """Load V3 concat classifier from checkpoint dict."""
         config_module = importlib.import_module("scripts.marslandform_v2.config")
         tile_module = importlib.import_module("scripts.marslandform_v2.models.tile_classifier")
@@ -237,7 +245,7 @@ class HiriseLandformPipeline:
         epoch = tile_ckpt.get("epoch", "?")
         f1 = tile_ckpt.get("best_landform_macro_f1", "?")
         logger.info("Loaded V3 concat classifier (epoch=%s, F1=%s)", epoch, f1)
-        return classifier, "v3-concat"
+        return classifier, "v3-concat", None
 
     def classify(self, request: ClassifyRequest) -> ClassifyResult:
         t0 = time.time()
@@ -257,7 +265,9 @@ class HiriseLandformPipeline:
         if num_tiles == 0:
             return self._empty_result(request, time.time() - t0)
 
-        tile_lat_lon = self._compute_tile_latlon(coords, img_w, img_h, request.lat, request.lon)
+        # Resolve PDS extent early — used for both tile lat/lon and accessibility
+        pds_extent = self._resolve_pds_extent(request.product_id)
+        tile_lat_lon = self._compute_tile_latlon(coords, img_w, img_h, request.lat, request.lon, pds_extent)
         embeddings = self._extract_embeddings(models, tile_images)
         tile_mola = self._extract_tile_mola_features(tile_lat_lon, request.lat, request.lon)
         probabilities, predictions = self._run_tile_classifier(models, embeddings, tile_mola)
@@ -316,11 +326,10 @@ class HiriseLandformPipeline:
                 from .mola_accessibility import compute_mola_accessibility
                 from .preprocessing import MOLA_DEM_PATH
 
-                # Try to get actual image extent from PDS label
-                pds_extent = self._resolve_pds_extent(request.product_id)
+                # Reuse pds_extent resolved earlier
                 if pds_extent is not None:
                     lat_min, lat_max, lon_min, lon_max = pds_extent
-                    logger.info('Using PDS extent: lat=[%.4f, %.4f] lon=[%.4f, %.4f]',
+                    logger.info('Using PDS extent for accessibility: lat=[%.4f, %.4f] lon=[%.4f, %.4f]',
                                 lat_min, lat_max, lon_min, lon_max)
                 else:
                     # Fallback: tile-center bounds (less accurate)
@@ -583,6 +592,11 @@ class HiriseLandformPipeline:
         with torch.autocast(device_type=device.type, enabled=device.type == "cuda"):
             logits = models.classifier(emb_t, mola_t)
 
+        # Apply per-class logit bias (threshold optimization from V5c training)
+        if models.logit_bias is not None:
+            bias_t = torch.from_numpy(models.logit_bias).float().to(device)
+            logits = logits + bias_t
+
         probs_t = torch.softmax(logits, dim=1)
         probs = probs_t.cpu().numpy()
         preds = np.argmax(probs, axis=1).astype(np.int64)
@@ -778,29 +792,49 @@ class HiriseLandformPipeline:
         img_h: int,
         center_lat: float | None,
         center_lon: float | None,
+        pds_extent: tuple[float, float, float, float] | None = None,
     ) -> list[tuple[float | None, float | None]]:
+        """Compute (lat, lon) for each tile center.
+
+        If PDS extent is available, use direct linear interpolation from image
+        pixel coordinates to geographic coordinates (most accurate).
+        Otherwise, fall back to center_lat/center_lon with pixel_scale_m estimate.
+        """
         if center_lat is None or center_lon is None:
             return [(None, None) for _ in coords]
 
-        mars_circumference_m = 2 * np.pi * 3389500
-        deg_per_meter_lat = 360.0 / mars_circumference_m
-        deg_per_meter_lon = deg_per_meter_lat / max(np.cos(np.radians(center_lat)), 0.01)
-        pixel_scale_m = 25.0
-
-        img_center_row = img_h / 2.0
-        img_center_col = img_w / 2.0
-
         result: list[tuple[float | None, float | None]] = []
-        for gx, gy in coords:
-            tile_center_row = gy * 224 + 112
-            tile_center_col = gx * 224 + 112
-            dy_px = img_center_row - tile_center_row
-            dx_px = tile_center_col - img_center_col
-            t_lat = center_lat + dy_px * pixel_scale_m * deg_per_meter_lat
-            t_lon = center_lon + dx_px * pixel_scale_m * deg_per_meter_lon
-            lat_val: float | None = float(t_lat)
-            lon_val: float | None = float(t_lon)
-            result.append((lat_val, lon_val))
+
+        if pds_extent is not None:
+            # PDS extent-based interpolation (V5-correct method)
+            lat_min, lat_max, lon_min, lon_max = pds_extent
+            for gx, gy in coords:
+                tile_center_row = gy * 224 + 112
+                tile_center_col = gx * 224 + 112
+                # Linear interpolation: row 0 = lat_max (north), row img_h = lat_min (south)
+                t_lat = lat_max - (tile_center_row / img_h) * (lat_max - lat_min)
+                # Linear interpolation: col 0 = lon_min (west), col img_w = lon_max (east)
+                t_lon = lon_min + (tile_center_col / img_w) * (lon_max - lon_min)
+                result.append((float(t_lat), float(t_lon)))
+        else:
+            # Fallback: pixel_scale_m estimate (less accurate, for when PDS is unavailable)
+            logger.warning('No PDS extent — using pixel_scale_m fallback for tile lat/lon')
+            mars_circumference_m = 2 * np.pi * 3389500
+            deg_per_meter_lat = 360.0 / mars_circumference_m
+            deg_per_meter_lon = deg_per_meter_lat / max(np.cos(np.radians(center_lat)), 0.01)
+            pixel_scale_m = 4.0  # Conservative estimate for browse images (~3.78 actual)
+
+            img_center_row = img_h / 2.0
+            img_center_col = img_w / 2.0
+            for gx, gy in coords:
+                tile_center_row = gy * 224 + 112
+                tile_center_col = gx * 224 + 112
+                dy_px = img_center_row - tile_center_row
+                dx_px = tile_center_col - img_center_col
+                t_lat = center_lat + dy_px * pixel_scale_m * deg_per_meter_lat
+                t_lon = center_lon + dx_px * pixel_scale_m * deg_per_meter_lon
+                result.append((float(t_lat), float(t_lon)))
+
         return result
 
     def _build_tile_predictions(
