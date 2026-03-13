@@ -17,6 +17,15 @@ from sklearn.cluster import DBSCAN
 CLASS_ORDER = ["LDA", "CCF", "LVF", "GLF"]
 MARS_RADIUS_KM = 3389.5
 
+# Optimized per-class confidence thresholds (from v5c FiLM classifier validation).
+# These were found via scripts/optimize_v5c_threshold.py to maximize per-class F1.
+DEFAULT_PER_CLASS_THRESHOLDS: dict[str, float] = {
+    "LDA": 0.36,
+    "LVF": 0.31,
+    "CCF": 0.36,
+    "GLF": 0.36,
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -46,8 +55,36 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--confidence-threshold",
         type=float,
-        default=0.5,
-        help="Minimum tile confidence for class filtering.",
+        default=None,
+        help=(
+            "Global minimum tile confidence for class filtering. "
+            "Overrides per-class defaults when set. "
+            "Default per-class thresholds: LDA=0.36, LVF=0.31, CCF=0.36, GLF=0.36."
+        ),
+    )
+    parser.add_argument(
+        "--threshold-lda",
+        type=float,
+        default=None,
+        help="Confidence threshold for LDA class (default: 0.36).",
+    )
+    parser.add_argument(
+        "--threshold-ccf",
+        type=float,
+        default=None,
+        help="Confidence threshold for CCF class (default: 0.36).",
+    )
+    parser.add_argument(
+        "--threshold-lvf",
+        type=float,
+        default=None,
+        help="Confidence threshold for LVF class (default: 0.31).",
+    )
+    parser.add_argument(
+        "--threshold-glf",
+        type=float,
+        default=None,
+        help="Confidence threshold for GLF class (default: 0.36).",
     )
     parser.add_argument(
         "--method",
@@ -265,9 +302,15 @@ def build_features_for_class(
     method: str,
     eps_deg: float,
 ) -> list[dict[str, object]]:
+    # Use the class-specific probability column (prob_LDA, prob_LVF, etc.) if available,
+    # otherwise fall back to the generic confidence column.
+    prob_col = f"prob_{class_name}"
+    use_class_prob = prob_col in data.columns
+    filter_col = prob_col if use_class_prob else "confidence"
+
     class_df = data[
         (data["pred_class"] == class_name)
-        & (data["confidence"] >= confidence_threshold)
+        & (data[filter_col] >= confidence_threshold)
         & (data["lat"].notna())
         & (data["lon"].notna())
     ].copy()
@@ -288,7 +331,7 @@ def build_features_for_class(
         points_lon_lat = np.asarray(cluster_df[["lon", "lat"]], dtype=float)
         ring = polygon_from_points(points_lon_lat, method=method)
         area_km2 = polygon_area_km2(ring)
-        mean_conf = float(np.mean(np.asarray(cluster_df["confidence"], dtype=float)))
+        mean_conf = float(np.mean(np.asarray(cluster_df[filter_col], dtype=float)))
 
         if mean_conf < confidence_threshold:
             continue
@@ -327,6 +370,29 @@ def write_geojson(path: Path, features: list[dict[str, object]]) -> None:
         json.dump(content, f, indent=2)
 
 
+def resolve_per_class_thresholds(args: argparse.Namespace) -> dict[str, float]:
+    """Build a per-class threshold dict from CLI args, falling back to defaults."""
+    thresholds: dict[str, float] = dict(DEFAULT_PER_CLASS_THRESHOLDS)
+
+    # If a global --confidence-threshold is set, override all classes.
+    if args.confidence_threshold is not None:
+        for cls in CLASS_ORDER:
+            thresholds[cls] = float(args.confidence_threshold)
+
+    # Per-class CLI overrides take highest priority.
+    cli_overrides = {
+        "LDA": args.threshold_lda,
+        "CCF": args.threshold_ccf,
+        "LVF": args.threshold_lvf,
+        "GLF": args.threshold_glf,
+    }
+    for cls, val in cli_overrides.items():
+        if val is not None:
+            thresholds[cls] = float(val)
+
+    return thresholds
+
+
 def main() -> None:
     args = parse_args()
     start = time.time()
@@ -343,10 +409,13 @@ def main() -> None:
             "Predictions do not contain lat/lon and could not be enriched from tile metadata."
         )
 
+    thresholds = resolve_per_class_thresholds(args)
+
     eps_deg = estimate_dbscan_eps_deg(predictions)
     print(f"[info] Loaded {len(predictions)} predictions")
     print(f"[info] DBSCAN eps={eps_deg:.5f} degrees (Mars areocentric lon/lat)")
     print(f"[info] Polygon method={args.method}")
+    print(f"[info] Per-class thresholds: {thresholds}")
 
     features_by_class = defaultdict(list)
     combined_features = []
@@ -355,7 +424,7 @@ def main() -> None:
         class_features = build_features_for_class(
             data=predictions,
             class_name=class_name,
-            confidence_threshold=float(args.confidence_threshold),
+            confidence_threshold=thresholds[class_name],
             min_tiles=int(args.min_tiles),
             method=args.method,
             eps_deg=eps_deg,
