@@ -564,8 +564,23 @@ class HiriseLandformPipeline:
         emb_t = torch.from_numpy(embeddings).float().to(device)
         mola_t = torch.from_numpy(mola_features).float().to(device)
 
+        # FiLM weight scaling: dampen MOLA modulation to prevent over-conditioning
+        # gamma is interpolated toward 1 (identity), beta toward 0 (no shift)
+        FILM_SCALE = 0.3  # dampening factor — lower = less MOLA influence
+        original_film_forward = models.classifier.film.forward
+
+        def dampened_film_forward(visual_features, mola_features):
+            h = models.classifier.film.mola_encoder(mola_features)
+            gamma = models.classifier.film.gamma_proj(h)
+            beta = models.classifier.film.beta_proj(h)
+            gamma_d = 1.0 + FILM_SCALE * (gamma - 1.0)
+            beta_d = FILM_SCALE * beta
+            return gamma_d * visual_features + beta_d
+
+        models.classifier.film.forward = dampened_film_forward
         with torch.autocast(device_type=device.type, enabled=device.type == "cuda"):
             logits = models.classifier(emb_t, mola_t)
+        models.classifier.film.forward = original_film_forward
 
         # Apply per-class logit bias (threshold optimization from V5c training)
         if models.logit_bias is not None:
