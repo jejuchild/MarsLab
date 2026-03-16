@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[3]
 V3_TILE_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "best_tile_classifier.pt"
 V4B_FILM_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "marslandform_v4b_deploy.pt"
 V5_FILM_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v3_output" / "models" / "marslandform_v5_deploy.pt"
+V6_LATE_FUSION_CHECKPOINT = ROOT / "Data" / "HiRISE" / "v5_retrain" / "late_fusion_v6b.pt"
 SSL_LORA_WEIGHTS = ROOT / "Data" / "HiRISE" / "v2_output" / "ssl_lora_weights" / "best_model.pt"
 TES_TI_PATH = ROOT / "backend" / "data" / "tes_thermal_inertia.npy"
 
@@ -121,6 +122,10 @@ class HiriseLandformPipeline:
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
 
+        # Priority 0: V6 Late Fusion (HiRISE visual=main, MOLA=sub)
+        if V6_LATE_FUSION_CHECKPOINT.exists():
+            return self._load_late_fusion_classifier(V6_LATE_FUSION_CHECKPOINT, device)
+
         # Priority 1: V5c FiLM model (4-class, PDS extent-corrected, balanced training)
         if V5_FILM_CHECKPOINT.exists():
             return self._load_film_classifier(V5_FILM_CHECKPOINT, device)
@@ -151,6 +156,42 @@ class HiriseLandformPipeline:
             V4B_FILM_CHECKPOINT, V3_TILE_CHECKPOINT,
         )
         return None, "none", None
+
+    def _load_late_fusion_classifier(self, ckpt_path: Path, device: torch.device) -> tuple[Any, str, np.ndarray | None]:
+        """Load V6 Late Fusion classifier. Returns (classifier, version, logit_bias=None)."""
+        lf_module = importlib.import_module("scripts.marslandform_v2.models.late_fusion_classifier")
+        LFClassifier = getattr(lf_module, "LateFusionClassifier")
+
+        tile_ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        cfg_data = tile_ckpt.get("cfg", {})
+
+        classifier = LFClassifier(
+            visual_dim=int(cfg_data.get("visual_dim", 768)),
+            mola_dim=int(cfg_data.get("mola_dim", 25)),
+            visual_hidden=int(cfg_data.get("visual_hidden", 256)),
+            mola_hidden=int(cfg_data.get("mola_hidden", 64)),
+            num_classes=int(cfg_data.get("num_classes", 4)),
+            dropout=float(cfg_data.get("dropout", 0.3)),
+        )
+
+        result = classifier.load_state_dict(tile_ckpt["model_state_dict"], strict=False)
+        if result.unexpected_keys:
+            logger.warning("Unexpected keys in Late Fusion checkpoint: %s", result.unexpected_keys)
+        if result.missing_keys:
+            logger.warning("Missing keys in Late Fusion checkpoint: %s", result.missing_keys)
+
+        classifier.eval()
+        classifier = classifier.to(device)
+        vis_w = tile_ckpt.get("vis_weight", "?")
+        mola_w = tile_ckpt.get("mola_weight", "?")
+        val_f1 = tile_ckpt.get("val_f1", "?")
+        logger.info(
+            "Loaded Late Fusion V6 from %s (vis_w=%.3f, mola_w=%.3f, val_F1=%s)",
+            ckpt_path.name, float(vis_w), float(mola_w), val_f1,
+        )
+
+        version = tile_ckpt.get("version", "v6-late-fusion")
+        return classifier, version, None  # No logit bias needed
 
     def _load_film_classifier(self, ckpt_path: Path, device: torch.device) -> tuple[Any, str, np.ndarray | None]:
         """Load FiLM classifier from checkpoint. Returns (classifier, version, logit_bias)."""
@@ -564,43 +605,14 @@ class HiriseLandformPipeline:
         emb_t = torch.from_numpy(embeddings).float().to(device)
         mola_t = torch.from_numpy(mola_features).float().to(device)
 
-        # Dual-path ensemble: HiRISE visual = main, MOLA FiLM = sub
-        # Path 1: visual-only (identity FiLM, alpha=0)
-        # Path 2: full FiLM conditioning (alpha=1)
-        # Final logits = W_VIS * visual_logits + W_MOLA * film_logits + bias
-        W_VIS = 0.7   # HiRISE visual weight (main)
-        W_MOLA = 0.3  # MOLA FiLM weight (sub)
-        ENSEMBLE_BIAS = np.array([-1.90, -2.75, -1.85, 0.0], dtype=np.float32)
-
-        original_film_forward = models.classifier.film.forward
-
-        # Path 1: visual-only (bypass FiLM modulation)
-        models.classifier.film.forward = lambda vis, mola: vis
+        # Direct forward pass — works for both FiLM and Late Fusion models
         with torch.autocast(device_type=device.type, enabled=device.type == "cuda"):
-            logits_vis = models.classifier(emb_t, mola_t)
+            logits = models.classifier(emb_t, mola_t)
 
-        # Path 2: full FiLM conditioning
-        models.classifier.film.forward = original_film_forward
-        with torch.autocast(device_type=device.type, enabled=device.type == "cuda"):
-            logits_film = models.classifier(emb_t, mola_t)
-
-        # Ensemble + optimized bias
-        logits = W_VIS * logits_vis + W_MOLA * logits_film
-        bias_t = torch.from_numpy(ENSEMBLE_BIAS).float().to(device)
-        logits = logits + bias_t
-
-        # Debug logging for ensemble
-        from collections import Counter as _Counter
-        _vis_p = torch.argmax(logits_vis, dim=1).cpu().numpy()
-        _film_p = torch.argmax(logits_film, dim=1).cpu().numpy()
-        _ens_p = torch.argmax(logits, dim=1).cpu().numpy()
-        logger.info(
-            "Ensemble debug: vis_only=%s  film_only=%s  ensemble=%s  mean_logits=[vis=%s, film=%s, ens=%s]",
-            dict(_Counter(_vis_p)), dict(_Counter(_film_p)), dict(_Counter(_ens_p)),
-            [round(x,2) for x in logits_vis.mean(0).cpu().numpy().tolist()],
-            [round(x,2) for x in logits_film.mean(0).cpu().numpy().tolist()],
-            [round(x,2) for x in logits.mean(0).cpu().numpy().tolist()],
-        )
+        # Apply per-class logit bias if available (FiLM models only)
+        if models.logit_bias is not None:
+            bias_t = torch.from_numpy(models.logit_bias).float().to(device)
+            logits = logits + bias_t
 
         probs_t = torch.softmax(logits, dim=1)
         probs = probs_t.cpu().numpy()

@@ -67,6 +67,11 @@ IMAGE_CATALOG: Dict[str, ImageInfo] = {
         date="2006-10-02", emission_angle=0.374, is_ortho=False,
         obs_id="TRA_000856_2265",
     ),
+    "RDR_002439": ImageInfo(
+        path=RDR_CACHE / "PSP_002439_2265_RED.JP2",
+        date="2007-02-02", emission_angle=14.710, is_ortho=False,
+        obs_id="PSP_002439_2265",
+    ),
     "RDR_064072": ImageInfo(
         path=RDR_CACHE / "ESP_064072_2265_RED.JP2",
         date="2020-03-28", emission_angle=3.098, is_ortho=False,
@@ -76,8 +81,19 @@ IMAGE_CATALOG: Dict[str, ImageInfo] = {
 
 DTM_PATH = DTM_CACHE / "DTEEC_001938_2265_002439_2265_U01.IMG"
 
-# Temporal pairs for analysis
+# Temporal pairs for analysis — RDR↔RDR for reliable co-registration
+# ORTHO↔RDR matching fails due to 8-bit vs 16-bit radiometric mismatch
 TEMPORAL_PAIRS = [
+    {"name": "D_rdr_primary", "ref": "RDR_000856", "tgt": "RDR_064072",
+     "baseline_yr": 13.49, "desc": "Primary RDR: TRA_000856(2006)→ESP_064072(2020)"},
+    {"name": "E_rdr_validation", "ref": "RDR_002439", "tgt": "RDR_064072",
+     "baseline_yr": 13.15, "desc": "Validation RDR: PSP_002439(2007)→ESP_064072(2020)"},
+    {"name": "F_rdr_null", "ref": "RDR_000856", "tgt": "RDR_002439",
+     "baseline_yr": 0.23, "desc": "Null test RDR: TRA_000856(2006)→PSP_002439(2007)"},
+]
+
+# Legacy ORTHO pairs (kept for reference, matching fails on these)
+ORTHO_PAIRS = [
     {"name": "A_primary", "ref": "ORTHO_001938", "tgt": "RDR_064072",
      "baseline_yr": 13.26, "desc": "Primary: 2006→2020 (14yr)"},
     {"name": "B_validation", "ref": "ORTHO_002439", "tgt": "RDR_064072",
@@ -452,24 +468,61 @@ def load_dtm_for_overlap(
     dtm_path: Path,
     overlap_bounds: dict,
     target_shape: Tuple[int, int],
+    ref_crs: Any = None,  # CRS of the overlap bounds
 ) -> np.ndarray:
-    """Load and resample DTM to match the overlap region of HiRISE images."""
+    """Load and resample DTM to match the overlap region of HiRISE images.
+
+    Handles CRS mismatch: overlap_bounds may be in RDR CRS while DTM is in ORTHO CRS.
+    """
     with rasterio.open(dtm_path) as ds:
-        left = overlap_bounds["left"]
-        bottom = overlap_bounds["bottom"]
-        right = overlap_bounds["right"]
-        top = overlap_bounds["top"]
+        left = overlap_bounds['left']
+        bottom = overlap_bounds['bottom']
+        right = overlap_bounds['right']
+        top = overlap_bounds['top']
+
+        dtm_dict = ds.crs.to_dict()
+
+        # Check if we need CRS conversion
+        needs_conversion = False
+        if ref_crs is not None:
+            ref_dict = ref_crs.to_dict() if hasattr(ref_crs, 'to_dict') else ref_crs
+            same = (
+                abs(ref_dict.get('lon_0', 0) - dtm_dict.get('lon_0', 0)) < 0.001
+                and abs(ref_dict.get('R', 0) - dtm_dict.get('R', 0)) < 1.0
+            )
+            needs_conversion = not same
+
+        if needs_conversion:
+            # Convert overlap bounds from ref CRS to DTM CRS via lon/lat
+            dtm_left, dtm_bottom, dtm_right, dtm_top = _transform_bounds_mars(
+                ref_dict, dtm_dict, left, bottom, right, top
+            )
+            logger.info(
+                f"DTM CRS conversion: overlap ({left:.0f},{bottom:.0f})-({right:.0f},{top:.0f}) "
+                f"→ DTM ({dtm_left:.0f},{dtm_bottom:.0f})-({dtm_right:.0f},{dtm_top:.0f})"
+            )
+            left, bottom, right, top = dtm_left, dtm_bottom, dtm_right, dtm_top
 
         win = from_bounds(left, bottom, right, top, ds.transform)
         win = win.round_offsets().round_lengths()
+
+        # Validate window
+        if win.width <= 0 or win.height <= 0:
+            logger.warning(f"DTM window has zero size ({win.width}x{win.height}). DTM may not overlap.")
+            return np.full(target_shape, np.nan, dtype=np.float32)
+
         dtm_chip = ds.read(1, window=win).astype(np.float32)
+
+    if dtm_chip.size == 0:
+        logger.warning("DTM chip is empty")
+        return np.full(target_shape, np.nan, dtype=np.float32)
 
     # Handle nodata
     dtm_chip[dtm_chip < -1e6] = np.nan
     dtm_chip[dtm_chip > 1e6] = np.nan
 
     # Resample to target shape (DTM is coarser than HiRISE)
-    if dtm_chip.shape != target_shape:
+    if dtm_chip.shape != target_shape and dtm_chip.shape[0] > 0 and dtm_chip.shape[1] > 0:
         from scipy.ndimage import zoom
         zoom_r = target_shape[0] / dtm_chip.shape[0]
         zoom_c = target_shape[1] / dtm_chip.shape[1]
@@ -488,43 +541,127 @@ def _normalize_for_coreg(img: np.ndarray) -> np.ndarray:
     return (img_f * 255).astype(np.uint8)
 
 
-def global_affine_registration(
-    ref_img: np.ndarray,
-    tgt_img: np.ndarray,
-    max_features: int = 10000,
-    ransac_threshold: float = 5.0,
-) -> Tuple[np.ndarray, float, int, int]:
-    """
-    Compute global affine transform from ref to tgt using ORB features + RANSAC.
+def _histogram_match(source: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    """Match source image histogram to reference (both uint8)."""
+    src_hist, _ = np.histogram(source.ravel(), bins=256, range=(0, 256))
+    ref_hist, _ = np.histogram(reference.ravel(), bins=256, range=(0, 256))
+    src_cdf = src_hist.cumsum().astype(np.float64)
+    ref_cdf = ref_hist.cumsum().astype(np.float64)
+    src_cdf /= max(src_cdf[-1], 1)
+    ref_cdf /= max(ref_cdf[-1], 1)
+    # Build lookup table
+    lut = np.zeros(256, dtype=np.uint8)
+    for i in range(256):
+        j = np.searchsorted(ref_cdf, src_cdf[i])
+        lut[i] = min(j, 255)
+    return lut[source]
 
-    Returns: (affine_2x3, rmse_pixels, n_keypoints, n_inliers)
+
+def _apply_clahe(img_u8: np.ndarray, clip_limit: float = 3.0, tile_size: int = 16) -> np.ndarray:
+    """Apply CLAHE for local contrast normalization."""
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(tile_size, tile_size))
+    return clahe.apply(img_u8)
+
+
+def _prepare_pair_for_matching(
+    ref_img: np.ndarray, tgt_img: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Prepare image pair for feature matching: normalize, histogram-match, CLAHE.
+    Handles 8-bit ORTHO vs 16-bit RDR radiometric mismatch.
     """
     ref_u8 = _normalize_for_coreg(ref_img)
     tgt_u8 = _normalize_for_coreg(tgt_img)
+    # Match target histogram to reference
+    tgt_u8 = _histogram_match(tgt_u8, ref_u8)
+    # CLAHE for local contrast normalization
+    ref_u8 = _apply_clahe(ref_u8)
+    tgt_u8 = _apply_clahe(tgt_u8)
+    return ref_u8, tgt_u8
 
-    # ORB feature detection
-    orb = cv2.ORB_create(nfeatures=max_features)
-    kp1, des1 = orb.detectAndCompute(ref_u8, None)
-    kp2, des2 = orb.detectAndCompute(tgt_u8, None)
 
-    if des1 is None or des2 is None or len(kp1) < 10 or len(kp2) < 10:
-        logger.warning("Insufficient features for affine registration")
-        return np.eye(2, 3, dtype=np.float64), float("inf"), len(kp1 or []), 0
+def global_affine_registration(
+    ref_img: np.ndarray,
+    tgt_img: np.ndarray,
+    max_features: int = 20000,
+    ransac_threshold: float = 5.0,
+) -> Tuple[np.ndarray, float, int, int]:
+    """
+    Compute global alignment using phase correlation for bulk shift,
+    then SIFT + RANSAC for affine refinement.
 
-    # Brute-force matching with Hamming distance
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    matches = bf.match(des1, des2)
-    matches = sorted(matches, key=lambda m: m.distance)
+    SIFT is far more robust than ORB across radiometric differences
+    (8-bit ORTHO vs 16-bit RDR) because it uses gradient histograms.
 
-    if len(matches) < 10:
-        logger.warning(f"Only {len(matches)} matches — insufficient for affine")
-        return np.eye(2, 3, dtype=np.float64), float("inf"), len(kp1), len(matches)
+    Returns: (affine_2x3, rmse_pixels, n_keypoints, n_inliers)
+    """
+    H, W = ref_img.shape
 
-    # Extract matched point coordinates
-    pts_ref = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 2)
-    pts_tgt = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 2)
+    # Step 1: Phase-correlation bulk alignment (handles large shifts)
+    patch_size = min(2048, H, W)
+    cy, cx = H // 2, W // 2
+    half = patch_size // 2
+    p1 = ref_img[cy-half:cy+half, cx-half:cx+half].astype(np.float64)
+    p2 = tgt_img[cy-half:cy+half, cx-half:cx+half].astype(np.float64)
+    p1 = (p1 - p1.mean()) / max(p1.std(), 1e-6)
+    p2 = (p2 - p2.mean()) / max(p2.std(), 1e-6)
 
-    # Estimate affine transform with RANSAC
+    from numpy.fft import fft2, ifft2
+    cc = np.abs(ifft2(fft2(p1) * np.conj(fft2(p2))))
+    peak = np.unravel_index(np.argmax(cc), cc.shape)
+    shift_r = float(peak[0])
+    shift_c = float(peak[1])
+    if shift_r > patch_size / 2:
+        shift_r -= patch_size
+    if shift_c > patch_size / 2:
+        shift_c -= patch_size
+
+    logger.info(f"Phase-corr bulk shift: ({shift_r:.0f}, {shift_c:.0f}) px")
+
+    # Step 2: Apply bulk shift as initial affine
+    M_bulk = np.float64([[1, 0, shift_c], [0, 1, shift_r]])
+    tgt_shifted = cv2.warpAffine(
+        tgt_img, M_bulk.astype(np.float32), (W, H),
+        flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=0,
+    )
+
+    # Step 3: SIFT feature matching with histogram-matched + CLAHE images
+    ref_u8, tgt_u8 = _prepare_pair_for_matching(ref_img, tgt_shifted)
+
+    sift = cv2.SIFT_create(nfeatures=max_features)
+    kp1, des1 = sift.detectAndCompute(ref_u8, None)
+    kp2, des2 = sift.detectAndCompute(tgt_u8, None)
+
+    n_kp = len(kp1) if kp1 else 0
+    logger.info(f"SIFT: ref={n_kp} kp, tgt={len(kp2) if kp2 else 0} kp")
+
+    if des1 is None or des2 is None or n_kp < 10 or len(kp2) < 10:
+        logger.warning("SIFT matching failed — using bulk shift only")
+        return M_bulk, float(np.sqrt(shift_r**2 + shift_c**2)) * 0.5, n_kp, 0
+
+    # FLANN matcher (better for SIFT float descriptors)
+    FLANN_INDEX_KDTREE = 1
+    flann = cv2.FlannBasedMatcher(
+        dict(algorithm=FLANN_INDEX_KDTREE, trees=5),
+        dict(checks=50),
+    )
+    raw_matches = flann.knnMatch(des1, des2, k=2)
+
+    # Lowe's ratio test (strict for precision)
+    good_matches = []
+    for m_pair in raw_matches:
+        if len(m_pair) == 2 and m_pair[0].distance < 0.7 * m_pair[1].distance:
+            good_matches.append(m_pair[0])
+
+    logger.info(f"SIFT ratio-test matches: {len(good_matches)}")
+
+    if len(good_matches) < 10:
+        logger.warning(f"Only {len(good_matches)} matches — using bulk shift")
+        return M_bulk, float(np.sqrt(shift_r**2 + shift_c**2)) * 0.5, n_kp, len(good_matches)
+
+    pts_ref = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 2)
+    pts_tgt = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 2)
+
     affine_mat, inlier_mask = cv2.estimateAffinePartial2D(
         pts_tgt, pts_ref,
         method=cv2.RANSAC,
@@ -532,8 +669,8 @@ def global_affine_registration(
     )
 
     if affine_mat is None:
-        logger.warning("Affine estimation failed — using identity")
-        return np.eye(2, 3, dtype=np.float64), float("inf"), len(kp1), 0
+        logger.warning("Affine refinement failed — using bulk shift")
+        return M_bulk, float(np.sqrt(shift_r**2 + shift_c**2)) * 0.5, n_kp, 0
 
     n_inliers = int(inlier_mask.sum()) if inlier_mask is not None else 0
 
@@ -542,35 +679,50 @@ def global_affine_registration(
     pts_tgt_inlier = pts_tgt[inlier_idx]
     pts_ref_inlier = pts_ref[inlier_idx]
 
-    # Apply affine to target points
     pts_tgt_h = np.hstack([pts_tgt_inlier, np.ones((len(pts_tgt_inlier), 1))])
     pts_warped = (affine_mat @ pts_tgt_h.T).T
     residuals = pts_ref_inlier - pts_warped
     rmse = float(np.sqrt(np.mean(residuals**2)))
 
+    # Compose bulk shift with SIFT refinement:
+    # affine_mat operates on the SHIFTED target, so we need:
+    #   composed = affine_mat @ [M_bulk; 0 0 1]
+    M_bulk_3x3 = np.vstack([M_bulk, [0, 0, 1]])
+    affine_3x3 = np.vstack([affine_mat, [0, 0, 1]])
+    composed_3x3 = affine_3x3 @ M_bulk_3x3
+    composed = composed_3x3[:2, :]
+
     logger.info(
-        f"Global affine: {len(matches)} matches, {n_inliers} inliers, "
+        f"Global affine: {len(good_matches)} matches, {n_inliers} inliers, "
         f"RMSE={rmse:.3f} px ({rmse * HIRISE_PIXEL_SCALE:.4f} m)"
     )
+    logger.info(
+        f"  Bulk shift: ({shift_r:.0f}, {shift_c:.0f}), "
+        f"composed translation: ({composed[1,2]:.1f}, {composed[0,2]:.1f}) px"
+    )
 
-    return affine_mat, rmse, len(kp1), n_inliers
-
+    return composed, rmse, len(kp1), n_inliers
 
 def apply_affine_warp(
     img: np.ndarray,
     affine_mat: np.ndarray,
     output_shape: Tuple[int, int],
 ) -> np.ndarray:
-    """Apply affine warp to align target image to reference."""
+    """
+    Apply affine warp to align target image to reference.
+
+    affine_mat maps from target pixel coords to reference pixel coords.
+    cv2.warpAffine without WARP_INVERSE_MAP interprets M as the forward transform,
+    and internally inverts it to compute: dst(p) = src(M^{-1} * p).
+    """
     h, w = output_shape
     warped = cv2.warpAffine(
-        img, affine_mat, (w, h),
-        flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP,
+        img, affine_mat.astype(np.float64), (w, h),
+        flags=cv2.INTER_CUBIC,
         borderMode=cv2.BORDER_CONSTANT,
         borderValue=0,
     )
     return warped
-
 
 def local_ecc_refinement(
     ref_img: np.ndarray,
@@ -579,17 +731,20 @@ def local_ecc_refinement(
     overlap_frac: float = ECC_TILE_OVERLAP,
     max_iterations: int = ECC_ITERATIONS,
     epsilon: float = ECC_EPSILON,
-) -> Tuple[np.ndarray, float]:
+) -> Tuple[np.ndarray, float, bool]:
     """
     Apply local ECC refinement in tiles to handle spatially-varying drift.
 
-    Returns warped target image and mean correction magnitude.
+    Uses histogram-matched + CLAHE images for robust ECC across radiometric differences.
+    Includes quality gate: rejects when correction std >> median (pure noise).
+
+    Returns (warped_target, mean_correction, quality_ok).
     """
     H, W = ref_img.shape
     step = int(tile_size * (1 - overlap_frac))
 
-    ref_u8 = _normalize_for_coreg(ref_img)
-    tgt_u8 = _normalize_for_coreg(tgt_img)
+    # Use histogram-matched + CLAHE images for better ECC convergence
+    ref_u8, tgt_u8 = _prepare_pair_for_matching(ref_img, tgt_img)
 
     # Collect local translation corrections
     corrections_r = []
@@ -605,23 +760,23 @@ def local_ecc_refinement(
             tgt_tile = tgt_u8[r:r + tile_size, c:c + tile_size]
 
             # Skip low-contrast tiles
-            if ref_tile.std() < 5 or tgt_tile.std() < 5:
+            if ref_tile.std() < 8 or tgt_tile.std() < 8:
                 continue
 
             try:
                 warp_matrix = np.eye(2, 3, dtype=np.float32)
-                _, warp_matrix = cv2.findTransformECC(
+                cc, warp_matrix = cv2.findTransformECC(
                     ref_tile.astype(np.float32),
                     tgt_tile.astype(np.float32),
                     warp_matrix,
-                    cv2.MOTION_EUCLIDEAN,
+                    cv2.MOTION_TRANSLATION,  # Translation only (simpler, more robust)
                     criteria,
                 )
                 tx = warp_matrix[0, 2]
                 ty = warp_matrix[1, 2]
 
-                # Reject outlier corrections (> 5 px)
-                if abs(tx) < 5 and abs(ty) < 5:
+                # Reject outlier corrections (> 3 px) — tighter threshold
+                if abs(tx) < 3 and abs(ty) < 3 and cc > 0.5:
                     corrections_c.append(tx)
                     corrections_r.append(ty)
                     centers_r.append(r + tile_size // 2)
@@ -632,53 +787,90 @@ def local_ecc_refinement(
 
     if len(corrections_r) < 4:
         logger.warning("Insufficient ECC tile matches — skipping local refinement")
-        return tgt_img.copy(), 0.0
+        return tgt_img.copy(), 0.0, False
 
     corrections_r = np.array(corrections_r)
     corrections_c = np.array(corrections_c)
     centers_r = np.array(centers_r)
     centers_c = np.array(centers_c)
 
-    mean_correction = float(np.sqrt(
-        np.median(corrections_r)**2 + np.median(corrections_c)**2
-    ))
+    med_r = float(np.median(corrections_r))
+    med_c = float(np.median(corrections_c))
+    std_r = float(np.std(corrections_r))
+    std_c = float(np.std(corrections_c))
+    mean_correction = float(np.sqrt(med_r**2 + med_c**2))
 
     logger.info(
         f"Local ECC: {len(corrections_r)} tiles, "
-        f"median correction: ({np.median(corrections_r):.3f}, {np.median(corrections_c):.3f}) px, "
-        f"std: ({np.std(corrections_r):.3f}, {np.std(corrections_c):.3f}) px"
+        f"median correction: ({med_r:.3f}, {med_c:.3f}) px, "
+        f"std: ({std_r:.3f}, {std_c:.3f}) px"
     )
 
-    # If corrections are spatially uniform, apply global median
-    if np.std(corrections_r) < 0.3 and np.std(corrections_c) < 0.3:
-        # Simple global translation
-        median_r = np.median(corrections_r)
-        median_c = np.median(corrections_c)
-        M = np.float32([[1, 0, median_c], [0, 1, median_r]])
+    # Quality gate: if std > 1.5 px, corrections are too noisy to be useful
+    # (For good co-registration, std should be << 0.5 px)
+    if std_r > 1.5 or std_c > 1.5:
+        logger.warning(
+            f"ECC corrections too noisy (std_r={std_r:.2f}, std_c={std_c:.2f} px). "
+            f"Applying ONLY median translation, not spatially-varying field."
+        )
+        # Apply only the robust median shift
+        M = np.float32([[1, 0, med_c], [0, 1, med_r]])
         warped = cv2.warpAffine(
             tgt_img, M, (W, H),
             flags=cv2.INTER_CUBIC,
             borderMode=cv2.BORDER_CONSTANT,
             borderValue=0,
         )
-        return warped, mean_correction
+        return warped, mean_correction, False
+
+    # If corrections are spatially uniform, apply global median
+    if std_r < 0.3 and std_c < 0.3:
+        M = np.float32([[1, 0, med_c], [0, 1, med_r]])
+        warped = cv2.warpAffine(
+            tgt_img, M, (W, H),
+            flags=cv2.INTER_CUBIC,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0,
+        )
+        return warped, mean_correction, True
 
     # Spatially-varying correction: interpolate correction field
     from scipy.interpolate import griddata
 
+    # First, apply MAD-based outlier rejection
+    mad_r = np.median(np.abs(corrections_r - med_r))
+    mad_c = np.median(np.abs(corrections_c - med_c))
+    inlier_mask = (
+        (np.abs(corrections_r - med_r) < 3 * max(mad_r, 0.1)) &
+        (np.abs(corrections_c - med_c) < 3 * max(mad_c, 0.1))
+    )
+    corrections_r = corrections_r[inlier_mask]
+    corrections_c = corrections_c[inlier_mask]
+    centers_r = centers_r[inlier_mask]
+    centers_c = centers_c[inlier_mask]
+
+    if len(corrections_r) < 4:
+        M = np.float32([[1, 0, med_c], [0, 1, med_r]])
+        warped = cv2.warpAffine(
+            tgt_img, M, (W, H),
+            flags=cv2.INTER_CUBIC,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0,
+        )
+        return warped, mean_correction, True
+
     grid_r, grid_c = np.mgrid[0:H, 0:W]
     points = np.column_stack([centers_r, centers_c])
 
-    map_r = griddata(points, corrections_r, (grid_r, grid_c), method="cubic", fill_value=0)
-    map_c = griddata(points, corrections_c, (grid_r, grid_c), method="cubic", fill_value=0)
+    map_r = griddata(points, corrections_r, (grid_r, grid_c), method="cubic", fill_value=med_r)
+    map_c = griddata(points, corrections_c, (grid_r, grid_c), method="cubic", fill_value=med_c)
 
     # Apply via remap
     map_x = (grid_c - map_c).astype(np.float32)
     map_y = (grid_r - map_r).astype(np.float32)
     warped = cv2.remap(tgt_img, map_x, map_y, cv2.INTER_CUBIC, borderValue=0)
 
-    return warped, mean_correction
-
+    return warped, mean_correction, True
 
 def hierarchical_coregistration(
     ref_img: np.ndarray,
@@ -687,8 +879,8 @@ def hierarchical_coregistration(
     """
     Full hierarchical co-registration pipeline.
 
-    1. Global affine registration (ORB + RANSAC)
-    2. Local ECC refinement in tiles
+    1. Global affine registration (SIFT + RANSAC)
+    2. Local ECC refinement in tiles (with quality gate)
 
     Returns (aligned_target, CoregResult).
     """
@@ -700,11 +892,15 @@ def hierarchical_coregistration(
     # Apply affine warp
     tgt_affine = apply_affine_warp(tgt_img, affine_mat, ref_img.shape)
 
-    # Step 2: Local ECC refinement
-    tgt_refined, ecc_correction = local_ecc_refinement(ref_img, tgt_affine)
+    # Step 2: Local ECC refinement (with quality gate)
+    tgt_refined, ecc_correction, ecc_quality_ok = local_ecc_refinement(ref_img, tgt_affine)
 
-    # Estimate final RMSE
-    final_rmse = max(affine_rmse * 0.3, 0.05)  # heuristic after ECC
+    # Estimate final RMSE based on ECC quality
+    if ecc_quality_ok and ecc_correction > 0.01:
+        final_rmse = max(affine_rmse * 0.3, 0.05)
+    else:
+        # ECC was noisy, final RMSE is close to affine RMSE
+        final_rmse = max(affine_rmse * 0.7, 0.1)
 
     coreg_result = CoregResult(
         affine_matrix=affine_mat,
@@ -717,7 +913,6 @@ def hierarchical_coregistration(
     )
 
     return tgt_refined, coreg_result
-
 
 # ─── Terrain Parallax Correction ──────────────────────────────────────────────
 
@@ -956,40 +1151,65 @@ def run_pair_analysis(
     # 2. Hierarchical co-registration
     tgt_aligned, coreg = hierarchical_coregistration(ref_img, tgt_img)
 
-    # 3. Terrain parallax correction (if target is not ortho)
+    # 3. Terrain parallax correction
+    #    - If ref is ORTHO: correct tgt by its full parallax
+    #    - If both are non-ORTHO (RDR): correct tgt by DIFFERENTIAL parallax
+    #    - If both are ORTHO: no correction needed
     parallax_info = ParallaxCorrection(
         max_displacement_m=0.0, mean_displacement_m=0.0,
         correction_applied=False, emission_angle_deg=tgt_info.emission_angle,
     )
 
-    if not tgt_info.is_ortho and dtm_path.exists():
-        dtm_chip = load_dtm_for_overlap(dtm_path, meta["overlap_bounds"], ref_img.shape)
-        disp_r, disp_c = compute_parallax_displacement(
-            dtm_chip,
-            emission_angle_deg=tgt_info.emission_angle,
-        )
-        # Only correct if reference is ortho (already corrected)
-        if ref_info.is_ortho:
-            tgt_aligned = apply_parallax_correction(tgt_aligned, disp_r, disp_c)
+    if dtm_path.exists() and (not tgt_info.is_ortho or not ref_info.is_ortho):
+        dtm_chip = load_dtm_for_overlap(dtm_path, meta['overlap_bounds'], ref_img.shape, ref_crs=meta.get('ref_crs'))
+
+        if not np.all(np.isnan(dtm_chip)):
+            if ref_info.is_ortho:
+                # Ref is orthorectified, correct tgt by its full parallax
+                disp_r, disp_c = compute_parallax_displacement(
+                    dtm_chip, emission_angle_deg=tgt_info.emission_angle,
+                )
+                tgt_aligned = apply_parallax_correction(tgt_aligned, disp_r, disp_c)
+                diff_angle = tgt_info.emission_angle
+            elif not ref_info.is_ortho and not tgt_info.is_ortho:
+                # Both are non-ORTHO: compute DIFFERENTIAL parallax
+                # The displacement difference due to terrain between two off-nadir views
+                disp_r_ref, disp_c_ref = compute_parallax_displacement(
+                    dtm_chip, emission_angle_deg=ref_info.emission_angle,
+                )
+                disp_r_tgt, disp_c_tgt = compute_parallax_displacement(
+                    dtm_chip, emission_angle_deg=tgt_info.emission_angle,
+                )
+                diff_r = disp_r_tgt - disp_r_ref
+                diff_c = disp_c_tgt - disp_c_ref
+                tgt_aligned = apply_parallax_correction(tgt_aligned, diff_r, diff_c)
+                diff_angle = abs(tgt_info.emission_angle - ref_info.emission_angle)
+                logger.info(
+                    f"Differential parallax: ref={ref_info.emission_angle:.2f}°, "
+                    f"tgt={tgt_info.emission_angle:.2f}°, diff={diff_angle:.2f}°"
+                )
+            else:
+                diff_angle = 0.0
+
+            h_rel = dtm_chip - np.nanmedian(dtm_chip)
             parallax_info = ParallaxCorrection(
                 max_displacement_m=float(np.nanmax(np.abs(
-                    dtm_chip - np.nanmedian(dtm_chip)
-                ) * math.tan(math.radians(tgt_info.emission_angle)))),
+                    h_rel * math.tan(math.radians(diff_angle))
+                ))) if diff_angle > 0 else 0.0,
                 mean_displacement_m=float(np.nanmean(np.abs(
-                    dtm_chip - np.nanmedian(dtm_chip)
-                ) * math.tan(math.radians(tgt_info.emission_angle)))),
+                    h_rel * math.tan(math.radians(diff_angle))
+                ))) if diff_angle > 0 else 0.0,
                 correction_applied=True,
                 emission_angle_deg=tgt_info.emission_angle,
             )
     elif tgt_info.is_ortho and ref_info.is_ortho:
-        logger.info("Both images are orthorectified — no parallax correction needed")
-
+        logger.info('Both images are orthorectified — no parallax correction needed')
     # 4. DTM-based terrain classification
     stable_mask_full = None
     scarp_mask_full = None
 
     if dtm_path.exists():
-        dtm_chip = load_dtm_for_overlap(dtm_path, meta["overlap_bounds"], ref_img.shape)
+        dtm_chip = load_dtm_for_overlap(dtm_path, meta["overlap_bounds"], ref_img.shape, ref_crs=meta.get("ref_crs"))
         slope = compute_slope_map(dtm_chip, pixel_scale_m=DTM_PIXEL_SCALE)
         terrain_cls = classify_terrain(slope)
 
@@ -1093,73 +1313,92 @@ def run_pipeline(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Verify all files exist
+    # Verify required files exist (only for pairs we're running)
     missing = []
-    for key, info in IMAGE_CATALOG.items():
+    needed_keys = set()
+    for p in TEMPORAL_PAIRS:
+        needed_keys.add(p['ref'])
+        needed_keys.add(p['tgt'])
+    for key in needed_keys:
+        info = IMAGE_CATALOG[key]
         if not info.path.exists():
             missing.append(f"{key}: {info.path}")
     if not DTM_PATH.exists():
         missing.append(f"DTM: {DTM_PATH}")
     if missing:
-        raise FileNotFoundError(
-            f"Missing files:\n" + "\n".join(missing)
-        )
-
+        logger.warning(f"Missing files (will skip affected pairs): {missing}")
     # Process each pair
     pair_results: List[PairResult] = []
     disp_data_all: Dict[str, dict] = {}
 
     for pair_config in TEMPORAL_PAIRS:
-        result, disp_data = run_pair_analysis(
-            pair_config,
-            chip_size=chip_size,
-            step_size=step_size,
-            detrend_order=detrend_order,
-        )
-        pair_results.append(result)
-        disp_data_all[pair_config["name"]] = disp_data
+        ref_info = IMAGE_CATALOG.get(pair_config['ref'])
+        tgt_info = IMAGE_CATALOG.get(pair_config['tgt'])
+        if ref_info is None or tgt_info is None:
+            logger.warning(f"Skipping {pair_config['name']}: unknown image key")
+            continue
+        if not ref_info.path.exists() or not tgt_info.path.exists():
+            logger.warning(f"Skipping {pair_config['name']}: missing data file")
+            continue
 
-        # Save per-pair results
-        pair_dir = output_dir / pair_config["name"]
-        pair_dir.mkdir(exist_ok=True)
+        try:
+            result, disp_data = run_pair_analysis(
+                pair_config,
+                chip_size=chip_size,
+                step_size=step_size,
+                detrend_order=detrend_order,
+            )
+            pair_results.append(result)
+            disp_data_all[pair_config['name']] = disp_data
 
-        np.savez_compressed(
-            pair_dir / "displacement.npz",
-            magnitude_m=disp_data["magnitude_m"],
-            row_disp_m=disp_data["row_disp_m"],
-            col_disp_m=disp_data["col_disp_m"],
-            snr=disp_data["snr"],
-            valid_mask=disp_data["valid_mask"],
-        )
+            # Save per-pair results
+            pair_dir = output_dir / pair_config['name']
+            pair_dir.mkdir(exist_ok=True)
+            np.savez_compressed(
+                pair_dir / 'displacement.npz',
+                magnitude_m=disp_data['magnitude_m'],
+                row_disp_m=disp_data['row_disp_m'],
+                col_disp_m=disp_data['col_disp_m'],
+                snr=disp_data['snr'],
+                valid_mask=disp_data['valid_mask'],
+            )
+        except Exception as e:
+            logger.error(f"Pair {pair_config['name']} failed: {e}")
+            continue
 
-    # Cross-validation: Pair A vs Pair B
+    # Cross-validation: primary vs validation pair
     crossval = CrossValResult(
         r_squared=np.nan, rmse_m=np.nan, n_common=0, ratio_A_B=np.nan,
     )
-    if "A_primary" in disp_data_all and "B_validation" in disp_data_all:
-        da = disp_data_all["A_primary"]
-        db = disp_data_all["B_validation"]
+    primary_name = TEMPORAL_PAIRS[0]['name'] if TEMPORAL_PAIRS else None
+    validation_name = TEMPORAL_PAIRS[1]['name'] if len(TEMPORAL_PAIRS) > 1 else None
+    if primary_name in disp_data_all and validation_name in disp_data_all:
+        da = disp_data_all[primary_name]
+        db = disp_data_all[validation_name]
 
-        # Ensure same shape for cross-validation
-        min_r = min(da["magnitude_m"].shape[0], db["magnitude_m"].shape[0])
-        min_c = min(da["magnitude_m"].shape[1], db["magnitude_m"].shape[1])
+        min_r = min(da['magnitude_m'].shape[0], db['magnitude_m'].shape[0])
+        min_c = min(da['magnitude_m'].shape[1], db['magnitude_m'].shape[1])
 
         crossval = cross_validate_pairs(
-            da["magnitude_m"][:min_r, :min_c],
-            db["magnitude_m"][:min_r, :min_c],
-            da["valid_mask"][:min_r, :min_c],
-            db["valid_mask"][:min_r, :min_c],
+            da['magnitude_m'][:min_r, :min_c],
+            db['magnitude_m'][:min_r, :min_c],
+            da['valid_mask'][:min_r, :min_c],
+            db['valid_mask'][:min_r, :min_c],
         )
 
-    # Null test: Pair C should show ~0 displacement
-    null_result = pair_results[2] if len(pair_results) > 2 else None
+    # Null test: last pair should show ~0 displacement
+    null_name = TEMPORAL_PAIRS[-1]['name'] if TEMPORAL_PAIRS else None
+    null_result = None
+    for pr in pair_results:
+        if pr.pair_name == null_name:
+            null_result = pr
+            break
     null_test = {
-        "scarp_excess_m": null_result.scarp_excess_m if null_result else np.nan,
-        "noise_floor_m": null_result.noise_floor_m if null_result else np.nan,
-        "pass": abs(null_result.scarp_excess_m) < 2 * null_result.noise_floor_m
-        if null_result else False,
+        'scarp_excess_m': null_result.scarp_excess_m if null_result else np.nan,
+        'noise_floor_m': null_result.noise_floor_m if null_result else np.nan,
+        'pass': (abs(null_result.scarp_excess_m) < 2 * null_result.noise_floor_m
+                 if null_result and not np.isnan(null_result.scarp_excess_m) else False),
     }
-
     # Determine verdict
     noise_floor = pair_results[0].noise_floor_m if pair_results else np.nan
     primary = pair_results[0] if pair_results else None
