@@ -1,0 +1,70 @@
+{
+  "date": "2026-03-14",
+  "generated_at": "2026-03-13T22:05:43.720123+00:00",
+  "categories": {
+    "missions": "Mostly focused on lunar missions, but with some Mars-related research",
+    "discoveries": "Multiple research studies on Mars' atmosphere, geology, and potential biosignatures",
+    "technology": "No significant technological advancements mentioned",
+    "human_exploration": "No human exploration missions or plans mentioned",
+    "sample_return": "China's Tianwen-3 Mars sample return mission is a significant development",
+    "international": "China's space program is actively involved in Mars research and exploration",
+    "commercial": "No commercial space activities mentioned"
+  },
+  "items": [
+    {
+      "title": "Good Morning, Moon",
+      "date": "Fri, 13 Mar 2026 16:19:57 +0000",
+      "source": "NASA",
+      "summary": "Early morning sunlight illuminates the western wall of this unnamed crater, leaving deep shadows on the ground and in the interior. The image was taken on August 30, 2023, by LROC (Lunar Reconnaissance Orbiter Camera). LROC is a system of three cameras and one of the seven instruments aboard NASA’s LRO (Lunar Reconnaissance Orbiter) mission, [&#8230;]",
+      "category": "missions",
+      "significance": "Lunar mission, not Mars, but still a space mission",
+      "url": "https://www.nasa.gov/image-article/good-morning-moon/"
+    },
+    {
+      "title": "China’s Tianwen-3 Mars sample return mission moves into spacecraft construction phase",
+      "date": "Thu, 12 Mar 2026 22:23:52 +0000",
+      "source": "SpaceNews",
+      "summary": "China’s Tianwen-3 Mars sample return mission is entering flight hardware development, targeting a late 2028 launch to seek out biosignatures on the Red Planet.\nThe post China’s Tianwen-3 Mars sample return mission moves into spacecraft construction phase appeared first on SpaceNews.",
+      "category": "sample_return",
+      "significance": "China's Tianwen-3 Mars sample return mission",
+      "url": "https://spacenews.com/chinas-tianwen-3-mars-sample-return-mission-moves-into-spacecraft-construction-phase/"
+    },
+    {
+      "title": "Atmospheric Escape Rates from Mars - If it Orbited an Old M-Dwarf Star",
+      "date": "2026-03-12",
+      "source": "arXiv",
+      "summary": "Atmospheric escape is an important process that influences the evolution of planetary atmospheres. A variety of physical mechanisms can contribute to escape from an atmosphere, including thermal escape, ion escape, photochemical escape, and sputtering. Here we estimate escape rates via each of th...",
+      "category": "discoveries",
+      "significance": "Research on atmospheric escape rates from Mars",
+      "url": "https://arxiv.org/abs/2603.11561v1"
+    },
+    {
+      "title": "Oxygenated False Positive Biosignatures in Mars-like Exoplanet Atmospheres",
+      "date": "2026-03-11",
+      "source": "arXiv",
+      "summary": "Oxygen is a well-studied biosignature. Studying potential abiotic pathways for O2 build-up in exoplanet atmospheres is essential for evaluating whether the detection of O2 would constitute a biosignature detection on other worlds. Previous modeling efforts in the literature demonstrated that dete...",
+      "category": "discoveries",
+      "significance": "Study on oxygenated false positive biosignatures in Mars-like exoplanet atmospheres",
+      "url": "https://arxiv.org/abs/2603.11017v1"
+    },
+    {
+      "title": "Martian concretion sizes predicted from two independently constrained inputs: atmospheric dust grain size and obliquity-forced wetting duration",
+      "date": "2026-03-11",
+      "source": "arXiv",
+      "summary": "Diagenetic concretions have been identified at multiple widely separated sites on Mars, including Meridiani Planum (Opportunity), Gale crater (Curiosity), and Jezero crater (Perseverance). Solid concretions at all sites fall within the millimetre size range (typically 1-6 mm diameter), despite di...",
+      "category": "discoveries",
+      "significance": "Research on Martian concretion sizes",
+      "url": "https://arxiv.org/abs/2603.11143v1"
+    },
+    {
+      "title": "Interstellar Object 3I/ATLAS Observed from Mars by China's Tianwen-1 Spacecraft",
+      "date": "2026-03-11",
+      "source": "arXiv",
+      "summary": "China's Tianwen-1 Mars orbiter successfully imaged the third interstellar object, 3I/ATLAS, during its close encounter with Mars using the onboard HiRIC CMOS camera. This is China's first deep-space observation of an astronomical object. These observations constitute the first imaging of this obj...",
+      "category": "international",
+      "significance": "China's Tianwen-1 Spacecraft observing interstellar object",
+      "url": "https://arxiv.org/abs/2603.10350v1"
+    }
+  ],
+  "trend_summary": "The current trend in Mars research is focused on scientific discoveries, with multiple studies on the planet's atmosphere, geology, and potential biosignatures. China's space program is playing a significant role in Mars exploration, with the Tianwen-3 sample return mission and the Tianwen-1 spacecraft's observations of interstellar objects. The lack of human exploration missions and commercial space activities is notable, but the emphasis on scientific research and international cooperation is a positive development for the field. Overall, the Mars research community is making progress in understanding the planet and its potential for supporting life. The involvement of international space agencies and programs is also a significant trend, highlighting the global interest in Mars exploration."
+}

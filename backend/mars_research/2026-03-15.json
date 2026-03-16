@@ -1,0 +1,30 @@
+{
+  "date": "2026-03-15",
+  "generated_at": "2026-03-14T22:10:10.275587+00:00",
+  "topic": {
+    "focus": "Ice Detection & Geomorphology",
+    "keywords": [
+      "SHARAD",
+      "subsurface ice",
+      "radar sounding",
+      "lobate debris aprons",
+      "glacial"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Soft capture of rotating debris with free-floating space robot",
+      "authors": "Run Li, Ruining Yuan, Ming Liu, Qinglei Hu, Xibin Cao",
+      "year": "2026",
+      "journal": "Aerospace Science and Technology",
+      "key_findings": "This paper does not appear to be related to Mars research or ice detection, as it focuses on the capture of rotating debris with a free-floating space robot. The main contribution is likely related to robotics and space technology.",
+      "methodology": "The paper's methodology is not directly applicable to MarsLab's goals, as it involves robotics and space technology rather than Mars research or ice detection.",
+      "relevance": "This paper is not directly relevant to MarsLab's Mars exploration goals, as it does not address ice detection, geomorphology, or other related topics.",
+      "category": "Not Applicable",
+      "url": "https://doi.org/10.1016/j.ast.2026.111955",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "Based on the provided paper, there is no clear trend in Mars research related to ice detection and geomorphology. However, it is possible that research in space technology and robotics could have indirect applications to Mars exploration. Further analysis of relevant papers would be necessary to identify trends in this area. The lack of directly applicable research in the provided paper highlights the need for more targeted searches to identify relevant studies.",
+  "connections_to_marslab": "The findings of this paper do not have a direct connection to MarsLab's mission, as they do not address mineral classification, ice detection, Arcadia Planitia site selection, or human exploration planning. However, the development of space technology and robotics could potentially have indirect applications to Mars exploration, such as the use of robots for sampling or reconnaissance."
+}
