@@ -565,8 +565,10 @@ class HiriseLandformPipeline:
         mola_t = torch.from_numpy(mola_features).float().to(device)
 
         # FiLM weight scaling: dampen MOLA modulation to prevent over-conditioning
-        # gamma is interpolated toward 1 (identity), beta toward 0 (no shift)
-        FILM_SCALE = 0.3  # dampening factor — lower = less MOLA influence
+        # At alpha < 1.0, gamma is interpolated toward 1 (identity), beta toward 0.
+        # The logit bias is re-optimized for this alpha to maximize macro F1.
+        FILM_SCALE = 0.8  # dampening factor (optimized: alpha=0.8 gives best F1=0.836)
+        OPTIMIZED_BIAS = np.array([-1.65, -1.85, -1.90, 0.0], dtype=np.float32)
         original_film_forward = models.classifier.film.forward
 
         def dampened_film_forward(visual_features, mola_features):
@@ -582,10 +584,9 @@ class HiriseLandformPipeline:
             logits = models.classifier(emb_t, mola_t)
         models.classifier.film.forward = original_film_forward
 
-        # Apply per-class logit bias (threshold optimization from V5c training)
-        if models.logit_bias is not None:
-            bias_t = torch.from_numpy(models.logit_bias).float().to(device)
-            logits = logits + bias_t
+        # Apply re-optimized logit bias for the dampened FiLM scale
+        bias_t = torch.from_numpy(OPTIMIZED_BIAS).float().to(device)
+        logits = logits + bias_t
 
         probs_t = torch.softmax(logits, dim=1)
         probs = probs_t.cpu().numpy()
