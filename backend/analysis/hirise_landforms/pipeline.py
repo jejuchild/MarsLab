@@ -564,29 +564,43 @@ class HiriseLandformPipeline:
         emb_t = torch.from_numpy(embeddings).float().to(device)
         mola_t = torch.from_numpy(mola_features).float().to(device)
 
-        # FiLM weight scaling: dampen MOLA modulation to prevent over-conditioning
-        # At alpha < 1.0, gamma is interpolated toward 1 (identity), beta toward 0.
-        # The logit bias is re-optimized for this alpha to maximize macro F1.
-        FILM_SCALE = 0.8  # dampening factor (optimized: alpha=0.8 gives best F1=0.836)
-        OPTIMIZED_BIAS = np.array([-1.65, -1.85, -1.90, 0.0], dtype=np.float32)
+        # Dual-path ensemble: HiRISE visual = main, MOLA FiLM = sub
+        # Path 1: visual-only (identity FiLM, alpha=0)
+        # Path 2: full FiLM conditioning (alpha=1)
+        # Final logits = W_VIS * visual_logits + W_MOLA * film_logits + bias
+        W_VIS = 0.7   # HiRISE visual weight (main)
+        W_MOLA = 0.3  # MOLA FiLM weight (sub)
+        ENSEMBLE_BIAS = np.array([-1.90, -2.75, -1.85, 0.0], dtype=np.float32)
+
         original_film_forward = models.classifier.film.forward
 
-        def dampened_film_forward(visual_features, mola_features):
-            h = models.classifier.film.mola_encoder(mola_features)
-            gamma = models.classifier.film.gamma_proj(h)
-            beta = models.classifier.film.beta_proj(h)
-            gamma_d = 1.0 + FILM_SCALE * (gamma - 1.0)
-            beta_d = FILM_SCALE * beta
-            return gamma_d * visual_features + beta_d
-
-        models.classifier.film.forward = dampened_film_forward
+        # Path 1: visual-only (bypass FiLM modulation)
+        models.classifier.film.forward = lambda vis, mola: vis
         with torch.autocast(device_type=device.type, enabled=device.type == "cuda"):
-            logits = models.classifier(emb_t, mola_t)
-        models.classifier.film.forward = original_film_forward
+            logits_vis = models.classifier(emb_t, mola_t)
 
-        # Apply re-optimized logit bias for the dampened FiLM scale
-        bias_t = torch.from_numpy(OPTIMIZED_BIAS).float().to(device)
+        # Path 2: full FiLM conditioning
+        models.classifier.film.forward = original_film_forward
+        with torch.autocast(device_type=device.type, enabled=device.type == "cuda"):
+            logits_film = models.classifier(emb_t, mola_t)
+
+        # Ensemble + optimized bias
+        logits = W_VIS * logits_vis + W_MOLA * logits_film
+        bias_t = torch.from_numpy(ENSEMBLE_BIAS).float().to(device)
         logits = logits + bias_t
+
+        # Debug logging for ensemble
+        from collections import Counter as _Counter
+        _vis_p = torch.argmax(logits_vis, dim=1).cpu().numpy()
+        _film_p = torch.argmax(logits_film, dim=1).cpu().numpy()
+        _ens_p = torch.argmax(logits, dim=1).cpu().numpy()
+        logger.info(
+            "Ensemble debug: vis_only=%s  film_only=%s  ensemble=%s  mean_logits=[vis=%s, film=%s, ens=%s]",
+            dict(_Counter(_vis_p)), dict(_Counter(_film_p)), dict(_Counter(_ens_p)),
+            [round(x,2) for x in logits_vis.mean(0).cpu().numpy().tolist()],
+            [round(x,2) for x in logits_film.mean(0).cpu().numpy().tolist()],
+            [round(x,2) for x in logits.mean(0).cpu().numpy().tolist()],
+        )
 
         probs_t = torch.softmax(logits, dim=1)
         probs = probs_t.cpu().numpy()
