@@ -94,41 +94,16 @@ class HiriseLandformPipeline:
         device = self._device
 
         # --- Load backbone ---
+        # NOTE: V5c training embeddings were extracted with vanilla DINOv2
+        # (LoRA loading bug in retrain script meant LoRA weights were never
+        # applied during embedding extraction). Deploy backbone must match.
         dinov2_cfg = DINOv2Config()
-        backbone = DinoV2LoRA(dinov2_cfg, use_lora=True)
+        backbone = DinoV2LoRA(dinov2_cfg, use_lora=False)
 
-        # Priority: load fine-tuned backbone from best checkpoint (V5 > V4b)
-        v4b_backbone_loaded = False
-        ckpt_path = V5_FILM_CHECKPOINT if V5_FILM_CHECKPOINT.exists() else V4B_FILM_CHECKPOINT
-        if ckpt_path.exists():
-            v4b_ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-            backbone_state = {
-                k: v for k, v in v4b_ckpt.get("model_state_dict", {}).items()
-                if k.startswith("backbone.")
-            }
-            if backbone_state:
-                result = backbone.load_state_dict(backbone_state, strict=False)
-                if not result.unexpected_keys and not result.missing_keys:
-                    logger.info("Loaded V4b fine-tuned backbone weights (%d tensors)", len(backbone_state))
-                    v4b_backbone_loaded = True
-                else:
-                    logger.warning(
-                        "V4b backbone partial load: %d unexpected, %d missing",
-                        len(result.unexpected_keys), len(result.missing_keys),
-                    )
-                    v4b_backbone_loaded = True  # Still better than SSL-only
-
-        if not v4b_backbone_loaded:
-            # Fallback: load SSL pretrained LoRA weights
-            if SSL_LORA_WEIGHTS.exists():
-                checkpoint = torch.load(SSL_LORA_WEIGHTS, map_location="cpu", weights_only=False)
-                if "student_backbone" in checkpoint:
-                    backbone.load_state_dict(checkpoint["student_backbone"], strict=False)
-                    logger.info("Loaded SSL LoRA backbone weights")
-                else:
-                    logger.warning("SSL checkpoint missing 'student_backbone' key: %s", SSL_LORA_WEIGHTS)
-            else:
-                logger.warning("No backbone weights found — using pretrained DINOv2 only")
+        # Skip loading fine-tuned backbone weights: V5c embeddings were
+        # extracted with pretrained DINOv2 (no fine-tuning applied due to LoRA
+        # loading bug). Using HuggingFace pretrained weights directly.
+        logger.info("Using pretrained DINOv2 backbone (no LoRA, matching V5c training)")
 
         backbone.eval()
         backbone = backbone.to(device)
