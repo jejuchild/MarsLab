@@ -56,6 +56,12 @@ export default function useSpectrumData(
         });
 
         if (!response.ok) {
+          // 404 = spectral data not available for this product (expected)
+          if (response.status === 404) {
+            setSpectrumData(null);
+            setDustAssessment(null);
+            return;
+          }
           throw new Error(`Failed to fetch spectrum: ${response.status}`);
         }
 

@@ -137,10 +137,10 @@ def train():
     model = LateFusionClassifier(
         visual_dim=768,
         mola_dim=25,
-        visual_hidden=128,
+        visual_hidden=256,
         mola_hidden=64,
         num_classes=NUM_CLASSES,
-        dropout=0.5,
+        dropout=0.3,
         init_vis_weight=0.7,
     ).to(device)
 
@@ -171,7 +171,7 @@ def train():
             return ((1 - pt) ** self.gamma * ce).mean()
 
     criterion = FocalLoss(gamma=2.0)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4, weight_decay=1e-2)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=60, eta_min=1e-5)
 
     # Training loop
@@ -254,10 +254,10 @@ def train():
                 "cfg": {
                     "visual_dim": 768,
                     "mola_dim": 25,
-                    "visual_hidden": 128,
+                    "visual_hidden": 256,
                     "mola_hidden": 64,
                     "num_classes": NUM_CLASSES,
-                    "dropout": 0.5,
+                    "dropout": 0.3,
                     "init_vis_weight": 0.7,
                     "class_names": CLASS_NAMES,
                     "architecture": "late_fusion_v6b",

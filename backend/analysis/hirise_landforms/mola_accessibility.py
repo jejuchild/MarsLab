@@ -18,8 +18,8 @@ Using a 5 km × 5 km rolling window around each MOLA pixel (~200 m):
 
     S_lat   — absolute latitude of the pixel (deg)
               |lat| < 20°       → 1
-              20° ≤ |lat| ≤ 30° → (30 - |lat|) / 10
-              |lat| > 30°       → 0
+              20° ≤ |lat| ≤ 60° → (60 - |lat|) / 40
+              |lat| > 60°       → 0
 
 Category mapping (from composite score):
     excellent      score ≥ 0.8
@@ -73,12 +73,12 @@ def _score_slope(mean_slope_deg: np.ndarray) -> np.ndarray:
 def _score_lat(lat_abs: np.ndarray) -> np.ndarray:
     """S_lat from absolute latitude (degrees).
 
-    |lat| < 20° → 1,  20° ≤ |lat| ≤ 30° → (30-|lat|)/10,  |lat| > 30° → 0
+    |lat| < 20° → 1,  20° ≤ |lat| ≤ 60° → (60-|lat|)/40,  |lat| > 60° → 0
     """
     s = np.zeros_like(lat_abs, dtype=np.float32)
     s[lat_abs < 20.0] = 1.0
-    mid = (lat_abs >= 20.0) & (lat_abs <= 30.0)
-    s[mid] = (30.0 - lat_abs[mid]) / 10.0
+    mid = (lat_abs >= 20.0) & (lat_abs <= 60.0)
+    s[mid] = (60.0 - lat_abs[mid]) / 40.0
     return s
 
 

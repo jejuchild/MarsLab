@@ -1,0 +1,30 @@
+{
+  "date": "2026-03-17",
+  "generated_at": "2026-03-16T22:10:09.636182+00:00",
+  "topic": {
+    "focus": "Surface Processes",
+    "keywords": [
+      "aeolian",
+      "dunes",
+      "impact crater",
+      "mass wasting",
+      "HiRISE"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Balancing Ni site supply and interfacial oxygen migration on Ni–Fe–CeO2 catalysts for coke resistant dry reforming of methane",
+      "authors": "Xuanyu Ji, Yuqin Cheng, Qiufan Qu, Qinghui Yu, Xiong Zhou, Yu Yang et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper does not appear to be related to Mars surface processes, as it focuses on catalysts for dry reforming of methane. The main contribution is likely related to the development of coke-resistant catalysts.",
+      "methodology": "The methods used in this paper are not directly applicable to Mars surface processes, but may involve materials science and catalysis techniques.",
+      "relevance": "This paper does not appear to be directly relevant to MarsLab's Mars exploration goals, as it does not address surface processes such as aeolian processes, impact cratering, mass wasting, or surface morphology.",
+      "category": "Not Applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139137",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "Based on the provided paper, there does not appear to be a clear trend related to Mars surface processes. However, research in materials science and catalysis may have indirect applications to Mars exploration, such as developing technologies for in-situ resource utilization. Further analysis of papers directly related to Mars surface processes would be necessary to identify trends. The lack of relevant papers in the initial dataset limits the ability to conduct a thorough trend analysis.",
+  "connections_to_marslab": "The findings of this paper do not appear to have a direct connection to MarsLab's mission, which focuses on Mars exploration and surface processes. However, the development of technologies for in-situ resource utilization, such as those related to catalysis, may have potential applications for future human exploration of Mars."
+}
