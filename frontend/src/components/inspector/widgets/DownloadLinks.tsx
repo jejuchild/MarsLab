@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import type { InstrumentType } from "../types";
 import { formatBytes } from "../types";
+import {
+  listLocalFiles,
+  downloadLocalZip,
+  type LocalFileInfo,
+  type Instrument,
+} from "../../../api/search";
 
 type DownloadLinksProps = {
   productId: string;
@@ -27,10 +33,22 @@ const BROWSE_LABELS: Record<string, { label: string; color: string }> = {
 
 const SUPPORTED_INSTRUMENTS = new Set<string>(["HIRISE", "CRISM", "CRISM_TRR3"]);
 
+// Map InstrumentType to lowercase Instrument for API calls
+const INSTRUMENT_MAP: Record<string, Instrument> = {
+  HIRISE: "hirise",
+  CRISM: "crism",
+  CRISM_TRR3: "crism",
+  SHARAD: "sharad",
+  SHARAD_HIGHRES: "sharad_highres",
+};
+
 export default function DownloadLinks({ productId, instrument }: DownloadLinksProps) {
   const [urls, setUrls] = useState<ProductUrls | null>(null);
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [localFiles, setLocalFiles] = useState<LocalFileInfo[]>([]);
+  const [localTotalSize, setLocalTotalSize] = useState(0);
 
+  // Fetch external URLs
   useEffect(() => {
     if (!SUPPORTED_INSTRUMENTS.has(instrument)) {
       setStatus("error");
@@ -54,6 +72,20 @@ export default function DownloadLinks({ productId, instrument }: DownloadLinksPr
       })
       .catch(() => {
         setStatus("error");
+      });
+  }, [productId, instrument]);
+
+  // Fetch local files for save-to-local
+  useEffect(() => {
+    const inst = INSTRUMENT_MAP[instrument];
+    if (!inst) return;
+    listLocalFiles(productId, inst)
+      .then((res) => {
+        setLocalFiles(res.files);
+        setLocalTotalSize(res.total_size);
+      })
+      .catch(() => {
+        setLocalFiles([]);
       });
   }, [productId, instrument]);
 
@@ -144,6 +176,25 @@ export default function DownloadLinks({ productId, instrument }: DownloadLinksPr
             {urls.img_filename ?? "Download IMG"}
           </span>
         </a>
+      )}
+
+      {/* Save to Local — server files to browser */}
+      {localFiles.length > 0 && (
+        <button
+          onClick={() => {
+            const inst = INSTRUMENT_MAP[instrument];
+            if (inst) downloadLocalZip(productId, inst);
+          }}
+          className="flex w-full items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-cyan-400 transition-colors hover:bg-cyan-500/20"
+        >
+          <span className="material-symbols-outlined text-[18px]">save_alt</span>
+          <span className="flex-1 text-left text-xs font-medium">
+            Save to Local ({localFiles.length} files)
+          </span>
+          <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-medium">
+            {formatBytes(localTotalSize)}
+          </span>
+        </button>
       )}
     </div>
   );

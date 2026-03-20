@@ -16,6 +16,9 @@ import {
   retryDownload,
   startSmartSearch,
   streamSmartSearch,
+  listLocalFiles,
+  downloadLocalFile,
+  downloadLocalZip,
   type SearchResult,
   type DownloadTask,
   type Instrument,
@@ -27,6 +30,7 @@ import {
   type SmartProductSelection,
   type ProximityResponse,
   type ProximityResult,
+  type LocalFileInfo,
   formatBytes,
 } from "../api/search";
 
@@ -1331,6 +1335,101 @@ function DownloadManifest({
             </table>
           </div>
         </div>
+
+        {/* Save to Local section */}
+        {task.status === "completed" && (
+          <SaveToLocalSection productId={task.product_id} instrument={task.instrument} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * SaveToLocalSection: Shows local files and provides download buttons.
+ */
+function SaveToLocalSection({ productId, instrument }: { productId: string; instrument: Instrument }) {
+  const [files, setFiles] = useState<LocalFileInfo[]>([]);
+  const [totalSize, setTotalSize] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(true);
+    listLocalFiles(productId, instrument)
+      .then((res) => {
+        setFiles(res.files);
+        setTotalSize(res.total_size);
+      })
+      .catch(() => {
+        setFiles([]);
+      })
+      .finally(() => setIsLoading(false));
+  }, [productId, instrument]);
+
+  if (isLoading) {
+    return (
+      <div className="border border-cyan-500/30 rounded-lg p-4 bg-cyan-500/5">
+        <div className="flex items-center gap-2 text-cyan-400 text-sm">
+          <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+          Loading local files...
+        </div>
+      </div>
+    );
+  }
+
+  if (files.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="border border-cyan-500/30 rounded-lg overflow-hidden bg-cyan-500/5">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-cyan-500/20">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-cyan-400 text-lg">save_alt</span>
+          <span className="text-sm font-bold text-cyan-400">Save to Local</span>
+          <span className="text-[10px] text-cyan-400/60 ml-1">
+            {files.length} files | {formatBytes(totalSize)}
+          </span>
+        </div>
+        <button
+          onClick={() => downloadLocalZip(productId, instrument)}
+          className="px-3 py-1.5 rounded-md text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 hover:bg-cyan-500/30 transition-colors flex items-center gap-1.5"
+        >
+          <span className="material-symbols-outlined text-sm">folder_zip</span>
+          Download ZIP ({formatBytes(totalSize)})
+        </button>
+      </div>
+      <div className="max-h-[200px] overflow-y-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-cyan-500/10 text-cyan-400/80 text-[10px] uppercase tracking-widest sticky top-0">
+            <tr>
+              <th className="px-4 py-2 font-semibold">File</th>
+              <th className="px-4 py-2 font-semibold">Size</th>
+              <th className="px-4 py-2 font-semibold text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-cyan-500/10 text-sm">
+            {files.map((file) => (
+              <tr key={file.filename} className="hover:bg-cyan-500/5">
+                <td className="px-4 py-2 font-mono text-xs text-white truncate max-w-[280px]">
+                  {file.filename}
+                </td>
+                <td className="px-4 py-2 text-xs text-slate-400">
+                  {formatBytes(file.size)}
+                </td>
+                <td className="px-4 py-2 text-right">
+                  <button
+                    onClick={() => downloadLocalFile(productId, instrument, file.filename)}
+                    className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 ml-auto"
+                  >
+                    <span className="material-symbols-outlined text-xs">download</span>
+                    Save
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -1441,10 +1540,24 @@ function DownloadTaskCard({
         </div>
       )}
 
-      {/* Completed info */}
-      {isComplete && task.completed_at && (
-        <div className="mt-1 text-[10px] text-slate-500">
-          Completed {new Date(task.completed_at).toLocaleString()}
+      {/* Completed info + Save to Local */}
+      {isComplete && (
+        <div className="mt-1 flex items-center justify-between">
+          {task.completed_at && (
+            <div className="text-[10px] text-slate-500">
+              Completed {new Date(task.completed_at).toLocaleString()}
+            </div>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadLocalZip(task.product_id, task.instrument);
+            }}
+            className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 shrink-0 px-2 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-xs">save_alt</span>
+            Save to Local
+          </button>
         </div>
       )}
 

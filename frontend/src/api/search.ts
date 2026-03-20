@@ -344,6 +344,93 @@ export function isSharadProductId(productId: string): boolean {
 }
 
 // =============================================================================
+// Local File Download API (save to user's machine)
+// =============================================================================
+
+export interface LocalFileInfo {
+  filename: string;
+  size: number;
+}
+
+export interface LocalFilesResponse {
+  product_id: string;
+  instrument: string;
+  files: LocalFileInfo[];
+  total_size: number;
+  file_count: number;
+}
+
+/**
+ * List all local files available for a product.
+ */
+export async function listLocalFiles(
+  productId: string,
+  instrument: Instrument
+): Promise<LocalFilesResponse> {
+  const res = await fetch(
+    `/api/download/local/${encodeURIComponent(instrument)}/${encodeURIComponent(productId)}/files`
+  );
+  if (!res.ok) {
+    throw new Error(await parseErrorDetail(res, "Failed to list local files"));
+  }
+  return res.json();
+}
+
+/**
+ * Get the URL for downloading a single file to the user's browser.
+ */
+export function getLocalFileUrl(
+  productId: string,
+  instrument: Instrument,
+  filename: string
+): string {
+  return `/api/download/local/${encodeURIComponent(instrument)}/${encodeURIComponent(productId)}/file?filename=${encodeURIComponent(filename)}`;
+}
+
+/**
+ * Get the URL for downloading all product files as a ZIP.
+ */
+export function getLocalZipUrl(
+  productId: string,
+  instrument: Instrument
+): string {
+  return `/api/download/local/${encodeURIComponent(instrument)}/${encodeURIComponent(productId)}/zip`;
+}
+
+/**
+ * Trigger a browser download for a single local file.
+ */
+export function downloadLocalFile(
+  productId: string,
+  instrument: Instrument,
+  filename: string
+): void {
+  const url = getLocalFileUrl(productId, instrument, filename);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.split("/").pop() || filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+/**
+ * Trigger a browser download for the entire product as ZIP.
+ */
+export function downloadLocalZip(
+  productId: string,
+  instrument: Instrument
+): void {
+  const url = getLocalZipUrl(productId, instrument);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${productId}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// =============================================================================
 // Download Cancellation API
 // =============================================================================
 

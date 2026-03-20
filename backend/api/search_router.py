@@ -11,10 +11,14 @@ Endpoints:
 """
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import asyncio
 import os
+import zipfile
+import io
+import mimetypes
 
 from .ode_client import (
     Instrument,
@@ -1249,3 +1253,166 @@ async def cancel_all_downloads(request: Request):
         "cancelled_count": cancelled_count,
         "message": f"Cancelled {cancelled_count} active download(s)"
     }
+
+
+# =============================================================================
+# Local File Download Endpoints (save to user's browser)
+# =============================================================================
+
+def _resolve_product_dir(product_id: str, instrument: Instrument) -> Path:
+    """Resolve the local directory for a product."""
+    from .download_manager import (
+        CRISM_DATA_DIR, HIRISE_DATA_DIR, SHARAD_DATA_DIR,
+        SHARAD_HIGHRES_DIR, parse_crism_base_key,
+    )
+    if instrument == Instrument.CRISM:
+        base_key = parse_crism_base_key(product_id)
+        return CRISM_DATA_DIR / base_key
+    elif instrument == Instrument.HIRISE:
+        # Try exact match first, then with _RED suffix (HiRISE convention)
+        exact = HIRISE_DATA_DIR / product_id.upper()
+        if exact.exists():
+            return exact
+        red = HIRISE_DATA_DIR / f"{product_id.upper()}_RED"
+        if red.exists():
+            return red
+        return exact  # fallback
+    elif instrument == Instrument.SHARAD:
+        return SHARAD_DATA_DIR
+    elif instrument == Instrument.SHARAD_HIGHRES:
+        return SHARAD_HIGHRES_DIR
+    else:
+        from .download_manager import BASE_DIR
+        return BASE_DIR / "data" / product_id.upper()
+
+
+def _list_product_files(product_id: str, instrument: Instrument) -> list[dict]:
+    """List files belonging to a product on disk."""
+    target_dir = _resolve_product_dir(product_id, instrument)
+    if not target_dir.exists():
+        return []
+
+    files = []
+
+    if instrument in (Instrument.SHARAD, Instrument.SHARAD_HIGHRES):
+        # Flat directory — match files starting with product_id prefix
+        prefix = product_id.lower().replace("_thm", "")
+        for f in target_dir.iterdir():
+            if f.is_file() and f.name.lower().startswith(prefix):
+                # Skip aria2 temp files and empty files
+                if f.suffix == ".aria2" or f.stat().st_size == 0:
+                    continue
+                files.append({
+                    "filename": f.name,
+                    "size": f.stat().st_size,
+                    "path": str(f),
+                })
+    else:
+        # Subdirectory-based (CRISM, HiRISE)
+        if not target_dir.is_dir():
+            return []
+        for f in target_dir.rglob("*"):
+            if f.is_file():
+                # Skip aria2 temp files and empty files
+                if f.suffix == ".aria2" or f.stat().st_size == 0:
+                    continue
+                files.append({
+                    "filename": str(f.relative_to(target_dir)),
+                    "size": f.stat().st_size,
+                    "path": str(f),
+                })
+
+    return files
+
+
+@router.get("/download/local/{instrument}/{product_id}/files")
+@limiter.limit("30/minute")
+async def list_local_files(request: Request, product_id: str, instrument: str):
+    """List all local files for a product that can be downloaded to user's machine."""
+    try:
+        inst = Instrument(instrument.lower())
+    except ValueError:
+        raise HTTPException(400, f"Invalid instrument: {instrument}")
+
+    files = _list_product_files(product_id, inst)
+    total_size = sum(f["size"] for f in files)
+
+    return {
+        "product_id": product_id,
+        "instrument": instrument,
+        "files": [{"filename": f["filename"], "size": f["size"]} for f in files],
+        "total_size": total_size,
+        "file_count": len(files),
+    }
+
+
+@router.get("/download/local/{instrument}/{product_id}/file")
+@limiter.limit("30/minute")
+async def download_local_file(request: Request, product_id: str, instrument: str, filename: str = Query(...)):
+    """Download a single file from local storage to user's browser."""
+    try:
+        inst = Instrument(instrument.lower())
+    except ValueError:
+        raise HTTPException(400, f"Invalid instrument: {instrument}")
+
+    target_dir = _resolve_product_dir(product_id, inst)
+
+    if inst in (Instrument.SHARAD, Instrument.SHARAD_HIGHRES):
+        file_path = target_dir / filename
+    else:
+        file_path = target_dir / filename
+
+    # Security: prevent path traversal
+    try:
+        file_path = file_path.resolve()
+        target_dir_resolved = target_dir.resolve()
+        if not str(file_path).startswith(str(target_dir_resolved)):
+            raise HTTPException(403, "Access denied")
+    except Exception:
+        raise HTTPException(403, "Invalid path")
+
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, f"File not found: {filename}")
+
+    media_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+    return FileResponse(
+        path=str(file_path),
+        filename=file_path.name,
+        media_type=media_type,
+    )
+
+
+@router.get("/download/local/{instrument}/{product_id}/zip")
+@limiter.limit("10/minute")
+async def download_local_zip(request: Request, product_id: str, instrument: str):
+    """Download all files for a product as a ZIP archive."""
+    try:
+        inst = Instrument(instrument.lower())
+    except ValueError:
+        raise HTTPException(400, f"Invalid instrument: {instrument}")
+
+    files = _list_product_files(product_id, inst)
+    if not files:
+        raise HTTPException(404, "No local files found for this product")
+
+    def generate_zip():
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in files:
+                arcname = f"{product_id}/{f['filename']}"
+                zf.write(f["path"], arcname)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    # Run ZIP generation in thread pool to avoid blocking
+    import asyncio
+    zip_bytes = await asyncio.to_thread(generate_zip)
+
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{product_id}.zip"',
+            "Content-Length": str(len(zip_bytes)),
+        },
+    )
