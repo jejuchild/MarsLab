@@ -1,0 +1,42 @@
+{
+  "date": "2026-03-20",
+  "generated_at": "2026-03-19T22:10:09.410222+00:00",
+  "topic": {
+    "focus": "Polar Science",
+    "keywords": [
+      "polar layered deposits",
+      "south polar",
+      "CO2 ice",
+      "stratigraphy",
+      "polar cap"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Integration of cold finger, DSC and HTGC techniques to study the physico-chemical properties of wax deposits",
+      "authors": "F.B. Okasaki, G.N. Clímaco, I.F. Pinheiro, L. Bizarre, V.C.B. Guersoni",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper does not appear to be related to Mars research, as it focuses on the physico-chemical properties of wax deposits. The main contribution is likely related to the integration of various techniques to study these properties.",
+      "methodology": "The authors used a combination of cold finger, DSC, and HTGC techniques to study the physico-chemical properties of wax deposits.",
+      "relevance": "This paper does not appear to be directly relevant to MarsLab's Mars exploration goals, as it does not address topics such as polar science, ice detection, or mineral classification.",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139027",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Comparative study on the high-temperature corrosion of boiler steels 12Cr1MoV and HR3C under NaCl-Na2SO4 deposits",
+      "authors": "Jing Pu, Xin Su, Xiaopan Zhang, Xuecong Liu, Daoyang Ma, Zhongfa Hu et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper does not appear to be related to Mars research, as it focuses on the high-temperature corrosion of boiler steels under NaCl-Na2SO4 deposits. The main contribution is likely related to the comparative study of corrosion resistance of different steel types.",
+      "methodology": "The authors used a comparative study approach to investigate the high-temperature corrosion of boiler steels 12Cr1MoV and HR3C under NaCl-Na2SO4 deposits.",
+      "relevance": "This paper does not appear to be directly relevant to MarsLab's Mars exploration goals, as it does not address topics such as polar science, ice detection, or mineral classification.",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139118",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "The two papers provided do not appear to be related to Mars research, and therefore do not provide insight into research trends in the field of Mars exploration. However, it can be noted that there is a lack of representation of Mars-related research in the provided papers. Further analysis of relevant papers would be necessary to identify trends in Mars research. The absence of Mars-related research in these papers may indicate a need for more targeted searching or filtering of research papers.",
+  "connections_to_marslab": "Unfortunately, the findings of these papers do not connect to MarsLab's mission, as they do not address topics such as mineral classification, ice detection, Arcadia Planitia site selection, or human exploration planning. To establish connections to MarsLab's mission, more relevant papers would need to be analyzed, focusing on topics such as polar science, ice cap stratigraphy, and CO2 ice deposits."
+}

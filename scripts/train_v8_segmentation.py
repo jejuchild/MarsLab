@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """
-Train V8 Segmentation Head on pre-extracted DINOv2 ViT-L patch tokens.
+Train V8.1 Segmentation Head on pre-extracted DINOv2 ViT-L patch tokens.
 
-Architecture: frozen ViT-L backbone → BN + Conv1×1 → per-patch class prediction.
-Data: pre-extracted patch tokens (256×1024 per tile) + patch labels (16×16 per tile).
-Split: product-level, seed=42, 15% val (same as V6b).
-
-Trainable params: ~6K. Training is fast even on CPU.
-
-Strategy: Preload ALL tokens+labels into RAM as flat arrays, then train with
-TensorDataset. Eliminates I/O bottleneck entirely.
+V8.1 improvements over V8.0:
+  - Spatial conv layers (3×3 + dilated 3×3 with residual) for local context
+  - MOLA elevation feature fusion (25-dim per tile, broadcast to 16×16 grid)
+  - Focal Loss (gamma=2.0) for class imbalance
+  - Lower LR (1e-3) with warmup + cosine annealing
+  - AdamW with weight decay + gradient clipping
 
 Usage:
-  python train_v8_segmentation.py
+  nohup python train_v8_segmentation.py > /tmp/train_v8.log 2>&1 &
 """
 from __future__ import annotations
 
@@ -24,27 +22,42 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 sys.path.insert(0, "/disk1/cspark/hirise-api")
 from scripts.marslandform_v2.models.seg_head import PatchSegmentationHead
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
 ROOT = Path("/disk1/cspark/MarsLab")
 DATA_DIR = ROOT / "Data/HiRISE/v8_segmentation"
 PATCH_TOKENS_DIR = DATA_DIR / "patch_tokens_v8"
 PATCH_LABELS_PATH = DATA_DIR / "patch_labels_v8.npy"
+MOLA_PATH = ROOT / "Data/HiRISE/v5_retrain/mola_features_v5.npy"
 OUT_DIR = DATA_DIR
 
 CLASS_NAMES = ["LDA", "LVF", "CCF", "OTHER"]
 NUM_CLASSES = 4
 UNLABELED = 255
 EMBED_DIM = 1024
+MOLA_DIM = 25
 PATCHES_PER_SIDE = 16
 
 
+class FocalLoss(nn.Module):
+    def __init__(self, gamma: float = 2.0, weight: torch.Tensor | None = None, ignore_index: int = -100):
+        super().__init__()
+        self.gamma = gamma
+        self.weight = weight
+        self.ignore_index = ignore_index
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        ce = F.cross_entropy(logits, targets, weight=self.weight, ignore_index=self.ignore_index, reduction="none")
+        pt = torch.exp(-ce)
+        focal = ((1 - pt) ** self.gamma * ce)
+        return focal.mean()
+
+
 def split_by_product(all_pids: list[str], val_ratio: float = 0.15, seed: int = 42):
-    """Split products into train/val (same strategy as V6b)."""
     rng = np.random.RandomState(seed)
     unique_pids = sorted(set(all_pids))
     rng.shuffle(unique_pids)
@@ -55,7 +68,6 @@ def split_by_product(all_pids: list[str], val_ratio: float = 0.15, seed: int = 4
 
 
 def compute_metrics(all_preds: np.ndarray, all_labels: np.ndarray):
-    """Compute accuracy and per-class F1 (ignoring UNLABELED)."""
     mask = all_labels != UNLABELED
     preds = all_preds[mask]
     labels = all_labels[mask]
@@ -79,19 +91,14 @@ def compute_metrics(all_preds: np.ndarray, all_labels: np.ndarray):
 
 def preload_split(
     pids: list[str],
-    patch_labels: dict,
+    patch_labels: dict[str, dict[str, np.ndarray]],
     tokens_dir: Path,
+    mola_dict: dict[str, dict[str, np.ndarray]],
     split_name: str,
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Preload all tokens + labels for a split into flat arrays.
-
-    Returns:
-        tokens: (N, 256, 1024) float16
-        labels: (N, 16, 16) uint8
-    """
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     all_tokens = []
     all_labels = []
+    all_mola = []
     skipped = 0
 
     for i, pid in enumerate(pids):
@@ -105,33 +112,42 @@ def preload_split(
 
         token_dict = np.load(token_file, allow_pickle=True).item()
         label_dict = patch_labels[pid]
+        mola_features_for_pid = mola_dict.get(pid, {})
 
         for tile_key in label_dict:
             if tile_key not in token_dict:
                 continue
-            all_tokens.append(token_dict[tile_key])   # (256, 1024) float16
-            all_labels.append(label_dict[tile_key])    # (16, 16) uint8
+            mola_vec = mola_features_for_pid.get(tile_key)
+            if mola_vec is None:
+                skipped += 1
+                continue
+            all_tokens.append(token_dict[tile_key])
+            all_labels.append(label_dict[tile_key])
+            all_mola.append(mola_vec)
 
         if (i + 1) % 1000 == 0:
             print(f"    {split_name}: loaded {i + 1}/{len(pids)} products, {len(all_tokens)} tiles")
 
-    tokens = np.stack(all_tokens, axis=0)  # (N, 256, 1024)
-    labels = np.stack(all_labels, axis=0)  # (N, 16, 16)
-    print(f"    {split_name}: {len(tokens)} tiles from {len(pids) - skipped} products (skipped {skipped})")
-    return tokens, labels
+    tokens = np.stack(all_tokens, axis=0)
+    labels = np.stack(all_labels, axis=0)
+    mola = np.stack(all_mola, axis=0)
+    print(f"    {split_name}: {len(tokens)} tiles from {len(pids)} products (skipped {skipped})")
+    return tokens, labels, mola
 
 
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
-    # Load patch labels
     print("Loading patch labels...")
     patch_labels = np.load(PATCH_LABELS_PATH, allow_pickle=True).item()
     all_pids = sorted(patch_labels.keys())
     print(f"  Products with labels: {len(all_pids)}")
 
-    # Count class distribution
+    print("Loading MOLA features...")
+    mola_dict = np.load(MOLA_PATH, allow_pickle=True).item()
+    print(f"  Products with MOLA: {len(mola_dict)}")
+
     class_counts = Counter()
     total_patches = 0
     for pid in all_pids:
@@ -146,49 +162,64 @@ def train():
     for c in range(NUM_CLASSES):
         print(f"    {CLASS_NAMES[c]}: {class_counts.get(c, 0):,}")
 
-    # Split
     train_pids, val_pids = split_by_product(all_pids)
     print(f"  Train products: {len(train_pids)}, Val products: {len(val_pids)}")
 
-    # Preload all data into RAM
-    print("\nPreloading tokens + labels into RAM...")
+    print("\nPreloading tokens + labels + MOLA into RAM...")
     t_load = time.time()
-    train_tokens, train_labels = preload_split(train_pids, patch_labels, PATCH_TOKENS_DIR, "train")
-    val_tokens, val_labels = preload_split(val_pids, patch_labels, PATCH_TOKENS_DIR, "val")
+    train_tokens, train_labels, train_mola = preload_split(
+        train_pids, patch_labels, PATCH_TOKENS_DIR, mola_dict, "train",
+    )
+    val_tokens, val_labels, val_mola = preload_split(
+        val_pids, patch_labels, PATCH_TOKENS_DIR, mola_dict, "val",
+    )
     load_time = time.time() - t_load
     print(f"  Loaded in {load_time:.1f}s")
-    print(f"  Train: {train_tokens.shape} tokens ({train_tokens.nbytes / 1e9:.1f}GB), {train_labels.shape} labels")
-    print(f"  Val: {val_tokens.shape} tokens ({val_tokens.nbytes / 1e9:.1f}GB), {val_labels.shape} labels")
+    print(f"  Train: {train_tokens.shape} tokens ({train_tokens.nbytes / 1e9:.1f}GB), "
+          f"{train_labels.shape} labels, {train_mola.shape} MOLA")
+    print(f"  Val: {val_tokens.shape} tokens ({val_tokens.nbytes / 1e9:.1f}GB), "
+          f"{val_labels.shape} labels, {val_mola.shape} MOLA")
 
-    # Keep as float16 torch tensors to save RAM (convert to float32 per-batch)
+    # Z-score normalize MOLA using training set stats
+    mola_mean = train_mola.mean(axis=0).astype(np.float32)
+    mola_std = train_mola.std(axis=0).astype(np.float32)
+    mola_std = np.maximum(mola_std, 1e-6)
+    train_mola_normed = ((train_mola - mola_mean) / mola_std).astype(np.float32)
+    val_mola_normed = ((val_mola - mola_mean) / mola_std).astype(np.float32)
+    print(f"  MOLA z-score normalized (mean range: [{mola_mean.min():.1f}, {mola_mean.max():.1f}], "
+          f"std range: [{mola_std.min():.4f}, {mola_std.max():.1f}])")
+
     train_ds = TensorDataset(
-        torch.from_numpy(train_tokens),  # (N, 256, 1024) float16
+        torch.from_numpy(train_tokens),
         torch.from_numpy(train_labels.astype(np.int64)),
+        torch.from_numpy(train_mola_normed),
     )
-    del train_tokens, train_labels
+    del train_tokens, train_labels, train_mola, train_mola_normed
     val_ds = TensorDataset(
-        torch.from_numpy(val_tokens),  # (N, 256, 1024) float16
+        torch.from_numpy(val_tokens),
         torch.from_numpy(val_labels.astype(np.int64)),
+        torch.from_numpy(val_mola_normed),
     )
-    del val_tokens, val_labels, patch_labels
+    del val_tokens, val_labels, val_mola, val_mola_normed, patch_labels, mola_dict
 
     print(f"  Train tiles: {len(train_ds)}, Val tiles: {len(val_ds)}")
 
     train_loader = DataLoader(train_ds, batch_size=256, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_ds, batch_size=512, shuffle=False, num_workers=0)
 
-    # Model
     model = PatchSegmentationHead(
         embed_dim=EMBED_DIM,
         num_classes=NUM_CLASSES,
         patches_per_side=PATCHES_PER_SIDE,
+        hidden_dim=64,
+        mola_dim=MOLA_DIM,
+        mola_hidden=16,
     ).to(device)
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"  Model params: {trainable:,} trainable / {total_params:,} total")
 
-    # Loss: CE with class weights + ignore unlabeled
     class_weight_vals = torch.zeros(NUM_CLASSES)
     for c in range(NUM_CLASSES):
         cnt = class_counts.get(c, 1)
@@ -196,39 +227,55 @@ def train():
     class_weight_vals = class_weight_vals / class_weight_vals.sum() * NUM_CLASSES
     print(f"  Class weights: {class_weight_vals.tolist()}")
 
-    criterion = nn.CrossEntropyLoss(
+    criterion = FocalLoss(
+        gamma=2.0,
         weight=class_weight_vals.to(device),
         ignore_index=UNLABELED,
     )
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=30, eta_min=1e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
-    # Training loop
+    warmup_epochs = 5
+    n_epochs = 50
+    warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+        optimizer, start_factor=0.1, end_factor=1.0, total_iters=warmup_epochs,
+    )
+    cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=n_epochs - warmup_epochs, eta_min=1e-5,
+    )
+    scheduler = torch.optim.lr_scheduler.SequentialLR(
+        optimizer,
+        schedulers=[warmup_scheduler, cosine_scheduler],
+        milestones=[warmup_epochs],
+    )
+
     best_val_f1 = 0
-    patience = 10
+    patience = 15
     no_improve = 0
-    n_epochs = 30
 
-    print(f"\n{'Ep':>3} | {'TrLoss':>7} | {'TrAcc':>6} | {'TrF1':>6} | {'VlAcc':>6} | {'VlF1':>6} | {'LR':>8} | Per-class Val F1")
+    print(f"\n{'Ep':>3} | {'TrLoss':>7} | {'TrAcc':>6} | {'TrF1':>6} | "
+          f"{'VlAcc':>6} | {'VlF1':>6} | {'LR':>8} | Per-class Val F1")
     print("-" * 110)
 
     for epoch in range(1, n_epochs + 1):
         t_ep = time.time()
 
-        # Train
         model.train()
         total_loss = 0
         n_samples = 0
         all_preds_tr, all_labels_tr = [], []
 
-        for tokens, labels in train_loader:
-            tokens, labels = tokens.float().to(device), labels.to(device)
-            logits = model(tokens)  # (B, 4, 16, 16)
+        for tokens, labels, mola in train_loader:
+            tokens = tokens.float().to(device)
+            labels = labels.to(device)
+            mola = mola.to(device)
+
+            logits = model(tokens, mola)
             loss = criterion(logits, labels)
 
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
 
             total_loss += loss.item() * tokens.shape[0]
@@ -242,13 +289,13 @@ def train():
         labels_tr = np.concatenate(all_labels_tr)
         tr_acc, tr_f1, _ = compute_metrics(preds_tr, labels_tr)
 
-        # Validate
         model.eval()
         all_preds_val, all_labels_val = [], []
         with torch.no_grad():
-            for tokens, labels in val_loader:
+            for tokens, labels, mola in val_loader:
                 tokens = tokens.float().to(device)
-                logits = model(tokens)
+                mola = mola.to(device)
+                logits = model(tokens, mola)
                 all_preds_val.append(logits.argmax(1).cpu().numpy())
                 all_labels_val.append(labels.numpy())
 
@@ -259,7 +306,8 @@ def train():
         ep_time = time.time() - t_ep
         lr = scheduler.get_last_lr()[0]
         f1_str = " ".join(f"{CLASS_NAMES[c]}={val_f1s[c]:.3f}" for c in range(NUM_CLASSES))
-        print(f"{epoch:>3} | {avg_loss:>7.4f} | {tr_acc:>6.3f} | {tr_f1:>6.3f} | {val_acc:>6.3f} | {val_f1:>6.3f} | {lr:>8.6f} | {f1_str}  ({ep_time:.0f}s)")
+        print(f"{epoch:>3} | {avg_loss:>7.4f} | {tr_acc:>6.3f} | {tr_f1:>6.3f} | "
+              f"{val_acc:>6.3f} | {val_f1:>6.3f} | {lr:>8.6f} | {f1_str}  ({ep_time:.0f}s)")
 
         if val_f1 > best_val_f1:
             best_val_f1 = val_f1
@@ -271,15 +319,20 @@ def train():
                 "val_acc": val_acc,
                 "train_f1": tr_f1,
                 "class_weights": class_weight_vals.tolist(),
+                "mola_mean": mola_mean.tolist(),
+                "mola_std": mola_std.tolist(),
                 "cfg": {
                     "embed_dim": EMBED_DIM,
                     "num_classes": NUM_CLASSES,
                     "patches_per_side": PATCHES_PER_SIDE,
+                    "hidden_dim": 64,
+                    "mola_dim": MOLA_DIM,
+                    "mola_hidden": 16,
                     "class_names": CLASS_NAMES,
-                    "architecture": "v8-patch-segmentation",
+                    "architecture": "v8.1-patch-segmentation",
                     "backbone": "facebook/dinov2-large",
                 },
-                "version": "v8-segmentation",
+                "version": "v8.1-segmentation",
             }, OUT_DIR / "seg_head_v8.pt")
         else:
             no_improve += 1
@@ -290,19 +343,18 @@ def train():
     print(f"\nBest val F1: {best_val_f1:.4f}")
     print(f"Saved to: {OUT_DIR / 'seg_head_v8.pt'}")
 
-    # Final evaluation
     best_ckpt = torch.load(OUT_DIR / "seg_head_v8.pt", map_location=device, weights_only=False)
     model.load_state_dict(best_ckpt["model_state_dict"])
     model.eval()
 
     print(f"\n=== Final Evaluation (best epoch={best_ckpt['epoch']}) ===")
 
-    # Per-class detailed metrics on val set
     all_preds, all_labels = [], []
     with torch.no_grad():
-        for tokens, labels in val_loader:
+        for tokens, labels, mola in val_loader:
             tokens = tokens.float().to(device)
-            logits = model(tokens)
+            mola = mola.to(device)
+            logits = model(tokens, mola)
             all_preds.append(logits.argmax(1).cpu().numpy())
             all_labels.append(labels.numpy())
 
@@ -323,15 +375,14 @@ def train():
             print(f"  {cnt:>10,}", end="")
         print()
 
-    # FP rate: OTHER predicted as glacial
     other_mask = (labels == 3) & mask
     other_as_glacial = ((preds != 3) & other_mask).sum()
     other_total = other_mask.sum()
-    print(f"\n  FP rate (OTHER→glacial): {other_as_glacial}/{other_total} = {other_as_glacial/max(other_total,1)*100:.2f}%")
+    print(f"\n  FP rate (OTHER→glacial): {other_as_glacial}/{other_total} = "
+          f"{other_as_glacial / max(other_total, 1) * 100:.2f}%")
 
-    # Per-class precision/recall
     print(f"\n  {'Class':>8} | {'Precision':>9} | {'Recall':>9} | {'F1':>9} | {'Support':>9}")
-    print(f"  {'-'*55}")
+    print(f"  {'-' * 55}")
     for c in range(NUM_CLASSES):
         tp = ((preds == c) & (labels == c) & mask).sum()
         fp = ((preds == c) & (labels != c) & mask).sum()

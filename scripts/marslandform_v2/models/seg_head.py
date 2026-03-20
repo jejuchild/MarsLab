@@ -1,16 +1,12 @@
 """
-V8 Segmentation Head — DINOv2 patch tokens → per-patch class prediction.
+V8.1 Segmentation Head — DINOv2 patch tokens → per-patch class prediction.
 
 Architecture:
-  DINOv2 ViT-L/14 patch tokens: (B, 256, 1024)  ← 16×16 grid, 1024-dim
-  Reshape → (B, 1024, 16, 16)
-  BatchNorm2d(1024) → Conv2d(1024, num_classes, 1×1)
-  Output: (B, num_classes, 16, 16)
+  Visual: (B,256,1024) → BN → Conv1×1→hidden → [Conv3×3 + DilatedConv3×3] (residual)
+  MOLA (optional): (B,25) → MLP→mola_hidden → broadcast to (B,mola_hidden,16,16)
+  Fusion: cat([visual, mola]) → Conv1×1 → logits
 
-Trainable parameters: ~6K (BN: 2×1024=2048, Conv: 1024×4+4=4100)
-Backbone is FROZEN — only the head trains.
-
-Classes: LDA (0), LVF (1), CCF (2), OTHER (3)
+~143K trainable params. Backbone is FROZEN.
 """
 from __future__ import annotations
 
@@ -21,10 +17,8 @@ import torch.nn.functional as F
 
 class PatchSegmentationHead(nn.Module):
     """
-    Lightweight segmentation head for DINOv2 patch tokens.
-
-    Takes patch tokens from a frozen ViT backbone and produces per-patch
-    class logits via BN + Conv1×1.
+    Segmentation head for DINOv2 patch tokens with spatial context
+    and optional MOLA elevation feature fusion.
     """
 
     def __init__(
@@ -32,48 +26,75 @@ class PatchSegmentationHead(nn.Module):
         embed_dim: int = 1024,
         num_classes: int = 4,
         patches_per_side: int = 16,
+        hidden_dim: int = 64,
+        mola_dim: int = 0,
+        mola_hidden: int = 16,
     ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_classes = num_classes
         self.patches_per_side = patches_per_side
+        self.use_mola = mola_dim > 0
 
         self.bn = nn.BatchNorm2d(embed_dim)
-        self.classifier = nn.Conv2d(embed_dim, num_classes, kernel_size=1)
+        self.project = nn.Conv2d(embed_dim, hidden_dim, kernel_size=1)
+        self.spatial = nn.Sequential(
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, padding=1),
+            nn.GELU(),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, padding=2, dilation=2),
+            nn.GELU(),
+        )
 
-    def forward(self, patch_tokens: torch.Tensor) -> torch.Tensor:
+        fusion_dim = hidden_dim
+        if self.use_mola:
+            self.mola_head = nn.Sequential(
+                nn.Linear(mola_dim, mola_hidden),
+                nn.GELU(),
+                nn.Linear(mola_hidden, mola_hidden),
+            )
+            fusion_dim += mola_hidden
+
+        self.classifier = nn.Conv2d(fusion_dim, num_classes, kernel_size=1)
+
+    def forward(
+        self,
+        patch_tokens: torch.Tensor,
+        mola_features: torch.Tensor | None = None,
+    ) -> torch.Tensor:
         """
         Args:
-            patch_tokens: (B, N_patches, embed_dim) from DINOv2 backbone
-                          N_patches = patches_per_side² = 256 for 224×224 input
+            patch_tokens: (B, 256, 1024) from frozen DINOv2 ViT-L
+            mola_features: (B, mola_dim) per-tile MOLA features, or None
 
         Returns:
-            logits: (B, num_classes, patches_per_side, patches_per_side)
+            logits: (B, num_classes, 16, 16)
         """
         B, N, D = patch_tokens.shape
         H = W = self.patches_per_side
 
-        # Reshape: (B, N, D) → (B, D, H, W)
         x = patch_tokens.transpose(1, 2).reshape(B, D, H, W)
-
-        # BN + Conv1×1
         x = self.bn(x)
-        logits = self.classifier(x)  # (B, num_classes, H, W)
+        x = F.gelu(self.project(x))
+        x = x + self.spatial(x)
 
-        return logits
+        if self.use_mola and mola_features is not None:
+            m = self.mola_head(mola_features)
+            m = m.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, H, W)
+            x = torch.cat([x, m], dim=1)
 
-    def predict(self, patch_tokens: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        return self.classifier(x)
+
+    def predict(
+        self,
+        patch_tokens: torch.Tensor,
+        mola_features: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
-        Convenience method: returns (probs, preds).
-
-        Args:
-            patch_tokens: (B, N_patches, embed_dim)
-
         Returns:
             probs: (B, num_classes, H, W) softmax probabilities
-            preds: (B, H, W) int64 class predictions
+            preds: (B, H, W) class predictions
         """
-        logits = self.forward(patch_tokens)
+        logits = self.forward(patch_tokens, mola_features)
         probs = F.softmax(logits, dim=1)
         preds = logits.argmax(dim=1)
         return probs, preds

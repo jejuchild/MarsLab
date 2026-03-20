@@ -1,0 +1,222 @@
+{
+  "date": "2026-03-18",
+  "generated_at": "2026-03-17T22:10:12.835589+00:00",
+  "topic": {
+    "focus": "Mineral Classification",
+    "keywords": [
+      "CRISM",
+      "spectral analysis",
+      "mineral mapping",
+      "phyllosilicates",
+      "sulfates"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Progression of Mineral Transformer Oils, Including Nanotechnology and Property Evaluation Techniques",
+      "authors": "Abdelrahman Sayed Tawfic, Mohamed H. Abdo, El-Sayed M. El-Refaie, Diaa-Eldin A. Mansour",
+      "year": "2026",
+      "journal": "Advanced Sciences and Technology Journal",
+      "key_findings": "This paper discusses the progression of mineral transformer oils, including nanotechnology and property evaluation techniques. It does not relate to Mars exploration.",
+      "methodology": "The authors used various property evaluation techniques to analyze mineral transformer oils.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.21608/astj.2025.411961.1089",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Mineral transformation and pore evolution induced by CO2-brine-rock interactions in sandstone reservoirs: Key mechanisms and controlling factors",
+      "authors": "Jingqiang Tan, Guodong Han, Yonggang Ding, Huricha Wu, Ruobing Luo, Xin Liu et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper investigates the mineral transformation and pore evolution in sandstone reservoirs due to CO2-brine-rock interactions. The study provides insights into the mechanisms and controlling factors of these interactions.",
+      "methodology": "The authors used experimental and analytical methods to study the interactions between CO2, brine, and rock in sandstone reservoirs.",
+      "relevance": "May be relevant to understanding geological processes on Mars",
+      "category": "Mineral Transformation",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139126",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Illustrating the role of water sources in nickel phyllosilicate synthesis for enhanced CO2 methanation",
+      "authors": "Zeyu Liu, Siyuan Yin, Fanqi Min, Lucheng Han, Tengfei Zhang, Xiangping Li et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper explores the role of water sources in nickel phyllosilicate synthesis for enhanced CO2 methanation. The study highlights the importance of water sources in the synthesis process.",
+      "methodology": "The authors used experimental methods to synthesize nickel phyllosilicates and investigate the effect of water sources on the synthesis process.",
+      "relevance": "May be relevant to understanding phyllosilicate formation on Mars",
+      "category": "Phyllosilicate Synthesis",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139057",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Real-time assessment and future forecasting of extra virgin olive oil oxidation using near-infrared spectroscopy throughout shelf life",
+      "authors": "Ibuki Kusumoto, Shunji Kato, Daitaro Ishikawa, Yurika Otoki, Yukihiro Ozaki, Kiyotaka Nakagawa",
+      "year": "2026",
+      "journal": "Food Control",
+      "key_findings": "This paper discusses the use of near-infrared spectroscopy for real-time assessment and future forecasting of extra virgin olive oil oxidation. The study does not relate to Mars exploration.",
+      "methodology": "The authors used near-infrared spectroscopy to analyze the oxidation of extra virgin olive oil.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.foodcont.2026.112099",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Shale pore response under solvent extraction: coupling of fluid removal and mineral swelling",
+      "authors": "Xinbin Zhao, Min Wang, Haixun Zhao, Yulong Tang, Jinbu Li, Shibo Yang et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper investigates the response of shale pores to solvent extraction, including the coupling of fluid removal and mineral swelling. The study provides insights into the mechanisms of shale pore response.",
+      "methodology": "The authors used experimental and analytical methods to study the response of shale pores to solvent extraction.",
+      "relevance": "May be relevant to understanding geological processes on Mars",
+      "category": "Shale Pore Response",
+      "url": "https://doi.org/10.1016/j.fuel.2026.138856",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Mineral and metal(loid)s content in canned tuna available in the Spanish market",
+      "authors": "Nuria Jiménez-Redondo, Isabel Casanova-Martínez, Esther Sendra, Marina Cano-Lamadrid, Antonio J. Signes-Pastor",
+      "year": "2026",
+      "journal": "Food Control",
+      "key_findings": "This paper analyzes the mineral and metal content in canned tuna available in the Spanish market. The study does not relate to Mars exploration.",
+      "methodology": "The authors used analytical methods to determine the mineral and metal content in canned tuna.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.foodcont.2026.112120",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Real-Time Detection of Multilingual Audio Distress Signals Using Compact CNN and MFCC Features in Noisy Environments",
+      "authors": "Shruthi G, Jinka Madhurilatha, Deepak D. J, Sowmya B. K, Nayana Rani S",
+      "year": "2028",
+      "journal": "International Journal of Internet Manufacturing and Services",
+      "key_findings": "This paper discusses the detection of multilingual audio distress signals using compact CNN and MFCC features in noisy environments. The study does not relate to Mars exploration.",
+      "methodology": "The authors used machine learning methods to detect audio distress signals.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1504/ijims.2028.10076632",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Zero-Day Intrusion Detection System: Training on Small Datasets with Advanced Data Augmentation and Ensemble Learning",
+      "authors": "Mehaboob Mujawar, Aasheesh Raizada, Abdullah Gubbi",
+      "year": "2028",
+      "journal": "International Journal of Internet Manufacturing and Services",
+      "key_findings": "This paper presents a zero-day intrusion detection system using advanced data augmentation and ensemble learning. The study does not relate to Mars exploration.",
+      "methodology": "The authors used machine learning methods to develop an intrusion detection system.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1504/ijims.2028.10075219",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Model-free Multivariate Change Point Detection and Localization with Statistical Guarantee",
+      "authors": "Xin Xing, Zuofeng Shang, Hongyu Miao, Pang Du",
+      "year": "2028",
+      "journal": "Statistica Sinica",
+      "key_findings": "This paper discusses model-free multivariate change point detection and localization with statistical guarantee. The study does not relate to Mars exploration.",
+      "methodology": "The authors used statistical methods to detect and localize change points.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.5705/ss.202024.0320",
+      "recency_score": 1.0
+    },
+    {
+      "title": "A Data-Adaptive Integrated Approach to Covariance Change Point Detection in High-dimensional Settings",
+      "authors": "Canhuang Xu, Lei Shu, Yu Chen, Qing Yang",
+      "year": "2028",
+      "journal": "Statistica Sinica",
+      "key_findings": "This paper presents a data-adaptive integrated approach to covariance change point detection in high-dimensional settings. The study does not relate to Mars exploration.",
+      "methodology": "The authors used statistical methods to detect change points in covariance.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.5705/ss.202025.0327",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Technology-Based Start-Ups Mapping: a Bibliometric Study and Prospective Research Path",
+      "authors": "Ruby Gothwal, Divya Malhan, Simran Sehgal",
+      "year": "2027",
+      "journal": "International Journal of Technoentrepreneurship",
+      "key_findings": "This paper discusses technology-based start-ups mapping using a bibliometric study and prospective research path. The study does not relate to Mars exploration.",
+      "methodology": "The authors used bibliometric methods to analyze technology-based start-ups.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1504/ijte.2027.10075188",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Knowledge Mapping and Mechanistic Insights in Emotional Digital Design: An Empirical Study Combining Clustering and Thematic Analysis",
+      "authors": "Lan Ma, Yiyuan Ding, Chenxi Dong, Tang Liu, Zhenyu Li, Wenlei Mao et al.",
+      "year": "2027",
+      "journal": "International Journal of Arts and Technology",
+      "key_findings": "This paper explores knowledge mapping and mechanistic insights in emotional digital design using clustering and thematic analysis. The study does not relate to Mars exploration.",
+      "methodology": "The authors used clustering and thematic analysis to study emotional digital design.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1504/ijart.2027.10076828",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Mapping the dynamics of financial literacy: A bibliometric and cluster analysis of financial behavior, knowledge, and attitude",
+      "authors": "Deepika Kanth, Ashish Ranjan Sinha, Vimal Kumar, Deepak Kumar Pathak",
+      "year": "2026",
+      "journal": "Strategic Business Research",
+      "key_findings": "This paper maps the dynamics of financial literacy using a bibliometric and cluster analysis of financial behavior, knowledge, and attitude. The study does not relate to Mars exploration.",
+      "methodology": "The authors used bibliometric and cluster analysis to study financial literacy.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.sbr.2026.100073",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Scenario-based mapping of state-level green hydrogen potential in Mexico: Policy-relevant insights from a multi-technology framework",
+      "authors": "Andrea Navarro Jiménez",
+      "year": "2026",
+      "journal": "Energy and Climate Change",
+      "key_findings": "This paper presents a scenario-based mapping of state-level green hydrogen potential in Mexico using a multi-technology framework. The study does not relate to Mars exploration.",
+      "methodology": "The authors used scenario-based mapping to analyze green hydrogen potential.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.egycc.2026.100240",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Mapping perceived service quality in tourism resorts through user-generated content",
+      "authors": "Tiago Savi Mondo, Aline Barbosa Tinoco Luz, Rômulo Duarte Silva de Oliveira, Erose Sthapit, Brian Garrod",
+      "year": "2026",
+      "journal": "Strategic Business Research",
+      "key_findings": "This paper discusses mapping perceived service quality in tourism resorts through user-generated content. The study does not relate to Mars exploration.",
+      "methodology": "The authors used user-generated content to analyze service quality in tourism resorts.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.sbr.2025.100024",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Mapping the consumer mind: A bibliometric-LDA review of neuromarketing's past, present, and future in consumer behavior",
+      "authors": "Abu Bashar, Naglaa Elgammal, Brighton Nyagadza, Maryam Juma, Kareem Mohamed",
+      "year": "2026",
+      "journal": "Strategic Business Research",
+      "key_findings": "This paper explores mapping the consumer mind using a bibliometric-LDA review of neuromarketing's past, present, and future in consumer behavior. The study does not relate to Mars exploration.",
+      "methodology": "The authors used bibliometric-LDA review to study neuromarketing.",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.sbr.2026.100092",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Comparative Analysis Of Machine Learning Algorithms For Land Use And Land Cover Mapping: Case Study Of Berrechid-Settat Region, Morocco",
+      "authors": "Youssef Laalaoui, Naïma El Assaoui, Oumaima Ouahine",
+      "year": "",
+      "journal": "GEOGRAPHY, ENVIRONMENT, SUSTAINABILITY",
+      "key_findings": "This paper presents a comparative analysis of machine learning algorithms for land use and land cover mapping in the Berrechid-Settat region of Morocco. The study may be relevant to understanding geological processes on Mars.",
+      "methodology": "The authors used machine learning algorithms to analyze land use and land cover mapping.",
+      "relevance": "May be relevant to understanding geological processes on Mars",
+      "category": "Land Use and Land Cover Mapping",
+      "url": "https://doi.org/10.24057/2071-9388-2025-3980",
+      "recency_score": 0.0
+    }
+  ],
+  "trend_analysis": "The majority of the papers do not relate to Mars exploration, with most focusing on topics such as technology-based start-ups, financial literacy, and consumer behavior. However, a few papers touch on geological processes, such as mineral transformation and shale pore response, which may be relevant to understanding the Martian environment. The use of machine learning algorithms and statistical methods is a common trend across many of the papers. Overall, the papers suggest a need for more research focused on Mars exploration and the application of machine learning and statistical methods to understand the Martian environment.",
+  "connections_to_marslab": "The findings of papers 2, 3, 5, and 17 may be relevant to MarsLab's mission, particularly in understanding geological processes on Mars. The use of machine learning algorithms and statistical methods in these papers may be applicable to analyzing data from Mars exploration missions. Additionally, the study of phyllosilicate formation and mineral transformation may be relevant to understanding the Martian geology and identifying potential resources for future human exploration. However, more research is needed to directly apply these findings to Mars exploration and to develop new methods and technologies for analyzing Martian data."
+}
