@@ -1,0 +1,78 @@
+{
+  "date": "2026-03-22",
+  "generated_at": "2026-03-21T22:10:10.221617+00:00",
+  "topic": {
+    "focus": "Arcadia Planitia",
+    "keywords": [
+      "Arcadia Planitia",
+      "landing site",
+      "ISRU",
+      "subsurface ice",
+      "terrain"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Advanced optimization for enhancing energy, exergy, and sustainability in commercial turbofan engine",
+      "authors": "Haoying Chen, Wei Liu, Sijing Chen, Heqiang Cui, Haibo Zhang",
+      "year": "2026",
+      "journal": "Aerospace Science and Technology",
+      "key_findings": "This paper focuses on optimizing energy, exergy, and sustainability in commercial turbofan engines, but does not provide direct findings related to Mars exploration. The optimization techniques presented may have indirect applications in spacecraft propulsion systems.",
+      "methodology": "The authors used advanced optimization techniques to enhance energy and exergy efficiency in commercial turbofan engines.",
+      "relevance": "The paper's focus on optimization techniques could be indirectly relevant to Mars exploration, particularly in the context of propulsion systems for spacecraft.",
+      "category": "Not directly related to Arcadia Planitia",
+      "url": "https://doi.org/10.1016/j.ast.2026.112014",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Insights from dielectric properties and ice crystal into the mechanism of low-frequency electric field superchilling for improving Litopenaeus vannamei water-related properties",
+      "authors": "Haiqiang Chen, Zuanhao Liang, Ming Yu, Yu Xia, Fengxue Liang",
+      "year": "2026",
+      "journal": "Journal of Food Engineering",
+      "key_findings": "This paper explores the dielectric properties of ice crystals and their response to low-frequency electric fields, which could have implications for ice detection and characterization. However, the paper's primary focus is on food engineering and does not directly relate to Mars exploration.",
+      "methodology": "The authors used experimental methods to study the dielectric properties of ice crystals and their response to low-frequency electric fields.",
+      "relevance": "The paper's findings on ice crystal properties could be indirectly relevant to Mars exploration, particularly in the context of subsurface ice mapping and characterization.",
+      "category": "Not directly related to Arcadia Planitia",
+      "url": "https://doi.org/10.1016/j.jfoodeng.2026.113090",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Extension of interferometric particle imaging to small ice-crystal sizes using the discrete dipole approximation",
+      "authors": "Marc Brunel, Gilles Demange, Renaud Patte, Maxim A. Yurkin",
+      "year": "2026",
+      "journal": "Optics &amp; Laser Technology",
+      "key_findings": "This paper presents a method for extending interferometric particle imaging to small ice-crystal sizes using the discrete dipole approximation. The technique could be applied to study ice crystals in various contexts, including Mars exploration.",
+      "methodology": "The authors used a combination of experimental and numerical methods to develop and validate the technique.",
+      "relevance": "The paper's findings could be relevant to Mars exploration, particularly in the context of subsurface ice mapping and characterization, as well as studying Martian atmospheric ice crystals.",
+      "category": "Ice characterization",
+      "url": "https://doi.org/10.1016/j.optlastec.2026.115132",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Prescribed-time disturbance rejection tracking control of output-constrained systems with applications to Mars entry vehicle",
+      "authors": "Di Jiang, Huaiyuan Jiang",
+      "year": "2026",
+      "journal": "Acta Astronautica",
+      "key_findings": "This paper presents a control strategy for Mars entry vehicles, which could be relevant to Mars exploration missions. The authors demonstrate the effectiveness of the control strategy in rejecting disturbances and tracking output constraints.",
+      "methodology": "The authors used a combination of theoretical and numerical methods to develop and validate the control strategy.",
+      "relevance": "The paper's findings could be directly relevant to Mars exploration, particularly in the context of landing site selection and entry vehicle control.",
+      "category": "Mars entry and landing",
+      "url": "https://doi.org/10.1016/j.actaastro.2026.01.068",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Phenotypic and Genotypic Characterization of Gardnerella vaginalis Isolates from Patients with Bacterial Vaginosis",
+      "authors": "Zahraa M. Al-Qanbar, Manal Kadhim",
+      "year": "2027",
+      "journal": "Egyptian Journal of Medical Microbiology",
+      "key_findings": "This paper focuses on the phenotypic and genotypic characterization of Gardnerella vaginalis isolates from patients with bacterial vaginosis, which is not directly related to Mars exploration. The paper's findings do not have any apparent connection to MarsLab's goals.",
+      "methodology": "The authors used a combination of experimental and analytical methods to characterize the bacterial isolates.",
+      "relevance": "The paper's findings are not relevant to Mars exploration or MarsLab's goals.",
+      "category": "Not directly related to Arcadia Planitia",
+      "url": "https://doi.org/10.21608/ejmm.2026.472122.2233",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "The papers fetched from Crossref do not show a clear trend or focus on Mars exploration, particularly in the context of Arcadia Planitia. However, some papers touch on topics that could be indirectly relevant, such as ice characterization and control strategies for spacecraft. The lack of direct relevance to MarsLab's goals suggests that a more targeted search may be necessary to find papers that align with the platform's objectives. Further analysis is needed to identify trends and connections to Mars exploration.",
+  "connections_to_marslab": "While the papers do not show a strong connection to MarsLab's mission, some findings could be indirectly relevant to the platform's goals. For example, the paper on ice characterization could inform subsurface ice mapping and characterization efforts, while the paper on control strategies for Mars entry vehicles could contribute to the development of more effective landing site selection and entry vehicle control systems. Further research and analysis are needed to fully explore these connections and identify potential applications to MarsLab's mission."
+}

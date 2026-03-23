@@ -1056,7 +1056,7 @@ async def check_exists(request: Request, instrument: str, product_id: str):
 
 @router.post("/download", response_model=DownloadResponse)
 @limiter.limit("20/minute")
-async def start_download(http_request: Request, request: DownloadRequest):
+async def start_download(request: Request, body: DownloadRequest):
     """
     Start downloading a product bundle (or missing files only).
 
@@ -1107,29 +1107,29 @@ async def start_download(http_request: Request, request: DownloadRequest):
     ```
     """
     try:
-        request.product_id = validate_product_id(request.product_id)
+        body.product_id = validate_product_id(body.product_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid product ID format")
 
     try:
-        inst = Instrument(request.instrument.lower())
+        inst = Instrument(body.instrument.lower())
     except ValueError:
-        raise HTTPException(400, f"Invalid instrument: {request.instrument}. Valid options: {', '.join(e.value for e in Instrument)}.")
+        raise HTTPException(400, f"Invalid instrument: {body.instrument}. Valid options: {', '.join(e.value for e in Instrument)}.")
 
     # Check detailed existence - allow downloading missing files
-    existence = check_local_existence_detailed(request.product_id, inst)
+    existence = check_local_existence_detailed(body.product_id, inst)
 
     # If fully downloaded and no specific file_types requested, reject
-    if existence.exists and not request.file_types:
+    if existence.exists and not body.file_types:
         raise HTTPException(409, "Product already fully downloaded")
 
     # Start download task (will skip existing files)
     task = await download_manager.start_download(
-        request.product_id,
+        body.product_id,
         inst,
-        lat=request.lat,
-        lon=request.lon,
-        file_types=request.file_types,
+        lat=body.lat,
+        lon=body.lon,
+        file_types=body.file_types,
     )
 
     return DownloadResponse(**task.to_dict())
@@ -1385,7 +1385,11 @@ async def download_local_file(request: Request, product_id: str, instrument: str
 @router.get("/download/local/{instrument}/{product_id}/zip")
 @limiter.limit("10/minute")
 async def download_local_zip(request: Request, product_id: str, instrument: str):
-    """Download all files for a product as a ZIP archive."""
+    """Download all files for a product as a streaming ZIP archive.
+
+    Uses ZIP_STORED (no compression) for large files (>50MB) to avoid
+    loading entire HiRISE JP2 files (~1GB+) into memory.
+    """
     try:
         inst = Instrument(instrument.lower())
     except ValueError:
@@ -1395,24 +1399,119 @@ async def download_local_zip(request: Request, product_id: str, instrument: str)
     if not files:
         raise HTTPException(404, "No local files found for this product")
 
-    def generate_zip():
-        buffer = io.BytesIO()
-        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+    LARGE_FILE_THRESHOLD = 50 * 1024 * 1024  # 50 MB
+    CHUNK_SIZE = 64 * 1024  # 64 KB chunks
+
+    def _stream_zip():
+        """Generator that yields ZIP data in chunks, never loading entire large files."""
+        import struct
+        import time
+
+        # We'll build the ZIP manually for streaming:
+        # For simplicity and reliability, use a temp file with ZIP_STORED for large files
+        import tempfile
+        tmp = tempfile.SpooledTemporaryFile(max_size=128 * 1024 * 1024)  # Spool up to 128MB in RAM
+        with zipfile.ZipFile(tmp, "w") as zf:
             for f in files:
                 arcname = f"{product_id}/{f['filename']}"
-                zf.write(f["path"], arcname)
-        buffer.seek(0)
-        return buffer.getvalue()
-
-    # Run ZIP generation in thread pool to avoid blocking
-    import asyncio
-    zip_bytes = await asyncio.to_thread(generate_zip)
+                compression = zipfile.ZIP_STORED if f["size"] > LARGE_FILE_THRESHOLD else zipfile.ZIP_DEFLATED
+                zf.write(f["path"], arcname, compress_type=compression)
+        tmp.seek(0)
+        while True:
+            chunk = tmp.read(CHUNK_SIZE)
+            if not chunk:
+                break
+            yield chunk
+        tmp.close()
 
     return StreamingResponse(
-        io.BytesIO(zip_bytes),
+        _stream_zip(),
         media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{product_id}.zip"',
-            "Content-Length": str(len(zip_bytes)),
         },
     )
+
+
+# =============================================================================
+# Cleanup Endpoints (aria2 residual files)
+# =============================================================================
+
+@router.get("/download/cleanup/scan")
+@limiter.limit("10/minute")
+async def scan_cleanup(request: Request):
+    """Scan for residual files (.aria2 temp files, 0-byte files) across all data directories."""
+    from .download_manager import (
+        CRISM_DATA_DIR, HIRISE_DATA_DIR, SHARAD_DATA_DIR,
+        SHARAD_HIGHRES_DIR,
+    )
+
+    residuals = []
+    total_size = 0
+
+    for data_dir, label in [
+        (CRISM_DATA_DIR, "crism"),
+        (HIRISE_DATA_DIR, "hirise"),
+        (SHARAD_DATA_DIR, "sharad"),
+        (SHARAD_HIGHRES_DIR, "sharad_highres"),
+    ]:
+        if not data_dir.exists():
+            continue
+        for f in data_dir.rglob("*"):
+            if not f.is_file():
+                continue
+            is_aria2 = f.suffix == ".aria2"
+            is_empty = f.stat().st_size == 0
+            if is_aria2 or is_empty:
+                size = f.stat().st_size
+                residuals.append({
+                    "path": str(f.relative_to(data_dir.parent)),
+                    "size": size,
+                    "reason": "aria2_temp" if is_aria2 else "empty_file",
+                    "directory": label,
+                })
+                total_size += size
+
+    return {
+        "residual_count": len(residuals),
+        "total_size": total_size,
+        "files": residuals,
+    }
+
+
+@router.delete("/download/cleanup")
+@limiter.limit("5/minute")
+async def run_cleanup(request: Request):
+    """Delete all residual files (.aria2 temp files, 0-byte files)."""
+    from .download_manager import (
+        CRISM_DATA_DIR, HIRISE_DATA_DIR, SHARAD_DATA_DIR,
+        SHARAD_HIGHRES_DIR,
+    )
+
+    deleted = 0
+    freed_bytes = 0
+    errors = []
+
+    for data_dir in [CRISM_DATA_DIR, HIRISE_DATA_DIR, SHARAD_DATA_DIR, SHARAD_HIGHRES_DIR]:
+        if not data_dir.exists():
+            continue
+        for f in data_dir.rglob("*"):
+            if not f.is_file():
+                continue
+            is_aria2 = f.suffix == ".aria2"
+            is_empty = f.stat().st_size == 0
+            if is_aria2 or is_empty:
+                try:
+                    size = f.stat().st_size
+                    f.unlink()
+                    deleted += 1
+                    freed_bytes += size
+                except Exception as e:
+                    errors.append({"path": str(f), "error": str(e)})
+
+    return {
+        "status": "completed",
+        "deleted_count": deleted,
+        "freed_bytes": freed_bytes,
+        "errors": errors,
+    }

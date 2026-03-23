@@ -247,10 +247,22 @@ function SearchResultItem({
           Missing: {result.missing_files.join(", ")}
         </div>
       )}
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex items-center justify-between">
         <span className="text-[10px] bg-surface-dark px-2 py-0.5 rounded text-slate-400">
           {result.instrument.toUpperCase()}
         </span>
+        {(isComplete || isPartial) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadLocalZip(result.product_id, result.instrument);
+            }}
+            className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 px-2 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-xs">save_alt</span>
+            Save to Local
+          </button>
+        )}
       </div>
     </div>
   );
@@ -338,6 +350,18 @@ function PointResultItem({
                 <span>Download</span>
               </>
             )}
+          </button>
+        )}
+        {isSelected && (isComplete || isPartial) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadLocalZip(result.product_id, instrument.toLowerCase() as Instrument);
+            }}
+            className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 px-2 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-xs">save_alt</span>
+            Save to Local
           </button>
         )}
       </div>
@@ -693,6 +717,15 @@ function SmartResultItem({ product }: { product: SmartProductSelection }) {
       {/* Per-product reasoning from Llama */}
       {product.reason && (
         <p className="text-[11px] text-slate-500 leading-snug italic">{product.reason}</p>
+      )}
+      {isLocal && (
+        <button
+          onClick={() => downloadLocalZip(product.product_id, product.instrument.toLowerCase() as Instrument)}
+          className="mt-1.5 text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 px-2 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors w-fit"
+        >
+          <span className="material-symbols-outlined text-xs">save_alt</span>
+          Save to Local
+        </button>
       )}
     </div>
   );

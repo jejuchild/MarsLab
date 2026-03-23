@@ -65,6 +65,20 @@ async def _background_index_repair(app: FastAPI):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Startup ---
+    # Fix PROJ_DATA: rasterio bundles PROJ 9.7.1 (needs proj.db MINOR>=6)
+    # while pyproj and conda ship older DBs. Use rasterio's proj.db which is compatible.
+    try:
+        import rasterio
+        rasterio_proj = os.path.join(os.path.dirname(rasterio.__file__), "proj_data")
+        if os.path.exists(os.path.join(rasterio_proj, "proj.db")):
+            os.environ["PROJ_DATA"] = rasterio_proj
+            os.environ.pop("PROJ_LIB", None)  # Remove conflicting legacy var
+            logger.info(f"[PROJ] Set PROJ_DATA={rasterio_proj} (rasterio bundled, MINOR=6)")
+        else:
+            logger.warning("[PROJ] rasterio proj_data not found, PROJ may fail")
+    except Exception as e:
+        logger.warning(f"[PROJ] Failed to set PROJ_DATA: {e}")
+
     # Phase 2a: shared aiohttp session for ODE connection pooling
     app.state.http_session = aiohttp.ClientSession()
 

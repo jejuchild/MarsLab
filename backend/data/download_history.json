@@ -86799,5 +86799,39 @@
     "error": null,
     "lat": 23.1385,
     "lon": 77.9719
+  },
+  {
+    "task_id": "bc11c90e",
+    "product_id": "frt00009312_07_if165l_trr3",
+    "base_key": "frt00009312_07",
+    "instrument": "crism",
+    "status": "failed",
+    "files": [],
+    "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00009312_07",
+    "progress_percent": 0.0,
+    "total_bytes": 0,
+    "downloaded_bytes": 0,
+    "created_at": "2026-03-23T03:12:54.342527",
+    "completed_at": null,
+    "error": "Server restarted during download",
+    "lat": null,
+    "lon": null
+  },
+  {
+    "task_id": "efc6141a",
+    "product_id": "frt00009312_07_if165l_trr3",
+    "base_key": "frt00009312_07",
+    "instrument": "crism",
+    "status": "queued",
+    "files": [],
+    "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00009312_07",
+    "progress_percent": 0.0,
+    "total_bytes": 0,
+    "downloaded_bytes": 0,
+    "created_at": "2026-03-23T03:15:20.809963",
+    "completed_at": null,
+    "error": null,
+    "lat": null,
+    "lon": null
   }
 ]

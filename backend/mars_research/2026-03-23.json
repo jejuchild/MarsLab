@@ -1,0 +1,42 @@
+{
+  "date": "2026-03-23",
+  "generated_at": "2026-03-22T22:10:09.729072+00:00",
+  "topic": {
+    "focus": "Surface Processes",
+    "keywords": [
+      "aeolian",
+      "dunes",
+      "impact crater",
+      "mass wasting",
+      "HiRISE"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Computational study of the formation, migration, and decomposition of epoxy groups during the combustion of char",
+      "authors": "Bastian Schnieder, Babak Farhadi Jahromi, Rochus Schmid, Christof Hättig",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper investigates the formation, migration, and decomposition of epoxy groups during char combustion, but does not provide direct findings related to Mars surface processes. The study focuses on computational modeling of chemical reactions.",
+      "methodology": "The authors employed computational modeling techniques to study the combustion of char and the evolution of epoxy groups.",
+      "relevance": "This paper is not directly relevant to MarsLab's Mars exploration goals, as it focuses on combustion processes and epoxy group formation, which are not directly related to Mars surface processes.",
+      "category": "Not Applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139080",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Fracture-controlled permeability evolution and methane migration pathways in abandoned coal mines: implications for abandoned mine methane recovery",
+      "authors": "Ce Jia, Chaojun Fan, Sheng Li, Mingkun Luo, Zhong Liu, Yiqi Wang et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper examines the relationship between fracture-controlled permeability and methane migration in abandoned coal mines, which may have implications for understanding gas migration and permeability in Martian subsurface environments. The study highlights the importance of fracture networks in controlling fluid flow.",
+      "methodology": "The authors used a combination of field observations, laboratory experiments, and numerical modeling to investigate the evolution of permeability and methane migration in abandoned coal mines.",
+      "relevance": "While this paper is not directly focused on Mars surface processes, its findings on fracture-controlled permeability and gas migration may have indirect relevance to understanding Martian subsurface environments and potential resources.",
+      "category": "Not Applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139102",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "The two papers analyzed do not exhibit a clear trend related to Mars surface processes, as they focus on combustion chemistry and subsurface fluid flow in terrestrial environments. However, the study of fracture-controlled permeability and gas migration may have implications for understanding Martian subsurface environments. Research on Mars surface processes often involves the study of aeolian processes, impact cratering, and mass wasting, which are not directly addressed in these papers. The lack of direct relevance to Mars surface processes suggests that these papers may not be directly applicable to MarsLab's research goals.",
+  "connections_to_marslab": "The findings of these papers do not have a direct connection to MarsLab's mission, which focuses on Mars surface processes, mineral classification, ice detection, and human exploration planning. However, the study of fracture-controlled permeability and gas migration may have indirect implications for understanding Martian subsurface environments and potential resources, which could be relevant to future human exploration missions."
+}
