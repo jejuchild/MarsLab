@@ -188,6 +188,60 @@ function DatasetSelector({
   );
 }
 
+/**
+ * Save to Local PC button — fetches PDS URL on click, then triggers browser download.
+ * Works for any product (Remote or Local) as long as it's CRISM or HiRISE.
+ */
+function SaveToLocalButton({ productId, instrument }: { productId: string; instrument: string }) {
+  const [loading, setLoading] = useState(false);
+  const inst = instrument.toLowerCase();
+  if (inst !== "crism" && inst !== "hirise" && inst !== "crism_trr3") return null;
+
+  const handleClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      const endpoint = inst === "hirise"
+        ? `/api/product-urls/hirise/${productId}`
+        : `/api/product-urls/crism/${productId}`;
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json() as PdsUrls;
+      // Pick the main file URL
+      const url = data.img_url || data.jp2_url;
+      if (url) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = data.img_filename || data.jp2_filename || productId;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        toast.error("No download URL found");
+      }
+    } catch {
+      toast.error("Failed to get download URL");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      className="flex items-center gap-0.5 px-2 py-1 rounded text-[10px] font-bold uppercase border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-50"
+    >
+      <span className={`material-symbols-outlined text-xs ${loading ? "animate-spin" : ""}`}>
+        {loading ? "progress_activity" : "save_alt"}
+      </span>
+      <span>Save to Local</span>
+    </button>
+  );
+}
+
 function SearchResultItem({
   result,
   isSelected,
@@ -251,18 +305,7 @@ function SearchResultItem({
         <span className="text-[10px] bg-surface-dark px-2 py-0.5 rounded text-slate-400">
           {result.instrument.toUpperCase()}
         </span>
-        {(isComplete || isPartial) && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              downloadLocalZip(result.product_id, result.instrument);
-            }}
-            className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 px-2 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-xs">save_alt</span>
-            Save to Local
-          </button>
-        )}
+        <SaveToLocalButton productId={result.product_id} instrument={result.instrument} />
       </div>
     </div>
   );
@@ -327,42 +370,48 @@ function PointResultItem({
           )}
         </div>
         {isSelected && downloadable && !isComplete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDownload();
-            }}
-            disabled={isDownloading}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-all ${
-              isDownloading
-                ? "bg-primary/50 text-white cursor-wait"
-                : "bg-primary hover:bg-primary/80 text-white"
-            }`}
-          >
-            {isDownloading ? (
-              <>
-                <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                <span>Starting...</span>
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-xs">download</span>
-                <span>Download</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload();
+              }}
+              disabled={isDownloading}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-all ${
+                isDownloading
+                  ? "bg-primary/50 text-white cursor-wait"
+                  : "bg-primary hover:bg-primary/80 text-white"
+              }`}
+            >
+              {isDownloading ? (
+                <>
+                  <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                  <span>Starting...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-xs">download</span>
+                  <span>Download</span>
+                </>
+              )}
+            </button>
+            <SaveToLocalButton productId={result.product_id} instrument={instrument} />
+          </div>
         )}
         {isSelected && (isComplete || isPartial) && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              downloadLocalZip(result.product_id, instrument.toLowerCase() as Instrument);
-            }}
-            className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 px-2 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors"
-          >
-            <span className="material-symbols-outlined text-xs">save_alt</span>
-            Save to Local
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                downloadLocalZip(result.product_id, instrument.toLowerCase() as Instrument);
+              }}
+              className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 px-2 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors"
+            >
+              <span className="material-symbols-outlined text-xs">folder_zip</span>
+              ZIP
+            </button>
+            <SaveToLocalButton productId={result.product_id} instrument={instrument} />
+          </div>
         )}
       </div>
     </div>

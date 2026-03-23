@@ -90665,5 +90665,552 @@
     "error": null,
     "lat": 10.0,
     "lon": 10.0
+  },
+  {
+    "task_id": "ed151af5",
+    "product_id": "frt0000a876_07_brcarj_mtr3",
+    "base_key": "frt0000a876_07",
+    "instrument": "crism",
+    "status": "downloading",
+    "files": [
+      {
+        "filename": "frt0000a876_07_if167j_mtr3.img",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_110/frt0000a876/frt0000a876_07_if167j_mtr3.img",
+        "status": "downloading",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_if167j_mtr3.lbl",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_110/frt0000a876/frt0000a876_07_if167j_mtr3.lbl",
+        "status": "completed",
+        "bytes_downloaded": 6180,
+        "bytes_total": 6180,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_if167j_mtr3.hdr",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_110/frt0000a876/frt0000a876_07_if167j_mtr3.hdr",
+        "status": "completed",
+        "bytes_downloaded": 14843,
+        "bytes_total": 14843,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_wv167j_mtr3.tab",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_110/frt0000a876/frt0000a876_07_wv167j_mtr3.tab",
+        "status": "completed",
+        "bytes_downloaded": 14670,
+        "bytes_total": 14670,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_brtruj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brtruj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 994171,
+        "bytes_total": 994171,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_brvnaj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brvnaj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 713391,
+        "bytes_total": 713391,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_brhydj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brhydj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 711140,
+        "bytes_total": 711140,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_bricej_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_bricej_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 753386,
+        "bytes_total": 753386,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_bric2j_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_bric2j_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 833817,
+        "bytes_total": 833817,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_brfalj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brfalj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 1064812,
+        "bytes_total": 1064812,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_brfemj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brfemj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 876388,
+        "bytes_total": 876388,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_brmafj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brmafj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 461297,
+        "bytes_total": 461297,
+        "error": null
+      },
+      {
+        "filename": "frt0000a876_07_brhcpj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brhcpj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt0000a876_07_brlcpj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brlcpj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt0000a876_07_brolvj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brolvj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt0000a876_07_brphsj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brphsj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt0000a876_07_brchlj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_110/frt0000a876/frt0000a876_07_brchlj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 978062,
+        "bytes_total": 978062,
+        "error": null
+      }
+    ],
+    "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt0000a876_07",
+    "progress_percent": 100.0,
+    "total_bytes": 7422157,
+    "downloaded_bytes": 7422157,
+    "created_at": "2026-03-23T05:39:35.538892",
+    "completed_at": null,
+    "error": null,
+    "lat": 35.6585915,
+    "lon": -160.466205
+  },
+  {
+    "task_id": "6083be9e",
+    "product_id": "msv0005b558_01_if152s_trr3",
+    "base_key": "msv0005b558_01",
+    "instrument": "crism",
+    "status": "completed",
+    "files": [],
+    "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/msv0005b558_01",
+    "progress_percent": 0.0,
+    "total_bytes": 0,
+    "downloaded_bytes": 0,
+    "created_at": "2026-03-23T05:39:35.539468",
+    "completed_at": "2026-03-23T05:39:36.531646",
+    "error": "No files found for CRISM observation msv0005b558_01",
+    "lat": 43.84885,
+    "lon": 177.2366
+  },
+  {
+    "task_id": "43ab5002",
+    "product_id": "msv0005aa84_01_if152s_trr3",
+    "base_key": "msv0005aa84_01",
+    "instrument": "crism",
+    "status": "completed",
+    "files": [],
+    "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/msv0005aa84_01",
+    "progress_percent": 0.0,
+    "total_bytes": 0,
+    "downloaded_bytes": 0,
+    "created_at": "2026-03-23T05:39:35.539951",
+    "completed_at": "2026-03-23T05:39:36.531360",
+    "error": "No files found for CRISM observation msv0005aa84_01",
+    "lat": 43.8969,
+    "lon": 177.24615
+  },
+  {
+    "task_id": "437d21ab",
+    "product_id": "msv0005be01_01_if152s_trr3",
+    "base_key": "msv0005be01_01",
+    "instrument": "crism",
+    "status": "completed",
+    "files": [],
+    "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/msv0005be01_01",
+    "progress_percent": 0.0,
+    "total_bytes": 0,
+    "downloaded_bytes": 0,
+    "created_at": "2026-03-23T05:39:36.563267",
+    "completed_at": "2026-03-23T05:39:39.406793",
+    "error": "No files found for CRISM observation msv0005be01_01",
+    "lat": 43.8535,
+    "lon": 177.2611
+  },
+  {
+    "task_id": "6aa34fe7",
+    "product_id": "frt00017c68_07_brcarj_mtr3",
+    "base_key": "frt00017c68_07",
+    "instrument": "crism",
+    "status": "downloading",
+    "files": [
+      {
+        "filename": "frt00017c68_07_if168j_mtr3.img",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2010/2010_098/frt00017c68/frt00017c68_07_if168j_mtr3.img",
+        "status": "downloading",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_if168j_mtr3.lbl",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2010/2010_098/frt00017c68/frt00017c68_07_if168j_mtr3.lbl",
+        "status": "completed",
+        "bytes_downloaded": 6180,
+        "bytes_total": 6180,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_if168j_mtr3.hdr",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2010/2010_098/frt00017c68/frt00017c68_07_if168j_mtr3.hdr",
+        "status": "completed",
+        "bytes_downloaded": 14926,
+        "bytes_total": 14926,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_wv168j_mtr3.tab",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2010/2010_098/frt00017c68/frt00017c68_07_wv168j_mtr3.tab",
+        "status": "completed",
+        "bytes_downloaded": 14670,
+        "bytes_total": 14670,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_brtruj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brtruj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 1087529,
+        "bytes_total": 1087529,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_brvnaj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brvnaj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 467717,
+        "bytes_total": 467717,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_brhydj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brhydj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 860480,
+        "bytes_total": 860480,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_bricej_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_bricej_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 841630,
+        "bytes_total": 841630,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_bric2j_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_bric2j_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 864121,
+        "bytes_total": 864121,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_brfalj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brfalj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 848322,
+        "bytes_total": 848322,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_brfemj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brfemj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 950664,
+        "bytes_total": 950664,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_brmafj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brmafj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 514424,
+        "bytes_total": 514424,
+        "error": null
+      },
+      {
+        "filename": "frt00017c68_07_brhcpj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brhcpj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt00017c68_07_brlcpj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brlcpj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt00017c68_07_brolvj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brolvj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt00017c68_07_brphsj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brphsj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt00017c68_07_brchlj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2010/2010_098/frt00017c68/frt00017c68_07_brchlj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 1089358,
+        "bytes_total": 1089358,
+        "error": null
+      }
+    ],
+    "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00017c68_07",
+    "progress_percent": 100.0,
+    "total_bytes": 7560021,
+    "downloaded_bytes": 7560021,
+    "created_at": "2026-03-23T05:39:36.563420",
+    "completed_at": null,
+    "error": null,
+    "lat": 60.555486,
+    "lon": -160.73762
+  },
+  {
+    "task_id": "da648f8c",
+    "product_id": "frt0000cb94_07_brcarj_mtr3",
+    "base_key": "frt0000cb94_07",
+    "instrument": "crism",
+    "status": "downloading",
+    "files": [
+      {
+        "filename": "frt0000cb94_07_if168j_mtr3.img",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_272/frt0000cb94/frt0000cb94_07_if168j_mtr3.img",
+        "status": "downloading",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_if168j_mtr3.lbl",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_272/frt0000cb94/frt0000cb94_07_if168j_mtr3.lbl",
+        "status": "completed",
+        "bytes_downloaded": 6182,
+        "bytes_total": 6182,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_if168j_mtr3.hdr",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_272/frt0000cb94/frt0000cb94_07_if168j_mtr3.hdr",
+        "status": "completed",
+        "bytes_downloaded": 14926,
+        "bytes_total": 14926,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_wv168j_mtr3.tab",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_272/frt0000cb94/frt0000cb94_07_wv168j_mtr3.tab",
+        "status": "completed",
+        "bytes_downloaded": 14670,
+        "bytes_total": 14670,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_brtruj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brtruj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 1036502,
+        "bytes_total": 1036502,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_brvnaj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brvnaj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 469276,
+        "bytes_total": 469276,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_brhydj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brhydj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 900290,
+        "bytes_total": 900290,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_bricej_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_bricej_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 739177,
+        "bytes_total": 739177,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_bric2j_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_bric2j_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 738737,
+        "bytes_total": 738737,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_brfalj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brfalj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 838967,
+        "bytes_total": 838967,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_brfemj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brfemj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 1017639,
+        "bytes_total": 1017639,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_brmafj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brmafj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 528928,
+        "bytes_total": 528928,
+        "error": null
+      },
+      {
+        "filename": "frt0000cb94_07_brhcpj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brhcpj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt0000cb94_07_brlcpj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brlcpj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt0000cb94_07_brolvj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brolvj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt0000cb94_07_brphsj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brphsj_mtr3.png",
+        "status": "failed",
+        "bytes_downloaded": 0,
+        "bytes_total": null,
+        "error": "Exit code 3"
+      },
+      {
+        "filename": "frt0000cb94_07_brchlj_mtr3.png",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/browse/2008/2008_272/frt0000cb94/frt0000cb94_07_brchlj_mtr3.png",
+        "status": "completed",
+        "bytes_downloaded": 1135845,
+        "bytes_total": 1135845,
+        "error": null
+      }
+    ],
+    "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt0000cb94_07",
+    "progress_percent": 100.0,
+    "total_bytes": 7441139,
+    "downloaded_bytes": 7441139,
+    "created_at": "2026-03-23T05:39:40.164253",
+    "completed_at": null,
+    "error": null,
+    "lat": 60.5614765,
+    "lon": -160.740105
+  },
+  {
+    "task_id": "4e4d8671",
+    "product_id": "s_07711901_rgram",
+    "base_key": "S_07711901_RGRAM",
+    "instrument": "sharad",
+    "status": "completed",
+    "files": [
+      {
+        "filename": "s_07711901_tiff.tif",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/tiff/s_0771xx/s_07711901_tiff.tif",
+        "status": "completed",
+        "bytes_downloaded": 15379610,
+        "bytes_total": 15379610,
+        "error": null
+      },
+      {
+        "filename": "s_07711901_tiff.lbl",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/tiff/s_0771xx/s_07711901_tiff.lbl",
+        "status": "completed",
+        "bytes_downloaded": 2903,
+        "bytes_total": 2903,
+        "error": null
+      }
+    ],
+    "target_dir": "/disk1/cspark/MarsLab/backend/sharad_data",
+    "progress_percent": 100.0,
+    "total_bytes": 15382513,
+    "downloaded_bytes": 15382513,
+    "created_at": "2026-03-23T05:40:20.734775",
+    "completed_at": "2026-03-23T05:40:25.130497",
+    "error": null,
+    "lat": 10.0,
+    "lon": 10.0
   }
 ]
