@@ -1069,6 +1069,16 @@ function FileStatusRow({ file }: { file: DownloadTask["files"][0] }) {
   );
 }
 
+type PdsUrls = {
+  img_url?: string;
+  img_filename?: string;
+  jp2_url?: string;
+  jp2_filename?: string;
+  jp2_size_bytes?: number;
+  lbl_url?: string;
+  browse_urls?: Record<string, string>;
+};
+
 function ProductPreview({
   result,
   onDownload,
@@ -1082,6 +1092,21 @@ function ProductPreview({
 }) {
   const isPartial = !result.exists && (result.has_core || result.has_browse);
   const isComplete = result.exists;
+
+  // Fetch PDS direct download URLs for Save to Local PC
+  const [pdsUrls, setPdsUrls] = useState<PdsUrls | null>(null);
+  useEffect(() => {
+    setPdsUrls(null);
+    const inst = result.instrument.toLowerCase();
+    if (inst !== "crism" && inst !== "hirise") return;
+    const endpoint = inst === "hirise"
+      ? `/api/product-urls/hirise/${result.product_id}`
+      : `/api/product-urls/crism/${result.product_id}`;
+    fetch(endpoint)
+      .then((r) => r.ok ? r.json() as Promise<PdsUrls> : null)
+      .then((d) => setPdsUrls(d))
+      .catch(() => {});
+  }, [result.product_id, result.instrument]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -1260,6 +1285,58 @@ function ProductPreview({
                 <span>Download Bundle</span>
               </>
             )}
+          </button>
+        )}
+
+        {/* Save to Local PC — direct PDS download (no MarsLab needed) */}
+        {pdsUrls && (
+          <div className="border-t border-cyan-500/20 pt-2 space-y-1.5">
+            <p className="text-[9px] uppercase text-cyan-400/60 font-bold tracking-wider">
+              Save to Local PC (direct from PDS)
+            </p>
+            {pdsUrls.img_url && (
+              <a
+                href={pdsUrls.img_url}
+                download={pdsUrls.img_filename ?? true}
+                className="w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm">save_alt</span>
+                {pdsUrls.img_filename ?? "Download IMG"}
+              </a>
+            )}
+            {pdsUrls.jp2_url && (
+              <a
+                href={pdsUrls.jp2_url}
+                download={pdsUrls.jp2_filename ?? true}
+                className="w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+              >
+                <span className="material-symbols-outlined text-sm">save_alt</span>
+                {pdsUrls.jp2_filename ?? "Download JP2"}
+                {pdsUrls.jp2_size_bytes != null && (
+                  <span className="text-[10px] text-cyan-400/60">({formatBytes(pdsUrls.jp2_size_bytes)})</span>
+                )}
+              </a>
+            )}
+            {pdsUrls.lbl_url && (
+              <a
+                href={pdsUrls.lbl_url}
+                download
+                className="w-full py-1.5 px-3 rounded-lg text-[10px] font-bold flex items-center justify-center gap-2 border border-border-dark text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 transition-colors"
+              >
+                <span className="material-symbols-outlined text-xs">save_alt</span>
+                Download Label (.lbl)
+              </a>
+            )}
+          </div>
+        )}
+        {/* Save to Local PC for already-downloaded products (from MarsLab server) */}
+        {(isComplete || isPartial) && (
+          <button
+            onClick={() => downloadLocalZip(result.product_id, result.instrument)}
+            className="w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-sm">folder_zip</span>
+            Save to Local (ZIP from MarsLab)
           </button>
         )}
       </div>

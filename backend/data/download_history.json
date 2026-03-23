@@ -90631,5 +90631,39 @@
     "error": null,
     "lat": 86.993,
     "lon": 255.801
+  },
+  {
+    "task_id": "8c0bc2b0",
+    "product_id": "s_07711901_rgram",
+    "base_key": "S_07711901_RGRAM",
+    "instrument": "sharad",
+    "status": "completed",
+    "files": [
+      {
+        "filename": "s_07711901_tiff.tif",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/tiff/s_0771xx/s_07711901_tiff.tif",
+        "status": "completed",
+        "bytes_downloaded": 15379610,
+        "bytes_total": 15379610,
+        "error": null
+      },
+      {
+        "filename": "s_07711901_tiff.lbl",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/tiff/s_0771xx/s_07711901_tiff.lbl",
+        "status": "completed",
+        "bytes_downloaded": 2903,
+        "bytes_total": 2903,
+        "error": null
+      }
+    ],
+    "target_dir": "/disk1/cspark/MarsLab/backend/sharad_data",
+    "progress_percent": 100.0,
+    "total_bytes": 15382513,
+    "downloaded_bytes": 15382513,
+    "created_at": "2026-03-23T04:42:08.886011",
+    "completed_at": "2026-03-23T04:42:27.346677",
+    "error": null,
+    "lat": 10.0,
+    "lon": 10.0
   }
 ]
