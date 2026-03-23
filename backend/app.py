@@ -687,7 +687,34 @@ def get_hirise_quickview_transparent(request: Request, product_id: str):
 
     path = jpg_path if os.path.exists(jpg_path) else png_path
     if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail=f"Quickview not found: {product_id}")
+        # Fallback: generate quickview from downloaded JP2 data
+        jp2_dir = os.path.join(HIRISE_DATA_DIR, f"{product_id}_RED")
+        jp2_path = os.path.join(jp2_dir, f"{product_id}_RED.JP2")
+        if not os.path.exists(jp2_path):
+            raise HTTPException(status_code=404, detail=f"Quickview not found: {product_id}")
+        try:
+            import rasterio
+            with rasterio.open(jp2_path) as ds:
+                full_w, full_h = ds.width, ds.height
+                # Read a heavily downsampled version (target ~800px wide)
+                scale = max(1, full_w // 800)
+                out_w, out_h = full_w // scale, full_h // scale
+                arr = ds.read(1, out_shape=(out_h, out_w))
+            # Normalize to 0-255
+            nonzero = arr[arr > 0]
+            if nonzero.size > 0:
+                vmin, vmax = float(np.percentile(nonzero, 1)), float(np.percentile(nonzero, 99))
+                if vmax > vmin:
+                    arr = np.clip((arr.astype(float) - vmin) / (vmax - vmin) * 255, 0, 255).astype(np.uint8)
+                else:
+                    arr = arr.astype(np.uint8)
+            else:
+                arr = arr.astype(np.uint8)
+            # Save as JPG for future use
+            cv2.imwrite(jpg_path, arr)
+            path = jpg_path
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to generate quickview: {e}")
 
     try:
         # Read image

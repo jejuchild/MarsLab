@@ -299,14 +299,27 @@ const boundsCache = new LRUMap<string, ProductBounds>(500);
 async function loadHiRISELBL(id: string): Promise<string | null> {
   if (hiriseLBLCache.has(id)) return hiriseLBLCache.get(id)!;
 
-  const res = await fetch(`${HIRISE_LBL_BASE}/${id}_RED.lbl`);
-  if (!res.ok) return null;
+  // Try multiple path patterns: subdirectory (new downloads) and flat (legacy)
+  const patterns = [
+    `${HIRISE_LBL_BASE}/${id}_RED/${id}_RED.LBL`,
+    `${HIRISE_LBL_BASE}/${id}_RED.lbl`,
+    `${HIRISE_LBL_BASE}/${id}_RED/${id}_RED.lbl`,
+  ];
 
-  const text = await res.text();
-  if (!text.includes("IMAGE_MAP_PROJECTION")) return null;
+  for (const url of patterns) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text.includes("IMAGE_MAP_PROJECTION")) continue;
+      hiriseLBLCache.set(id, text);
+      return text;
+    } catch {
+      continue;
+    }
+  }
 
-  hiriseLBLCache.set(id, text);
-  return text;
+  return null;
 }
 
 async function loadCRISMLBL(id: string): Promise<string | null> {
