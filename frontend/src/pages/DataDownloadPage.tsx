@@ -271,7 +271,7 @@ function SearchResultItem({
         {isComplete ? (
           <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 border border-emerald-500/30">
             <span className="material-symbols-outlined text-[10px]">check</span>
-            Complete
+            MarsLab
           </span>
         ) : isPartial ? (
           <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 border border-amber-500/30">
@@ -348,7 +348,7 @@ function PointResultItem({
         {isComplete ? (
           <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 border border-emerald-500/30">
             <span className="material-symbols-outlined text-[10px]">check</span>
-            Local
+            MarsLab
           </span>
         ) : isPartial ? (
           <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase border border-amber-500/30">
@@ -727,7 +727,7 @@ function SmartResultItem({ product }: { product: SmartProductSelection }) {
         {isLocal ? (
           <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 border border-emerald-500/30 shrink-0">
             <span className="material-symbols-outlined text-[10px]">check</span>
-            Local
+            MarsLab
           </span>
         ) : isDownloading ? (
           <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase flex items-center gap-1 border border-amber-500/30 shrink-0">
@@ -989,44 +989,41 @@ function ProximitySearchResults({
                             </span>
                           )}
                         </div>
-                        {selectedItem === r.product_id && (() => {
-                          const isLocal = r.instrument.toLowerCase() === "hirise_dtm" || r.instrument.toLowerCase() === "ctx";
-                          const isDownloaded = downloadedProducts.has(r.product_id);
-                          if (isLocal || isDownloaded) {
-                            return (
-                              <span className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                <span className="material-symbols-outlined text-xs">check_circle</span>
-                                {isLocal ? "Local" : "Downloaded"}
-                              </span>
-                            );
-                          }
-                          return (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDownload(r.product_id, r.instrument.toLowerCase());
-                              }}
-                              disabled={downloadingProductId === r.product_id}
-                              className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-all ${
-                                downloadingProductId === r.product_id
-                                  ? "bg-primary/50 text-white cursor-wait"
-                                  : "bg-primary hover:bg-primary/80 text-white"
-                              }`}
-                            >
-                              {downloadingProductId === r.product_id ? (
-                                <>
-                                  <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
-                                  <span>Starting...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="material-symbols-outlined text-xs">download</span>
-                                  <span>Download</span>
-                                </>
-                              )}
-                            </button>
-                          );
-                        })()}
+                        <div className="flex items-center gap-1.5">
+                          {selectedItem === r.product_id && (() => {
+                            const isOnMarsLab = r.instrument.toLowerCase() === "hirise_dtm" || r.instrument.toLowerCase() === "ctx" || downloadedProducts.has(r.product_id);
+                            if (!isOnMarsLab) {
+                              return (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDownload(r.product_id, r.instrument.toLowerCase());
+                                  }}
+                                  disabled={downloadingProductId === r.product_id}
+                                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase transition-all ${
+                                    downloadingProductId === r.product_id
+                                      ? "bg-primary/50 text-white cursor-wait"
+                                      : "bg-primary hover:bg-primary/80 text-white"
+                                  }`}
+                                >
+                                  {downloadingProductId === r.product_id ? (
+                                    <>
+                                      <span className="material-symbols-outlined text-xs animate-spin">progress_activity</span>
+                                      <span>Starting...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="material-symbols-outlined text-xs">download</span>
+                                      <span>Download</span>
+                                    </>
+                                  )}
+                                </button>
+                              );
+                            }
+                            return null;
+                          })()}
+                          <SaveToLocalButton productId={r.product_id} instrument={r.instrument} />
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1160,7 +1157,7 @@ function ProductPreview({
         {isComplete ? (
           <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded flex items-center gap-1">
             <span className="material-symbols-outlined text-xs">check_circle</span>
-            Complete
+            MarsLab
           </span>
         ) : isPartial ? (
           <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded flex items-center gap-1">
@@ -1191,7 +1188,7 @@ function ProductPreview({
           <div className="bg-bg-dark rounded p-2 border border-border-dark">
             <p className="text-[9px] uppercase text-slate-500">Status</p>
             <p className={isComplete ? "text-emerald-400" : isPartial ? "text-amber-400" : "text-slate-400"}>
-              {isComplete ? "Complete" : isPartial ? "Partial" : "Remote"}
+              {isComplete ? "MarsLab" : isPartial ? "Partial" : "Remote"}
             </p>
           </div>
           {(result.lat !== null || result.lon !== null) && (
