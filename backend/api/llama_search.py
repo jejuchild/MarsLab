@@ -4,12 +4,13 @@ Llama-powered Smart AI Search.
 Single-step: User query → Llama parses → search executes → Llama picks best
 products → auto-download → return results with reasoning.
 
-Uses Ollama (local Llama 3.3) — free and unlimited.
+Uses Groq API (cloud Llama 3.1) for fast inference.
 """
 
 import json
 import logging
 import asyncio
+import os
 import uuid
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
@@ -48,7 +49,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai/smart", tags=["smart-search"])
 
-# Ollama config
+# Groq config (fast cloud inference — primary)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+# Ollama config (unused — kept for reference)
 OLLAMA_BASE_URL = "http://localhost:11434"
 OLLAMA_MODEL = "llama3.1:8b"
 
@@ -124,59 +130,56 @@ def _cleanup_old_sessions():
 
 
 # =============================================================================
-# Ollama Integration
+# Groq API Integration
 # =============================================================================
 
-async def _check_ollama() -> bool:
-    """Check if Ollama is running and has the configured model."""
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{OLLAMA_BASE_URL}/api/tags",
-                timeout=aiohttp.ClientTimeout(total=3),
-            ) as resp:
-                if resp.status != 200:
-                    return False
-                data = await resp.json()
-                models = [m.get("name", "") for m in data.get("models", [])]
-                # Accept any llama3 variant (3.1, 3.3, etc.)
-                return any("llama3" in m for m in models)
-    except Exception:
-        return False
+async def _check_groq() -> bool:
+    """Check if Groq API key is configured."""
+    return bool(GROQ_API_KEY)
 
 
-async def _call_ollama(
+async def _call_groq(
     prompt: str,
     system: str = "",
     temperature: float = 0.2,
     max_tokens: int = 4096,
 ) -> str:
-    """Call Ollama for text generation."""
+    """Call Groq API for fast Llama inference."""
+    if not GROQ_API_KEY:
+        logger.error("GROQ_API_KEY not set")
+        return ""
+
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
     try:
         payload = {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "system": system,
-            "stream": False,
-            "options": {
-                "temperature": temperature,
-                "num_predict": max_tokens,
-            },
+            "model": GROQ_MODEL,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
         }
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{OLLAMA_BASE_URL}/api/generate",
+                GROQ_BASE_URL,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=180),
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 if resp.status != 200:
                     text = await resp.text()
-                    logger.error(f"Ollama error {resp.status}: {text}")
+                    logger.error(f"Groq error {resp.status}: {text}")
                     return ""
                 data = await resp.json()
-                return data.get("response", "")
+                return data["choices"][0]["message"]["content"]
     except Exception as e:
-        logger.error(f"Ollama call failed: {e}")
+        logger.error(f"Groq call failed: {e}")
         return ""
 
 
@@ -270,20 +273,29 @@ JSON schema:
   "intent": "download",
   "targets": ["CRISM"],
   "region": {
-    "type": "named_region | bbox | point | global",
-    "name": "string or null",
-    "bbox": {"minLat": N, "maxLat": N, "minLon": N, "maxLon": N},
-    "point": {"lat": N, "lon": N},
+    "type": "named_region",
+    "name": "Jezero Crater",
+    "bbox": {"minLat": 17.8, "maxLat": 19.0, "minLon": 77.0, "maxLon": 78.2},
+    "point": null,
     "radiusKm": 100
   },
   "filters": {
     "maxResults": 20,
-    "spatialPredicate": "any | intersects | crosses | within | nearest",
+    "spatialPredicate": "any",
     "distribution": "any",
     "terrainHint": null,
-    "crossInstrument": null or {"instrument": "HIRISE_DTM", "titleContains": null}
+    "crossInstrument": null
   }
 }
+
+region.type MUST be exactly one of: "named_region", "bbox", "point", "global".
+- "named_region": Use when user mentions a known Mars location. Set name and bbox.
+- "bbox": Use when user gives explicit coordinates. Set bbox only.
+- "point": Use for a single coordinate. Set point only.
+- "global": Use when no location is specified.
+
+spatialPredicate MUST be one of: "any", "intersects", "crosses", "within", "nearest".
+crossInstrument: Use {"instrument": "HIRISE_DTM", "titleContains": null} when user wants cross-instrument overlap, otherwise null.
 
 crossInstrument: Use when user wants products from instrument A that overlap/intersect with instrument B.
 Put A in "targets", B in crossInstrument.instrument.
@@ -328,7 +340,7 @@ async def _parse_with_llama(query: str, max_results: int) -> GeminiPlan:
 User wants max {max_results} results.
 Output ONLY the JSON object."""
 
-    response = await _call_ollama(prompt, PARSE_SYSTEM_PROMPT)
+    response = await _call_groq(prompt, PARSE_SYSTEM_PROMPT)
 
     if not response:
         return GeminiPlan(
@@ -352,8 +364,24 @@ Output ONLY the JSON object."""
 
     # Build GeminiPlan from parsed data
     region_data = data.get("region", {})
+
+    # Sanitize region type — Llama sometimes returns the schema description literally
+    raw_region_type = region_data.get("type", "global")
+    VALID_REGION_TYPES = {"named_region", "bbox", "point", "global"}
+    if raw_region_type not in VALID_REGION_TYPES:
+        # Try to infer from available data
+        if region_data.get("name"):
+            raw_region_type = "named_region"
+        elif region_data.get("point"):
+            raw_region_type = "point"
+        elif region_data.get("bbox"):
+            raw_region_type = "bbox"
+        else:
+            raw_region_type = "global"
+        logger.info(f"Sanitized invalid region type to: {raw_region_type}")
+
     region = GeminiRegion(
-        type=region_data.get("type", "global"),
+        type=raw_region_type,
         name=region_data.get("name"),
         bbox=region_data.get("bbox"),
         point=region_data.get("point"),
@@ -369,9 +397,15 @@ Output ONLY the JSON object."""
             titleContains=cross_data.get("titleContains"),
         )
 
+    # Sanitize spatialPredicate
+    raw_predicate = filters_data.get("spatialPredicate", "any")
+    VALID_PREDICATES = {"any", "intersects", "crosses", "within", "nearest"}
+    if raw_predicate not in VALID_PREDICATES:
+        raw_predicate = "any"
+
     filters = GeminiFilters(
         maxResults=min(filters_data.get("maxResults", max_results), max_results),
-        spatialPredicate=filters_data.get("spatialPredicate", "any"),
+        spatialPredicate=raw_predicate,
         distribution=filters_data.get("distribution", "any"),
         terrainHint=filters_data.get("terrainHint"),
         crossInstrument=cross_filter,
@@ -438,7 +472,7 @@ Select the best products to download. Prefer products that are NOT already downl
 If all relevant products are already downloaded, still list them and note they're local.
 Output ONLY JSON."""
 
-    response = await _call_ollama(prompt, SELECTION_SYSTEM_PROMPT, temperature=0.3)
+    response = await _call_groq(prompt, SELECTION_SYSTEM_PROMPT, temperature=0.3)
 
     if not response:
         # Fallback: select all non-downloaded products
@@ -491,21 +525,21 @@ async def _run_smart_search(
             await queue.put({"event": event, "data": data})
 
     try:
-        # ── Step 1: Check Ollama ─────────────────────
+        # ── Step 1: Check Groq ─────────────────────
         session.status = "parsing"
-        session.stage_message = "Connecting to Llama..."
-        await emit("stage", {"status": "parsing", "message": "Connecting to Llama..."})
+        session.stage_message = "Connecting to Groq..."
+        await emit("stage", {"status": "parsing", "message": "Connecting to Groq..."})
 
-        ollama_ok = await _check_ollama()
-        if not ollama_ok:
-            session.error = "Ollama is not running. Start Ollama with: ollama serve && ollama pull llama3.1:8b"
+        groq_ok = await _check_groq()
+        if not groq_ok:
+            session.error = "GROQ_API_KEY is not set. Configure it in your environment."
             session.status = "error"
             await emit("error", {"error": session.error})
             return
 
         # ── Step 2: Parse with Llama ─────────────────
-        session.stage_message = "Llama is analyzing your request..."
-        await emit("stage", {"status": "parsing", "message": "Llama is analyzing your request..."})
+        session.stage_message = "Groq Llama is analyzing your request..."
+        await emit("stage", {"status": "parsing", "message": "Groq Llama is analyzing your request..."})
 
         plan = await _parse_with_llama(session.query, max_results)
 
@@ -721,12 +755,12 @@ def _build_response(session: SmartSession) -> Dict[str, Any]:
 
 @router.get("/status")
 async def smart_search_status():
-    """Check Ollama/Llama availability for smart search."""
-    available = await _check_ollama()
+    """Check Groq/Llama availability for smart search."""
+    available = await _check_groq()
     return {
         "ollama_available": available,
-        "model": OLLAMA_MODEL,
-        "message": "Llama ready for smart search" if available else "Ollama not running — start with: ollama serve",
+        "model": GROQ_MODEL,
+        "message": "Groq Llama ready for smart search" if available else "GROQ_API_KEY not set",
     }
 
 
