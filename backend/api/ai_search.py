@@ -13,6 +13,7 @@ Then translates to existing search primitives.
 """
 
 import re
+import asyncio
 import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
@@ -962,75 +963,99 @@ async def _execute_gemini_plan(plan: GeminiPlan) -> List[GeminiSearchResult]:
 
     logger.info(f"Executing search: bbox=[{minlat:.1f}, {maxlat:.1f}, {westernlon:.1f}, {easternlon:.1f}]")
 
-    # Search each requested instrument
-    async with aiohttp.ClientSession() as session:
-        for target in plan.targets:
-            instrument = target.lower()
-            try:
-                products = []
+    # Search each requested instrument — local-first, ODE as fallback, all in parallel
+    max_per_inst = plan.filters.maxResults * 2
 
-                # CTX, HIRISE_DTM, and SHARAD_HIGHRES use local index search
-                if instrument in ("ctx", "hirise_dtm", "sharad_highres"):
-                    local_results = _search_local_index(
-                        instrument.upper(), minlat, maxlat,
-                        lon_min_180, lon_max_180,
-                        center_lat, center_lon,
-                        plan.filters.maxResults * 2,
-                    )
-                    results.extend(local_results)
-                    continue
+    # Map of instrument key to ODE-queryable instruments
+    _ODE_INSTRUMENTS = {"crism", "hirise", "sharad", "sharad_highres"}
 
+    async def _search_one_instrument(target: str) -> List[GeminiSearchResult]:
+        """Search one instrument: local index first, ODE fallback if needed."""
+        instrument = target.lower()
+        inst_results: List[GeminiSearchResult] = []
+
+        # Step 1: Always try local index first (instant, no network)
+        local_results = _search_local_index(
+            instrument.upper(), minlat, maxlat,
+            lon_min_180, lon_max_180,
+            center_lat, center_lon,
+            max_per_inst,
+        )
+        inst_results.extend(local_results)
+
+        # Step 2: If local results exist, skip slow ODE call
+        if inst_results or instrument not in _ODE_INSTRUMENTS:
+            return inst_results
+
+        # Step 3: ODE fallback for instruments with remote data
+        try:
+            products = []
+            async with aiohttp.ClientSession() as session:
                 if instrument == "crism":
                     products = await search_ode_spatial(
                         minlat, maxlat, westernlon, easternlon,
                         Instrument.CRISM,
-                        max_results=plan.filters.maxResults * 2,
+                        max_results=max_per_inst,
                         session=session
                     )
                 elif instrument == "hirise":
                     products = await search_ode_spatial(
                         minlat, maxlat, westernlon, easternlon,
                         Instrument.HIRISE,
-                        max_results=plan.filters.maxResults * 2,
+                        max_results=max_per_inst,
                         session=session
                     )
                 elif instrument == "sharad":
                     products = await search_sharad_spatial(
                         minlat, maxlat, westernlon, easternlon,
-                        max_results=plan.filters.maxResults * 2,
+                        max_results=max_per_inst,
                         session=session
                     )
                 elif instrument == "sharad_highres":
                     products = await search_sharad_highres_spatial(
                         minlat, maxlat, westernlon, easternlon,
-                        max_results=plan.filters.maxResults * 2,
+                        max_results=max_per_inst,
                         session=session
                     )
 
-                # Convert to results
-                for p in products:
-                    inst_enum = Instrument(instrument)
-                    existence = check_local_existence_detailed(p.product_id, inst_enum)
+            # Deduplicate: skip products already found in local index
+            local_pids = {r.product_id.upper() for r in inst_results}
 
-                    distance_km = None
-                    if p.lat is not None and p.lon is not None and center_lat is not None:
-                        distance_km = haversine_distance_km(center_lat, center_lon, p.lat, p.lon)
+            for p in products:
+                if p.product_id.upper() in local_pids:
+                    continue
+                inst_enum = Instrument(instrument)
+                existence = check_local_existence_detailed(p.product_id, inst_enum)
 
-                    results.append(GeminiSearchResult(
-                        product_id=p.product_id,
-                        instrument=instrument.upper(),
-                        lat=p.lat,
-                        lon=p.lon,
-                        distance_km=round(distance_km, 2) if distance_km else None,
-                        exists=existence.exists,
-                        has_core=existence.has_core,
-                        has_browse=existence.has_browse,
-                        missing_files=existence.missing_files,
-                    ))
+                distance_km = None
+                if p.lat is not None and p.lon is not None and center_lat is not None:
+                    distance_km = haversine_distance_km(center_lat, center_lon, p.lat, p.lon)
 
-            except Exception as e:
-                logger.error(f"Search error for {instrument}: {e}")
-                continue
+                inst_results.append(GeminiSearchResult(
+                    product_id=p.product_id,
+                    instrument=instrument.upper(),
+                    lat=p.lat,
+                    lon=p.lon,
+                    distance_km=round(distance_km, 2) if distance_km else None,
+                    exists=existence.exists,
+                    has_core=existence.has_core,
+                    has_browse=existence.has_browse,
+                    missing_files=existence.missing_files,
+                ))
+        except Exception as e:
+            logger.error(f"ODE search error for {instrument}: {e}")
+
+        return inst_results
+
+    # Run all instrument searches in parallel
+    tasks = [_search_one_instrument(target) for target in plan.targets]
+    all_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for r in all_results:
+        if isinstance(r, Exception):
+            logger.error(f"Instrument search failed: {r}")
+            continue
+        results.extend(r)
 
     return results
 

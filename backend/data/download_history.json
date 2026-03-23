@@ -86993,14 +86993,14 @@
     "product_id": "frt0000981f_07_if167j_mtr3",
     "base_key": "frt0000981f_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt0000981f_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_018/frt0000981f/frt0000981f_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1578613272,
+        "bytes_total": 1578613272,
         "error": null
       },
       {
@@ -87134,10 +87134,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt0000981f_07",
     "progress_percent": 100.0,
-    "total_bytes": 7068738,
-    "downloaded_bytes": 7068738,
+    "total_bytes": 1585682010,
+    "downloaded_bytes": 1585682010,
     "created_at": "2026-03-23T03:50:07.373836",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.062567",
     "error": null,
     "lat": 39.1956,
     "lon": 188.3516
@@ -87147,14 +87147,14 @@
     "product_id": "frt000086b5_07_if167j_mtr3",
     "base_key": "frt000086b5_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt000086b5_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_298/frt000086b5/frt000086b5_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1555192128,
+        "bytes_total": 1555192128,
         "error": null
       },
       {
@@ -87288,10 +87288,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt000086b5_07",
     "progress_percent": 100.0,
-    "total_bytes": 7541041,
-    "downloaded_bytes": 7541041,
+    "total_bytes": 1562733169,
+    "downloaded_bytes": 1562733169,
     "created_at": "2026-03-23T03:50:07.374352",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.127588",
     "error": null,
     "lat": 39.3705,
     "lon": 179.113
@@ -87301,14 +87301,14 @@
     "product_id": "frt00006b27_07_if167j_mtr3",
     "base_key": "frt00006b27_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt00006b27_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_198/frt00006b27/frt00006b27_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1542110400,
+        "bytes_total": 1542110400,
         "error": null
       },
       {
@@ -87442,10 +87442,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00006b27_07",
     "progress_percent": 100.0,
-    "total_bytes": 8030038,
-    "downloaded_bytes": 8030038,
+    "total_bytes": 1550140438,
+    "downloaded_bytes": 1550140438,
     "created_at": "2026-03-23T03:50:07.374541",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.121209",
     "error": null,
     "lat": 38.1836,
     "lon": 177.7789
@@ -87455,14 +87455,14 @@
     "product_id": "frt0000820b_07_if167j_mtr3",
     "base_key": "frt0000820b_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt0000820b_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_282/frt0000820b/frt0000820b_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1490599140,
+        "bytes_total": 1490599140,
         "error": null
       },
       {
@@ -87596,10 +87596,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt0000820b_07",
     "progress_percent": 100.0,
-    "total_bytes": 7625829,
-    "downloaded_bytes": 7625829,
+    "total_bytes": 1498224969,
+    "downloaded_bytes": 1498224969,
     "created_at": "2026-03-23T03:50:07.374706",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.127830",
     "error": null,
     "lat": 35.6662,
     "lon": 184.4209
@@ -87609,14 +87609,14 @@
     "product_id": "frt00008704_07_if167j_mtr3",
     "base_key": "frt00008704_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt00008704_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_299/frt00008704/frt00008704_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1475371680,
+        "bytes_total": 1475371680,
         "error": null
       },
       {
@@ -87750,10 +87750,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00008704_07",
     "progress_percent": 100.0,
-    "total_bytes": 7967264,
-    "downloaded_bytes": 7967264,
+    "total_bytes": 1483338944,
+    "downloaded_bytes": 1483338944,
     "created_at": "2026-03-23T03:50:07.374891",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.065533",
     "error": null,
     "lat": 35.6611,
     "lon": 184.4211
@@ -87763,14 +87763,14 @@
     "product_id": "frt00009077_07_if167j_mtr3",
     "base_key": "frt00009077_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt00009077_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_362/frt00009077/frt00009077_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1506108264,
+        "bytes_total": 1506108264,
         "error": null
       },
       {
@@ -87904,10 +87904,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00009077_07",
     "progress_percent": 100.0,
-    "total_bytes": 7819926,
-    "downloaded_bytes": 7819926,
+    "total_bytes": 1513928190,
+    "downloaded_bytes": 1513928190,
     "created_at": "2026-03-23T03:50:07.375045",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.127646",
     "error": null,
     "lat": 35.527,
     "lon": 192.2789
@@ -87917,14 +87917,14 @@
     "product_id": "frt00008458_07_if167j_mtr3",
     "base_key": "frt00008458_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt00008458_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_291/frt00008458/frt00008458_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1523262384,
+        "bytes_total": 1523262384,
         "error": null
       },
       {
@@ -88058,10 +88058,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00008458_07",
     "progress_percent": 100.0,
-    "total_bytes": 7466308,
-    "downloaded_bytes": 7466308,
+    "total_bytes": 1530728692,
+    "downloaded_bytes": 1530728692,
     "created_at": "2026-03-23T03:50:07.375192",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.071738",
     "error": null,
     "lat": 37.0099,
     "lon": 197.884
@@ -88071,14 +88071,14 @@
     "product_id": "frt00009bb9_07_if167j_mtr3",
     "base_key": "frt00009bb9_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt00009bb9_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_031/frt00009bb9/frt00009bb9_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1470207840,
+        "bytes_total": 1470207840,
         "error": null
       },
       {
@@ -88212,10 +88212,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00009bb9_07",
     "progress_percent": 100.0,
-    "total_bytes": 7696822,
-    "downloaded_bytes": 7696822,
+    "total_bytes": 1477904662,
+    "downloaded_bytes": 1477904662,
     "created_at": "2026-03-23T03:50:07.375336",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.127517",
     "error": null,
     "lat": 35.2956,
     "lon": 200.2858
@@ -88533,14 +88533,14 @@
     "product_id": "frt000086b5_07_if167j_mtr3",
     "base_key": "frt000086b5_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt000086b5_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_298/frt000086b5/frt000086b5_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1555192128,
+        "bytes_total": 1555192128,
         "error": null
       },
       {
@@ -88674,10 +88674,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt000086b5_07",
     "progress_percent": 100.0,
-    "total_bytes": 7541041,
-    "downloaded_bytes": 7541041,
+    "total_bytes": 1562733169,
+    "downloaded_bytes": 1562733169,
     "created_at": "2026-03-23T03:50:07.376072",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.127776",
     "error": null,
     "lat": 39.3705,
     "lon": 179.113
@@ -88687,14 +88687,14 @@
     "product_id": "frt00006b27_07_if167j_mtr3",
     "base_key": "frt00006b27_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt00006b27_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_198/frt00006b27/frt00006b27_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1542110400,
+        "bytes_total": 1542110400,
         "error": null
       },
       {
@@ -88828,10 +88828,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00006b27_07",
     "progress_percent": 100.0,
-    "total_bytes": 8030038,
-    "downloaded_bytes": 8030038,
+    "total_bytes": 1550140438,
+    "downloaded_bytes": 1550140438,
     "created_at": "2026-03-23T03:50:07.376230",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.127869",
     "error": null,
     "lat": 38.1836,
     "lon": 177.7789
@@ -88841,14 +88841,14 @@
     "product_id": "frt0000820b_07_if167j_mtr3",
     "base_key": "frt0000820b_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt0000820b_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_282/frt0000820b/frt0000820b_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1490599140,
+        "bytes_total": 1490599140,
         "error": null
       },
       {
@@ -88982,10 +88982,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt0000820b_07",
     "progress_percent": 100.0,
-    "total_bytes": 7625829,
-    "downloaded_bytes": 7625829,
+    "total_bytes": 1498224969,
+    "downloaded_bytes": 1498224969,
     "created_at": "2026-03-23T03:50:07.376377",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.127695",
     "error": null,
     "lat": 35.6662,
     "lon": 184.4209
@@ -88995,14 +88995,14 @@
     "product_id": "frt00008704_07_if167j_mtr3",
     "base_key": "frt00008704_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt00008704_07_if167j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2007/2007_299/frt00008704/frt00008704_07_if167j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1475371680,
+        "bytes_total": 1475371680,
         "error": null
       },
       {
@@ -89136,10 +89136,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00008704_07",
     "progress_percent": 100.0,
-    "total_bytes": 7967264,
-    "downloaded_bytes": 7967264,
+    "total_bytes": 1483338944,
+    "downloaded_bytes": 1483338944,
     "created_at": "2026-03-23T03:50:07.376519",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:00:33.127735",
     "error": null,
     "lat": 35.6611,
     "lon": 184.4211
@@ -90381,14 +90381,14 @@
     "product_id": "frt00009a7a_07_if168j_mtr3",
     "base_key": "frt00009a7a_07",
     "instrument": "crism",
-    "status": "downloading",
+    "status": "completed",
     "files": [
       {
         "filename": "frt00009a7a_07_if168j_mtr3.img",
         "url": "https://pds-geosciences.wustl.edu/mro/mro-m-crism-5-rdr-mptargeted-v1/mrocr_4001/mtrdr/2008/2008_026/frt00009a7a/frt00009a7a_07_if168j_mtr3.img",
-        "status": "downloading",
-        "bytes_downloaded": 0,
-        "bytes_total": null,
+        "status": "completed",
+        "bytes_downloaded": 1854726144,
+        "bytes_total": 1854726144,
         "error": null
       },
       {
@@ -90522,10 +90522,10 @@
     ],
     "target_dir": "/disk1/cspark/MarsLab/backend/crism_data/frt00009a7a_07",
     "progress_percent": 100.0,
-    "total_bytes": 7920058,
-    "downloaded_bytes": 7920058,
+    "total_bytes": 1862646202,
+    "downloaded_bytes": 1862646202,
     "created_at": "2026-03-23T03:51:00.018946",
-    "completed_at": null,
+    "completed_at": "2026-03-23T04:01:24.749750",
     "error": null,
     "lat": 60.4017,
     "lon": 197.7725
