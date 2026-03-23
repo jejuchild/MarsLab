@@ -369,8 +369,8 @@ function PointResultItem({
             </span>
           )}
         </div>
-        {isSelected && downloadable && !isComplete && (
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
+          {isSelected && downloadable && !isComplete && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -395,24 +395,9 @@ function PointResultItem({
                 </>
               )}
             </button>
-            <SaveToLocalButton productId={result.product_id} instrument={instrument} />
-          </div>
-        )}
-        {isSelected && (isComplete || isPartial) && (
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                downloadLocalZip(result.product_id, instrument.toLowerCase() as Instrument);
-              }}
-              className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold uppercase flex items-center gap-0.5 px-2 py-0.5 rounded border border-cyan-500/30 hover:bg-cyan-500/10 transition-colors"
-            >
-              <span className="material-symbols-outlined text-xs">folder_zip</span>
-              ZIP
-            </button>
-            <SaveToLocalButton productId={result.product_id} instrument={instrument} />
-          </div>
-        )}
+          )}
+          <SaveToLocalButton productId={result.product_id} instrument={instrument} />
+        </div>
       </div>
     </div>
   );
