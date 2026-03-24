@@ -670,16 +670,21 @@ from analysis.integration.integration_router import router as integration_router
 app.include_router(integration_router)  # /api/integration/* — Cross-system Integration Modules
 
 @app.get("/hirise/quickview/{product_id}.png")
-@limiter.limit("20/minute")
 def get_hirise_quickview_transparent(request: Request, product_id: str):
     """
     Serve HiRISE quickview image with transparent background.
-    Black pixels are made transparent.
+    Black pixels are made transparent.  Results are cached to disk.
     """
     try:
         product_id = validate_product_id(product_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid product ID format")
+
+    # Check for cached transparent PNG first (fast path)
+    cache_dir = os.path.join(BASE_DIR, "hirise_quickview", ".png_cache")
+    cached_png = os.path.join(cache_dir, f"{product_id}.png")
+    if os.path.exists(cached_png):
+        return FileResponse(cached_png, media_type="image/png")
 
     # Try JPG first (most common)
     jpg_path = os.path.join(BASE_DIR, "hirise_quickview", f"{product_id}.jpg")
@@ -728,8 +733,15 @@ def get_hirise_quickview_transparent(request: Request, product_id: str):
         else:
             gray = img
 
-        # Create RGBA with transparent black pixels
+        # Downscale large images to ~1024px wide for faster overlay rendering
         h, w = gray.shape
+        if w > 1024:
+            scale = 1024 / w
+            new_w, new_h = 1024, int(h * scale)
+            gray = cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            h, w = new_h, new_w
+
+        # Create RGBA with transparent black pixels
         rgba = np.zeros((h, w, 4), dtype=np.uint8)
         rgba[:, :, 0] = gray  # R
         rgba[:, :, 1] = gray  # G
@@ -737,12 +749,18 @@ def get_hirise_quickview_transparent(request: Request, product_id: str):
         # Alpha: 255 for non-black pixels, 0 for black (threshold at 5)
         rgba[:, :, 3] = np.where(gray > 5, 255, 0)
 
-        # Encode as PNG
-        ok, png = cv2.imencode(".png", cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA))
+        # Encode as PNG with compression
+        ok, png_bytes = cv2.imencode(".png", cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA),
+                                     [cv2.IMWRITE_PNG_COMPRESSION, 6])
         if not ok:
             raise HTTPException(status_code=500, detail="Failed to encode PNG")
 
-        return Response(png.tobytes(), media_type="image/png")
+        # Cache to disk for future requests
+        os.makedirs(cache_dir, exist_ok=True)
+        with open(cached_png, "wb") as f:
+            f.write(png_bytes.tobytes())
+
+        return Response(png_bytes.tobytes(), media_type="image/png")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

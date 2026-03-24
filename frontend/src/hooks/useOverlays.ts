@@ -140,6 +140,9 @@ export default function useOverlays({
   // Track CTX tile imagery layers for cleanup
   const ctxTileLayersRef = useRef<Map<string, Cesium.ImageryLayer>>(new Map());
 
+  // Guard against duplicate quickview fetches (prevents 429 retry loops)
+  const quickviewFetchingRef = useRef<Set<string>>(new Set());
+
   // Track blob URLs for CRISM RGB images to clean up later
   const crismBlobUrlsRef = useRef<Map<string, string>>(new Map());
 
@@ -368,9 +371,11 @@ export default function useOverlays({
     }
 
     // STEP 3: Create new overlays
+    // Skip products already being fetched (prevents duplicate requests / 429 loops)
+    const deduped = toCreate.filter((id) => !quickviewFetchingRef.current.has(id));
     // Separate CTX products (tile layers) from CRISM/HiRISE (single images)
-    const ctxToCreate = toCreate.filter((id) => isCTXProduct(id));
-    const imageToCreate = toCreate.filter((id) => !isCTXProduct(id));
+    const ctxToCreate = deduped.filter((id) => isCTXProduct(id));
+    const imageToCreate = deduped.filter((id) => !isCTXProduct(id));
 
     // Create CTX tile overlays (synchronous - no network fetch needed)
     for (const productId of ctxToCreate) {
@@ -404,6 +409,9 @@ export default function useOverlays({
 
     // Create CRISM/HiRISE/HiRISE DTM image overlays (async)
     if (imageToCreate.length > 0) {
+      // Mark all as in-flight to prevent duplicate fetches from re-renders
+      for (const id of imageToCreate) quickviewFetchingRef.current.add(id);
+
       // Pre-fetch bounds in parallel for faster creation
       Promise.all(
         imageToCreate.map(async (productId) => {
@@ -457,6 +465,8 @@ export default function useOverlays({
             console.error("[Quickview] Failed to add overlay:", productId, e);
             toast.error(`Failed to load quickview for ${productId}`);
             return null;
+          } finally {
+            quickviewFetchingRef.current.delete(productId);
           }
         }),
       ).then((results) => {
