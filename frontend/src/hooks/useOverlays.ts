@@ -106,6 +106,9 @@ export default function useOverlays({
         fpEnt.rectangle.material = new Cesium.ColorMaterialProperty(
           Cesium.Color.TRANSPARENT,
         );
+        fpEnt.rectangle.outlineColor = new Cesium.ConstantProperty(
+          Cesium.Color.TRANSPARENT,
+        );
       } else {
         const color = isHiRISEDTM
           ? Cesium.Color.fromCssColorString("#d97706")
@@ -117,6 +120,7 @@ export default function useOverlays({
         fpEnt.rectangle.material = new Cesium.ColorMaterialProperty(
           color.withAlpha(0.10),
         );
+        fpEnt.rectangle.outlineColor = new Cesium.ConstantProperty(color);
       }
     } else if (footprintManager?.hasFeature(`${instrument}_FP_${productId}`)) {
       footprintManager.setFeatureVisible(instrument, productId, !transparent);

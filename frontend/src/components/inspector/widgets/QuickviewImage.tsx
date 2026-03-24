@@ -23,7 +23,11 @@ function buildCrismUrls(productId: string): string[] {
 function getImageUrl(productId: string, instrument: InstrumentType): string | string[] {
   switch (instrument) {
     case "HIRISE":
-      return `/hirise/quickview/${productId}.jpg`;
+      // Try JPG (static) first, then transparent PNG (generated endpoint)
+      return [
+        `/hirise/quickview/${productId}.jpg`,
+        `/hirise/quickview/${productId}.png`,
+      ];
     case "HIRISE_DTM":
       return `/hirise_dtm/overlay/${productId}.png`;
     case "CRISM_TRR3": {

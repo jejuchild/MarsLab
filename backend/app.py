@@ -910,7 +910,7 @@ def get_crism_quickview_transparent(request: Request, product_id: str):
 # Static fallback for non-transparent files
 app.mount(
     "/hirise/quickview",
-    StaticFiles(directory="hirise_quickview"),
+    StaticFiles(directory="hirise_quickview", follow_symlink=True),
     name="hirise_quickview",
 )
 

@@ -202,7 +202,8 @@
       "Bash(which opencode:*)",
       "Bash(npx oh-my-opencode:*)",
       "Bash(opencode auth:*)",
-      "Bash(projinfo:*)"
+      "Bash(projinfo:*)",
+      "Bash(grep -E \"\\\\.\\(py\\)$\")"
     ]
   }
 }

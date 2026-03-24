@@ -561,7 +561,7 @@ export default function MainPage() {
   const [aiAnalysisPin, setAiAnalysisPin] = useState<TerrainPoint | null>(null);
 
   // Default opacity for new overlays
-  const DEFAULT_OPACITY = 80;
+  const DEFAULT_OPACITY = 100;
 
   // Handle visible products update from map
   const handleVisibleProductsChange = useCallback((products: VisibleProduct[]) => {
