@@ -233,99 +233,119 @@ export default function useFlyTo({
   }, [flyToCoords, onFlyToCoordsComplete, viewerRef, marsEllipsoid]);
 
   // Temporarily highlight a product after fly-to (deep-link from DataDownloadPage)
+  // Uses retry logic because footprints may still be loading when this fires.
   useEffect(() => {
     if (!highlightProductId) return;
     const viewer = viewerRef.current;
     if (!viewer) return;
 
     const pid = highlightProductId;
-    const result = findEntityByProductId(viewer, pid);
-    const entity = result?.entity ?? null;
-    const foundInst = result?.instrument ?? "";
+    let cancelled = false;
+    let cleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
-    if (!entity) {
-      onHighlightComplete?.();
-      return;
-    }
+    function tryHighlight(attemptsLeft: number) {
+      if (cancelled) return;
+      const v = viewerRef.current;
+      if (!v) return;
 
-    // Auto-select the product so the Inspector opens (deep-link UX)
-    if (foundInst) {
-      let selectLat = 0;
-      let selectLon = 0;
-      if (entity.rectangle?.coordinates) {
-        const rect = entity.rectangle.coordinates.getValue(Cesium.JulianDate.now());
-        if (rect) {
-          selectLat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
-          selectLon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
+      const result = findEntityByProductId(v, pid);
+      const entity = result?.entity ?? null;
+      const foundInst = result?.instrument ?? "";
+
+      if (!entity) {
+        if (attemptsLeft > 0) {
+          // Footprints still loading — retry after a short delay
+          cleanupTimer = setTimeout(() => tryHighlight(attemptsLeft - 1), 400);
+        } else {
+          onHighlightComplete?.();
         }
-      } else if (entity.position) {
-        const pos = entity.position.getValue(Cesium.JulianDate.now());
-        if (pos) {
-          const carto = Cesium.Cartographic.fromCartesian(pos, marsEllipsoid);
-          selectLat = Cesium.Math.toDegrees(carto.latitude);
-          selectLon = Cesium.Math.toDegrees(carto.longitude);
-        }
+        return;
       }
-      const title = entity.properties?.title?.getValue?.() as string | undefined;
-      onSelect({
-        instrument: foundInst as InspectorContext["instrument"],
-        productId: pid,
-        lat: selectLat,
-        lon: selectLon,
-        title,
-      });
 
-      // Auto-activate quickview overlay for deep-link products
-      onToggleOverlay?.(pid, "quickview");
-    }
-
-    // Save original material
-    const origMaterial = entity.rectangle?.material;
-    const origOutline = entity.rectangle?.outlineColor;
-    const origOutlineWidth = entity.rectangle?.outlineWidth;
-
-    // Apply bright highlight
-    if (entity.rectangle) {
-      entity.rectangle.material = new Cesium.ColorMaterialProperty(
-        Cesium.Color.MAGENTA.withAlpha(0.7)
-      );
-      entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE);
-      entity.rectangle.outlineWidth = new Cesium.ConstantProperty(3);
-    }
-    // Also handle polyline entities (SHARAD)
-    if (entity.polyline) {
-      const origPolyMaterial = entity.polyline.material;
-      const origPolyWidth = entity.polyline.width;
-      entity.polyline.material = new Cesium.ColorMaterialProperty(Cesium.Color.MAGENTA);
-      entity.polyline.width = new Cesium.ConstantProperty(5);
-
-      viewer.scene.requestRender();
-
-      const timer = setTimeout(() => {
-        if (entity?.polyline) {
-          entity.polyline.material = origPolyMaterial;
-          entity.polyline.width = origPolyWidth;
+      // Auto-select the product so the Inspector opens (deep-link UX)
+      if (foundInst) {
+        let selectLat = 0;
+        let selectLon = 0;
+        if (entity.rectangle?.coordinates) {
+          const rect = entity.rectangle.coordinates.getValue(Cesium.JulianDate.now());
+          if (rect) {
+            selectLat = Cesium.Math.toDegrees((rect.south + rect.north) / 2);
+            selectLon = Cesium.Math.toDegrees((rect.west + rect.east) / 2);
+          }
+        } else if (entity.position) {
+          const pos = entity.position.getValue(Cesium.JulianDate.now());
+          if (pos) {
+            const carto = Cesium.Cartographic.fromCartesian(pos, marsEllipsoid);
+            selectLat = Cesium.Math.toDegrees(carto.latitude);
+            selectLon = Cesium.Math.toDegrees(carto.longitude);
+          }
         }
-        viewer.scene.requestRender();
+        const title = entity.properties?.title?.getValue?.() as string | undefined;
+        onSelect({
+          instrument: foundInst as InspectorContext["instrument"],
+          productId: pid,
+          lat: selectLat,
+          lon: selectLon,
+          title,
+        });
+
+        // Auto-activate quickview overlay for deep-link products
+        onToggleOverlay?.(pid, "quickview");
+      }
+
+      // Save original material
+      const origMaterial = entity.rectangle?.material;
+      const origOutline = entity.rectangle?.outlineColor;
+      const origOutlineWidth = entity.rectangle?.outlineWidth;
+
+      // Apply bright highlight
+      if (entity.rectangle) {
+        entity.rectangle.material = new Cesium.ColorMaterialProperty(
+          Cesium.Color.MAGENTA.withAlpha(0.7)
+        );
+        entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE);
+        entity.rectangle.outlineWidth = new Cesium.ConstantProperty(3);
+      }
+      // Also handle polyline entities (SHARAD)
+      if (entity.polyline) {
+        const origPolyMaterial = entity.polyline.material;
+        const origPolyWidth = entity.polyline.width;
+        entity.polyline.material = new Cesium.ColorMaterialProperty(Cesium.Color.MAGENTA);
+        entity.polyline.width = new Cesium.ConstantProperty(5);
+
+        v.scene.requestRender();
+
+        cleanupTimer = setTimeout(() => {
+          if (entity?.polyline) {
+            entity.polyline.material = origPolyMaterial;
+            entity.polyline.width = origPolyWidth;
+          }
+          v.scene.requestRender();
+          onHighlightComplete?.();
+        }, 3000);
+        return;
+      }
+
+      v.scene.requestRender();
+
+      // Restore after 3 seconds
+      cleanupTimer = setTimeout(() => {
+        if (entity?.rectangle) {
+          if (origMaterial) entity.rectangle.material = origMaterial;
+          if (origOutline) entity.rectangle.outlineColor = origOutline;
+          if (origOutlineWidth) entity.rectangle.outlineWidth = origOutlineWidth;
+        }
+        v.scene.requestRender();
         onHighlightComplete?.();
       }, 3000);
-      return () => clearTimeout(timer);
     }
 
-    viewer.scene.requestRender();
+    tryHighlight(8); // Up to 8 retries × 400ms = 3.2s wait for footprints
 
-    // Restore after 3 seconds
-    const timer = setTimeout(() => {
-      if (entity?.rectangle) {
-        if (origMaterial) entity.rectangle.material = origMaterial;
-        if (origOutline) entity.rectangle.outlineColor = origOutline;
-        if (origOutlineWidth) entity.rectangle.outlineWidth = origOutlineWidth;
-      }
-      viewer.scene.requestRender();
-      onHighlightComplete?.();
-    }, 3000);
-
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      if (cleanupTimer) clearTimeout(cleanupTimer);
+    };
   }, [highlightProductId, onHighlightComplete, onSelect, onToggleOverlay, viewerRef, marsEllipsoid]);
 
   // Bring high-res overlay to front when bringToFrontId changes
