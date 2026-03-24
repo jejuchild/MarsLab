@@ -36,6 +36,7 @@ import EmptyState from "../components/EmptyState";
 import KeyboardShortcuts from "../components/KeyboardShortcuts";
 import OnboardingTour from "../components/OnboardingTour";
 import type { InstrumentType } from "../utils/FootprintManager";
+import { detectInstrument } from "../utils/cesiumEntityUtils";
 import { getInstrumentIds, type InstrumentId, isInstrumentId } from "../config/instrumentRegistry";
 import type { OverlapStats } from "../utils/overlapFilter";
 import SpectralComparison from "../components/SpectralComparison";
@@ -596,6 +597,13 @@ export default function MainPage() {
         total: result.total,
       },
     }));
+    // If a deep-link product is waiting for footprints, trigger highlight now
+    const pendingPid = pendingDeepLinkHighlightRef.current;
+    if (pendingPid && detectInstrument(pendingPid) === result.instrument) {
+      pendingDeepLinkHighlightRef.current = null;
+      // Small delay to let Cesium entities render after footprint load
+      setTimeout(() => setHighlightProductId(pendingPid), 200);
+    }
   }, []);
 
   // Set overlay for a product (or clear if type is null)
@@ -709,10 +717,14 @@ export default function MainPage() {
   const handleFlyToComplete = useCallback(() => {
     const pid = flyToProductIdRef.current;
     setFlyToProductId(null);
-    // If this fly-to came from a deep-link, highlight the product after arrival
+    // If this fly-to came from a deep-link, reload footprints for the new viewport
+    // (initial load uses global bbox with limit=2000, product may not be included)
     if (pid && deepLinkFlyToRef.current) {
       deepLinkFlyToRef.current = false;
-      setHighlightProductId(pid);
+      const inst = detectInstrument(pid) as Exclude<InstrumentType, "CUSTOM">;
+      pendingDeepLinkHighlightRef.current = pid;
+      // Re-trigger footprint loading — camera is now at the product location
+      setLoadFootprintsTrigger({ instrument: inst, timestamp: Date.now() });
     }
   }, []);
 
@@ -863,6 +875,8 @@ export default function MainPage() {
 
   // Track whether the current fly-to was triggered by a deep-link
   const deepLinkFlyToRef = useRef(false);
+  // Product ID waiting for footprints to reload after deep-link fly-to
+  const pendingDeepLinkHighlightRef = useRef<string | null>(null);
 
   // --- URL State: Restore on mount ---
   // Read URL params once and apply them to app state.
