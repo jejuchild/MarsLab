@@ -1,0 +1,30 @@
+{
+  "date": "2026-03-25",
+  "generated_at": "2026-03-24T22:10:10.479295+00:00",
+  "topic": {
+    "focus": "Ice Detection & Geomorphology",
+    "keywords": [
+      "SHARAD",
+      "subsurface ice",
+      "radar sounding",
+      "lobate debris aprons",
+      "glacial"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Design of Magnetic Shielding for a Wide Field of View Sounding Rocket Instrument",
+      "authors": "Sophia Nowak, C. V. Ambarish, Haiyue Duan, William Griffin, Felix T. Jaeckel, Miriam Marino et al.",
+      "year": "2026",
+      "journal": "IEEE Transactions on Applied Superconductivity",
+      "key_findings": "The paper discusses the design of magnetic shielding for a wide field of view sounding rocket instrument, but does not provide specific findings related to Mars or ice detection. The main contribution is likely related to the development of a new instrument or technology.",
+      "methodology": "The methods used in this paper are likely related to engineering and design principles, possibly including simulations or modeling of magnetic shielding.",
+      "relevance": "This paper may have indirect relevance to MarsLab's Mars exploration goals, potentially contributing to the development of new instruments or technologies that could be used in future Mars missions.",
+      "category": "Instrumentation and Technology",
+      "url": "https://doi.org/10.1109/tasc.2026.3672347",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "The provided paper does not directly relate to ice detection or geomorphology, suggesting a potential gap in the current research fetch. However, the development of new instruments and technologies, such as magnetic shielding, could be a growing trend in the field of space exploration. Further research would be needed to determine the prevalence of this trend and its potential applications to Mars exploration. The use of sounding rocket instruments could be an area of increasing interest, particularly if they can be adapted for use in Mars missions.",
+  "connections_to_marslab": "While the provided paper does not have a direct connection to MarsLab's mission, the development of new instruments and technologies could potentially contribute to the advancement of Mars exploration goals, such as mineral classification, ice detection, or human exploration planning. For example, a sounding rocket instrument with advanced magnetic shielding could be used to study the Martian subsurface or detect ice deposits, which would be relevant to MarsLab's objectives."
+}
