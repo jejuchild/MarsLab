@@ -116,11 +116,24 @@ def parse_rdr_rows(observation_ids: set[str]):
             have_polygon = all(lon is not None and lat is not None for lon, lat in corners)
 
             if have_polygon:
-                polygon = []
+                # Convert to -180..180
+                converted = []
                 for lon, lat in corners:
                     if lon is None or lat is None:
                         continue
-                    polygon.append([lon_360_to_180(lon), lat])
+                    converted.append([lon_360_to_180(lon), lat])
+
+                # Detect antimeridian crossing: if any pair of corners
+                # spans > 180° in longitude, shift negative lons by +360
+                lons_180 = [c[0] for c in converted]
+                if max(lons_180) - min(lons_180) > 180:
+                    # Straddles antimeridian — shift to keep all corners together
+                    converted = [
+                        [lon + 360 if lon < 0 else lon, lat]
+                        for lon, lat in converted
+                    ]
+
+                polygon = converted
                 polygon.append(polygon[0])
             else:
                 polygon = None

@@ -382,9 +382,9 @@ export class FootprintManager {
       let north = -Infinity;
 
       for (const [lon, lat] of ring) {
-        const nlon = normalizeLon(lon);
-        if (nlon < west) west = nlon;
-        if (nlon > east) east = nlon;
+        // Use raw lon — antimeridian polygons may use >180 (e.g. 180.1)
+        if (lon < west) west = lon;
+        if (lon > east) east = lon;
         if (lat < south) south = lat;
         if (lat > north) north = lat;
       }
@@ -469,7 +469,48 @@ export class FootprintManager {
 
         let outlineIndex = -1;
 
-        if (geom.type !== "LineString") {
+        if (geom.type === "Polygon") {
+          // Use actual polygon ring coordinates for accurate footprint shape
+          const ring = geom.coordinates?.[0] as [number, number][] | undefined;
+          if (!ring || ring.length < 4) continue;
+
+          const polyPositions: number[] = [];
+          for (const [lon, lat] of ring) {
+            // Use raw coordinates — Cesium handles any longitude value.
+            // Normalizing would re-break antimeridian-crossing polygons
+            // (e.g. 179.9° and 180.1° → 179.9° and -179.9°).
+            polyPositions.push(lon, lat);
+          }
+          // Remove closing point for PolygonGeometry (it auto-closes)
+          const hierarchy = new Cesium.PolygonHierarchy(
+            Cesium.Cartesian3.fromDegreesArray(
+              polyPositions.slice(0, -2), // drop duplicate closing vertex
+              this.ellipsoid,
+            ),
+          );
+
+          geometryInstances.push(
+            new Cesium.GeometryInstance({
+              geometry: new Cesium.PolygonGeometry({
+                polygonHierarchy: hierarchy,
+              }),
+              id: entityId,
+              attributes: {
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(0.12)),
+                show: new Cesium.ShowGeometryInstanceAttribute(true),
+              },
+            }),
+          );
+
+          outlineIndex = outlineCollection.length;
+          outlineCollection.add({
+            positions: Cesium.Cartesian3.fromDegreesArray(polyPositions, this.ellipsoid),
+            width: 1.0,
+            material: Cesium.Material.fromType("Color", { color }),
+            id: entityId,
+          });
+        } else if (geom.type === "Point") {
+          // Point geometry: use bounding-box rectangle as before
           geometryInstances.push(
             new Cesium.GeometryInstance({
               geometry: new Cesium.RectangleGeometry({
