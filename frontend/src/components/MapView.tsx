@@ -370,6 +370,8 @@ type GeoJsonIndex = {
   features?: GeoJsonIndexFeature[];
 };
 
+// Cache for HiRISE index
+let hiriseIndexCache: GeoJsonIndex | null = null;
 // Cache for HiRISE DTM index
 let hiriseDTMIndexCache: GeoJsonIndex | null = null;
 // Cache for CRISM TRR3 index
@@ -468,7 +470,38 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
     return null;
   }
 
-  const isHiRISE = productId.startsWith("ESP_");
+  // Check for HiRISE products — bounds from index.geojson polygon
+  const isHiRISE = productId.startsWith("ESP_") || productId.startsWith("PSP_");
+  if (isHiRISE) {
+    if (!hiriseIndexCache) {
+      try {
+        const res = await fetch("/hirise_index.geojson");
+        if (res.ok) {
+          hiriseIndexCache = await res.json();
+        }
+      } catch {
+        // fall through to LBL parsing
+      }
+    }
+
+    if (hiriseIndexCache?.features) {
+      for (const feature of hiriseIndexCache.features) {
+        if (feature.properties?.product_id === productId) {
+          const coords = feature.geometry?.coordinates?.[0];
+          if (coords) {
+            const bounds = boundsFromPolygon(coords);
+            if (bounds) {
+              boundsCache.set(productId, bounds);
+              return bounds;
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Fallback: parse LBL file for precise bounds
   const lbl = isHiRISE ? await loadHiRISELBL(productId) : await loadCRISMLBL(productId);
   if (!lbl) return null;
 

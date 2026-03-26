@@ -420,8 +420,9 @@ export class FootprintManager {
       if (lon === 0 && lat === 0) return null;
 
       const nlon = normalizeLon(lon);
-      const halfW = instrument === "HIRISE" ? 0.08 : 0.07;
-      const halfH = instrument === "HIRISE" ? 0.15 : 0.06;
+      // HiRISE: narrow & tall strip; others: roughly square
+      const halfW = instrument === "HIRISE" ? 0.03 : 0.07;
+      const halfH = instrument === "HIRISE" ? 0.1 : 0.06;
       return {
         west: nlon - halfW,
         east: nlon + halfW,

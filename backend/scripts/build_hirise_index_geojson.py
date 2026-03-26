@@ -71,8 +71,9 @@ def normalize_geometry_longitudes(geometry: dict[str, object]):
 
 
 def rectangle_footprint(center_lat: float, center_lon_360: float):
-    half_lat = 0.025
-    half_lon = 0.05
+    # HiRISE swaths are long & narrow strips (~6km wide, ~10-20km long)
+    half_lat = 0.1   # ~11 km along-track (was 0.025)
+    half_lon = 0.03   # ~3.5 km cross-track at equator (was 0.05)
     west = lon_360_to_180(center_lon_360 - half_lon)
     east = lon_360_to_180(center_lon_360 + half_lon)
     south = max(-90.0, center_lat - half_lat)
