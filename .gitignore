@@ -121,3 +121,4 @@ backend/data/crawl_report_*.json
 # Neural Climate data/checkpoints (generated)
 backend/neural_climate/checkpoints/
 backend/neural_climate/data/
+*.npz
