@@ -207,7 +207,11 @@
       "Bash(jq .features[0])",
       "Bash(git filter-branch:*)",
       "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git rm --cached --ignore-unmatch backend/data/thermal_pinn/deeponet_training_data.npz results/sct_analysis/v2_ortho/pair_B/aligned_images.npz' --prune-empty -- origin/responsive-web..HEAD)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Read(//home/cspark/miniconda3/lib/gdalplugins/**)",
+      "Bash(ldd /home/cspark/miniconda3/lib/gdalplugins/*.so)",
+      "Bash(LD_LIBRARY_PATH=/home/cspark/miniconda3/lib:$LD_LIBRARY_PATH gdal_translate -of GTiff -co COMPRESS=LZW -co TILED=YES backend/hirise_data/ESP_011630_1985_RED.JP2 /tmp/test_hirise_convert.tif)",
+      "Bash(conda install:*)"
     ]
   }
 }
