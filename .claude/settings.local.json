@@ -203,7 +203,8 @@
       "Bash(npx oh-my-opencode:*)",
       "Bash(opencode auth:*)",
       "Bash(projinfo:*)",
-      "Bash(grep -E \"\\\\.\\(py\\)$\")"
+      "Bash(grep -E \"\\\\.\\(py\\)$\")",
+      "Bash(jq .features[0])"
     ]
   }
 }
