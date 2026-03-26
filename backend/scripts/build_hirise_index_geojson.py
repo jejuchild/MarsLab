@@ -88,24 +88,38 @@ def rectangle_footprint(center_lat: float, center_lon_360: float):
 
 
 def parse_rdr_rows(observation_ids: set[str]):
+    import csv
+
     records = {}
     with RDR_INDEX_PATH.open("r", encoding="utf-8", errors="ignore") as handle:
         for line in handle:
-            obs_id = line[99:114].strip()
+            # Quick check before expensive CSV parsing
+            obs_id_raw = line[99:114].strip()
+            if obs_id_raw not in observation_ids or obs_id_raw in records:
+                continue
+
+            fields = list(csv.reader([line]))[0]
+            obs_id = fields[4].strip()
             if obs_id not in observation_ids or obs_id in records:
                 continue
 
-            c1_lat = parse_float(line[732:742])
-            c1_lon = parse_float(line[743:753])
-            c2_lat = parse_float(line[754:764])
-            c2_lon = parse_float(line[765:775])
-            c3_lat = parse_float(line[776:786])
-            c3_lon = parse_float(line[787:797])
-            c4_lat = parse_float(line[798:808])
-            c4_lon = parse_float(line[809:819])
+            # Corner coordinates (fields 46-53)
+            c1_lat = parse_float(fields[46])
+            c1_lon = parse_float(fields[47])
+            c2_lat = parse_float(fields[48])
+            c2_lon = parse_float(fields[49])
+            c3_lat = parse_float(fields[50])
+            c3_lon = parse_float(fields[51])
+            c4_lat = parse_float(fields[52])
+            c4_lon = parse_float(fields[53])
 
-            center_lat = parse_float(line[691:696])
-            center_lon = parse_float(line[697:705])
+            center_lat = parse_float(fields[29])
+            center_lon = parse_float(fields[30])
+
+            # Full product dimensions (for quickview aspect-ratio correction)
+            rdr_lines = parse_float(fields[17])
+            rdr_samples = parse_float(fields[18])
+            proj_center_lat = parse_float(fields[42])
 
             corners = [
                 (c1_lon, c1_lat),
@@ -142,6 +156,9 @@ def parse_rdr_rows(observation_ids: set[str]):
                 "center_lat": center_lat,
                 "center_lon_360": center_lon,
                 "polygon": polygon,
+                "rdr_lines": int(rdr_lines) if rdr_lines else None,
+                "rdr_samples": int(rdr_samples) if rdr_samples else None,
+                "proj_center_lat": proj_center_lat,
             }
 
             if len(records) == len(observation_ids):
@@ -178,7 +195,12 @@ def build_feature(
     if polygon is None:
         polygon = rectangle_footprint(center_lat, center_lon_360)
 
-    properties = {
+    # Full product aspect ratio for quickview alignment correction
+    rdr_lines = rdr_record.get("rdr_lines") if rdr_record else None
+    rdr_samples = rdr_record.get("rdr_samples") if rdr_record else None
+    proj_center_lat = rdr_record.get("proj_center_lat") if rdr_record else None
+
+    properties: dict[str, object] = {
         "instrument": "HIRISE",
         "product_id": image_id,
         "quicklook": f"/hirise/quickview/{image_id}.jpg",
@@ -188,6 +210,11 @@ def build_feature(
     }
     if title:
         properties["title"] = title
+    if rdr_lines and rdr_samples:
+        properties["rdr_lines"] = rdr_lines
+        properties["rdr_samples"] = rdr_samples
+    if proj_center_lat is not None:
+        properties["proj_center_lat"] = proj_center_lat
 
     return {
         "type": "Feature",

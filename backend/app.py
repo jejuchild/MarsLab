@@ -669,6 +669,22 @@ app.include_router(pinns_router)
 from analysis.integration.integration_router import router as integration_router
 app.include_router(integration_router)  # /api/integration/* — Cross-system Integration Modules
 
+def _get_hirise_rdr_props(product_id: str) -> tuple[int, int] | None:
+    """Get (rdr_lines, rdr_samples) from HiRISE index cache for aspect-ratio correction."""
+    cache = _geojson_cache.get("hirise")
+    if not cache:
+        return None
+    for feat in cache.get("features", []):
+        props = feat.get("properties", {})
+        if props.get("product_id") == product_id:
+            lines = props.get("rdr_lines")
+            samples = props.get("rdr_samples")
+            if lines and samples:
+                return (int(lines), int(samples))
+            return None
+    return None
+
+
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(request: Request, product_id: str):
     """
@@ -733,8 +749,30 @@ def get_hirise_quickview_transparent(request: Request, product_id: str):
         else:
             gray = img
 
-        # Downscale large images to ~1024px wide for faster overlay rendering
+        # Crop browse image to match full product aspect ratio.
+        # Browse images (abrowse.jpg) are non-uniformly downscaled from the
+        # full RDR product and may include annotation padding, causing ~8-9%
+        # aspect ratio mismatch that leads to misaligned quickview overlays.
         h, w = gray.shape
+        rdr_props = _get_hirise_rdr_props(product_id)
+        if rdr_props:
+            rdr_lines, rdr_samples = rdr_props
+            target_ratio = rdr_samples / rdr_lines  # width/height
+            current_ratio = w / h
+            if abs(current_ratio - target_ratio) / target_ratio > 0.01:
+                if current_ratio < target_ratio:
+                    # Image is too tall — crop top/bottom
+                    new_h = int(w / target_ratio)
+                    crop = (h - new_h) // 2
+                    gray = gray[crop:crop + new_h, :]
+                else:
+                    # Image is too wide — crop left/right
+                    new_w = int(h * target_ratio)
+                    crop = (w - new_w) // 2
+                    gray = gray[:, crop:crop + new_w]
+                h, w = gray.shape
+
+        # Downscale large images to ~1024px wide for faster overlay rendering
         if w > 1024:
             scale = 1024 / w
             new_w, new_h = 1024, int(h * scale)
