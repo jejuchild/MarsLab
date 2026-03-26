@@ -149,11 +149,15 @@ def convert_jp2_to_tif(jp2_path: Path, skip_gdal: bool = False) -> Optional[Path
     if tif_path.exists():
         return tif_path
     try:
+        env = os.environ.copy()
+        conda_lib = Path(sys.executable).parent.parent / "lib"
+        if conda_lib.exists():
+            env["LD_LIBRARY_PATH"] = f"{conda_lib}:{env.get('LD_LIBRARY_PATH', '')}"
         result = subprocess.run(
             ["gdal_translate", "-of", "GTiff",
              "-co", "COMPRESS=LZW", "-co", "TILED=YES",
              str(jp2_path), str(tif_path)],
-            capture_output=True, text=True, timeout=600,
+            capture_output=True, text=True, timeout=600, env=env,
         )
         if result.returncode == 0:
             return tif_path
@@ -248,15 +252,22 @@ async def download_jezero_sharad(args):
         if not products:
             return
 
-        # Extract product IDs and metadata
+        # Extract product IDs from LabelURL (SHARAD RDR has no Product_id field)
         tracks = []
         for p in products[:args.max_obs]:
-            pid = p.get("Product_id", p.get("pdsid", "")).upper()
+            label_url = p.get("LabelURL", "")
+            if not label_url:
+                continue
+            # Extract filename from URL: .../r_0400201_001_ss19_700_a.lbl
+            pid = label_url.rsplit("/", 1)[-1]
+            # Strip extension (.lbl) if present
+            if "." in pid:
+                pid = pid.rsplit(".", 1)[0]
+            pid = pid.upper()
             if not pid:
                 continue
             lat = _float(p.get("Center_latitude"))
             lon = _float(p.get("Center_longitude"))
-            label_url = p.get("LabelURL", "")
             footprint_wkt = p.get("Footprint_C0_geometry", "")
             tracks.append({
                 "pid": pid, "lat": lat, "lon": lon,
