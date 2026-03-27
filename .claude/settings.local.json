@@ -215,7 +215,9 @@
       "Bash(python3 -c \":*)",
       "Bash(printf \"E%04d\" -180)",
       "Bash(printf \"E%04d\" -144)",
-      "Bash(do unzip:*)"
+      "Bash(do unzip:*)",
+      "Bash(iostat -d 1 3)",
+      "Bash(iotop -bn1)"
     ]
   }
 }
