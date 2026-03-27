@@ -22,12 +22,16 @@ import struct
 import io
 import math
 import glob as globmod
+import logging
+import time
 
 import numpy as np
 from PIL import Image
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import Response, JSONResponse
 from cachetools import LRUCache
+
+logger = logging.getLogger(__name__)
 
 from api.validation import validate_product_id
 
@@ -400,6 +404,7 @@ def _render_radargram_png(
     if cache_key and cache_key in _png_cache:
         return _png_cache[cache_key]
 
+    t0 = time.monotonic()
     power = np.asarray(power, dtype=np.float32)
     power = np.nan_to_num(power, nan=0.0, posinf=0.0, neginf=0.0)
 
@@ -421,9 +426,17 @@ def _render_radargram_png(
 
     if per_trace:
         # Per-trace normalization (vectorized) — matches PDS browse image style
+        # Uses np.partition (O(n) partial sort) instead of np.percentile (O(n log n))
         p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
-        vmins = np.percentile(p, pmin, axis=1, keepdims=True)
-        vmaxs = np.percentile(p, pmax, axis=1, keepdims=True)
+        n_bins = p.shape[1]
+        k_lo = max(0, int(pmin / 100.0 * n_bins))
+        k_hi = min(n_bins - 1, int(pmax / 100.0 * n_bins))
+        if k_lo == k_hi:
+            k_hi = min(n_bins - 1, k_lo + 1)
+        p_sorted_lo = np.partition(p, k_lo, axis=1)
+        vmins = p_sorted_lo[:, k_lo : k_lo + 1]
+        p_sorted_hi = np.partition(p, k_hi, axis=1)
+        vmaxs = p_sorted_hi[:, k_hi : k_hi + 1]
         vmaxs = np.where(vmaxs <= vmins, vmins + 1, vmaxs)
         img = ((p - vmins) / (vmaxs - vmins) * 255).clip(0, 255).astype(np.uint8)
     else:
@@ -443,6 +456,10 @@ def _render_radargram_png(
     buf = io.BytesIO()
     pil_img.save(buf, format="PNG", optimize=False)
     png_bytes = buf.getvalue()
+
+    elapsed = time.monotonic() - t0
+    logger.info("_render_radargram_png: %d traces x %d bins, ds=%d, per_trace=%s => %.2fs",
+                p.shape[0], p.shape[1] if p.ndim > 1 else 0, downsample, per_trace, elapsed)
 
     if cache_key:
         _png_cache[cache_key] = png_bytes

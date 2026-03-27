@@ -218,7 +218,8 @@
       "Bash(do unzip:*)",
       "Bash(iostat -d 1 3)",
       "Bash(iotop -bn1)",
-      "Bash(find /disk1/cspark/MarsLab -type f \\\\\\(-name *download* -o -name *fetch* \\\\\\))"
+      "Bash(find /disk1/cspark/MarsLab -type f \\\\\\(-name *download* -o -name *fetch* \\\\\\))",
+      "Bash(gdalbuildvrt ctx_arcadia.vrt *_Mosaic.tif)"
     ]
   }
 }

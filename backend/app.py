@@ -655,6 +655,9 @@ app.include_router(mars_research_router)  # /api/mars-research — Mars Research
 from api.accessibility_router import router as accessibility_router
 app.include_router(accessibility_router)  # /api/accessibility/* — Ice Accessibility Algorithm
 
+from api.ctx_tile_router import router as ctx_tile_router
+app.include_router(ctx_tile_router)  # /api/ctx-mosaic/* — Murray Lab CTX Mosaic Tiles
+
 from api.pathfinder_router import router as pathfinder_router
 app.include_router(pathfinder_router)  # /api/pathfinder/* — AI Rover Route Planning
 

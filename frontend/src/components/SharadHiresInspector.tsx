@@ -112,6 +112,7 @@ export default function SharadHiresInspector({
   const [molaProfile, setMolaProfile] = useState<MolaProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [, setAuxLoading] = useState(false); // surface/mola still loading
 
   // Display controls
   const [useLog, setUseLog] = useState(true);
@@ -260,20 +261,25 @@ export default function SharadHiresInspector({
           molaData = cached.molaProfile;
           clutterOk = cached.clutterAvailable;
         } else {
+          // Helper: fetch with 30s timeout via AbortController
+          const fetchWithTimeout = (url: string, timeoutMs = 30000): Promise<globalThis.Response> => {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+            return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
+          };
+
           // Step 1: Fetch metadata first to compute safe downsample
-          const metaRes = await fetch(`/api/sharad_highres/metadata?product_id=${pid}`);
+          const metaRes = await fetchWithTimeout(`/api/sharad_highres/metadata?product_id=${pid}`);
           if (!metaRes.ok) throw new Error("Failed to load metadata");
           metaData = await metaRes.json();
 
           // Dynamic downsample: highest resolution that fits in browser canvas limits
           const ds = Math.max(1, Math.ceil(metaData.rows / MAX_IMAGE_WIDTH));
 
-          // Step 2: Fetch the rest in parallel with computed downsample
-          const [imgRes, rmRes, surfRes, molaRes] = await Promise.all([
-            fetch(`/api/sharad_highres/radargram?product_id=${pid}&downsample=${ds}&log=${useLog ? 1 : 0}&pmin=${pmin}&pmax=${pmax}&amplitude=${useAmplitude ? 1 : 0}&per_trace=${usePerTrace ? 1 : 0}`),
-            fetch(`/api/sharad_highres/radargram_meta?product_id=${pid}&downsample=${ds}`),
-            fetch(`/api/sharad_highres/surface?product_id=${pid}&downsample=${ds}`),
-            fetch(`/api/sharad_highres/mola_profile?product_id=${pid}&downsample=${ds}`),
+          // Step 2: Fetch radargram + meta (critical), surface + mola (non-blocking)
+          const [imgRes, rmRes] = await Promise.all([
+            fetchWithTimeout(`/api/sharad_highres/radargram?product_id=${pid}&downsample=${ds}&log=${useLog ? 1 : 0}&pmin=${pmin}&pmax=${pmax}&amplitude=${useAmplitude ? 1 : 0}&per_trace=${usePerTrace ? 1 : 0}`),
+            fetchWithTimeout(`/api/sharad_highres/radargram_meta?product_id=${pid}&downsample=${ds}`),
           ]);
 
           if (!imgRes.ok) throw new Error("Failed to load radargram");
@@ -282,18 +288,33 @@ export default function SharadHiresInspector({
           blob = await imgRes.blob();
           rmData = await rmRes.json();
 
+          // Surface + MOLA fetched in parallel but non-blocking:
+          // radargram will show even if these fail or timeout
           surfData = [];
           molaData = null;
-          if (surfRes.ok) {
-            const sj = await surfRes.json();
-            surfData = sj.surface || [];
-          }
-          if (molaRes.ok) {
-            molaData = await molaRes.json();
-          }
+          if (!cancelled) setAuxLoading(true);
+          const auxPromise = Promise.allSettled([
+            fetchWithTimeout(`/api/sharad_highres/surface?product_id=${pid}&downsample=${ds}`),
+            fetchWithTimeout(`/api/sharad_highres/mola_profile?product_id=${pid}&downsample=${ds}`),
+          ]).then(async ([surfResult, molaResult]) => {
+            if (surfResult.status === "fulfilled" && surfResult.value.ok) {
+              const sj = await surfResult.value.json();
+              surfData = sj.surface || [];
+            }
+            if (molaResult.status === "fulfilled" && molaResult.value.ok) {
+              molaData = await molaResult.value.json();
+            }
+            if (!cancelled) {
+              setSurface(surfData);
+              setMolaProfile(molaData);
+              setAuxLoading(false);
+            }
+          }).catch(() => {
+            if (!cancelled) setAuxLoading(false);
+          });
 
           // Check cluttergram availability (non-blocking)
-          fetch(`/api/sharad_highres/cluttergram_meta?product_id=${pid}`)
+          fetchWithTimeout(`/api/sharad_highres/cluttergram_meta?product_id=${pid}`)
             .then(r => r.json())
             .then(d => {
               clutterOk = d.available === true;
@@ -304,6 +325,30 @@ export default function SharadHiresInspector({
             })
             .catch(() => {});
 
+          // Decode radargram image immediately — show UI before aux data arrives
+          const img = new globalThis.Image();
+          img.src = URL.createObjectURL(blob);
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error("Failed to decode radargram image"));
+          });
+
+          if (!cancelled) {
+            setMetadata(metaData);
+            setClutterAvailable(clutterOk);
+            setRadargram(img);
+            setRadargramMeta(rmData);
+            // Surface/mola will be set by auxPromise callback
+            const cw = containerRef.current?.clientWidth || 450;
+            const ch = containerRef.current?.clientHeight || 400;
+            setViewX({ start: 0, end: Math.min(1, cw / img.width) });
+            setViewY({ start: 0, end: Math.min(1, ch / img.height) });
+            setLoading(false);
+          }
+
+          // Wait for aux data before caching
+          await auxPromise;
+
           // Store in cache (evict oldest if full)
           if (_productCache.size >= MAX_CACHE_SIZE) {
             _productCache.delete(_productCache.keys().next().value!);
@@ -313,9 +358,10 @@ export default function SharadHiresInspector({
             surface: surfData, molaProfile: molaData, clutterAvailable: clutterOk,
             paramKey,
           });
+          return; // skip the generic state-setting below (already done)
         }
 
-        // Decode blob → HTMLImageElement
+        // Cache-hit path: decode blob → HTMLImageElement
         const img = new globalThis.Image();
         img.src = URL.createObjectURL(blob);
         await new Promise<void>((resolve, reject) => {
@@ -338,7 +384,10 @@ export default function SharadHiresInspector({
           setViewY({ start: 0, end: Math.min(1, ch / img.height) });
         }
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Unknown error";
+        let msg = e instanceof Error ? e.message : "Unknown error";
+        if (e instanceof DOMException && e.name === "AbortError") {
+          msg = "Request timed out — the server took too long to respond";
+        }
         if (!cancelled) setError(msg);
       } finally {
         if (!cancelled) setLoading(false);

@@ -51836,6 +51836,150 @@
           ]
         ]
       }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "product_id": "R_1592201_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "dat_file": "r_1592201_001_ss19_700_a.dat",
+        "lbl_file": "r_1592201_001_ss19_700_a.lbl"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            74.3746,
+            22.4126
+          ],
+          [
+            74.3067,
+            21.8968
+          ],
+          [
+            74.247,
+            21.4418
+          ],
+          [
+            74.1557,
+            20.7437
+          ],
+          [
+            74.049,
+            19.9243
+          ],
+          [
+            73.9448,
+            19.1201
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "product_id": "R_1600801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "dat_file": "r_1600801_001_ss19_700_a.dat",
+        "lbl_file": "r_1600801_001_ss19_700_a.lbl"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            75.0342,
+            19.1571
+          ],
+          [
+            74.9989,
+            19.4302
+          ],
+          [
+            74.9398,
+            19.8852
+          ],
+          [
+            74.8172,
+            20.8258
+          ],
+          [
+            74.7179,
+            21.584
+          ],
+          [
+            74.6043,
+            22.4471
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "product_id": "R_1627801_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "dat_file": "r_1627801_001_ss19_700_a.dat",
+        "lbl_file": "r_1627801_001_ss19_700_a.lbl"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            75.1466,
+            22.485
+          ],
+          [
+            75.0349,
+            21.6368
+          ],
+          [
+            74.9277,
+            20.8185
+          ],
+          [
+            74.8131,
+            19.9394
+          ],
+          [
+            74.7101,
+            19.1452
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "product_id": "R_1648902_001_SS19_700_A",
+        "instrument": "SHARAD_HIGHRES",
+        "dat_file": "r_1648902_001_ss19_700_a.dat",
+        "lbl_file": null
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            74.6951,
+            22.4311
+          ],
+          [
+            74.6033,
+            21.7341
+          ],
+          [
+            74.4762,
+            20.7636
+          ],
+          [
+            74.3695,
+            19.9448
+          ],
+          [
+            74.2654,
+            19.1419
+          ]
+        ]
+      }
     }
   ]
 }
