@@ -1,8 +1,8 @@
 """
-CTX Mosaic tile server — serves XYZ tiles from Murray Lab CTX GeoTIFF mosaic.
+CTX Mosaic tile server — serves XYZ tiles from Murray Lab CTX 4°×4° GeoTIFFs.
 
-Uses a GDAL VRT built from individual 4°×4° tiles. Tiles are rendered on demand
-and cached in an LRU dict to avoid re-reading for repeated requests.
+Instead of a slow VRT over 140 tiles, directly opens only the TIF(s) that
+overlap the requested tile bounds. Each TIF covers a 4°×4° geographic region.
 
 Endpoint:  GET /api/ctx-mosaic/tile/{z}/{x}/{y}.png
 """
@@ -13,6 +13,7 @@ import math
 from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 from fastapi import APIRouter, HTTPException
@@ -21,45 +22,87 @@ from fastapi.responses import Response
 router = APIRouter(prefix="/api/ctx-mosaic")
 
 # ── Config ──
-VRT_PATH = Path("/disk1/cspark/MarsLab/Data/CTX/arcadia_tiles/ctx_arcadia.vrt")
+TILE_DIR = Path("/disk1/cspark/MarsLab/Data/CTX/arcadia_tiles")
 TILE_SIZE = 256
-MAX_CACHE = 2000  # ~2000 tiles × ~50KB ≈ 100MB RAM
-
-# Mars radius for geographic tiling
+MAX_CACHE = 2000
 MARS_RADIUS = 3396190.0
 
-# LRU tile cache
+# LRU tile cache: key → PNG bytes
 _tile_cache: OrderedDict[str, bytes] = OrderedDict()
 
-# Lazy-loaded rasterio dataset
-_vrt_ds = None
-
-
-def _get_vrt():
-    """Open the VRT lazily (once per process)."""
-    global _vrt_ds
-    if _vrt_ds is None:
-        import rasterio
-        if not VRT_PATH.exists():
-            raise RuntimeError(f"CTX VRT not found: {VRT_PATH}")
-        _vrt_ds = rasterio.open(str(VRT_PATH))
-    return _vrt_ds
+# Lazy rasterio dataset cache: filename → open dataset
+_ds_cache: dict[str, object] = {}
 
 
 def _tile_bounds_geographic(z: int, x: int, y: int):
-    """
-    Compute geographic bounds (lon/lat in degrees) for a tile in
-    Cesium's GeographicTilingScheme (2 tiles at level 0).
-    """
-    n_x = 2 * (2 ** z)  # number of tiles in x at this level
-    n_y = 1 * (2 ** z)  # number of tiles in y at this level
-
+    """Geographic bounds for Cesium GeographicTilingScheme tile."""
+    n_x = 2 * (2 ** z)
+    n_y = 1 * (2 ** z)
     lon_min = -180.0 + (x / n_x) * 360.0
     lon_max = -180.0 + ((x + 1) / n_x) * 360.0
     lat_max = 90.0 - (y / n_y) * 180.0
     lat_min = 90.0 - ((y + 1) / n_y) * 180.0
-
     return lon_min, lat_min, lon_max, lat_max
+
+
+def _find_ctx_tifs(lon_min: float, lat_min: float, lon_max: float, lat_max: float) -> list[str]:
+    """
+    Find Murray Lab TIF filenames that overlap the given geographic bounds.
+    Murray Lab tiles are 4°×4°, named by lower-left corner:
+      E{lon}_N{lat}  (lon can be negative like E-180)
+    """
+    results = []
+
+    # Iterate over all possible 4° grid cells that could overlap
+    # Latitude grid: 32, 36, 40, ..., 56
+    lat_start = max(32, int(math.floor(lat_min / 4) * 4))
+    lat_end = min(56, int(math.floor(lat_max / 4) * 4))
+
+    for grid_lat in range(lat_start, lat_end + 1, 4):
+        if grid_lat + 4 < lat_min or grid_lat > lat_max:
+            continue
+
+        # Longitude: need to handle both positive (140..176) and negative (-180..-144) ranges
+        for grid_lon in _overlapping_lons(lon_min, lon_max):
+            tif_name = _tif_filename(grid_lon, grid_lat)
+            tif_path = TILE_DIR / tif_name
+            if tif_path.exists():
+                results.append(tif_name)
+
+    return results
+
+
+def _overlapping_lons(lon_min: float, lon_max: float) -> list[int]:
+    """Return Murray Lab grid longitudes (4° steps) that overlap [lon_min, lon_max]."""
+    lons = []
+    # Positive range: 140, 144, ..., 176
+    for g in range(140, 180, 4):
+        if g + 4 > lon_min and g < lon_max:
+            lons.append(g)
+    # Negative range: -180, -176, ..., -144
+    for g in range(-180, -140, 4):
+        if g + 4 > lon_min and g < lon_max:
+            lons.append(g)
+    return lons
+
+
+def _tif_filename(grid_lon: int, grid_lat: int) -> str:
+    """Build Murray Lab TIF filename from grid coordinates."""
+    if grid_lon < 0:
+        lon_str = f"E{grid_lon:04d}"  # E-180, E-176, etc.
+    else:
+        lon_str = f"E{grid_lon:03d}"  # E140, E144, etc.
+    lat_str = f"N{grid_lat:02d}"
+    return f"MurrayLab_CTX_V01_{lon_str}_{lat_str}_Mosaic.tif"
+
+
+def _open_tif(filename: str):
+    """Open a TIF with lazy caching."""
+    if filename not in _ds_cache:
+        import rasterio
+        path = TILE_DIR / filename
+        _ds_cache[filename] = rasterio.open(str(path))
+    return _ds_cache[filename]
 
 
 def _lonlat_to_projected(lon_deg: float, lat_deg: float):
@@ -69,12 +112,47 @@ def _lonlat_to_projected(lon_deg: float, lat_deg: float):
     return x, y
 
 
+def _read_tile_from_tif(tif_name: str, lon_min: float, lat_min: float,
+                        lon_max: float, lat_max: float) -> Optional[np.ndarray]:
+    """Read a region from a single TIF, resampled to TILE_SIZE."""
+    try:
+        from rasterio.windows import from_bounds
+        from rasterio.enums import Resampling
+
+        ds = _open_tif(tif_name)
+        px_min, py_min = _lonlat_to_projected(lon_min, lat_min)
+        px_max, py_max = _lonlat_to_projected(lon_max, lat_max)
+
+        window = from_bounds(px_min, py_min, px_max, py_max, ds.transform)
+
+        # Clip window to dataset bounds
+        row_off = max(0, int(window.row_off))
+        col_off = max(0, int(window.col_off))
+        row_end = min(ds.height, int(window.row_off + window.height))
+        col_end = min(ds.width, int(window.col_off + window.width))
+
+        if row_end <= row_off or col_end <= col_off:
+            return None
+
+        from rasterio.windows import Window
+        clipped = Window(col_off, row_off, col_end - col_off, row_end - row_off)
+
+        data = ds.read(
+            1,
+            window=clipped,
+            out_shape=(TILE_SIZE, TILE_SIZE),
+            resampling=Resampling.bilinear,
+        )
+        return data
+    except Exception:
+        return None
+
+
 @router.get("/tile/{z}/{x}/{y}.png")
 def get_ctx_tile(z: int, x: int, y: int):
-    """Render a 256×256 PNG tile from the CTX mosaic VRT."""
+    """Render a 256x256 PNG tile from CTX mosaic TIFs."""
     cache_key = f"ctx_{z}_{x}_{y}"
 
-    # Check cache
     if cache_key in _tile_cache:
         _tile_cache.move_to_end(cache_key)
         return Response(
@@ -83,57 +161,41 @@ def get_ctx_tile(z: int, x: int, y: int):
             headers={"Cache-Control": "public, max-age=604800"},
         )
 
-    # Geographic bounds of this tile
     lon_min, lat_min, lon_max, lat_max = _tile_bounds_geographic(z, x, y)
 
-    # Quick reject: CTX Arcadia data is roughly lat 32–60N, lon 140E–216E (-144W)
-    # Skip tiles clearly outside this region
+    # Quick reject
     if lat_max < 30 or lat_min > 62:
         raise HTTPException(status_code=404, detail="No CTX data")
-    # Longitude check: data spans 140..180 and -180..-144
     in_positive = lon_max > 138 and lon_min < 182
     in_negative = lon_max > -182 and lon_min < -142
     if not in_positive and not in_negative:
         raise HTTPException(status_code=404, detail="No CTX data")
 
-    try:
-        from rasterio.windows import from_bounds
-        from rasterio.enums import Resampling
-
-        ds = _get_vrt()
-
-        # Convert geographic bounds to projected coordinates
-        px_min, py_min = _lonlat_to_projected(lon_min, lat_min)
-        px_max, py_max = _lonlat_to_projected(lon_max, lat_max)
-
-        # Get the rasterio window for this extent
-        window = from_bounds(px_min, py_min, px_max, py_max, ds.transform)
-
-        # Read data — resampled to TILE_SIZE × TILE_SIZE
-        data = ds.read(
-            1,
-            window=window,
-            out_shape=(TILE_SIZE, TILE_SIZE),
-            resampling=Resampling.bilinear,
-        )
-
-        # If entirely nodata / zero, return 404
-        if data is None or np.max(data) == 0:
-            raise HTTPException(status_code=404, detail="No CTX data")
-
-        # Encode as PNG
-        from PIL import Image
-        img = Image.fromarray(data, mode="L")
-        buf = BytesIO()
-        img.save(buf, format="PNG", optimize=True)
-        png_bytes = buf.getvalue()
-
-    except HTTPException:
-        raise
-    except Exception:
+    tifs = _find_ctx_tifs(lon_min, lat_min, lon_max, lat_max)
+    if not tifs:
         raise HTTPException(status_code=404, detail="No CTX data")
 
-    # Cache with LRU eviction
+    # Read from each overlapping TIF and composite
+    canvas = np.zeros((TILE_SIZE, TILE_SIZE), dtype=np.uint8)
+
+    for tif_name in tifs:
+        data = _read_tile_from_tif(tif_name, lon_min, lat_min, lon_max, lat_max)
+        if data is not None:
+            # Overlay non-zero pixels
+            mask = data > 0
+            canvas[mask] = data[mask]
+
+    if np.max(canvas) == 0:
+        raise HTTPException(status_code=404, detail="No CTX data")
+
+    # Encode PNG
+    from PIL import Image
+    img = Image.fromarray(canvas, mode="L")
+    buf = BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    png_bytes = buf.getvalue()
+
+    # Cache
     if len(_tile_cache) >= MAX_CACHE:
         _tile_cache.popitem(last=False)
     _tile_cache[cache_key] = png_bytes

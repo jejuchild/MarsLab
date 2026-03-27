@@ -1,0 +1,67 @@
+SAM Mars HiRISE Test Report
+========================================
+
+Image: ESP_011286_2200
+  Original size: (2048, 3354)
+  Resized: (625, 1023)
+  Num masks: 10
+  Coverage: 84.1%
+  Avg predicted IoU: 0.937
+  Avg stability: 0.946
+  Inference time: 111.2s
+  Largest segment: 70.1% of image
+  Smallest segment: 0.20% of image
+  Median segment: 0.60% of image
+
+Image: ESP_011358_1255
+  Original size: (2048, 4914)
+  Resized: (426, 1024)
+  Num masks: 13
+  Coverage: 76.2%
+  Avg predicted IoU: 0.906
+  Avg stability: 0.949
+  Inference time: 105.2s
+  Largest segment: 19.9% of image
+  Smallest segment: 0.17% of image
+  Median segment: 2.56% of image
+
+Image: ESP_011365_1365
+  Original size: (2048, 6534)
+  Resized: (320, 1024)
+  Num masks: 25
+  Coverage: 67.5%
+  Avg predicted IoU: 0.894
+  Avg stability: 0.964
+  Inference time: 102.8s
+  Largest segment: 61.0% of image
+  Smallest segment: 0.13% of image
+  Median segment: 0.20% of image
+
+Image: ESP_083500_1400
+  Original size: (2048, 2990)
+  Resized: (701, 1024)
+  Num masks: 11
+  Coverage: 93.8%
+  Avg predicted IoU: 0.937
+  Avg stability: 0.959
+  Inference time: 99.9s
+  Largest segment: 32.2% of image
+  Smallest segment: 0.17% of image
+  Median segment: 2.70% of image
+
+Image: ESP_083513_2060
+  Original size: (2048, 3587)
+  Resized: (584, 1024)
+  Num masks: 9
+  Coverage: 91.1%
+  Avg predicted IoU: 0.924
+  Avg stability: 0.960
+  Inference time: 101.9s
+  Largest segment: 32.1% of image
+  Smallest segment: 0.14% of image
+  Median segment: 4.94% of image
+
+========================================
+CONCLUSION
+Check the generated images in results/sam_test/
+Compare *_grid_comparison.png to see SAM vs fixed tiles
