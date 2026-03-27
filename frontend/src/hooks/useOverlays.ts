@@ -429,7 +429,7 @@ export default function useOverlays({
               return null;
             }
 
-            const isHiRISE = productId.startsWith("ESP_");
+            const isHiRISE = productId.startsWith("ESP_") || productId.startsWith("PSP_") || productId.startsWith("TRA_");
             const isHiRISEDTM = productId.startsWith("DTE");
             // TRR3 IDs: {type}{hex}_{nn} (no _mtr3 suffix), e.g. frs0005bad3_01
             const isTRR3 = /^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(productId);
@@ -617,7 +617,7 @@ export default function useOverlays({
               return null;
             }
 
-            const isHiRISE = productId.startsWith("ESP_");
+            const isHiRISE = productId.startsWith("ESP_") || productId.startsWith("PSP_") || productId.startsWith("TRA_");
             let imageUrl: string;
 
             if (isHiRISE) {
