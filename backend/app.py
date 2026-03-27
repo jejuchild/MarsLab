@@ -703,36 +703,27 @@ def _get_hirise_feature(product_id: str) -> dict | None:
 
 def _reproject_polar_browse(gray: np.ndarray, feature: dict) -> np.ndarray:
     """Reproject a polar stereographic browse image to equirectangular (lat/lon).
-    Returns the reprojected image (grayscale) that maps to the polygon's bounding box."""
-    import rasterio
-    from rasterio.transform import from_bounds
-    from rasterio.warp import reproject, Resampling
+    Uses pyproj for coordinate transforms and cv2.remap for fast warping."""
     from pyproj import Transformer
 
-    props = feature["properties"]
     coords = feature["geometry"]["coordinates"][0]
-    proj_center_lat = props.get("proj_center_lat", 90.0)
+    proj_center_lat = feature["properties"].get("proj_center_lat", 90.0)
 
-    # Polygon bounding box in geographic coords
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
     west, east = min(lons), max(lons)
     south, north = min(lats), max(lats)
 
-    # Mars polar stereographic CRS
     sign = 1 if proj_center_lat > 0 else -1
     mars_a, mars_b = 3396190.0, 3376200.0
-    src_crs = (
+    stereo_crs = (
         f"+proj=stere +lat_0={sign * 90} +lon_0=0 "
         f"+k=1 +x_0=0 +y_0=0 +a={mars_a} +b={mars_b} +units=m +no_defs"
     )
-    dst_crs = f"+proj=longlat +a={mars_a} +b={mars_b} +no_defs"
+    geo_crs = f"+proj=longlat +a={mars_a} +b={mars_b} +no_defs"
 
-    # Convert polygon bbox to polar stereographic to get image extent
-    geo_to_stereo = Transformer.from_crs(dst_crs, src_crs, always_xy=True)
-    x_min, y_min = geo_to_stereo.transform(west, south)
-    x_max, y_max = geo_to_stereo.transform(east, north)
-    # Also transform all corners to get proper extent
+    # Source image extent in polar stereographic coordinates
+    geo_to_stereo = Transformer.from_crs(geo_crs, stereo_crs, always_xy=True)
     xs, ys = [], []
     for lon, lat in coords:
         x, y = geo_to_stereo.transform(lon, lat)
@@ -741,25 +732,27 @@ def _reproject_polar_browse(gray: np.ndarray, feature: dict) -> np.ndarray:
     src_left, src_right = min(xs), max(xs)
     src_bottom, src_top = min(ys), max(ys)
 
-    h, w = gray.shape
-    src_transform = from_bounds(src_left, src_bottom, src_right, src_top, w, h)
+    h_src, w_src = gray.shape
 
-    # Target: equirectangular image covering the same geographic bbox
-    # Use enough pixels to maintain resolution
-    dst_h = max(h, 512)
-    dst_w = max(w, 512)
-    dst_transform = from_bounds(west, south, east, north, dst_w, dst_h)
+    # Destination grid in geographic coordinates
+    dst_h = max(h_src, 512)
+    dst_w = max(w_src, 512)
 
-    dst = np.zeros((dst_h, dst_w), dtype=gray.dtype)
-    reproject(
-        source=gray,
-        destination=dst,
-        src_transform=src_transform,
-        src_crs=src_crs,
-        dst_transform=dst_transform,
-        dst_crs=dst_crs,
-        resampling=Resampling.bilinear,
-    )
+    # For each destination pixel, compute its (lon, lat) → (x_stereo, y_stereo) → source pixel
+    lon_arr = np.linspace(west, east, dst_w, dtype=np.float64)
+    lat_arr = np.linspace(north, south, dst_h, dtype=np.float64)  # top=north → bottom=south
+    lon_grid, lat_grid = np.meshgrid(lon_arr, lat_arr)
+
+    # Transform geographic → polar stereographic
+    x_grid, y_grid = geo_to_stereo.transform(lon_grid.ravel(), lat_grid.ravel())
+    x_grid = np.array(x_grid).reshape(dst_h, dst_w)
+    y_grid = np.array(y_grid).reshape(dst_h, dst_w)
+
+    # Map stereo coords to source pixel coords
+    map_x = ((x_grid - src_left) / (src_right - src_left) * (w_src - 1)).astype(np.float32)
+    map_y = ((src_top - y_grid) / (src_top - src_bottom) * (h_src - 1)).astype(np.float32)
+
+    dst = cv2.remap(gray, map_x, map_y, cv2.INTER_LINEAR, borderValue=0)
     return dst
 
 
