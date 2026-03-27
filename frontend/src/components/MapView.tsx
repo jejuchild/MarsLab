@@ -494,11 +494,10 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
             const bounds = boundsFromPolygon(coords);
             if (bounds) {
               // Include polygon ring (without closing vertex) for tilted overlay
-              const ring = coords.length > 0 && coords[0][0] === coords[coords.length - 1][0]
-                && coords[0][1] === coords[coords.length - 1][1]
-                ? coords.slice(0, -1) as [number, number][]
-                : coords;
-              bounds.polygon = ring;
+              const first = coords[0];
+              const last = coords[coords.length - 1];
+              const isClosed = first && last && first[0] === last[0] && first[1] === last[1];
+              bounds.polygon = isClosed ? coords.slice(0, -1) as [number, number][] : coords;
               boundsCache.set(productId, bounds);
               return bounds;
             }
