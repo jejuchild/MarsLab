@@ -469,48 +469,10 @@ export class FootprintManager {
 
         let outlineIndex = -1;
 
-        if (geom.type === "Polygon") {
-          // Use actual polygon ring coordinates for accurate footprint shape
-          const ring = geom.coordinates?.[0] as [number, number][] | undefined;
-          if (!ring || ring.length < 4) continue;
-
-          const polyPositions: number[] = [];
-          for (const [lon, lat] of ring) {
-            // Use raw coordinates — Cesium handles any longitude value.
-            // Normalizing would re-break antimeridian-crossing polygons
-            // (e.g. 179.9° and 180.1° → 179.9° and -179.9°).
-            polyPositions.push(lon, lat);
-          }
-          // Remove closing point for PolygonGeometry (it auto-closes)
-          const hierarchy = new Cesium.PolygonHierarchy(
-            Cesium.Cartesian3.fromDegreesArray(
-              polyPositions.slice(0, -2), // drop duplicate closing vertex
-              this.ellipsoid,
-            ),
-          );
-
-          geometryInstances.push(
-            new Cesium.GeometryInstance({
-              geometry: new Cesium.PolygonGeometry({
-                polygonHierarchy: hierarchy,
-              }),
-              id: entityId,
-              attributes: {
-                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(0.12)),
-                show: new Cesium.ShowGeometryInstanceAttribute(true),
-              },
-            }),
-          );
-
-          outlineIndex = outlineCollection.length;
-          outlineCollection.add({
-            positions: Cesium.Cartesian3.fromDegreesArray(polyPositions, this.ellipsoid),
-            width: 1.0,
-            material: Cesium.Material.fromType("Color", { color }),
-            id: entityId,
-          });
-        } else if (geom.type === "Point") {
-          // Point geometry: use bounding-box rectangle as before
+        if (geom.type !== "LineString") {
+          // Render all non-LineString types as bbox rectangles.
+          // This matches the quickview overlay rectangle so footprint and
+          // quickview are always the same shape/size.
           geometryInstances.push(
             new Cesium.GeometryInstance({
               geometry: new Cesium.RectangleGeometry({

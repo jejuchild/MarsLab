@@ -293,8 +293,6 @@ interface ProductBounds {
   north: number;
   lines?: number;
   samples?: number;
-  /** Actual polygon ring coordinates for non-rectangular overlays (e.g. tilted HiRISE strips) */
-  polygon?: [number, number][];
 }
 const boundsCache = new LRUMap<string, ProductBounds>(500);
 
@@ -493,11 +491,6 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
           if (coords) {
             const bounds = boundsFromPolygon(coords);
             if (bounds) {
-              // Include polygon ring (without closing vertex) for tilted overlay
-              const first = coords[0];
-              const last = coords[coords.length - 1];
-              const isClosed = first && last && first[0] === last[0] && first[1] === last[1];
-              bounds.polygon = isClosed ? coords.slice(0, -1) as [number, number][] : coords;
               boundsCache.set(productId, bounds);
               return bounds;
             }
