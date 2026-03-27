@@ -690,6 +690,79 @@ def _get_hirise_rdr_props(product_id: str) -> tuple[int, int] | None:
     return None
 
 
+def _get_hirise_feature(product_id: str) -> dict | None:
+    """Get full feature dict from HiRISE index cache."""
+    cache = _geojson_cache.get("hirise")
+    if not cache:
+        return None
+    for feat in cache.get("features", []):
+        if feat.get("properties", {}).get("product_id") == product_id:
+            return feat
+    return None
+
+
+def _reproject_polar_browse(gray: np.ndarray, feature: dict) -> np.ndarray:
+    """Reproject a polar stereographic browse image to equirectangular (lat/lon).
+    Returns the reprojected image (grayscale) that maps to the polygon's bounding box."""
+    import rasterio
+    from rasterio.transform import from_bounds
+    from rasterio.warp import reproject, Resampling
+    from pyproj import Transformer
+
+    props = feature["properties"]
+    coords = feature["geometry"]["coordinates"][0]
+    proj_center_lat = props.get("proj_center_lat", 90.0)
+
+    # Polygon bounding box in geographic coords
+    lons = [c[0] for c in coords]
+    lats = [c[1] for c in coords]
+    west, east = min(lons), max(lons)
+    south, north = min(lats), max(lats)
+
+    # Mars polar stereographic CRS
+    sign = 1 if proj_center_lat > 0 else -1
+    mars_a, mars_b = 3396190.0, 3376200.0
+    src_crs = (
+        f"+proj=stere +lat_0={sign * 90} +lon_0=0 "
+        f"+k=1 +x_0=0 +y_0=0 +a={mars_a} +b={mars_b} +units=m +no_defs"
+    )
+    dst_crs = f"+proj=longlat +a={mars_a} +b={mars_b} +no_defs"
+
+    # Convert polygon bbox to polar stereographic to get image extent
+    geo_to_stereo = Transformer.from_crs(dst_crs, src_crs, always_xy=True)
+    x_min, y_min = geo_to_stereo.transform(west, south)
+    x_max, y_max = geo_to_stereo.transform(east, north)
+    # Also transform all corners to get proper extent
+    xs, ys = [], []
+    for lon, lat in coords:
+        x, y = geo_to_stereo.transform(lon, lat)
+        xs.append(x)
+        ys.append(y)
+    src_left, src_right = min(xs), max(xs)
+    src_bottom, src_top = min(ys), max(ys)
+
+    h, w = gray.shape
+    src_transform = from_bounds(src_left, src_bottom, src_right, src_top, w, h)
+
+    # Target: equirectangular image covering the same geographic bbox
+    # Use enough pixels to maintain resolution
+    dst_h = max(h, 512)
+    dst_w = max(w, 512)
+    dst_transform = from_bounds(west, south, east, north, dst_w, dst_h)
+
+    dst = np.zeros((dst_h, dst_w), dtype=gray.dtype)
+    reproject(
+        source=gray,
+        destination=dst,
+        src_transform=src_transform,
+        src_crs=src_crs,
+        dst_transform=dst_transform,
+        dst_crs=dst_crs,
+        resampling=Resampling.bilinear,
+    )
+    return dst
+
+
 @app.get("/hirise/quickview/{product_id}.png")
 def get_hirise_quickview_transparent(request: Request, product_id: str):
     """
@@ -776,6 +849,18 @@ def get_hirise_quickview_transparent(request: Request, product_id: str):
                     crop = (w - new_w) // 2
                     gray = gray[:, crop:crop + new_w]
                 h, w = gray.shape
+
+        # Reproject polar stereographic browse images to equirectangular
+        # so the overlay aligns correctly on the geographic map
+        feat = _get_hirise_feature(product_id)
+        if feat:
+            proj_lat = feat.get("properties", {}).get("proj_center_lat")
+            if proj_lat is not None and abs(proj_lat) >= 85:
+                try:
+                    gray = _reproject_polar_browse(gray, feat)
+                    h, w = gray.shape
+                except Exception as e:
+                    logger.warning(f"[QuickView] Polar reprojection failed for {product_id}: {e}")
 
         # Downscale large images to ~1024px wide for faster overlay rendering
         if w > 1024:
