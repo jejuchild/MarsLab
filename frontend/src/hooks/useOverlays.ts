@@ -485,29 +485,55 @@ export default function useOverlays({
           const { productId, bounds, imageUrl, instrument } = result;
 
           const isDTM = instrument === "HIRISE_DTM";
-          v.entities.add({
-            id: `QUICKVIEW_OVERLAY_${productId}`,
-            show: isDTM ? showHiRISEDTMRef.current : true,
-            rectangle: {
-              coordinates: Cesium.Rectangle.fromDegrees(
-                bounds.west,
-                bounds.south,
-                bounds.east,
-                bounds.north,
-              ),
-              material: new Cesium.ImageMaterialProperty({
-                image: imageUrl,
-                transparent: true,
-                color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
-              }),
-              height: 0,
-            },
-            properties: {
-              product_id: productId,
-              instrument,
-              kind: "OVERLAY",
-            },
+          const overlayMaterial = new Cesium.ImageMaterialProperty({
+            image: imageUrl,
+            transparent: true,
+            color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
           });
+
+          // Use polygon entity for HiRISE products (tilted strips) to clip
+          // the overlay to the actual footprint shape instead of the bbox
+          const polyRing = (bounds as { polygon?: [number, number][] }).polygon;
+          if (polyRing && polyRing.length >= 3) {
+            const positions = Cesium.Cartesian3.fromDegreesArray(
+              polyRing.flatMap(([lon, lat]) => [lon, lat]),
+            );
+            v.entities.add({
+              id: `QUICKVIEW_OVERLAY_${productId}`,
+              show: isDTM ? showHiRISEDTMRef.current : true,
+              polygon: {
+                hierarchy: new Cesium.PolygonHierarchy(positions),
+                material: overlayMaterial,
+                height: 0,
+                stRotation: Cesium.Math.toRadians(0),
+              },
+              properties: {
+                product_id: productId,
+                instrument,
+                kind: "OVERLAY",
+              },
+            });
+          } else {
+            v.entities.add({
+              id: `QUICKVIEW_OVERLAY_${productId}`,
+              show: isDTM ? showHiRISEDTMRef.current : true,
+              rectangle: {
+                coordinates: Cesium.Rectangle.fromDegrees(
+                  bounds.west,
+                  bounds.south,
+                  bounds.east,
+                  bounds.north,
+                ),
+                material: overlayMaterial,
+                height: 0,
+              },
+              properties: {
+                product_id: productId,
+                instrument,
+                kind: "OVERLAY",
+              },
+            });
+          }
 
           // Track blob URL for cleanup
           if (imageUrl.startsWith("blob:")) {

@@ -670,13 +670,18 @@ from analysis.integration.integration_router import router as integration_router
 app.include_router(integration_router)  # /api/integration/* — Cross-system Integration Modules
 
 def _get_hirise_rdr_props(product_id: str) -> tuple[int, int] | None:
-    """Get (rdr_lines, rdr_samples) from HiRISE index cache for aspect-ratio correction."""
+    """Get (rdr_lines, rdr_samples) from HiRISE index cache for aspect-ratio correction.
+    Returns None for polar stereographic products (|proj_center_lat| >= 85)
+    where equirectangular aspect-ratio correction doesn't apply."""
     cache = _geojson_cache.get("hirise")
     if not cache:
         return None
     for feat in cache.get("features", []):
         props = feat.get("properties", {})
         if props.get("product_id") == product_id:
+            proj_lat = props.get("proj_center_lat")
+            if proj_lat is not None and abs(proj_lat) >= 85:
+                return None  # polar stereographic — skip aspect correction
             lines = props.get("rdr_lines")
             samples = props.get("rdr_samples")
             if lines and samples:

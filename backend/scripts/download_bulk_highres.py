@@ -142,32 +142,41 @@ def run_aria2(download_list: List[Tuple[str, str, str]], concurrent: int = 4,
 
 
 def convert_jp2_to_tif(jp2_path: Path, skip_gdal: bool = False) -> Optional[Path]:
-    """Convert JP2 to GeoTIFF using Python GDAL bindings."""
+    """Convert JP2 to GeoTIFF using rasterio (windowed read for large files)."""
     if skip_gdal:
         return None
     tif_path = jp2_path.with_suffix(".tif")
     if tif_path.exists():
         return tif_path
     try:
-        from osgeo import gdal
-        gdal.UseExceptions()
-        ds = gdal.Open(str(jp2_path))
-        if not ds:
-            print(f"    GDAL: cannot open {jp2_path.name}")
-            return None
-        driver = gdal.GetDriverByName("GTiff")
-        out = driver.CreateCopy(
-            str(tif_path), ds,
-            options=["COMPRESS=LZW", "TILED=YES", "BIGTIFF=IF_SAFER"],
-        )
-        out = None
-        ds = None
+        import rasterio
+        from rasterio.windows import Window
+
+        with rasterio.open(str(jp2_path)) as src:
+            profile = src.profile.copy()
+            profile.update(
+                driver="GTiff",
+                compress="lzw",
+                tiled=True,
+                blockxsize=512,
+                blockysize=512,
+                bigtiff="IF_SAFER",
+            )
+            with rasterio.open(str(tif_path), "w", **profile) as dst:
+                tile = 2048
+                for row_off in range(0, src.height, tile):
+                    for col_off in range(0, src.width, tile):
+                        win = Window(
+                            col_off, row_off,
+                            min(tile, src.width - col_off),
+                            min(tile, src.height - row_off),
+                        )
+                        dst.write(src.read(window=win), window=win)
         return tif_path
     except ImportError:
-        print("    GDAL Python bindings not installed, skipping JP2 conversion")
+        print("    rasterio not installed, skipping JP2 conversion")
     except Exception as e:
-        print(f"    GDAL error: {e}")
-        # Clean up partial file
+        print(f"    Conversion error: {e}")
         if tif_path.exists():
             tif_path.unlink(missing_ok=True)
     return None
