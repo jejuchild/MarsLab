@@ -22,6 +22,7 @@ from fastapi.responses import Response
 router = APIRouter(prefix="/api/ctx-mosaic")
 
 # ── Config ──
+COG_DIR = Path("/disk1/cspark/MarsLab/Data/CTX/arcadia_cog")
 TILE_DIR = Path("/disk1/cspark/MarsLab/Data/CTX/arcadia_tiles")
 TILE_SIZE = 256
 MAX_CACHE = 2000
@@ -97,10 +98,13 @@ def _tif_filename(grid_lon: int, grid_lat: int) -> str:
 
 
 def _open_tif(filename: str):
-    """Open a TIF with lazy caching."""
+    """Open a TIF with lazy caching. Prefer COG (fast) over raw TIF (slow)."""
     if filename not in _ds_cache:
         import rasterio
-        path = TILE_DIR / filename
+        cog_path = COG_DIR / filename
+        raw_path = TILE_DIR / filename
+        # COG is internally tiled with overviews — much faster for partial reads
+        path = cog_path if cog_path.exists() else raw_path
         _ds_cache[filename] = rasterio.open(str(path))
     return _ds_cache[filename]
 
