@@ -1,5 +1,12 @@
 [
   {
+    "id": "83483996",
+    "title": "SHARAD prfile",
+    "description": "SHARAD profile이 오른쪽에 표시될때 가운데 지도에서 어느 부분에 해당되는 영역인지 표시가 되면 좋겠습니다. 또한 오른편 창의 +x 방향이 중앙 지도에서는 위에서 아래(아래에서 위)인지도 표시가 되면 좋겠습니다.",
+    "status": "unread",
+    "created_at": "2026-03-27T01:13:19.859903+00:00"
+  },
+  {
     "id": "1da5ddb6",
     "title": "SHARAD loss tangent",
     "description": "SHARAD Data 에서 loss tanget를 계산할 수 있으면 좋겠어요 \n수식은 E.I.Petersen et al., (2018) ALL OUR APRONS ARE ICY: NO EVIDENCE FOR DEBRIS-RICH “LOBATE DEBRIS APRONS” IN\nDEUTERONILUS MENSAE , 2018년 LPSC 초록에 있습니다. LDA 지형에서 Cluttergram으로 제거하고 남은 subsurface 에 대해서 유전율 3.1을 가정하고 계산할 수 있습니다. 감사합니다!",

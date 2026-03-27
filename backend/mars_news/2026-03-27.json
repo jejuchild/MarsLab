@@ -1,0 +1,34 @@
+{
+  "date": "2026-03-27",
+  "generated_at": "2026-03-26T22:06:07.719288+00:00",
+  "categories": {
+    "missions": "Ongoing and planned missions to Mars continue to drive research and exploration",
+    "discoveries": "No recent significant discoveries reported, but ongoing missions may lead to new findings",
+    "technology": "Advancements in propulsion systems, such as nuclear electric propulsion, are being developed and tested",
+    "human_exploration": "No recent updates on human exploration of Mars, but new technologies may pave the way",
+    "sample_return": "No recent developments reported on sample return missions",
+    "international": "No recent international collaborations or agreements reported",
+    "commercial": "No recent commercial developments or missions reported"
+  },
+  "items": [
+    {
+      "title": "Curiosity Blog, Sols 4838-4844: Wrapping Up the Boxwork Terrain",
+      "date": "Thu, 26 Mar 2026 15:26:13 +0000",
+      "source": "NASA",
+      "summary": "Written by Deborah Padgett, MSL Operations Product Ground System Task Lead at NASA’s Jet Propulsion Laboratory Earth planning date: Friday, March 20, 2026 Curiosity has just concluded a very intense week of science observations and engineering activities, as it wraps up its monthslong investigation of the Martian boxwork terrain. Three days of planning this week […]",
+      "category": "missions",
+      "significance": "Curiosity rover's ongoing exploration of Mars terrain",
+      "url": "https://science.nasa.gov/blog/curiosity-blog-sols-4838-4844-wrapping-up-the-boxwork-terrain/"
+    },
+    {
+      "title": "NASA to test nuclear electric propulsion with 2028 mission to Mars",
+      "date": "Thu, 26 Mar 2026 11:24:09 +0000",
+      "source": "SpaceNews",
+      "summary": "NASA’s new exploration strategy includes the rapid development of a nuclear-powered mission to Mars in 2028, leveraging hardware originally built for the lunar Gateway.\nThe post NASA to test nuclear electric propulsion with 2028 mission to Mars appeared first on SpaceNews.",
+      "category": "technology",
+      "significance": "Development of nuclear electric propulsion for Mars mission",
+      "url": "https://spacenews.com/nasa-to-test-nuclear-electric-propulsion-with-2028-mission-to-mars/"
+    }
+  ],
+  "trend_summary": "Current trends in Mars exploration focus on ongoing missions, such as the Curiosity rover, and the development of new technologies, like nuclear electric propulsion. These advancements may pave the way for future human exploration of Mars. As research and exploration continue, new discoveries and findings are likely to emerge. The development of new propulsion systems and technologies is a significant area of focus, with potential applications for future Mars missions. Overall, Mars exploration is an active and evolving field, with ongoing and planned missions driving research and innovation."
+}

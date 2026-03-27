@@ -142,31 +142,34 @@ def run_aria2(download_list: List[Tuple[str, str, str]], concurrent: int = 4,
 
 
 def convert_jp2_to_tif(jp2_path: Path, skip_gdal: bool = False) -> Optional[Path]:
-    """Convert JP2 to GeoTIFF using gdal_translate."""
+    """Convert JP2 to GeoTIFF using Python GDAL bindings."""
     if skip_gdal:
         return None
     tif_path = jp2_path.with_suffix(".tif")
     if tif_path.exists():
         return tif_path
     try:
-        env = os.environ.copy()
-        conda_lib = Path(sys.executable).parent.parent / "lib"
-        if conda_lib.exists():
-            env["LD_LIBRARY_PATH"] = f"{conda_lib}:{env.get('LD_LIBRARY_PATH', '')}"
-        result = subprocess.run(
-            ["gdal_translate", "-of", "GTiff",
-             "-co", "COMPRESS=LZW", "-co", "TILED=YES",
-             str(jp2_path), str(tif_path)],
-            capture_output=True, text=True, timeout=600, env=env,
+        from osgeo import gdal
+        gdal.UseExceptions()
+        ds = gdal.Open(str(jp2_path))
+        if not ds:
+            print(f"    GDAL: cannot open {jp2_path.name}")
+            return None
+        driver = gdal.GetDriverByName("GTiff")
+        out = driver.CreateCopy(
+            str(tif_path), ds,
+            options=["COMPRESS=LZW", "TILED=YES", "BIGTIFF=IF_SAFER"],
         )
-        if result.returncode == 0:
-            return tif_path
-        else:
-            print(f"    GDAL warning: {result.stderr[:200]}")
-    except FileNotFoundError:
-        print("    GDAL not installed, skipping JP2 conversion")
-    except subprocess.TimeoutExpired:
-        print("    GDAL conversion timed out")
+        out = None
+        ds = None
+        return tif_path
+    except ImportError:
+        print("    GDAL Python bindings not installed, skipping JP2 conversion")
+    except Exception as e:
+        print(f"    GDAL error: {e}")
+        # Clean up partial file
+        if tif_path.exists():
+            tif_path.unlink(missing_ok=True)
     return None
 
 

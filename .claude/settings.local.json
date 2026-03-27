@@ -211,7 +211,10 @@
       "Read(//home/cspark/miniconda3/lib/gdalplugins/**)",
       "Bash(ldd /home/cspark/miniconda3/lib/gdalplugins/*.so)",
       "Bash(LD_LIBRARY_PATH=/home/cspark/miniconda3/lib:$LD_LIBRARY_PATH gdal_translate -of GTiff -co COMPRESS=LZW -co TILED=YES backend/hirise_data/ESP_011630_1985_RED.JP2 /tmp/test_hirise_convert.tif)",
-      "Bash(conda install:*)"
+      "Bash(conda install:*)",
+      "Bash(python3 -c \":*)",
+      "Bash(printf \"E%04d\" -180)",
+      "Bash(printf \"E%04d\" -144)"
     ]
   }
 }

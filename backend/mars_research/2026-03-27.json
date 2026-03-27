@@ -1,0 +1,42 @@
+{
+  "date": "2026-03-27",
+  "generated_at": "2026-03-26T22:10:10.977387+00:00",
+  "topic": {
+    "focus": "Mars Geochemistry",
+    "keywords": [
+      "geochemistry",
+      "PIXL",
+      "elemental composition",
+      "Perseverance",
+      "Jezero"
+    ]
+  },
+  "papers": [
+    {
+      "title": "SR-FTIR spectroscopy combined with machine learning reveals the alterations of biochemical composition in tendinopathy",
+      "authors": "Shaozi Zhong, Jintao Li, Chao Chen, Haolin Ke, Zhe Li, Zhicheng Wen et al.",
+      "year": "2026",
+      "journal": "Spectrochimica Acta Part A: Molecular and Biomolecular Spectroscopy",
+      "key_findings": "This paper does not relate to Mars Geochemistry, as it discusses the alterations of biochemical composition in tendinopathy using SR-FTIR spectroscopy combined with machine learning. The main contribution is the application of this technique to analyze tendinopathy.",
+      "methodology": "The paper uses SR-FTIR spectroscopy combined with machine learning to analyze the biochemical composition in tendinopathy.",
+      "relevance": "This paper does not relate to MarsLab's Mars exploration goals, as it focuses on biochemical composition in tendinopathy.",
+      "category": "Not Relevant",
+      "url": "https://doi.org/10.1016/j.saa.2026.127767",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Quasi-model-assisted estimators under nonresponse in sample surveys",
+      "authors": "Caren Hasler, Esther Eustache",
+      "year": "2026",
+      "journal": "Journal of Statistical Planning and Inference",
+      "key_findings": "This paper does not relate to Mars Geochemistry, as it discusses quasi-model-assisted estimators under nonresponse in sample surveys. The main contribution is the development of new estimators for sample surveys.",
+      "methodology": "The paper uses quasi-model-assisted estimators to analyze sample surveys.",
+      "relevance": "This paper does not relate to MarsLab's Mars exploration goals, as it focuses on sample surveys.",
+      "category": "Not Relevant",
+      "url": "https://doi.org/10.1016/j.jspi.2026.106407",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "The papers provided do not show any trends related to Mars Geochemistry, as they focus on unrelated topics such as biochemical composition in tendinopathy and sample surveys. However, the use of machine learning and advanced statistical techniques in these papers highlights the growing importance of these methods in various fields. Further research is needed to identify trends in Mars Geochemistry. The lack of relevant papers in this batch suggests that more targeted searches may be necessary to find papers related to MarsLab's goals.",
+  "connections_to_marslab": "Unfortunately, the findings in these papers do not connect to MarsLab's mission, as they do not relate to Mars Geochemistry or any other aspect of Mars exploration. To find relevant connections, it would be necessary to analyze papers that focus on in-situ elemental composition, Perseverance PIXL, sample analysis, or rock geochemistry, which are more directly related to MarsLab's goals such as mineral classification, ice detection, Arcadia Planitia site selection, and human exploration planning."
+}
