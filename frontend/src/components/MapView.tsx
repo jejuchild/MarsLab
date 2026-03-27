@@ -66,7 +66,7 @@ type RGBWavelengths = {
 type BrowseProductType = "HYD" | "ICE" | "IC2";
 type ScoreProductType = "score_ice" | "score_hyd";
 
-type BaseLayerType = "MOLA" | "HRSC";
+type BaseLayerType = "MOLA" | "HRSC" | "CTX";
 
 type MapMode = "2D" | "3D";
 
@@ -248,6 +248,7 @@ const MARS_RECT = Cesium.Rectangle.fromDegrees(-180, -90, 180, 90);
 const BASE_LAYER_URLS: Record<BaseLayerType, string> = {
   MOLA: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg",
   HRSC: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg",
+  CTX: "/api/ctx-mosaic/tile/{z}/{x}/{y}.png",
 };
 
 /* ==================================================

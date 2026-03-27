@@ -167,7 +167,7 @@ export type ProductOverlay = {
 export type ActiveOverlays = Map<string, ProductOverlay>;
 
 // Base map layer types
-export type BaseLayerType = "MOLA" | "HRSC";
+export type BaseLayerType = "MOLA" | "HRSC" | "CTX";
 
 // Map mode types (2D flat view vs 3D globe)
 export type MapMode = "2D" | "3D";

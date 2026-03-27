@@ -73,6 +73,22 @@ export default function ViewModeSection({
           />
           <span className={lp.body}>Mars Express HRSC</span>
         </label>
+        <label
+          className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+            baseLayer === "CTX"
+              ? "bg-primary/20 border border-primary/50"
+              : "bg-[#1a2333] border border-[#232f48] hover:border-primary/30"
+          }`}
+        >
+          <input
+            type="radio"
+            name="baseLayer"
+            checked={baseLayer === "CTX"}
+            onChange={() => onBaseLayerChange("CTX")}
+            className="rounded-full bg-[#0a0f18] border-[#232f48] text-primary focus:ring-0 focus:ring-offset-0"
+          />
+          <span className={lp.body}>MRO CTX 5m (Arcadia)</span>
+        </label>
       </div>
     </div>
   );
