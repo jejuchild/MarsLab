@@ -1,0 +1,37 @@
+DINOv2 Clustering Test Report
+========================================
+
+Image: ESP_011286_2200
+  Size: (2048, 3354), Tiles: 103
+  Feature extraction: 18.1s
+  k=4: {np.int32(0): 27, np.int32(1): 28, np.int32(2): 28, np.int32(3): 20}
+  k=6: {np.int32(0): 31, np.int32(1): 13, np.int32(2): 23, np.int32(3): 8, np.int32(4): 5, np.int32(5): 23}
+  k=8: {np.int32(0): 19, np.int32(1): 23, np.int32(2): 3, np.int32(3): 7, np.int32(4): 4, np.int32(5): 2, np.int32(6): 22, np.int32(7): 23}
+
+Image: ESP_011358_1255
+  Size: (2048, 4914), Tiles: 121
+  Feature extraction: 18.6s
+  k=4: {np.int32(0): 21, np.int32(1): 38, np.int32(2): 23, np.int32(3): 39}
+  k=6: {np.int32(0): 13, np.int32(1): 26, np.int32(2): 15, np.int32(3): 20, np.int32(4): 27, np.int32(5): 20}
+  k=8: {np.int32(0): 24, np.int32(1): 12, np.int32(2): 22, np.int32(3): 9, np.int32(4): 18, np.int32(5): 6, np.int32(6): 26, np.int32(7): 4}
+
+Image: ESP_011365_1365
+  Size: (2048, 6534), Tiles: 179
+  Feature extraction: 30.5s
+  k=4: {np.int32(0): 59, np.int32(1): 41, np.int32(2): 33, np.int32(3): 46}
+  k=6: {np.int32(0): 41, np.int32(1): 31, np.int32(2): 52, np.int32(3): 14, np.int32(4): 7, np.int32(5): 34}
+  k=8: {np.int32(0): 14, np.int32(1): 55, np.int32(2): 19, np.int32(3): 26, np.int32(4): 15, np.int32(5): 15, np.int32(6): 31, np.int32(7): 4}
+
+Image: ESP_083500_1400
+  Size: (2048, 2990), Tiles: 93
+  Feature extraction: 17.1s
+  k=4: {np.int32(0): 10, np.int32(1): 21, np.int32(2): 28, np.int32(3): 34}
+  k=6: {np.int32(0): 12, np.int32(1): 15, np.int32(2): 20, np.int32(3): 6, np.int32(4): 22, np.int32(5): 18}
+  k=8: {np.int32(0): 14, np.int32(1): 7, np.int32(2): 7, np.int32(3): 27, np.int32(4): 2, np.int32(5): 26, np.int32(6): 5, np.int32(7): 5}
+
+Image: ESP_083513_2060
+  Size: (2048, 3587), Tiles: 111
+  Feature extraction: 16.0s
+  k=4: {np.int32(0): 37, np.int32(1): 24, np.int32(2): 41, np.int32(3): 9}
+  k=6: {np.int32(0): 10, np.int32(1): 17, np.int32(2): 36, np.int32(3): 26, np.int32(4): 5, np.int32(5): 17}
+  k=8: {np.int32(0): 19, np.int32(1): 9, np.int32(2): 5, np.int32(3): 6, np.int32(4): 16, np.int32(5): 14, np.int32(6): 21, np.int32(7): 21}
