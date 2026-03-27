@@ -214,7 +214,8 @@
       "Bash(conda install:*)",
       "Bash(python3 -c \":*)",
       "Bash(printf \"E%04d\" -180)",
-      "Bash(printf \"E%04d\" -144)"
+      "Bash(printf \"E%04d\" -144)",
+      "Bash(do unzip:*)"
     ]
   }
 }
