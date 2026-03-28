@@ -664,6 +664,9 @@ app.include_router(pathfinder_router)  # /api/pathfinder/* — AI Rover Route Pl
 from rag.rag_router import router as rag_router
 app.include_router(rag_router)  # /api/rag/* — Mars Science RAG
 
+from api.mastcam_router import router as mastcam_router
+app.include_router(mastcam_router)  # /api/mastcam/* — Mastcam-Z 360° Panoramas
+
 from neural_climate.climate_router import router as neural_climate_router
 app.include_router(neural_climate_router)  # /api/climate/neural/* — Mars GCM Neural Emulator
 from pinns_interior.pinns_router import router as pinns_router

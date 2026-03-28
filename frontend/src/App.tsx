@@ -13,6 +13,7 @@ const FeatureSuggestionsPage = lazy(() => import("./pages/FeatureSuggestionsPage
 const DailyDiscussionsPage = lazy(() => import("./pages/DailyDiscussionsPage"));
 const MarsNewsPage = lazy(() => import("./pages/MarsNewsPage"));
 const MarsResearchPage = lazy(() => import("./pages/MarsResearchPage"));
+const MastcamPanoPage = lazy(() => import("./pages/MastcamPanoPage"));
 
 const PageLoading = () => (
   <div className="h-screen w-screen flex items-center justify-center bg-[#0a0f18] text-[#6b7c9c]">
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="/discussions" element={<LazyPage scope="Discussions"><DailyDiscussionsPage /></LazyPage>} />
           <Route path="/news" element={<LazyPage scope="News"><MarsNewsPage /></LazyPage>} />
           <Route path="/research" element={<LazyPage scope="Research"><MarsResearchPage /></LazyPage>} />
+          <Route path="/mastcam" element={<LazyPage scope="Mastcam"><MastcamPanoPage /></LazyPage>} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

@@ -1,0 +1,90 @@
+{
+  "date": "2026-03-28",
+  "generated_at": "2026-03-27T22:10:14.344414+00:00",
+  "topic": {
+    "focus": "Water & Habitability",
+    "keywords": [
+      "water",
+      "habitability",
+      "recurring slope lineae",
+      "brine",
+      "ancient lake"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Microstructural and biochemical constraints on cryptoendolithic life in Atacama halite: implications for extreme habitability",
+      "authors": "P. Vítek, P. Mácová, O. Artieda, T. Kowaluk, J. Wierzchos",
+      "year": "2026",
+      "journal": "Spectrochimica Acta Part A: Molecular and Biomolecular Spectroscopy",
+      "key_findings": "The paper explores the microstructural and biochemical constraints on cryptoendolithic life in Atacama halite, providing insights into extreme habitability. The study suggests that certain microorganisms can survive in extreme environments, which has implications for the search for life on Mars.",
+      "methodology": "The researchers used spectroscopy and microscopy techniques to analyze the microstructure and biochemical properties of Atacama halite.",
+      "relevance": "The study's findings on extreme habitability have implications for the search for life on Mars, particularly in areas with similar environmental conditions.",
+      "category": "Water & Habitability",
+      "url": "https://doi.org/10.1016/j.saa.2026.127710",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Uncovering a novel Al2Li2FeO5 structure as a candidate altermagnet in ancient Yaozhou sauce wares (960–1279 CE)",
+      "authors": "Jianjun Li, Xiaoxiao Fu, Zhixin Zeng, Wenhao He, Changlin Zheng, Cuifan Chen et al.",
+      "year": "2026",
+      "journal": "Journal of the European Ceramic Society",
+      "key_findings": "The paper presents a novel Al2Li2FeO5 structure as a candidate altermagnet in ancient Yaozhou sauce wares. However, this study is not directly related to Mars exploration or water habitability.",
+      "methodology": "The researchers used materials science techniques to analyze the structure and properties of the Al2Li2FeO5 material.",
+      "relevance": "This study is not directly relevant to MarsLab's Mars exploration goals, as it focuses on materials science and historical ceramics.",
+      "category": "Not Relevant",
+      "url": "https://doi.org/10.1016/j.jeurceramsoc.2026.118325",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Interface hyperfine coupling engineering of graphene oxide@MgAl-LDH architectures toward eco-efficient lithium extraction from salt-lake brines",
+      "authors": "You Wang, Lijuan Qiao, Derui Zhu, Junjie Yu, Feiyan Chen, Riming Hu et al.",
+      "year": "2026",
+      "journal": "Journal of Colloid and Interface Science",
+      "key_findings": "The paper presents a novel graphene oxide@MgAl-LDH architecture for eco-efficient lithium extraction from salt-lake brines. The study demonstrates the potential for efficient lithium extraction from brines, which could have implications for resource utilization on Mars.",
+      "methodology": "The researchers used materials science and chemical engineering techniques to design and test the graphene oxide@MgAl-LDH architecture.",
+      "relevance": "The study's findings on lithium extraction from brines could have implications for resource utilization on Mars, particularly in areas with similar brine environments.",
+      "category": "Water & Habitability",
+      "url": "https://doi.org/10.1016/j.jcis.2026.140319",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Whole-genome Analysis Pseudomonas aeruginosa Strain A3 Isolated from Drinking Water in a Private School using Low-volume of Broth Medium",
+      "authors": "Noor A. ILSAN, Maulin Inggraini, Reza Anindita, Jekmal Malau, Ni Putu Ratna Ayu Krishanti, Amida Cahyari Putri Wihanda et al.",
+      "year": "2027",
+      "journal": "Egyptian Journal of Medical Microbiology",
+      "key_findings": "The paper presents a whole-genome analysis of Pseudomonas aeruginosa Strain A3 isolated from drinking water in a private school. However, this study is not directly related to Mars exploration or water habitability.",
+      "methodology": "The researchers used genomics and microbiology techniques to analyze the Pseudomonas aeruginosa Strain A3 genome.",
+      "relevance": "This study is not directly relevant to MarsLab's Mars exploration goals, as it focuses on microbiology and public health.",
+      "category": "Not Relevant",
+      "url": "https://doi.org/10.21608/ejmm.2026.467063.2180",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Lanthanide Tantalum Perovskite Oxynitrides for Photocatalytic Water Splitting: Exploring Beyond Lanthanum",
+      "authors": "James Hill, Yiyang Li",
+      "year": "2027",
+      "journal": "Johnson Matthey Technology Review",
+      "key_findings": "The paper explores the use of lanthanide tantalum perovskite oxynitrides for photocatalytic water splitting, which could have implications for in-situ resource utilization on Mars. The study demonstrates the potential for efficient water splitting using these materials.",
+      "methodology": "The researchers used materials science and chemical engineering techniques to design and test the lanthanide tantalum perovskite oxynitrides.",
+      "relevance": "The study's findings on photocatalytic water splitting could have implications for in-situ resource utilization on Mars, particularly in areas with abundant water resources.",
+      "category": "Water & Habitability",
+      "url": "https://doi.org/10.1595/205651327x17703026459384",
+      "recency_score": 1.0
+    },
+    {
+      "title": "DE LA DEFENSA DEL RÍO LEMPA A LA LUCHA CONTRA LA PRIVATIZACIÓN DEL RECURSO HIDRICO EN EL SALVADOR: INTERPRETACIONES DE INSTITUCIONES PARTICULARES, GUBERNAMENTALES Y SU INFLUENCIA EN LA LEGISLACIÓN DE POLÍTICAS PÚBLICAS 2009-2019",
+      "authors": "Dennis Francisco Sevillano Payes",
+      "year": "",
+      "journal": "Diálogos Revista Electrónica",
+      "key_findings": "The paper discusses the conflict over the defense of the Lempa River and its water resources in El Salvador. However, this study is not directly related to Mars exploration or water habitability.",
+      "methodology": "The researchers used social science and policy analysis techniques to examine the conflict over the Lempa River.",
+      "relevance": "This study is not directly relevant to MarsLab's Mars exploration goals, as it focuses on social science and policy analysis.",
+      "category": "Not Relevant",
+      "url": "https://doi.org/10.15517/dre.v26i2.65361",
+      "recency_score": 0.0
+    }
+  ],
+  "trend_analysis": "The papers analyzed demonstrate a trend towards interdisciplinary research, combining materials science, chemistry, and biology to study water habitability and resource utilization. However, only a few papers are directly relevant to MarsLab's Mars exploration goals, highlighting the need for more targeted research in this area. The use of advanced materials and technologies, such as graphene oxide and lanthanide tantalum perovskite oxynitrides, is a common theme among the relevant papers. Overall, the research trends suggest a growing interest in water habitability and resource utilization, which could have significant implications for future Mars exploration missions.",
+  "connections_to_marslab": "The findings from papers 1, 3, and 5 have direct connections to MarsLab's mission, particularly in the areas of mineral classification, ice detection, and in-situ resource utilization. The study on cryptoendolithic life in Atacama halite (paper 1) has implications for the search for life on Mars, while the research on lithium extraction from brines (paper 3) and photocatalytic water splitting (paper 5) could inform the development of resource utilization technologies for future Mars missions. These findings could also inform the selection of the Arcadia Planitia site and the planning of human exploration missions to Mars."
+}
