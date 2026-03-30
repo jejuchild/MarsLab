@@ -21,7 +21,7 @@ from mars_captions import LABEL_NAMES, LABEL_FULL_NAMES
 # ── Config ──────────────────────────────────────────────────────────────
 MODEL_CHECKPOINT = "dandelin/vilt-b32-mlm"
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output", "vilt_mars")
-NUM_EPOCHS = 20
+NUM_EPOCHS = 3  # reduced for CPU — increase to 20 with GPU
 BATCH_SIZE = 8
 LEARNING_RATE = 5e-5
 
@@ -112,7 +112,7 @@ def main():
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         fp16=torch.cuda.is_available(),
-        dataloader_num_workers=4,
+        dataloader_num_workers=2,
         report_to="none",
     )
 

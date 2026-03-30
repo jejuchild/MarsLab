@@ -22,8 +22,8 @@ from mars_captions import LABEL_NAMES, CAPTION_TEMPLATES, get_caption
 # ── Config ──────────────────────────────────────────────────────────────
 MODEL_CHECKPOINT = "Salesforce/blip2-opt-2.7b"
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output", "blip2_mars_lora")
-NUM_EPOCHS = 10
-BATCH_SIZE = 2  # BLIP-2 is large, keep small
+NUM_EPOCHS = 3  # reduced for CPU — increase to 10 with GPU
+BATCH_SIZE = 1  # CPU: keep minimal
 LEARNING_RATE = 2e-4  # LoRA-friendly LR
 MAX_LENGTH = 80
 
