@@ -290,8 +290,11 @@ export default function useMapLayers({
       return;
     }
 
+    // Arcadia Planitia extent: lon 140E–216E (=144W), lat 32N–60N
+    const arcadiaRect = Cesium.Rectangle.fromDegrees(140, 32, -144, 60);
     const provider = new Cesium.UrlTemplateImageryProvider({
       url: "/api/ctx-mosaic/tile/{z}/{x}/{y}.png",
+      rectangle: arcadiaRect,
       tilingScheme: new Cesium.GeographicTilingScheme({
         ellipsoid: marsEllipsoid,
         numberOfLevelZeroTilesX: 2,

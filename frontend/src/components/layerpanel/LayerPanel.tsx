@@ -48,8 +48,6 @@ export default function LayerPanel({
   onFusionVisibleChange,
   fusionOpacity = 0.6,
   onFusionOpacityChange,
-  ctxMosaicVisible = false,
-  onCtxMosaicVisibleChange,
   ctxMosaicOpacity = 1.0,
   onCtxMosaicOpacityChange,
   // Footprints
@@ -258,36 +256,6 @@ export default function LayerPanel({
           customDatasets={customDatasets}
           onCustomDatasetToggle={onCustomDatasetToggle}
         />
-
-        {/* CTX Mosaic Overlay */}
-        <div className={lp.section}>
-          <h3 className={lp.h3}>CTX Mosaic</h3>
-          <label className="flex items-center gap-2 p-2 rounded cursor-pointer bg-[#1a2333] border border-[#232f48] hover:border-primary/30 transition-colors">
-            <input
-              type="checkbox"
-              checked={ctxMosaicVisible}
-              onChange={(e) => onCtxMosaicVisibleChange?.(e.target.checked)}
-              className="rounded bg-[#0a0f18] border-[#232f48] text-primary focus:ring-0 focus:ring-offset-0"
-            />
-            <span className={`text-[11px] font-medium ${ctxMosaicVisible ? "text-amber-300" : "text-[#92a4c9]"}`}>
-              MRO CTX 5m/px (Arcadia)
-            </span>
-          </label>
-          {ctxMosaicVisible && (
-            <div className="mt-1 px-2">
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={ctxMosaicOpacity}
-                onChange={(e) => onCtxMosaicOpacityChange?.(parseFloat(e.target.value))}
-                className="w-full h-1 accent-amber-400"
-              />
-              <div className="text-[10px] text-[#607090] text-right">{Math.round(ctxMosaicOpacity * 100)}%</div>
-            </div>
-          )}
-        </div>
 
         <AnalysisTools
           analysisMode={analysisMode}
