@@ -89,6 +89,13 @@ export const INST_STYLES: Record<
     btn: "bg-pink-500/20 text-pink-400 border border-pink-500/30 hover:bg-pink-500/30",
     btnLoading: "bg-pink-500/10 text-pink-400/50 border border-pink-500/20 cursor-wait",
   },
+  ctx_mosaic: {
+    text: "text-yellow-600",
+    bgActive: "bg-yellow-700/15 border border-yellow-700/40",
+    checkbox: "text-yellow-600",
+    btn: "bg-yellow-700/20 text-yellow-600 border border-yellow-700/30 hover:bg-yellow-700/30",
+    btnLoading: "bg-yellow-700/10 text-yellow-600/50 border border-yellow-700/20 cursor-wait",
+  },
   hirise_dtm: {
     text: "text-amber-600",
     bgActive: "bg-amber-700/15 border border-amber-700/40",
