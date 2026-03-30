@@ -75,6 +75,7 @@ type UseFootprintsParams = {
   }>;
   showRegionLayer: boolean;
   extractCrismObsId: (productId: string) => string;
+  highResOnly?: boolean;
 };
 
 type UseFootprintsResult = {
@@ -104,6 +105,7 @@ export default function useFootprints({
   customDatasets,
   showRegionLayer,
   extractCrismObsId,
+  highResOnly = false,
 }: UseFootprintsParams): UseFootprintsResult {
   const internalFootprintManagerRef = useRef<FootprintManager | null>(null);
   const footprintManagerRef = externalFootprintManagerRef ?? internalFootprintManagerRef;
@@ -190,6 +192,12 @@ export default function useFootprints({
       }
     };
   }, [marsEllipsoid, viewerRef]);
+
+  // Sync highResOnly to FootprintManager
+  useEffect(() => {
+    const fm = footprintManagerRef.current;
+    if (fm) fm.highResOnly = highResOnly;
+  }, [highResOnly, footprintManagerRef]);
 
   // Keep inspected product ref in sync
   inspectedProductIdRef.current = inspectedProductId ?? null;

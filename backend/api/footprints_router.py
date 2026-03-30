@@ -368,6 +368,67 @@ LOD_THRESHOLDS_KM = {
 }
 
 
+def _build_highres_set(instrument: str) -> set:
+    """Build set of product IDs that have high-res data on disk."""
+    inst = instrument.upper()
+    result = set()
+
+    if inst == "HIRISE":
+        data_dir = os.path.join(BASE_DIR, "hirise_data")
+        if os.path.isdir(data_dir):
+            for f in os.listdir(data_dir):
+                fu = f.upper()
+                if fu.endswith("_RED.JP2") or fu.endswith("_RED.TIF"):
+                    result.add(f.rsplit("_RED", 1)[0].upper())
+    elif inst in ("CRISM", "CRISM_TRR3"):
+        # CRISM TRR3: check mineral_cnn_data subdirs for .img
+        data_dir = os.path.join(BASE_DIR, "mineral_cnn_data")
+        if os.path.isdir(data_dir):
+            for d in os.listdir(data_dir):
+                sub = os.path.join(data_dir, d)
+                if os.path.isdir(sub):
+                    if any(f.upper().endswith("_TRR3.IMG") for f in os.listdir(sub)):
+                        result.add(d.upper())
+        # Also check crism_data for MTR3
+        data_dir2 = os.path.join(BASE_DIR, "crism_data")
+        if os.path.isdir(data_dir2):
+            for f in os.listdir(data_dir2):
+                if f.lower().endswith(".img") and "_mtr3" in f.lower():
+                    base = f.lower().split("_if")[0] if "_if" in f.lower() else f.rsplit(".", 1)[0]
+                    result.add(base.upper())
+    elif inst == "SHARAD_HIGHRES":
+        data_dir = os.path.join(BASE_DIR, "sharad_highres")
+        if os.path.isdir(data_dir):
+            for f in os.listdir(data_dir):
+                if f.upper().endswith(".DAT"):
+                    result.add(f.rsplit(".", 1)[0].upper())
+    elif inst == "SHARAD":
+        data_dir = os.path.join(BASE_DIR, "sharad_data")
+        if os.path.isdir(data_dir):
+            for f in os.listdir(data_dir):
+                if f.upper().endswith(".JPG") or f.upper().endswith(".IMG"):
+                    result.add(f.rsplit(".", 1)[0].replace("_THM", "").upper())
+    elif inst == "HIRISE_DTM":
+        data_dir = os.path.join(BASE_DIR, "hirise_dtm_data")
+        if os.path.isdir(data_dir):
+            for f in os.listdir(data_dir):
+                if f.upper().endswith(".IMG"):
+                    result.add(f.rsplit(".", 1)[0].upper())
+
+    return result
+
+
+_highres_cache: dict[str, set] = {}
+
+
+def get_highres_set(instrument: str) -> set:
+    """Get cached high-res product ID set for an instrument."""
+    key = instrument.upper()
+    if key not in _highres_cache:
+        _highres_cache[key] = _build_highres_set(instrument)
+    return _highres_cache[key]
+
+
 @router.get("/api/footprints")
 async def get_footprints(
     instrument: str = Query(..., description="Instrument: CRISM, HIRISE, or SHARAD"),
@@ -377,6 +438,7 @@ async def get_footprints(
     limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT, description="Maximum features to return"),
     offset: int = Query(0, ge=0, description="Offset for paginated fetching"),
     camera_height_km: Optional[float] = Query(None, description="Camera height in km for server-side LOD enforcement"),
+    highres_only: bool = Query(False, description="Filter to products with high-res data on disk"),
 ):
     """
     Get footprints within a bounding box.
@@ -485,6 +547,16 @@ async def get_footprints(
             feature
             for feature in matching_features
             if feature.get("properties", {}).get("product_id", "").lower().startswith("frt")
+        ]
+
+    # Filter to high-res products only (those with actual data files on disk)
+    if highres_only:
+        hr_set = get_highres_set(instrument)
+        matching_features = [
+            feature
+            for feature in matching_features
+            if feature.get("properties", {}).get("product_id", "").upper() in hr_set
+               or feature.get("properties", {}).get("base_key", "").upper() in hr_set
         ]
 
     total_matching = len(matching_features)

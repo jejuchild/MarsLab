@@ -105,6 +105,8 @@ export interface FootprintSectionProps {
   onLoadFootprints?: (instrument: string) => void;
   footprintsLoading?: Record<string, boolean>;
   footprintCounts?: Record<string, FootprintCount>;
+  highResOnly?: boolean;
+  onHighResOnlyChange?: (v: boolean) => void;
   showCustomData: boolean;
   onToggleCustomData: (v: boolean) => void;
   onLoadCustomData?: () => void;
@@ -157,6 +159,8 @@ export interface LayerPanelProps {
   onLoadFootprints?: (instrument: string) => void;
   footprintsLoading?: Record<string, boolean>;
   footprintCounts?: Record<string, FootprintCount>;
+  highResOnly?: boolean;
+  onHighResOnlyChange?: (v: boolean) => void;
   visibleProducts?: VisibleProduct[];
   activeOverlays?: ActiveOverlays;
   onSetOverlay?: (productId: string, type: OverlayType | null) => void;

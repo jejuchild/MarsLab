@@ -56,6 +56,8 @@ export default function LayerPanel({
   onLoadFootprints,
   footprintsLoading = {},
   footprintCounts = {},
+  highResOnly = false,
+  onHighResOnlyChange,
   showCustomData,
   onToggleCustomData,
   onLoadCustomData,
@@ -249,6 +251,8 @@ export default function LayerPanel({
           onLoadFootprints={onLoadFootprints}
           footprintsLoading={footprintsLoading}
           footprintCounts={footprintCounts}
+          highResOnly={highResOnly}
+          onHighResOnlyChange={onHighResOnlyChange}
           showCustomData={showCustomData}
           onToggleCustomData={onToggleCustomData}
           onLoadCustomData={onLoadCustomData}

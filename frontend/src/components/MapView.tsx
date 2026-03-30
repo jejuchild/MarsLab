@@ -212,6 +212,8 @@ type MapViewProps = {
   fusionOpacity?: number;
   // CTX Mosaic overlay opacity (Murray Lab 5m, Arcadia Planitia)
   ctxMosaicOpacity?: number;
+  // High-Res Only filter
+  highResOnly?: boolean;
   onOlympusMonsClimber?: () => void;
   // Pathfinder route overlay
   pathfinderStart?: { lat: number; lon: number } | null;
@@ -708,6 +710,7 @@ export default function MapView({
   fusionVisible = false,
   fusionOpacity = 0.6,
   ctxMosaicOpacity = 1.0,
+  highResOnly = false,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
   pathfinderStart = null,
@@ -885,6 +888,7 @@ export default function MapView({
     customDatasets,
     showRegionLayer,
     extractCrismObsId,
+    highResOnly,
   });
 
   useOverlays({

@@ -44,6 +44,7 @@ export interface FootprintManagerConfig {
   onLoadStart?: (instrument: InstrumentType) => void;
   onLoadEnd?: (instrument: InstrumentType, result: LoadResult) => void;
   onError?: (instrument: InstrumentType, error: Error) => void;
+  highResOnly?: boolean;
 }
 
 export interface ProductBounds {
@@ -88,6 +89,7 @@ export class FootprintManager {
   private onLoadStart?: (instrument: InstrumentType) => void;
   private onLoadEnd?: (instrument: InstrumentType, result: LoadResult) => void;
   private onError?: (instrument: InstrumentType, error: Error) => void;
+  private _highResOnly: boolean = false;
 
   constructor(config: FootprintManagerConfig) {
     this.viewer = config.viewer;
@@ -95,6 +97,7 @@ export class FootprintManager {
     this.onLoadStart = config.onLoadStart;
     this.onLoadEnd = config.onLoadEnd;
     this.onError = config.onError;
+    this._highResOnly = config.highResOnly ?? false;
 
     // Initialize empty collections for each instrument
     this.instanceIds.set("CRISM", new Set());
@@ -272,7 +275,8 @@ export class FootprintManager {
     this.onLoadStart?.(instrument);
 
     try {
-      const url = `/api/footprints?instrument=${instrument}&bbox=${bbox.join(",")}&limit=2000`;
+      const hrParam = this._highResOnly ? "&highres_only=true" : "";
+      const url = `/api/footprints?instrument=${instrument}&bbox=${bbox.join(",")}&limit=2000${hrParam}`;
       const res = await fetch(url, { signal: controller.signal });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -576,6 +580,17 @@ export class FootprintManager {
     this.viewer.scene.primitives.add(outlineCollection);
     this.outlineCollections.set(instrument, outlineCollection);
     this.viewer.scene.requestRender();
+  }
+
+  /**
+   * Set high-res only filter flag
+   */
+  set highResOnly(value: boolean) {
+    this._highResOnly = value;
+  }
+
+  get highResOnly(): boolean {
+    return this._highResOnly;
   }
 
   /**

@@ -21,6 +21,8 @@ export default function FootprintSection({
   onLoadCustomData,
   customDataLoading,
   customDatasets = [],
+  highResOnly = false,
+  onHighResOnlyChange,
   onCustomDatasetToggle: _onCustomDatasetToggle,
 }: FootprintSectionProps) {
   // Count how many instruments have loaded data
@@ -47,6 +49,26 @@ export default function FootprintSection({
       trailing={trailing}
     >
       <div className="space-y-1">
+        {/* High-Res Only filter toggle */}
+        <button
+          onClick={() => onHighResOnlyChange?.(!highResOnly)}
+          className={`flex items-center gap-2 w-full px-2.5 py-1.5 rounded transition-colors text-left ${
+            highResOnly
+              ? "bg-purple-500/20 border border-purple-500/40"
+              : "bg-[#101622] border border-transparent hover:bg-[#1a2333]"
+          }`}
+        >
+          <span className={`material-symbols-outlined text-sm ${highResOnly ? "text-purple-400" : "text-[#6b7c9c]"}`}>
+            hd
+          </span>
+          <span className={`text-[10px] font-bold flex-1 ${highResOnly ? "text-purple-300" : "text-[#92a4c9]"}`}>
+            High-Res Only
+          </span>
+          <span className={`material-symbols-outlined text-xs ${highResOnly ? "text-purple-400" : "text-[#6b7c9c]"}`}>
+            {highResOnly ? "toggle_on" : "toggle_off"}
+          </span>
+        </button>
+
         {INSTRUMENT_GROUPS.map((group) => {
           const activeCount = group.instruments.filter((id) => instrumentVisibility[id]).length;
           const allActive = activeCount === group.instruments.length;

@@ -346,6 +346,7 @@ export default function MainPage() {
   // Explicit footprint loading state
   type FootprintLoadTrigger = { instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3"; timestamp: number } | null;
   const [loadFootprintsTrigger, setLoadFootprintsTrigger] = useState<FootprintLoadTrigger>(null);
+  const [highResOnly, setHighResOnly] = useState(false);
   const [footprintsLoading, setFootprintsLoading] = useState<{ crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean; hirise_dtm: boolean; crism_trr3: boolean }>({
     crism: false,
     hirise: false,
@@ -1740,6 +1741,8 @@ export default function MainPage() {
       onLoadFootprints={handleLoadFootprints}
       footprintsLoading={footprintsLoading}
       footprintCounts={footprintCounts}
+      highResOnly={highResOnly}
+      onHighResOnlyChange={setHighResOnly}
       // Product data
       visibleProducts={visibleProducts}
       activeOverlays={activeOverlays}
@@ -2157,6 +2160,7 @@ export default function MainPage() {
         fusionVisible={fusionVisible}
         fusionOpacity={fusionOpacity}
         ctxMosaicOpacity={ctxMosaicOpacity}
+        highResOnly={highResOnly}
         pathfinderStart={pathfinderStart}
         pathfinderGoal={pathfinderGoal}
         pathfinderRoute={pathfinderRoute}
