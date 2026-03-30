@@ -210,6 +210,9 @@ type MapViewProps = {
   // Ice Prospecting Fusion overlay
   fusionVisible?: boolean;
   fusionOpacity?: number;
+  // CTX Mosaic overlay (Murray Lab 5m, Arcadia Planitia)
+  ctxMosaicVisible?: boolean;
+  ctxMosaicOpacity?: number;
   onOlympusMonsClimber?: () => void;
   // Pathfinder route overlay
   pathfinderStart?: { lat: number; lon: number } | null;
@@ -705,6 +708,8 @@ export default function MapView({
   accessibilityOpacity = 0.6,
   fusionVisible = false,
   fusionOpacity = 0.6,
+  ctxMosaicVisible = false,
+  ctxMosaicOpacity = 1.0,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
   pathfinderStart = null,
@@ -922,6 +927,9 @@ export default function MapView({
     accessibilityOpacity,
     fusionVisible,
     fusionOpacity,
+    ctxMosaicVisible: ctxMosaicVisible ?? false,
+    ctxMosaicOpacity: ctxMosaicOpacity ?? 1.0,
+    marsEllipsoid: MARS_ELLIPSOID,
   });
 
   useFlyTo({

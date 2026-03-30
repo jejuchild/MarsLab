@@ -274,4 +274,52 @@ export default function useMapLayers({
       viewerRef.current?.scene.requestRender();
     }
   }, [fusionOpacity, viewerRef]);
+
+  // CTX Mosaic overlay layer (Murray Lab 5m, Arcadia Planitia)
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    if (ctxMosaicLayerRef.current) {
+      viewer.imageryLayers.remove(ctxMosaicLayerRef.current, false);
+      ctxMosaicLayerRef.current = null;
+    }
+
+    if (!ctxMosaicVisible) {
+      viewer.scene.requestRender();
+      return;
+    }
+
+    const provider = new Cesium.UrlTemplateImageryProvider({
+      url: "/api/ctx-mosaic/tile/{z}/{x}/{y}.png",
+      tilingScheme: new Cesium.GeographicTilingScheme({
+        ellipsoid: marsEllipsoid,
+        numberOfLevelZeroTilesX: 2,
+        numberOfLevelZeroTilesY: 1,
+      }),
+      minimumLevel: 0,
+      maximumLevel: 12,
+      credit: "Murray Lab / Caltech — CTX Global Mosaic V01",
+    });
+    const layer = viewer.imageryLayers.addImageryProvider(provider);
+    layer.alpha = ctxMosaicOpacity;
+    ctxMosaicLayerRef.current = layer;
+    viewer.scene.requestRender();
+
+    return () => {
+      if (!viewer || viewer.isDestroyed()) return;
+      if (ctxMosaicLayerRef.current) {
+        viewer.imageryLayers.remove(ctxMosaicLayerRef.current, false);
+        ctxMosaicLayerRef.current = null;
+      }
+    };
+  }, [ctxMosaicVisible, marsEllipsoid, viewerRef]);
+
+  // Update CTX mosaic layer opacity
+  useEffect(() => {
+    if (ctxMosaicLayerRef.current) {
+      ctxMosaicLayerRef.current.alpha = ctxMosaicOpacity;
+      viewerRef.current?.scene.requestRender();
+    }
+  }, [ctxMosaicOpacity, viewerRef]);
 }

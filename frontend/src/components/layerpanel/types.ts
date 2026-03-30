@@ -208,6 +208,10 @@ export interface LayerPanelProps {
   onFusionVisibleChange?: (v: boolean) => void;
   fusionOpacity?: number;
   onFusionOpacityChange?: (v: number) => void;
+  ctxMosaicVisible?: boolean;
+  onCtxMosaicVisibleChange?: (v: boolean) => void;
+  ctxMosaicOpacity?: number;
+  onCtxMosaicOpacityChange?: (v: number) => void;
   showMeasurementTools?: boolean;
   onToggleMeasurementTools?: (v: boolean) => void;
   isMobile?: boolean;

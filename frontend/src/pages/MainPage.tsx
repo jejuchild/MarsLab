@@ -434,6 +434,8 @@ export default function MainPage() {
   const [accessibilityOpacity, setAccessibilityOpacity] = useState(0.6);
   const [fusionVisible, setFusionVisible] = useState(false);
   const [fusionOpacity, setFusionOpacity] = useState(0.6);
+  const [ctxMosaicVisible, setCtxMosaicVisible] = useState(false);
+  const [ctxMosaicOpacity, setCtxMosaicOpacity] = useState(1.0);
   const [accessibilityExplainMode, setAccessibilityExplainMode] = useState(false);
   const [accessibilityExplainPoint, setAccessibilityExplainPoint] = useState<{ lat: number; lon: number } | null>(null);
   const [scienceLayerVisibility, setScienceLayerVisibility] = useState<Record<SwimMethod, boolean>>(() => {
@@ -1805,6 +1807,10 @@ export default function MainPage() {
       onFusionVisibleChange={setFusionVisible}
       fusionOpacity={fusionOpacity}
       onFusionOpacityChange={setFusionOpacity}
+      ctxMosaicVisible={ctxMosaicVisible}
+      onCtxMosaicVisibleChange={setCtxMosaicVisible}
+      ctxMosaicOpacity={ctxMosaicOpacity}
+      onCtxMosaicOpacityChange={setCtxMosaicOpacity}
     />
   );
 
@@ -2153,6 +2159,8 @@ export default function MainPage() {
         accessibilityOpacity={accessibilityOpacity}
         fusionVisible={fusionVisible}
         fusionOpacity={fusionOpacity}
+        ctxMosaicVisible={ctxMosaicVisible}
+        ctxMosaicOpacity={ctxMosaicOpacity}
         pathfinderStart={pathfinderStart}
         pathfinderGoal={pathfinderGoal}
         pathfinderRoute={pathfinderRoute}
