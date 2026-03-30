@@ -1,0 +1,42 @@
+{
+  "date": "2026-03-29",
+  "generated_at": "2026-03-28T22:10:10.916851+00:00",
+  "topic": {
+    "focus": "Polar Science",
+    "keywords": [
+      "polar layered deposits",
+      "south polar",
+      "CO2 ice",
+      "stratigraphy",
+      "polar cap"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Detection of first melting temperature in superheater ash deposits using In situ electrochemical diagnostics",
+      "authors": "Ali PourghasemiHanza, Mikael Bergelin, Juho Lehmusto",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper discusses the detection of first melting temperature in superheater ash deposits using In situ electrochemical diagnostics, but it does not appear to be directly related to Mars research. The authors present a method for detecting melting temperatures, which could potentially be applied to other fields.",
+      "methodology": "The authors used In situ electrochemical diagnostics to detect the first melting temperature in superheater ash deposits.",
+      "relevance": "This paper is not directly relevant to MarsLab's Mars exploration goals, as it appears to be focused on a different field of research.",
+      "category": "Not Applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139190",
+      "recency_score": 1.0
+    },
+    {
+      "title": "A. A. Bunge — naval physician, zoologist, polar explorer (1851—1930)",
+      "authors": "Irina V. Egorysheva, Vlaga V. Chalova",
+      "year": "",
+      "journal": "REMEDIUM",
+      "key_findings": "This paper is a biographical article about Aleksandr Aleksandrovich Bunge, a Russian naval physician and zoologist, polar explorer, and does not present any scientific findings related to Mars research. The article discusses Bunge's life and achievements, but does not provide any information relevant to Mars exploration.",
+      "methodology": "The authors used historical research methods to gather information about Bunge's life and achievements.",
+      "relevance": "This paper is not relevant to MarsLab's Mars exploration goals, as it is a biographical article about a historical figure and does not present any scientific findings related to Mars research.",
+      "category": "Not Applicable",
+      "url": "https://doi.org/10.32687/1561-5936-2026-30-1-108-112",
+      "recency_score": 0.0
+    }
+  ],
+  "trend_analysis": "The papers provided do not appear to be directly related to Mars research, and therefore do not provide any insight into current trends in Mars exploration. However, the fact that these papers were fetched from a database suggests that the search terms used may need to be refined to yield more relevant results. Further research is needed to identify current trends in Mars exploration, particularly in the area of polar science.",
+  "connections_to_marslab": "Neither of the papers provided appear to have any direct connection to MarsLab's mission, including mineral classification, ice detection, Arcadia Planitia site selection, or human exploration planning. To make meaningful connections to MarsLab's mission, more relevant papers would need to be analyzed, such as those focused on polar science, geology, or planetary exploration."
+}
