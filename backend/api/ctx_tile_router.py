@@ -66,8 +66,7 @@ def _find_ctx_tifs(lon_min: float, lat_min: float, lon_max: float, lat_max: floa
         # Longitude: need to handle both positive (140..176) and negative (-180..-144) ranges
         for grid_lon in _overlapping_lons(lon_min, lon_max):
             tif_name = _tif_filename(grid_lon, grid_lat)
-            tif_path = TILE_DIR / tif_name
-            if tif_path.exists():
+            if (COG_DIR / tif_name).exists() or (TILE_DIR / tif_name).exists():
                 results.append(tif_name)
 
     return results
