@@ -87,7 +87,7 @@ type SHARADPopup = {
 } | null;
 
 // Explicit loading applies to all instruments
-type ExplicitLoadInstrument = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
+type ExplicitLoadInstrument = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3";
 
 // Footprint load result for UI feedback
 type FootprintLoadResult = {
@@ -540,7 +540,7 @@ function getFootprintBounds(
   productId: string,
   footprintManager?: FootprintManager | null,
 ): ProductBounds | null {
-  const prefixes: string[] = ["CRISM", "HIRISE", "CTX", "HIRISE_DTM", "CRISM_TRR3", "SHARAD", "SHARAD_HIGHRES"];
+  const prefixes: string[] = ["CRISM", "HIRISE", "CTX", "CTX_MOSAIC", "HIRISE_DTM", "CRISM_TRR3", "SHARAD", "SHARAD_HIGHRES"];
   for (const prefix of prefixes) {
     const ent = viewer.entities.getById(`${prefix}_FP_${productId}`);
     if (!ent?.rectangle?.coordinates) continue;
@@ -917,7 +917,6 @@ export default function MapView({
 
   useMapLayers({
     viewerRef,
-    footprintManagerRef: sharedFootprintManagerRef,
     swimLayer,
     scienceLayerVisibility,
     scienceLayerDepth,
@@ -926,9 +925,6 @@ export default function MapView({
     accessibilityOpacity,
     fusionVisible,
     fusionOpacity,
-    ctxMosaicVisible: showCTX,
-    ctxMosaicOpacity: ctxMosaicOpacity ?? 1.0,
-    marsEllipsoid: MARS_ELLIPSOID,
   });
 
   useFlyTo({

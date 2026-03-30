@@ -163,6 +163,7 @@ _INDEX_FILES = {
     "hirise_dtm": os.path.join(BASE_DIR, "hirise_dtm_data", "index.geojson"),
     "sharad_highres": os.path.join(BASE_DIR, "sharad_highres_data", "index.geojson"),
     "ctx": os.path.join(BASE_DIR, "ctx_data", "index.geojson"),
+    "ctx_mosaic": os.path.join(BASE_DIR, "ctx_mosaic_data", "index.geojson"),
     "crism_trr3": os.path.join(BASE_DIR, "mineral_cnn_data", "index.geojson"),
 }
 
@@ -1130,6 +1131,18 @@ def get_crism_trr3_index():
             headers={"Cache-Control": "public, max-age=86400"},
         )
     raise HTTPException(status_code=404, detail="CRISM TRR3 index.geojson not found")
+
+
+@app.get("/ctx_mosaic_index.geojson")
+def get_ctx_mosaic_index():
+    """Serve CTX Mosaic (Murray Lab) index.geojson."""
+    if "ctx_mosaic" in _geojson_bytes_cache:
+        return Response(
+            content=_geojson_bytes_cache["ctx_mosaic"],
+            media_type="application/json",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    raise HTTPException(status_code=404, detail="CTX Mosaic index.geojson not found")
 
 
 # HiRISE DTM overlay cache

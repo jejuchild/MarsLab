@@ -436,9 +436,13 @@ export default function useOverlays({
 
             // Derive quickview URL
             let imageUrl: string;
-            let instrument: "HIRISE" | "CRISM" | "HIRISE_DTM" | "CRISM_TRR3" = "CRISM";
+            const isCtxMosaic = productId.startsWith("CTX_MOSAIC_");
+            let instrument: "HIRISE" | "CRISM" | "HIRISE_DTM" | "CRISM_TRR3" | "CTX_MOSAIC" = "CRISM";
 
-            if (isHiRISEDTM) {
+            if (isCtxMosaic) {
+              imageUrl = `/api/ctx-mosaic/quickview/${productId}.png`;
+              instrument = "CTX_MOSAIC";
+            } else if (isHiRISEDTM) {
               imageUrl = `/hirise_dtm/overlay/${productId}.png`;
               instrument = "HIRISE_DTM";
             } else if (isHiRISE) {

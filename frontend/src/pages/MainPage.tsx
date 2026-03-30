@@ -344,7 +344,7 @@ export default function MainPage() {
   const showCRISM_TRR3 = instrumentVisibility.crism_trr3;
 
   // Explicit footprint loading state
-  type FootprintLoadTrigger = { instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3"; timestamp: number } | null;
+  type FootprintLoadTrigger = { instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3"; timestamp: number } | null;
   const [loadFootprintsTrigger, setLoadFootprintsTrigger] = useState<FootprintLoadTrigger>(null);
   const [footprintsLoading, setFootprintsLoading] = useState<{ crism: boolean; hirise: boolean; sharad: boolean; sharad_highres: boolean; ctx: boolean; hirise_dtm: boolean; crism_trr3: boolean }>({
     crism: false,
@@ -574,10 +574,10 @@ export default function MainPage() {
     // Auto-enable visibility when loading
     const id = instrument.toLowerCase() as InstrumentId;
     setInstrumentVisibility(prev => ({ ...prev, [id]: true }));
-    setLoadFootprintsTrigger({ instrument: instrument as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3", timestamp: Date.now() });
+    setLoadFootprintsTrigger({ instrument: instrument as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3", timestamp: Date.now() });
   }, []);
 
-  const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3", loading: boolean) => {
+  const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3", loading: boolean) => {
     setFootprintsLoading((prev) => ({
       ...prev,
       [instrument.toLowerCase()]: loading,
@@ -585,7 +585,7 @@ export default function MainPage() {
   }, []);
 
   const handleFootprintsLoaded = useCallback((result: {
-    instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
+    instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3";
     count: number;
     truncated: boolean;
     total: number;
@@ -761,7 +761,7 @@ export default function MainPage() {
     if (results.length === 0) return;
     const best = results[0];
     if (!best) return;
-    const primaryInst = (best.instrument || params.instrument || "") as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
+    const primaryInst = (best.instrument || params.instrument || "") as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3";
 
     // Load primary instrument
     handleLoadFootprints(primaryInst);
@@ -2184,7 +2184,7 @@ export default function MainPage() {
           hidden={analysisMode === "agentic"}
           inspectorOpen={selected !== null}
           onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
-          onLoadInstrument={(inst) => handleLoadFootprints(inst as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3")}
+          onLoadInstrument={(inst) => handleLoadFootprints(inst as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3")}
           onSelectInstrumentProduct={handleSelectInstrumentProduct}
           onSearchResults={handleSearchResults}
           loadedInstruments={

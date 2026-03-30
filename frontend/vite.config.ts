@@ -63,6 +63,7 @@ export default defineConfig({
       "/world_tiles": "http://localhost:8000",
       "/sharad_index.geojson": "http://localhost:8000",
       "/sharad": "http://localhost:8000",
+      "/ctx_mosaic_index.geojson": "http://localhost:8000",
     },
   },
 });

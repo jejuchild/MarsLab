@@ -5,7 +5,6 @@ import { SWIM_METHODS } from "../api/swim_ice";
 
 type UseMapLayersParams = {
   viewerRef: React.MutableRefObject<Cesium.Viewer | null>;
-  footprintManagerRef: React.MutableRefObject<import("../utils/FootprintManager").default | null>;
   swimLayer: string | false;
   scienceLayerVisibility: Record<string, boolean>;
   scienceLayerDepth: string;
@@ -14,9 +13,6 @@ type UseMapLayersParams = {
   accessibilityOpacity: number;
   fusionVisible: boolean;
   fusionOpacity: number;
-  ctxMosaicVisible: boolean;
-  ctxMosaicOpacity: number;
-  marsEllipsoid: Cesium.Ellipsoid;
 };
 
 export default function useMapLayers({
@@ -29,17 +25,12 @@ export default function useMapLayers({
   accessibilityOpacity,
   fusionVisible,
   fusionOpacity,
-  ctxMosaicVisible,
-  ctxMosaicOpacity,
-  marsEllipsoid,
-  footprintManagerRef,
 }: UseMapLayersParams): void {
   const swimLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   const scienceLayerRefs = useRef<Map<string, Cesium.ImageryLayer>>(new Map());
   const scienceLayerDepthRefs = useRef<Map<string, string | null>>(new Map());
   const accessibilityLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   const fusionLayerRef = useRef<Cesium.ImageryLayer | null>(null);
-  const ctxMosaicLayerRef = useRef<Cesium.ImageryLayer | null>(null);
 
   // SWIM real data imagery overlay
   useEffect(() => {
@@ -277,59 +268,4 @@ export default function useMapLayers({
     }
   }, [fusionOpacity, viewerRef]);
 
-  // CTX Mosaic overlay layer (Murray Lab 5m, Arcadia Planitia)
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-
-    if (ctxMosaicLayerRef.current) {
-      viewer.imageryLayers.remove(ctxMosaicLayerRef.current, false);
-      ctxMosaicLayerRef.current = null;
-    }
-
-    if (!ctxMosaicVisible) {
-      // Restore CTX footprint fill when mosaic is off
-      footprintManagerRef.current?.setFillVisible?.("CTX", true);
-      viewer.scene.requestRender();
-      return;
-    }
-
-    // Hide CTX footprint fills — mosaic replaces them
-    footprintManagerRef.current?.setFillVisible?.("CTX", false);
-
-    // Arcadia Planitia extent: lon 140E–216E (=144W), lat 32N–60N
-    const arcadiaRect = Cesium.Rectangle.fromDegrees(140, 32, -144, 60);
-    const provider = new Cesium.UrlTemplateImageryProvider({
-      url: "/api/ctx-mosaic/tile/{z}/{x}/{y}.png",
-      rectangle: arcadiaRect,
-      tilingScheme: new Cesium.GeographicTilingScheme({
-        ellipsoid: marsEllipsoid,
-        numberOfLevelZeroTilesX: 2,
-        numberOfLevelZeroTilesY: 1,
-      }),
-      minimumLevel: 0,
-      maximumLevel: 12,
-      credit: "Murray Lab / Caltech — CTX Global Mosaic V01",
-    });
-    const layer = viewer.imageryLayers.addImageryProvider(provider);
-    layer.alpha = ctxMosaicOpacity;
-    ctxMosaicLayerRef.current = layer;
-    viewer.scene.requestRender();
-
-    return () => {
-      if (!viewer || viewer.isDestroyed()) return;
-      if (ctxMosaicLayerRef.current) {
-        viewer.imageryLayers.remove(ctxMosaicLayerRef.current, false);
-        ctxMosaicLayerRef.current = null;
-      }
-    };
-  }, [ctxMosaicVisible, marsEllipsoid, viewerRef]);
-
-  // Update CTX mosaic layer opacity
-  useEffect(() => {
-    if (ctxMosaicLayerRef.current) {
-      ctxMosaicLayerRef.current.alpha = ctxMosaicOpacity;
-      viewerRef.current?.scene.requestRender();
-    }
-  }, [ctxMosaicOpacity, viewerRef]);
 }

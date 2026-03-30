@@ -3,7 +3,7 @@
  * Replaces hardcoded instrument-specific logic across the frontend.
  */
 
-export type InstrumentId = 'crism' | 'hirise' | 'sharad' | 'sharad_highres' | 'ctx' | 'hirise_dtm' | 'crism_trr3';
+export type InstrumentId = 'crism' | 'hirise' | 'sharad' | 'sharad_highres' | 'ctx' | 'ctx_mosaic' | 'hirise_dtm' | 'crism_trr3';
 export type GeometryType = 'Polygon' | 'LineString' | 'Point';
 export type InstrumentGroupId = 'spectral' | 'imaging' | 'radar';
 
@@ -57,7 +57,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
  */
 export const INSTRUMENT_GROUPS: InstrumentGroup[] = [
   { id: 'spectral', displayName: 'Spectrum',  icon: 'science',       instruments: ['crism', 'crism_trr3'] },
-  { id: 'imaging',  displayName: 'Imagery',   icon: 'photo_camera',  instruments: ['hirise', 'hirise_dtm', 'ctx'] },
+  { id: 'imaging',  displayName: 'Imagery',   icon: 'photo_camera',  instruments: ['hirise', 'hirise_dtm', 'ctx', 'ctx_mosaic'] },
   { id: 'radar',    displayName: 'Radar',     icon: 'radar',         instruments: ['sharad', 'sharad_highres'] },
 ];
 
@@ -140,6 +140,19 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     color: '#8B4513',
     cesiumColor: hexToRgb('#8B4513'),
     productIdPattern: /^DTE.*|^DTEEC.*/i,
+    supportsSpectrum: false,
+    supportsRgb: false,
+  },
+  ctx_mosaic: {
+    id: 'ctx_mosaic',
+    name: 'CTX_MOSAIC',
+    displayName: 'CTX Mosaic (Murray Lab 5m)',
+    subLabel: 'CTX 5m Mosaic',
+    group: 'imaging',
+    geometryType: 'Polygon',
+    color: '#DAA520',
+    cesiumColor: hexToRgb('#DAA520'),
+    productIdPattern: /^CTX_MOSAIC_/i,
     supportsSpectrum: false,
     supportsRgb: false,
   },

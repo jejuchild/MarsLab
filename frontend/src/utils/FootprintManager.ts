@@ -12,7 +12,7 @@ import * as Cesium from "cesium";
 import { getInstrumentCesiumColor, type InstrumentId } from "../config/instrumentRegistry";
 import { normalizeLonForMap } from "./coordinates";
 
-export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3";
+export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3";
 
 export interface LoadResult {
   instrument: InstrumentType;

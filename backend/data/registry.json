@@ -93,6 +93,24 @@
         "supplementary": []
       }
     },
+    "ctx_mosaic": {
+      "id": "ctx_mosaic",
+      "name": "CTX_MOSAIC",
+      "display_name": "CTX Mosaic (Murray Lab 5m)",
+      "geometry_type": "Polygon",
+      "color": "#DAA520",
+      "data_directory": "ctx_mosaic_data",
+      "index_file": "index.geojson",
+      "product_id_pattern": "^CTX_MOSAIC_",
+      "quickview_path": null,
+      "supports_spectrum": false,
+      "supports_rgb": false,
+      "file_types": {
+        "primary": [],
+        "label": [],
+        "supplementary": []
+      }
+    },
     "hirise_dtm": {
       "id": "hirise_dtm",
       "name": "HIRISE_DTM",
