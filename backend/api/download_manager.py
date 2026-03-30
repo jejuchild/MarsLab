@@ -1254,6 +1254,38 @@ def check_local_existence_detailed(product_id: str, instrument: Instrument) -> E
             existing_files=existing,
         )
 
+    # HiRISE: also check flat structure (files directly in hirise_data/, not subdirectory)
+    if not target_dir.exists() and instrument == Instrument.HIRISE:
+        flat_dir = HIRISE_DATA_DIR
+        pid_upper = base_key.upper()
+        jp2 = flat_dir / f"{pid_upper}_RED.JP2"
+        tif = flat_dir / f"{pid_upper}_RED.tif"
+        lbl = flat_dir / f"{pid_upper}_RED.LBL"
+        lbl_lower = flat_dir / f"{pid_upper}_RED.lbl"
+
+        has_jp2 = jp2.exists() and jp2.stat().st_size > 0
+        has_tif = tif.exists() and tif.stat().st_size > 0
+        has_lbl = lbl.exists() or lbl_lower.exists()
+        has_core_flat = has_jp2 or has_tif
+
+        if has_core_flat or has_lbl:
+            existing_flat = []
+            missing_flat = []
+            if has_jp2: existing_flat.append("jp2")
+            if has_tif: existing_flat.append("tif")
+            if has_lbl: existing_flat.append("lbl")
+            if not has_core_flat: missing_flat.append("jp2/tif")
+            if not has_lbl: missing_flat.append("lbl")
+            return ExistenceResult(
+                exists=has_core_flat and has_lbl,
+                has_core=has_core_flat,
+                has_header=has_lbl,
+                has_wavelength=True,
+                has_browse=False,
+                missing_files=missing_flat,
+                existing_files=existing_flat,
+            )
+
     if not target_dir.exists():
         if instrument == Instrument.CRISM:
             missing = ["img", "lbl", "hdr", "tab", "browse"]
