@@ -13,6 +13,9 @@ type UseMapLayersParams = {
   accessibilityOpacity: number;
   fusionVisible: boolean;
   fusionOpacity: number;
+  ctxMosaicVisible: boolean;
+  ctxMosaicOpacity: number;
+  marsEllipsoid: Cesium.Ellipsoid;
 };
 
 export default function useMapLayers({
@@ -25,12 +28,16 @@ export default function useMapLayers({
   accessibilityOpacity,
   fusionVisible,
   fusionOpacity,
+  ctxMosaicVisible,
+  ctxMosaicOpacity,
+  marsEllipsoid,
 }: UseMapLayersParams): void {
   const swimLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   const scienceLayerRefs = useRef<Map<string, Cesium.ImageryLayer>>(new Map());
   const scienceLayerDepthRefs = useRef<Map<string, string | null>>(new Map());
   const accessibilityLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   const fusionLayerRef = useRef<Cesium.ImageryLayer | null>(null);
+  const ctxMosaicLayerRef = useRef<Cesium.ImageryLayer | null>(null);
 
   // SWIM real data imagery overlay
   useEffect(() => {
