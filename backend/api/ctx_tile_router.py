@@ -54,10 +54,15 @@ def _find_ctx_tifs(lon_min: float, lat_min: float, lon_max: float, lat_max: floa
     """
     results = []
 
+    # Convert ographic lat to ocentric for TIF grid lookup
+    # CTX TIFs use ocentric latitude in their grid naming
+    lat_min_oc = _ographic_to_ocentric(lat_min)
+    lat_max_oc = _ographic_to_ocentric(lat_max)
+
     # Iterate over all possible 4° grid cells that could overlap
-    # Latitude grid: 32, 36, 40, ..., 56
-    lat_start = max(32, int(math.floor(lat_min / 4) * 4))
-    lat_end = min(56, int(math.floor(lat_max / 4) * 4))
+    # Latitude grid: 32, 36, 40, ..., 56 (ocentric)
+    lat_start = max(32, int(math.floor(lat_min_oc / 4) * 4))
+    lat_end = min(56, int(math.floor(lat_max_oc / 4) * 4))
 
     for grid_lat in range(lat_start, lat_end + 1, 4):
         if grid_lat + 4 < lat_min or grid_lat > lat_max:
@@ -108,10 +113,23 @@ def _open_tif(filename: str):
     return _ds_cache[filename]
 
 
-def _lonlat_to_projected(lon_deg: float, lat_deg: float):
-    """Convert geographic degrees to Mars equirectangular projected coords."""
+# Mars flattening for ographic ↔ ocentric conversion
+_MARS_F = 1.0 / 169.894447223612
+_MARS_1MF2 = (1.0 - _MARS_F) ** 2  # (1-f)^2
+
+
+def _ographic_to_ocentric(lat_deg: float) -> float:
+    """Convert planetographic (geodetic) latitude to planetocentric."""
+    lat_rad = math.radians(lat_deg)
+    lat_c = math.atan(_MARS_1MF2 * math.tan(lat_rad))
+    return math.degrees(lat_c)
+
+
+def _lonlat_to_projected(lon_deg: float, lat_ographic_deg: float):
+    """Convert ographic lon/lat to Mars ocentric equirectangular projected coords."""
+    lat_ocentric = _ographic_to_ocentric(lat_ographic_deg)
     x = lon_deg * (math.pi / 180.0) * MARS_RADIUS
-    y = lat_deg * (math.pi / 180.0) * MARS_RADIUS
+    y = lat_ocentric * (math.pi / 180.0) * MARS_RADIUS
     return x, y
 
 
@@ -166,8 +184,8 @@ def get_ctx_tile(z: int, x: int, y: int):
 
     lon_min, lat_min, lon_max, lat_max = _tile_bounds_geographic(z, x, y)
 
-    # Quick reject
-    if lat_max < 30 or lat_min > 62:
+    # Quick reject (ographic bounds — slightly wider than ocentric 32-60)
+    if lat_max < 29 or lat_min > 63:
         raise HTTPException(status_code=404, detail="No CTX data")
     in_positive = lon_max > 138 and lon_min < 182
     in_negative = lon_max > -182 and lon_min < -142
