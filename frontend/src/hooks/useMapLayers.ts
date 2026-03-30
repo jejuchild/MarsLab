@@ -5,6 +5,7 @@ import { SWIM_METHODS } from "../api/swim_ice";
 
 type UseMapLayersParams = {
   viewerRef: React.MutableRefObject<Cesium.Viewer | null>;
+  footprintManagerRef: React.MutableRefObject<import("../utils/FootprintManager").default | null>;
   swimLayer: string | false;
   scienceLayerVisibility: Record<string, boolean>;
   scienceLayerDepth: string;
@@ -31,6 +32,7 @@ export default function useMapLayers({
   ctxMosaicVisible,
   ctxMosaicOpacity,
   marsEllipsoid,
+  footprintManagerRef,
 }: UseMapLayersParams): void {
   const swimLayerRef = useRef<Cesium.ImageryLayer | null>(null);
   const scienceLayerRefs = useRef<Map<string, Cesium.ImageryLayer>>(new Map());
@@ -286,9 +288,14 @@ export default function useMapLayers({
     }
 
     if (!ctxMosaicVisible) {
+      // Restore CTX footprint fill when mosaic is off
+      footprintManagerRef.current?.setFillVisible?.("CTX", true);
       viewer.scene.requestRender();
       return;
     }
+
+    // Hide CTX footprint fills — mosaic replaces them
+    footprintManagerRef.current?.setFillVisible?.("CTX", false);
 
     // Arcadia Planitia extent: lon 140E–216E (=144W), lat 32N–60N
     const arcadiaRect = Cesium.Rectangle.fromDegrees(140, 32, -144, 60);

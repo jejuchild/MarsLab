@@ -135,36 +135,71 @@ def _lonlat_to_projected(lon_deg: float, lat_ographic_deg: float):
 
 def _read_tile_from_tif(tif_name: str, lon_min: float, lat_min: float,
                         lon_max: float, lat_max: float) -> Optional[np.ndarray]:
-    """Read a region from a single TIF, resampled to TILE_SIZE."""
+    """Read a region from a single TIF with per-row ographic→ocentric correction.
+
+    Cesium tiles are in ographic (geodetic) latitude, but the TIF is in ocentric
+    (geocentric) equirectangular projection. The conversion is non-linear, so we
+    compute the correct projected y for each output row and sample accordingly.
+    """
     try:
-        from rasterio.windows import from_bounds
-        from rasterio.enums import Resampling
-
         ds = _open_tif(tif_name)
-        px_min, py_min = _lonlat_to_projected(lon_min, lat_min)
-        px_max, py_max = _lonlat_to_projected(lon_max, lat_max)
+        inv_transform = ~ds.transform  # projected coords → pixel coords
 
-        window = from_bounds(px_min, py_min, px_max, py_max, ds.transform)
+        # X (longitude) is the same in both systems — compute column range once
+        x_min = lon_min * (math.pi / 180.0) * MARS_RADIUS
+        x_max = lon_max * (math.pi / 180.0) * MARS_RADIUS
 
-        # Clip window to dataset bounds
-        row_off = max(0, int(window.row_off))
-        col_off = max(0, int(window.col_off))
-        row_end = min(ds.height, int(window.row_off + window.height))
-        col_end = min(ds.width, int(window.col_off + window.width))
+        # Pixel columns for the lon range
+        col_min_f, _ = inv_transform * (x_min, 0)
+        col_max_f, _ = inv_transform * (x_max, 0)
+        col_start = max(0, int(col_min_f))
+        col_end = min(ds.width, int(col_max_f) + 1)
+        if col_end <= col_start:
+            return None
+        col_width = col_end - col_start
 
-        if row_end <= row_off or col_end <= col_off:
+        # For each output row, compute the ographic lat → ocentric → projected y → pixel row
+        output = np.zeros((TILE_SIZE, TILE_SIZE), dtype=np.uint8)
+
+        # Pre-compute the ocentric projected y for each output row
+        from rasterio.enums import Resampling
+        from rasterio.windows import Window
+
+        lat_step = (lat_max - lat_min) / TILE_SIZE
+        row_map = np.empty(TILE_SIZE, dtype=np.float64)
+        for i in range(TILE_SIZE):
+            # Output row 0 = lat_max (top), row TILE_SIZE-1 = lat_min (bottom)
+            lat_ographic = lat_max - (i + 0.5) * lat_step
+            lat_ocentric = _ographic_to_ocentric(lat_ographic)
+            proj_y = lat_ocentric * (math.pi / 180.0) * MARS_RADIUS
+            _, pix_row = inv_transform * (0, proj_y)
+            row_map[i] = pix_row
+
+        # Read a slightly larger window to cover all needed rows
+        src_row_min = max(0, int(np.min(row_map)) - 1)
+        src_row_max = min(ds.height, int(np.max(row_map)) + 2)
+        if src_row_max <= src_row_min:
             return None
 
-        from rasterio.windows import Window
-        clipped = Window(col_off, row_off, col_end - col_off, row_end - row_off)
+        window = Window(col_start, src_row_min, col_width, src_row_max - src_row_min)
+        raw = ds.read(1, window=window)
+        if raw.size == 0:
+            return None
 
-        data = ds.read(
-            1,
-            window=clipped,
-            out_shape=(TILE_SIZE, TILE_SIZE),
-            resampling=Resampling.bilinear,
-        )
-        return data
+        # Resample: for each output row, pick the correct source row via linear interp
+        from scipy.ndimage import map_coordinates
+
+        # Build coordinate arrays for map_coordinates
+        # row coordinates relative to the window
+        src_rows = row_map - src_row_min  # fractional rows in the raw array
+        src_cols = np.linspace(0, col_width - 1, TILE_SIZE)
+
+        # Create 2D coordinate grids
+        rr, cc = np.meshgrid(src_rows, src_cols, indexing="ij")
+        output = map_coordinates(raw.astype(np.float32), [rr, cc], order=1, mode="nearest")
+        output = np.clip(output, 0, 255).astype(np.uint8)
+
+        return output
     except Exception:
         return None
 

@@ -594,6 +594,16 @@ export class FootprintManager {
     this.viewer.scene.requestRender();
   }
 
+  /**
+   * Set visibility of footprint fills only (keep outlines visible).
+   * Used when CTX mosaic replaces individual footprint fills.
+   */
+  setFillVisible(instrument: InstrumentType, visible: boolean): void {
+    const fill = this.fillPrimitives.get(instrument);
+    if (fill) fill.show = visible;
+    this.viewer.scene.requestRender();
+  }
+
   getFeatureMetadata(entityId: string): FeatureMetadata | null {
     return this.featureMetadata.get(entityId) ?? null;
   }

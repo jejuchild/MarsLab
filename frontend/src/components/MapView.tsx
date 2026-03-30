@@ -917,6 +917,7 @@ export default function MapView({
 
   useMapLayers({
     viewerRef,
+    footprintManagerRef: sharedFootprintManagerRef,
     swimLayer,
     scienceLayerVisibility,
     scienceLayerDepth,
