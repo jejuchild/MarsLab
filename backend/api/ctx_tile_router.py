@@ -24,6 +24,8 @@ router = APIRouter(prefix="/api/ctx-mosaic")
 # ── Config ──
 COG_DIR = Path("/disk1/cspark/MarsLab/Data/CTX/arcadia_cog")
 TILE_DIR = Path("/disk1/cspark/MarsLab/Data/CTX/arcadia_tiles")
+QUICKVIEW_CACHE_DIR = Path("/disk1/cspark/MarsLab/Data/CTX/quickview_cache")
+QUICKVIEW_SIZE = 1024  # px
 TILE_SIZE = 256
 MAX_CACHE = 2000
 MARS_RADIUS = 3396190.0
@@ -261,3 +263,68 @@ def get_ctx_tile(z: int, x: int, y: int):
         media_type="image/png",
         headers={"Cache-Control": "public, max-age=604800"},
     )
+
+
+# ── Quickview endpoint: per-tile downsampled PNG ──
+
+@router.get("/quickview/{product_id}.png")
+def get_ctx_quickview(product_id: str):
+    """Serve a downsampled quickview PNG for a single CTX mosaic tile.
+
+    product_id format: CTX_MOSAIC_E160_N44
+    """
+    QUICKVIEW_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_path = QUICKVIEW_CACHE_DIR / f"{product_id}.png"
+
+    # Serve from disk cache
+    if cache_path.exists():
+        return Response(
+            content=cache_path.read_bytes(),
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=604800"},
+        )
+
+    # Parse product_id → TIF filename
+    # CTX_MOSAIC_E160_N44 → MurrayLab_CTX_V01_E160_N44_Mosaic.tif
+    parts = product_id.split("_")
+    if len(parts) < 4 or parts[0] != "CTX" or parts[1] != "MOSAIC":
+        raise HTTPException(status_code=400, detail="Invalid product_id")
+
+    lon_str = parts[2]  # E160 or E-180
+    lat_str = parts[3]  # N44
+    tif_name = f"MurrayLab_CTX_V01_{lon_str}_{lat_str}_Mosaic.tif"
+
+    cog_path = COG_DIR / tif_name
+    if not cog_path.exists():
+        raw_path = TILE_DIR / tif_name
+        if not raw_path.exists():
+            raise HTTPException(status_code=404, detail="Tile not found")
+
+    try:
+        from rasterio.enums import Resampling
+
+        ds = _open_tif(tif_name)
+        data = ds.read(
+            1,
+            out_shape=(QUICKVIEW_SIZE, QUICKVIEW_SIZE),
+            resampling=Resampling.bilinear,
+        )
+
+        from PIL import Image
+        img = Image.fromarray(data, mode="L")
+        buf = BytesIO()
+        img.save(buf, format="PNG", optimize=True)
+        png_bytes = buf.getvalue()
+
+        # Save to disk cache
+        cache_path.write_bytes(png_bytes)
+
+        return Response(
+            content=png_bytes,
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=604800"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate quickview: {e}")

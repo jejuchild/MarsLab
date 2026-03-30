@@ -1,0 +1,5325 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-144_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-144_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -142.0,
+        "tif_name": "MurrayLab_CTX_V01_E-144_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -144,
+              32.30479028111658
+            ],
+            [
+              -140,
+              32.30479028111658
+            ],
+            [
+              -140,
+              36.32226593467266
+            ],
+            [
+              -144,
+              36.32226593467266
+            ],
+            [
+              -144,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-144_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-144_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -142.0,
+        "tif_name": "MurrayLab_CTX_V01_E-144_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -144,
+              36.32226593467266
+            ],
+            [
+              -140,
+              36.32226593467266
+            ],
+            [
+              -140,
+              40.33343536438517
+            ],
+            [
+              -144,
+              40.33343536438517
+            ],
+            [
+              -144,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-144_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-144_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -142.0,
+        "tif_name": "MurrayLab_CTX_V01_E-144_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -144,
+              40.33343536438517
+            ],
+            [
+              -140,
+              40.33343536438517
+            ],
+            [
+              -140,
+              44.338095570323915
+            ],
+            [
+              -144,
+              44.338095570323915
+            ],
+            [
+              -144,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-144_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-144_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -142.0,
+        "tif_name": "MurrayLab_CTX_V01_E-144_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -144,
+              44.338095570323915
+            ],
+            [
+              -140,
+              44.338095570323915
+            ],
+            [
+              -140,
+              48.33617169069096
+            ],
+            [
+              -144,
+              48.33617169069096
+            ],
+            [
+              -144,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-144_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-144_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -142.0,
+        "tif_name": "MurrayLab_CTX_V01_E-144_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -144,
+              48.33617169069096
+            ],
+            [
+              -140,
+              48.33617169069096
+            ],
+            [
+              -140,
+              52.3277172245716
+            ],
+            [
+              -144,
+              52.3277172245716
+            ],
+            [
+              -144,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-144_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-144_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -142.0,
+        "tif_name": "MurrayLab_CTX_V01_E-144_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -144,
+              52.3277172245716
+            ],
+            [
+              -140,
+              52.3277172245716
+            ],
+            [
+              -140,
+              56.312911750017534
+            ],
+            [
+              -144,
+              56.312911750017534
+            ],
+            [
+              -144,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-144_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-144_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -142.0,
+        "tif_name": "MurrayLab_CTX_V01_E-144_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -144,
+              56.312911750017534
+            ],
+            [
+              -140,
+              56.312911750017534
+            ],
+            [
+              -140,
+              60.29205627737859
+            ],
+            [
+              -144,
+              60.29205627737859
+            ],
+            [
+              -144,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-148_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-148_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -146.0,
+        "tif_name": "MurrayLab_CTX_V01_E-148_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -148,
+              32.30479028111658
+            ],
+            [
+              -144,
+              32.30479028111658
+            ],
+            [
+              -144,
+              36.32226593467266
+            ],
+            [
+              -148,
+              36.32226593467266
+            ],
+            [
+              -148,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-148_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-148_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -146.0,
+        "tif_name": "MurrayLab_CTX_V01_E-148_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -148,
+              36.32226593467266
+            ],
+            [
+              -144,
+              36.32226593467266
+            ],
+            [
+              -144,
+              40.33343536438517
+            ],
+            [
+              -148,
+              40.33343536438517
+            ],
+            [
+              -148,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-148_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-148_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -146.0,
+        "tif_name": "MurrayLab_CTX_V01_E-148_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -148,
+              40.33343536438517
+            ],
+            [
+              -144,
+              40.33343536438517
+            ],
+            [
+              -144,
+              44.338095570323915
+            ],
+            [
+              -148,
+              44.338095570323915
+            ],
+            [
+              -148,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-148_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-148_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -146.0,
+        "tif_name": "MurrayLab_CTX_V01_E-148_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -148,
+              44.338095570323915
+            ],
+            [
+              -144,
+              44.338095570323915
+            ],
+            [
+              -144,
+              48.33617169069096
+            ],
+            [
+              -148,
+              48.33617169069096
+            ],
+            [
+              -148,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-148_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-148_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -146.0,
+        "tif_name": "MurrayLab_CTX_V01_E-148_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -148,
+              48.33617169069096
+            ],
+            [
+              -144,
+              48.33617169069096
+            ],
+            [
+              -144,
+              52.3277172245716
+            ],
+            [
+              -148,
+              52.3277172245716
+            ],
+            [
+              -148,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-148_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-148_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -146.0,
+        "tif_name": "MurrayLab_CTX_V01_E-148_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -148,
+              52.3277172245716
+            ],
+            [
+              -144,
+              52.3277172245716
+            ],
+            [
+              -144,
+              56.312911750017534
+            ],
+            [
+              -148,
+              56.312911750017534
+            ],
+            [
+              -148,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-148_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-148_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -146.0,
+        "tif_name": "MurrayLab_CTX_V01_E-148_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -148,
+              56.312911750017534
+            ],
+            [
+              -144,
+              56.312911750017534
+            ],
+            [
+              -144,
+              60.29205627737859
+            ],
+            [
+              -148,
+              60.29205627737859
+            ],
+            [
+              -148,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-152_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-152_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -150.0,
+        "tif_name": "MurrayLab_CTX_V01_E-152_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -152,
+              32.30479028111658
+            ],
+            [
+              -148,
+              32.30479028111658
+            ],
+            [
+              -148,
+              36.32226593467266
+            ],
+            [
+              -152,
+              36.32226593467266
+            ],
+            [
+              -152,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-152_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-152_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -150.0,
+        "tif_name": "MurrayLab_CTX_V01_E-152_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -152,
+              36.32226593467266
+            ],
+            [
+              -148,
+              36.32226593467266
+            ],
+            [
+              -148,
+              40.33343536438517
+            ],
+            [
+              -152,
+              40.33343536438517
+            ],
+            [
+              -152,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-152_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-152_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -150.0,
+        "tif_name": "MurrayLab_CTX_V01_E-152_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -152,
+              40.33343536438517
+            ],
+            [
+              -148,
+              40.33343536438517
+            ],
+            [
+              -148,
+              44.338095570323915
+            ],
+            [
+              -152,
+              44.338095570323915
+            ],
+            [
+              -152,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-152_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-152_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -150.0,
+        "tif_name": "MurrayLab_CTX_V01_E-152_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -152,
+              44.338095570323915
+            ],
+            [
+              -148,
+              44.338095570323915
+            ],
+            [
+              -148,
+              48.33617169069096
+            ],
+            [
+              -152,
+              48.33617169069096
+            ],
+            [
+              -152,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-152_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-152_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -150.0,
+        "tif_name": "MurrayLab_CTX_V01_E-152_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -152,
+              48.33617169069096
+            ],
+            [
+              -148,
+              48.33617169069096
+            ],
+            [
+              -148,
+              52.3277172245716
+            ],
+            [
+              -152,
+              52.3277172245716
+            ],
+            [
+              -152,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-152_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-152_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -150.0,
+        "tif_name": "MurrayLab_CTX_V01_E-152_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -152,
+              52.3277172245716
+            ],
+            [
+              -148,
+              52.3277172245716
+            ],
+            [
+              -148,
+              56.312911750017534
+            ],
+            [
+              -152,
+              56.312911750017534
+            ],
+            [
+              -152,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-152_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-152_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -150.0,
+        "tif_name": "MurrayLab_CTX_V01_E-152_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -152,
+              56.312911750017534
+            ],
+            [
+              -148,
+              56.312911750017534
+            ],
+            [
+              -148,
+              60.29205627737859
+            ],
+            [
+              -152,
+              60.29205627737859
+            ],
+            [
+              -152,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-156_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-156_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -154.0,
+        "tif_name": "MurrayLab_CTX_V01_E-156_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -156,
+              32.30479028111658
+            ],
+            [
+              -152,
+              32.30479028111658
+            ],
+            [
+              -152,
+              36.32226593467266
+            ],
+            [
+              -156,
+              36.32226593467266
+            ],
+            [
+              -156,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-156_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-156_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -154.0,
+        "tif_name": "MurrayLab_CTX_V01_E-156_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -156,
+              36.32226593467266
+            ],
+            [
+              -152,
+              36.32226593467266
+            ],
+            [
+              -152,
+              40.33343536438517
+            ],
+            [
+              -156,
+              40.33343536438517
+            ],
+            [
+              -156,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-156_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-156_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -154.0,
+        "tif_name": "MurrayLab_CTX_V01_E-156_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -156,
+              40.33343536438517
+            ],
+            [
+              -152,
+              40.33343536438517
+            ],
+            [
+              -152,
+              44.338095570323915
+            ],
+            [
+              -156,
+              44.338095570323915
+            ],
+            [
+              -156,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-156_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-156_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -154.0,
+        "tif_name": "MurrayLab_CTX_V01_E-156_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -156,
+              44.338095570323915
+            ],
+            [
+              -152,
+              44.338095570323915
+            ],
+            [
+              -152,
+              48.33617169069096
+            ],
+            [
+              -156,
+              48.33617169069096
+            ],
+            [
+              -156,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-156_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-156_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -154.0,
+        "tif_name": "MurrayLab_CTX_V01_E-156_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -156,
+              48.33617169069096
+            ],
+            [
+              -152,
+              48.33617169069096
+            ],
+            [
+              -152,
+              52.3277172245716
+            ],
+            [
+              -156,
+              52.3277172245716
+            ],
+            [
+              -156,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-156_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-156_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -154.0,
+        "tif_name": "MurrayLab_CTX_V01_E-156_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -156,
+              52.3277172245716
+            ],
+            [
+              -152,
+              52.3277172245716
+            ],
+            [
+              -152,
+              56.312911750017534
+            ],
+            [
+              -156,
+              56.312911750017534
+            ],
+            [
+              -156,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-156_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-156_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -154.0,
+        "tif_name": "MurrayLab_CTX_V01_E-156_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -156,
+              56.312911750017534
+            ],
+            [
+              -152,
+              56.312911750017534
+            ],
+            [
+              -152,
+              60.29205627737859
+            ],
+            [
+              -156,
+              60.29205627737859
+            ],
+            [
+              -156,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-160_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-160_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -158.0,
+        "tif_name": "MurrayLab_CTX_V01_E-160_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -160,
+              32.30479028111658
+            ],
+            [
+              -156,
+              32.30479028111658
+            ],
+            [
+              -156,
+              36.32226593467266
+            ],
+            [
+              -160,
+              36.32226593467266
+            ],
+            [
+              -160,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-160_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-160_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -158.0,
+        "tif_name": "MurrayLab_CTX_V01_E-160_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -160,
+              36.32226593467266
+            ],
+            [
+              -156,
+              36.32226593467266
+            ],
+            [
+              -156,
+              40.33343536438517
+            ],
+            [
+              -160,
+              40.33343536438517
+            ],
+            [
+              -160,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-160_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-160_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -158.0,
+        "tif_name": "MurrayLab_CTX_V01_E-160_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -160,
+              40.33343536438517
+            ],
+            [
+              -156,
+              40.33343536438517
+            ],
+            [
+              -156,
+              44.338095570323915
+            ],
+            [
+              -160,
+              44.338095570323915
+            ],
+            [
+              -160,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-160_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-160_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -158.0,
+        "tif_name": "MurrayLab_CTX_V01_E-160_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -160,
+              44.338095570323915
+            ],
+            [
+              -156,
+              44.338095570323915
+            ],
+            [
+              -156,
+              48.33617169069096
+            ],
+            [
+              -160,
+              48.33617169069096
+            ],
+            [
+              -160,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-160_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-160_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -158.0,
+        "tif_name": "MurrayLab_CTX_V01_E-160_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -160,
+              48.33617169069096
+            ],
+            [
+              -156,
+              48.33617169069096
+            ],
+            [
+              -156,
+              52.3277172245716
+            ],
+            [
+              -160,
+              52.3277172245716
+            ],
+            [
+              -160,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-160_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-160_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -158.0,
+        "tif_name": "MurrayLab_CTX_V01_E-160_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -160,
+              52.3277172245716
+            ],
+            [
+              -156,
+              52.3277172245716
+            ],
+            [
+              -156,
+              56.312911750017534
+            ],
+            [
+              -160,
+              56.312911750017534
+            ],
+            [
+              -160,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-160_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-160_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -158.0,
+        "tif_name": "MurrayLab_CTX_V01_E-160_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -160,
+              56.312911750017534
+            ],
+            [
+              -156,
+              56.312911750017534
+            ],
+            [
+              -156,
+              60.29205627737859
+            ],
+            [
+              -160,
+              60.29205627737859
+            ],
+            [
+              -160,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-164_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-164_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -162.0,
+        "tif_name": "MurrayLab_CTX_V01_E-164_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164,
+              32.30479028111658
+            ],
+            [
+              -160,
+              32.30479028111658
+            ],
+            [
+              -160,
+              36.32226593467266
+            ],
+            [
+              -164,
+              36.32226593467266
+            ],
+            [
+              -164,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-164_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-164_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -162.0,
+        "tif_name": "MurrayLab_CTX_V01_E-164_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164,
+              36.32226593467266
+            ],
+            [
+              -160,
+              36.32226593467266
+            ],
+            [
+              -160,
+              40.33343536438517
+            ],
+            [
+              -164,
+              40.33343536438517
+            ],
+            [
+              -164,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-164_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-164_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -162.0,
+        "tif_name": "MurrayLab_CTX_V01_E-164_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164,
+              40.33343536438517
+            ],
+            [
+              -160,
+              40.33343536438517
+            ],
+            [
+              -160,
+              44.338095570323915
+            ],
+            [
+              -164,
+              44.338095570323915
+            ],
+            [
+              -164,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-164_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-164_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -162.0,
+        "tif_name": "MurrayLab_CTX_V01_E-164_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164,
+              44.338095570323915
+            ],
+            [
+              -160,
+              44.338095570323915
+            ],
+            [
+              -160,
+              48.33617169069096
+            ],
+            [
+              -164,
+              48.33617169069096
+            ],
+            [
+              -164,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-164_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-164_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -162.0,
+        "tif_name": "MurrayLab_CTX_V01_E-164_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164,
+              48.33617169069096
+            ],
+            [
+              -160,
+              48.33617169069096
+            ],
+            [
+              -160,
+              52.3277172245716
+            ],
+            [
+              -164,
+              52.3277172245716
+            ],
+            [
+              -164,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-164_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-164_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -162.0,
+        "tif_name": "MurrayLab_CTX_V01_E-164_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164,
+              52.3277172245716
+            ],
+            [
+              -160,
+              52.3277172245716
+            ],
+            [
+              -160,
+              56.312911750017534
+            ],
+            [
+              -164,
+              56.312911750017534
+            ],
+            [
+              -164,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-164_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-164_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -162.0,
+        "tif_name": "MurrayLab_CTX_V01_E-164_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -164,
+              56.312911750017534
+            ],
+            [
+              -160,
+              56.312911750017534
+            ],
+            [
+              -160,
+              60.29205627737859
+            ],
+            [
+              -164,
+              60.29205627737859
+            ],
+            [
+              -164,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-168_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-168_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -166.0,
+        "tif_name": "MurrayLab_CTX_V01_E-168_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168,
+              32.30479028111658
+            ],
+            [
+              -164,
+              32.30479028111658
+            ],
+            [
+              -164,
+              36.32226593467266
+            ],
+            [
+              -168,
+              36.32226593467266
+            ],
+            [
+              -168,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-168_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-168_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -166.0,
+        "tif_name": "MurrayLab_CTX_V01_E-168_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168,
+              36.32226593467266
+            ],
+            [
+              -164,
+              36.32226593467266
+            ],
+            [
+              -164,
+              40.33343536438517
+            ],
+            [
+              -168,
+              40.33343536438517
+            ],
+            [
+              -168,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-168_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-168_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -166.0,
+        "tif_name": "MurrayLab_CTX_V01_E-168_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168,
+              40.33343536438517
+            ],
+            [
+              -164,
+              40.33343536438517
+            ],
+            [
+              -164,
+              44.338095570323915
+            ],
+            [
+              -168,
+              44.338095570323915
+            ],
+            [
+              -168,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-168_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-168_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -166.0,
+        "tif_name": "MurrayLab_CTX_V01_E-168_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168,
+              44.338095570323915
+            ],
+            [
+              -164,
+              44.338095570323915
+            ],
+            [
+              -164,
+              48.33617169069096
+            ],
+            [
+              -168,
+              48.33617169069096
+            ],
+            [
+              -168,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-168_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-168_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -166.0,
+        "tif_name": "MurrayLab_CTX_V01_E-168_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168,
+              48.33617169069096
+            ],
+            [
+              -164,
+              48.33617169069096
+            ],
+            [
+              -164,
+              52.3277172245716
+            ],
+            [
+              -168,
+              52.3277172245716
+            ],
+            [
+              -168,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-168_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-168_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -166.0,
+        "tif_name": "MurrayLab_CTX_V01_E-168_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168,
+              52.3277172245716
+            ],
+            [
+              -164,
+              52.3277172245716
+            ],
+            [
+              -164,
+              56.312911750017534
+            ],
+            [
+              -168,
+              56.312911750017534
+            ],
+            [
+              -168,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-168_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-168_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -166.0,
+        "tif_name": "MurrayLab_CTX_V01_E-168_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -168,
+              56.312911750017534
+            ],
+            [
+              -164,
+              56.312911750017534
+            ],
+            [
+              -164,
+              60.29205627737859
+            ],
+            [
+              -168,
+              60.29205627737859
+            ],
+            [
+              -168,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-172_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-172_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -170.0,
+        "tif_name": "MurrayLab_CTX_V01_E-172_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -172,
+              32.30479028111658
+            ],
+            [
+              -168,
+              32.30479028111658
+            ],
+            [
+              -168,
+              36.32226593467266
+            ],
+            [
+              -172,
+              36.32226593467266
+            ],
+            [
+              -172,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-172_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-172_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -170.0,
+        "tif_name": "MurrayLab_CTX_V01_E-172_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -172,
+              36.32226593467266
+            ],
+            [
+              -168,
+              36.32226593467266
+            ],
+            [
+              -168,
+              40.33343536438517
+            ],
+            [
+              -172,
+              40.33343536438517
+            ],
+            [
+              -172,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-172_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-172_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -170.0,
+        "tif_name": "MurrayLab_CTX_V01_E-172_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -172,
+              40.33343536438517
+            ],
+            [
+              -168,
+              40.33343536438517
+            ],
+            [
+              -168,
+              44.338095570323915
+            ],
+            [
+              -172,
+              44.338095570323915
+            ],
+            [
+              -172,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-172_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-172_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -170.0,
+        "tif_name": "MurrayLab_CTX_V01_E-172_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -172,
+              44.338095570323915
+            ],
+            [
+              -168,
+              44.338095570323915
+            ],
+            [
+              -168,
+              48.33617169069096
+            ],
+            [
+              -172,
+              48.33617169069096
+            ],
+            [
+              -172,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-172_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-172_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -170.0,
+        "tif_name": "MurrayLab_CTX_V01_E-172_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -172,
+              48.33617169069096
+            ],
+            [
+              -168,
+              48.33617169069096
+            ],
+            [
+              -168,
+              52.3277172245716
+            ],
+            [
+              -172,
+              52.3277172245716
+            ],
+            [
+              -172,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-172_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-172_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -170.0,
+        "tif_name": "MurrayLab_CTX_V01_E-172_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -172,
+              52.3277172245716
+            ],
+            [
+              -168,
+              52.3277172245716
+            ],
+            [
+              -168,
+              56.312911750017534
+            ],
+            [
+              -172,
+              56.312911750017534
+            ],
+            [
+              -172,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-172_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-172_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -170.0,
+        "tif_name": "MurrayLab_CTX_V01_E-172_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -172,
+              56.312911750017534
+            ],
+            [
+              -168,
+              56.312911750017534
+            ],
+            [
+              -168,
+              60.29205627737859
+            ],
+            [
+              -172,
+              60.29205627737859
+            ],
+            [
+              -172,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-176_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-176_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -174.0,
+        "tif_name": "MurrayLab_CTX_V01_E-176_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -176,
+              32.30479028111658
+            ],
+            [
+              -172,
+              32.30479028111658
+            ],
+            [
+              -172,
+              36.32226593467266
+            ],
+            [
+              -176,
+              36.32226593467266
+            ],
+            [
+              -176,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-176_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-176_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -174.0,
+        "tif_name": "MurrayLab_CTX_V01_E-176_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -176,
+              36.32226593467266
+            ],
+            [
+              -172,
+              36.32226593467266
+            ],
+            [
+              -172,
+              40.33343536438517
+            ],
+            [
+              -176,
+              40.33343536438517
+            ],
+            [
+              -176,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-176_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-176_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -174.0,
+        "tif_name": "MurrayLab_CTX_V01_E-176_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -176,
+              40.33343536438517
+            ],
+            [
+              -172,
+              40.33343536438517
+            ],
+            [
+              -172,
+              44.338095570323915
+            ],
+            [
+              -176,
+              44.338095570323915
+            ],
+            [
+              -176,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-176_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-176_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -174.0,
+        "tif_name": "MurrayLab_CTX_V01_E-176_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -176,
+              44.338095570323915
+            ],
+            [
+              -172,
+              44.338095570323915
+            ],
+            [
+              -172,
+              48.33617169069096
+            ],
+            [
+              -176,
+              48.33617169069096
+            ],
+            [
+              -176,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-176_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-176_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -174.0,
+        "tif_name": "MurrayLab_CTX_V01_E-176_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -176,
+              48.33617169069096
+            ],
+            [
+              -172,
+              48.33617169069096
+            ],
+            [
+              -172,
+              52.3277172245716
+            ],
+            [
+              -176,
+              52.3277172245716
+            ],
+            [
+              -176,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-176_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-176_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -174.0,
+        "tif_name": "MurrayLab_CTX_V01_E-176_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -176,
+              52.3277172245716
+            ],
+            [
+              -172,
+              52.3277172245716
+            ],
+            [
+              -172,
+              56.312911750017534
+            ],
+            [
+              -176,
+              56.312911750017534
+            ],
+            [
+              -176,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-176_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-176_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -174.0,
+        "tif_name": "MurrayLab_CTX_V01_E-176_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -176,
+              56.312911750017534
+            ],
+            [
+              -172,
+              56.312911750017534
+            ],
+            [
+              -172,
+              60.29205627737859
+            ],
+            [
+              -176,
+              60.29205627737859
+            ],
+            [
+              -176,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-180_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-180_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": -178.0,
+        "tif_name": "MurrayLab_CTX_V01_E-180_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180,
+              32.30479028111658
+            ],
+            [
+              -176,
+              32.30479028111658
+            ],
+            [
+              -176,
+              36.32226593467266
+            ],
+            [
+              -180,
+              36.32226593467266
+            ],
+            [
+              -180,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-180_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-180_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": -178.0,
+        "tif_name": "MurrayLab_CTX_V01_E-180_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180,
+              36.32226593467266
+            ],
+            [
+              -176,
+              36.32226593467266
+            ],
+            [
+              -176,
+              40.33343536438517
+            ],
+            [
+              -180,
+              40.33343536438517
+            ],
+            [
+              -180,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-180_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-180_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": -178.0,
+        "tif_name": "MurrayLab_CTX_V01_E-180_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180,
+              40.33343536438517
+            ],
+            [
+              -176,
+              40.33343536438517
+            ],
+            [
+              -176,
+              44.338095570323915
+            ],
+            [
+              -180,
+              44.338095570323915
+            ],
+            [
+              -180,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-180_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-180_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": -178.0,
+        "tif_name": "MurrayLab_CTX_V01_E-180_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180,
+              44.338095570323915
+            ],
+            [
+              -176,
+              44.338095570323915
+            ],
+            [
+              -176,
+              48.33617169069096
+            ],
+            [
+              -180,
+              48.33617169069096
+            ],
+            [
+              -180,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-180_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-180_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": -178.0,
+        "tif_name": "MurrayLab_CTX_V01_E-180_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180,
+              48.33617169069096
+            ],
+            [
+              -176,
+              48.33617169069096
+            ],
+            [
+              -176,
+              52.3277172245716
+            ],
+            [
+              -180,
+              52.3277172245716
+            ],
+            [
+              -180,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-180_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-180_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": -178.0,
+        "tif_name": "MurrayLab_CTX_V01_E-180_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180,
+              52.3277172245716
+            ],
+            [
+              -176,
+              52.3277172245716
+            ],
+            [
+              -176,
+              56.312911750017534
+            ],
+            [
+              -180,
+              56.312911750017534
+            ],
+            [
+              -180,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E-180_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E-180_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": -178.0,
+        "tif_name": "MurrayLab_CTX_V01_E-180_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -180,
+              56.312911750017534
+            ],
+            [
+              -176,
+              56.312911750017534
+            ],
+            [
+              -176,
+              60.29205627737859
+            ],
+            [
+              -180,
+              60.29205627737859
+            ],
+            [
+              -180,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E140_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E140_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 142.0,
+        "tif_name": "MurrayLab_CTX_V01_E140_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              140,
+              32.30479028111658
+            ],
+            [
+              144,
+              32.30479028111658
+            ],
+            [
+              144,
+              36.32226593467266
+            ],
+            [
+              140,
+              36.32226593467266
+            ],
+            [
+              140,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E140_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E140_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 142.0,
+        "tif_name": "MurrayLab_CTX_V01_E140_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              140,
+              36.32226593467266
+            ],
+            [
+              144,
+              36.32226593467266
+            ],
+            [
+              144,
+              40.33343536438517
+            ],
+            [
+              140,
+              40.33343536438517
+            ],
+            [
+              140,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E140_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E140_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 142.0,
+        "tif_name": "MurrayLab_CTX_V01_E140_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              140,
+              40.33343536438517
+            ],
+            [
+              144,
+              40.33343536438517
+            ],
+            [
+              144,
+              44.338095570323915
+            ],
+            [
+              140,
+              44.338095570323915
+            ],
+            [
+              140,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E140_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E140_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 142.0,
+        "tif_name": "MurrayLab_CTX_V01_E140_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              140,
+              44.338095570323915
+            ],
+            [
+              144,
+              44.338095570323915
+            ],
+            [
+              144,
+              48.33617169069096
+            ],
+            [
+              140,
+              48.33617169069096
+            ],
+            [
+              140,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E140_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E140_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 142.0,
+        "tif_name": "MurrayLab_CTX_V01_E140_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              140,
+              48.33617169069096
+            ],
+            [
+              144,
+              48.33617169069096
+            ],
+            [
+              144,
+              52.3277172245716
+            ],
+            [
+              140,
+              52.3277172245716
+            ],
+            [
+              140,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E140_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E140_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 142.0,
+        "tif_name": "MurrayLab_CTX_V01_E140_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              140,
+              52.3277172245716
+            ],
+            [
+              144,
+              52.3277172245716
+            ],
+            [
+              144,
+              56.312911750017534
+            ],
+            [
+              140,
+              56.312911750017534
+            ],
+            [
+              140,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E140_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E140_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 142.0,
+        "tif_name": "MurrayLab_CTX_V01_E140_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              140,
+              56.312911750017534
+            ],
+            [
+              144,
+              56.312911750017534
+            ],
+            [
+              144,
+              60.29205627737859
+            ],
+            [
+              140,
+              60.29205627737859
+            ],
+            [
+              140,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E144_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E144_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 146.0,
+        "tif_name": "MurrayLab_CTX_V01_E144_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              144,
+              32.30479028111658
+            ],
+            [
+              148,
+              32.30479028111658
+            ],
+            [
+              148,
+              36.32226593467266
+            ],
+            [
+              144,
+              36.32226593467266
+            ],
+            [
+              144,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E144_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E144_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 146.0,
+        "tif_name": "MurrayLab_CTX_V01_E144_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              144,
+              36.32226593467266
+            ],
+            [
+              148,
+              36.32226593467266
+            ],
+            [
+              148,
+              40.33343536438517
+            ],
+            [
+              144,
+              40.33343536438517
+            ],
+            [
+              144,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E144_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E144_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 146.0,
+        "tif_name": "MurrayLab_CTX_V01_E144_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              144,
+              40.33343536438517
+            ],
+            [
+              148,
+              40.33343536438517
+            ],
+            [
+              148,
+              44.338095570323915
+            ],
+            [
+              144,
+              44.338095570323915
+            ],
+            [
+              144,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E144_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E144_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 146.0,
+        "tif_name": "MurrayLab_CTX_V01_E144_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              144,
+              44.338095570323915
+            ],
+            [
+              148,
+              44.338095570323915
+            ],
+            [
+              148,
+              48.33617169069096
+            ],
+            [
+              144,
+              48.33617169069096
+            ],
+            [
+              144,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E144_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E144_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 146.0,
+        "tif_name": "MurrayLab_CTX_V01_E144_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              144,
+              48.33617169069096
+            ],
+            [
+              148,
+              48.33617169069096
+            ],
+            [
+              148,
+              52.3277172245716
+            ],
+            [
+              144,
+              52.3277172245716
+            ],
+            [
+              144,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E144_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E144_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 146.0,
+        "tif_name": "MurrayLab_CTX_V01_E144_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              144,
+              52.3277172245716
+            ],
+            [
+              148,
+              52.3277172245716
+            ],
+            [
+              148,
+              56.312911750017534
+            ],
+            [
+              144,
+              56.312911750017534
+            ],
+            [
+              144,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E144_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E144_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 146.0,
+        "tif_name": "MurrayLab_CTX_V01_E144_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              144,
+              56.312911750017534
+            ],
+            [
+              148,
+              56.312911750017534
+            ],
+            [
+              148,
+              60.29205627737859
+            ],
+            [
+              144,
+              60.29205627737859
+            ],
+            [
+              144,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E148_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E148_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 150.0,
+        "tif_name": "MurrayLab_CTX_V01_E148_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              148,
+              32.30479028111658
+            ],
+            [
+              152,
+              32.30479028111658
+            ],
+            [
+              152,
+              36.32226593467266
+            ],
+            [
+              148,
+              36.32226593467266
+            ],
+            [
+              148,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E148_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E148_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 150.0,
+        "tif_name": "MurrayLab_CTX_V01_E148_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              148,
+              36.32226593467266
+            ],
+            [
+              152,
+              36.32226593467266
+            ],
+            [
+              152,
+              40.33343536438517
+            ],
+            [
+              148,
+              40.33343536438517
+            ],
+            [
+              148,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E148_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E148_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 150.0,
+        "tif_name": "MurrayLab_CTX_V01_E148_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              148,
+              40.33343536438517
+            ],
+            [
+              152,
+              40.33343536438517
+            ],
+            [
+              152,
+              44.338095570323915
+            ],
+            [
+              148,
+              44.338095570323915
+            ],
+            [
+              148,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E148_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E148_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 150.0,
+        "tif_name": "MurrayLab_CTX_V01_E148_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              148,
+              44.338095570323915
+            ],
+            [
+              152,
+              44.338095570323915
+            ],
+            [
+              152,
+              48.33617169069096
+            ],
+            [
+              148,
+              48.33617169069096
+            ],
+            [
+              148,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E148_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E148_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 150.0,
+        "tif_name": "MurrayLab_CTX_V01_E148_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              148,
+              48.33617169069096
+            ],
+            [
+              152,
+              48.33617169069096
+            ],
+            [
+              152,
+              52.3277172245716
+            ],
+            [
+              148,
+              52.3277172245716
+            ],
+            [
+              148,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E148_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E148_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 150.0,
+        "tif_name": "MurrayLab_CTX_V01_E148_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              148,
+              52.3277172245716
+            ],
+            [
+              152,
+              52.3277172245716
+            ],
+            [
+              152,
+              56.312911750017534
+            ],
+            [
+              148,
+              56.312911750017534
+            ],
+            [
+              148,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E148_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E148_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 150.0,
+        "tif_name": "MurrayLab_CTX_V01_E148_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              148,
+              56.312911750017534
+            ],
+            [
+              152,
+              56.312911750017534
+            ],
+            [
+              152,
+              60.29205627737859
+            ],
+            [
+              148,
+              60.29205627737859
+            ],
+            [
+              148,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E152_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E152_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 154.0,
+        "tif_name": "MurrayLab_CTX_V01_E152_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              152,
+              32.30479028111658
+            ],
+            [
+              156,
+              32.30479028111658
+            ],
+            [
+              156,
+              36.32226593467266
+            ],
+            [
+              152,
+              36.32226593467266
+            ],
+            [
+              152,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E152_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E152_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 154.0,
+        "tif_name": "MurrayLab_CTX_V01_E152_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              152,
+              36.32226593467266
+            ],
+            [
+              156,
+              36.32226593467266
+            ],
+            [
+              156,
+              40.33343536438517
+            ],
+            [
+              152,
+              40.33343536438517
+            ],
+            [
+              152,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E152_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E152_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 154.0,
+        "tif_name": "MurrayLab_CTX_V01_E152_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              152,
+              40.33343536438517
+            ],
+            [
+              156,
+              40.33343536438517
+            ],
+            [
+              156,
+              44.338095570323915
+            ],
+            [
+              152,
+              44.338095570323915
+            ],
+            [
+              152,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E152_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E152_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 154.0,
+        "tif_name": "MurrayLab_CTX_V01_E152_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              152,
+              44.338095570323915
+            ],
+            [
+              156,
+              44.338095570323915
+            ],
+            [
+              156,
+              48.33617169069096
+            ],
+            [
+              152,
+              48.33617169069096
+            ],
+            [
+              152,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E152_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E152_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 154.0,
+        "tif_name": "MurrayLab_CTX_V01_E152_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              152,
+              48.33617169069096
+            ],
+            [
+              156,
+              48.33617169069096
+            ],
+            [
+              156,
+              52.3277172245716
+            ],
+            [
+              152,
+              52.3277172245716
+            ],
+            [
+              152,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E152_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E152_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 154.0,
+        "tif_name": "MurrayLab_CTX_V01_E152_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              152,
+              52.3277172245716
+            ],
+            [
+              156,
+              52.3277172245716
+            ],
+            [
+              156,
+              56.312911750017534
+            ],
+            [
+              152,
+              56.312911750017534
+            ],
+            [
+              152,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E152_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E152_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 154.0,
+        "tif_name": "MurrayLab_CTX_V01_E152_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              152,
+              56.312911750017534
+            ],
+            [
+              156,
+              56.312911750017534
+            ],
+            [
+              156,
+              60.29205627737859
+            ],
+            [
+              152,
+              60.29205627737859
+            ],
+            [
+              152,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E156_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E156_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 158.0,
+        "tif_name": "MurrayLab_CTX_V01_E156_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              156,
+              32.30479028111658
+            ],
+            [
+              160,
+              32.30479028111658
+            ],
+            [
+              160,
+              36.32226593467266
+            ],
+            [
+              156,
+              36.32226593467266
+            ],
+            [
+              156,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E156_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E156_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 158.0,
+        "tif_name": "MurrayLab_CTX_V01_E156_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              156,
+              36.32226593467266
+            ],
+            [
+              160,
+              36.32226593467266
+            ],
+            [
+              160,
+              40.33343536438517
+            ],
+            [
+              156,
+              40.33343536438517
+            ],
+            [
+              156,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E156_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E156_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 158.0,
+        "tif_name": "MurrayLab_CTX_V01_E156_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              156,
+              40.33343536438517
+            ],
+            [
+              160,
+              40.33343536438517
+            ],
+            [
+              160,
+              44.338095570323915
+            ],
+            [
+              156,
+              44.338095570323915
+            ],
+            [
+              156,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E156_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E156_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 158.0,
+        "tif_name": "MurrayLab_CTX_V01_E156_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              156,
+              44.338095570323915
+            ],
+            [
+              160,
+              44.338095570323915
+            ],
+            [
+              160,
+              48.33617169069096
+            ],
+            [
+              156,
+              48.33617169069096
+            ],
+            [
+              156,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E156_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E156_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 158.0,
+        "tif_name": "MurrayLab_CTX_V01_E156_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              156,
+              48.33617169069096
+            ],
+            [
+              160,
+              48.33617169069096
+            ],
+            [
+              160,
+              52.3277172245716
+            ],
+            [
+              156,
+              52.3277172245716
+            ],
+            [
+              156,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E156_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E156_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 158.0,
+        "tif_name": "MurrayLab_CTX_V01_E156_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              156,
+              52.3277172245716
+            ],
+            [
+              160,
+              52.3277172245716
+            ],
+            [
+              160,
+              56.312911750017534
+            ],
+            [
+              156,
+              56.312911750017534
+            ],
+            [
+              156,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E156_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E156_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 158.0,
+        "tif_name": "MurrayLab_CTX_V01_E156_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              156,
+              56.312911750017534
+            ],
+            [
+              160,
+              56.312911750017534
+            ],
+            [
+              160,
+              60.29205627737859
+            ],
+            [
+              156,
+              60.29205627737859
+            ],
+            [
+              156,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E160_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E160_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 162.0,
+        "tif_name": "MurrayLab_CTX_V01_E160_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              160,
+              32.30479028111658
+            ],
+            [
+              164,
+              32.30479028111658
+            ],
+            [
+              164,
+              36.32226593467266
+            ],
+            [
+              160,
+              36.32226593467266
+            ],
+            [
+              160,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E160_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E160_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 162.0,
+        "tif_name": "MurrayLab_CTX_V01_E160_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              160,
+              36.32226593467266
+            ],
+            [
+              164,
+              36.32226593467266
+            ],
+            [
+              164,
+              40.33343536438517
+            ],
+            [
+              160,
+              40.33343536438517
+            ],
+            [
+              160,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E160_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E160_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 162.0,
+        "tif_name": "MurrayLab_CTX_V01_E160_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              160,
+              40.33343536438517
+            ],
+            [
+              164,
+              40.33343536438517
+            ],
+            [
+              164,
+              44.338095570323915
+            ],
+            [
+              160,
+              44.338095570323915
+            ],
+            [
+              160,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E160_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E160_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 162.0,
+        "tif_name": "MurrayLab_CTX_V01_E160_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              160,
+              44.338095570323915
+            ],
+            [
+              164,
+              44.338095570323915
+            ],
+            [
+              164,
+              48.33617169069096
+            ],
+            [
+              160,
+              48.33617169069096
+            ],
+            [
+              160,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E160_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E160_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 162.0,
+        "tif_name": "MurrayLab_CTX_V01_E160_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              160,
+              48.33617169069096
+            ],
+            [
+              164,
+              48.33617169069096
+            ],
+            [
+              164,
+              52.3277172245716
+            ],
+            [
+              160,
+              52.3277172245716
+            ],
+            [
+              160,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E160_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E160_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 162.0,
+        "tif_name": "MurrayLab_CTX_V01_E160_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              160,
+              52.3277172245716
+            ],
+            [
+              164,
+              52.3277172245716
+            ],
+            [
+              164,
+              56.312911750017534
+            ],
+            [
+              160,
+              56.312911750017534
+            ],
+            [
+              160,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E160_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E160_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 162.0,
+        "tif_name": "MurrayLab_CTX_V01_E160_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              160,
+              56.312911750017534
+            ],
+            [
+              164,
+              56.312911750017534
+            ],
+            [
+              164,
+              60.29205627737859
+            ],
+            [
+              160,
+              60.29205627737859
+            ],
+            [
+              160,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E164_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E164_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 166.0,
+        "tif_name": "MurrayLab_CTX_V01_E164_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              164,
+              32.30479028111658
+            ],
+            [
+              168,
+              32.30479028111658
+            ],
+            [
+              168,
+              36.32226593467266
+            ],
+            [
+              164,
+              36.32226593467266
+            ],
+            [
+              164,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E164_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E164_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 166.0,
+        "tif_name": "MurrayLab_CTX_V01_E164_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              164,
+              36.32226593467266
+            ],
+            [
+              168,
+              36.32226593467266
+            ],
+            [
+              168,
+              40.33343536438517
+            ],
+            [
+              164,
+              40.33343536438517
+            ],
+            [
+              164,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E164_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E164_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 166.0,
+        "tif_name": "MurrayLab_CTX_V01_E164_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              164,
+              40.33343536438517
+            ],
+            [
+              168,
+              40.33343536438517
+            ],
+            [
+              168,
+              44.338095570323915
+            ],
+            [
+              164,
+              44.338095570323915
+            ],
+            [
+              164,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E164_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E164_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 166.0,
+        "tif_name": "MurrayLab_CTX_V01_E164_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              164,
+              44.338095570323915
+            ],
+            [
+              168,
+              44.338095570323915
+            ],
+            [
+              168,
+              48.33617169069096
+            ],
+            [
+              164,
+              48.33617169069096
+            ],
+            [
+              164,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E164_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E164_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 166.0,
+        "tif_name": "MurrayLab_CTX_V01_E164_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              164,
+              48.33617169069096
+            ],
+            [
+              168,
+              48.33617169069096
+            ],
+            [
+              168,
+              52.3277172245716
+            ],
+            [
+              164,
+              52.3277172245716
+            ],
+            [
+              164,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E164_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E164_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 166.0,
+        "tif_name": "MurrayLab_CTX_V01_E164_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              164,
+              52.3277172245716
+            ],
+            [
+              168,
+              52.3277172245716
+            ],
+            [
+              168,
+              56.312911750017534
+            ],
+            [
+              164,
+              56.312911750017534
+            ],
+            [
+              164,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E164_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E164_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 166.0,
+        "tif_name": "MurrayLab_CTX_V01_E164_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              164,
+              56.312911750017534
+            ],
+            [
+              168,
+              56.312911750017534
+            ],
+            [
+              168,
+              60.29205627737859
+            ],
+            [
+              164,
+              60.29205627737859
+            ],
+            [
+              164,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E168_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E168_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 170.0,
+        "tif_name": "MurrayLab_CTX_V01_E168_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              168,
+              32.30479028111658
+            ],
+            [
+              172,
+              32.30479028111658
+            ],
+            [
+              172,
+              36.32226593467266
+            ],
+            [
+              168,
+              36.32226593467266
+            ],
+            [
+              168,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E168_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E168_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 170.0,
+        "tif_name": "MurrayLab_CTX_V01_E168_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              168,
+              36.32226593467266
+            ],
+            [
+              172,
+              36.32226593467266
+            ],
+            [
+              172,
+              40.33343536438517
+            ],
+            [
+              168,
+              40.33343536438517
+            ],
+            [
+              168,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E168_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E168_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 170.0,
+        "tif_name": "MurrayLab_CTX_V01_E168_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              168,
+              40.33343536438517
+            ],
+            [
+              172,
+              40.33343536438517
+            ],
+            [
+              172,
+              44.338095570323915
+            ],
+            [
+              168,
+              44.338095570323915
+            ],
+            [
+              168,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E168_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E168_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 170.0,
+        "tif_name": "MurrayLab_CTX_V01_E168_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              168,
+              44.338095570323915
+            ],
+            [
+              172,
+              44.338095570323915
+            ],
+            [
+              172,
+              48.33617169069096
+            ],
+            [
+              168,
+              48.33617169069096
+            ],
+            [
+              168,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E168_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E168_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 170.0,
+        "tif_name": "MurrayLab_CTX_V01_E168_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              168,
+              48.33617169069096
+            ],
+            [
+              172,
+              48.33617169069096
+            ],
+            [
+              172,
+              52.3277172245716
+            ],
+            [
+              168,
+              52.3277172245716
+            ],
+            [
+              168,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E168_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E168_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 170.0,
+        "tif_name": "MurrayLab_CTX_V01_E168_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              168,
+              52.3277172245716
+            ],
+            [
+              172,
+              52.3277172245716
+            ],
+            [
+              172,
+              56.312911750017534
+            ],
+            [
+              168,
+              56.312911750017534
+            ],
+            [
+              168,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E168_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E168_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 170.0,
+        "tif_name": "MurrayLab_CTX_V01_E168_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              168,
+              56.312911750017534
+            ],
+            [
+              172,
+              56.312911750017534
+            ],
+            [
+              172,
+              60.29205627737859
+            ],
+            [
+              168,
+              60.29205627737859
+            ],
+            [
+              168,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E172_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E172_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 174.0,
+        "tif_name": "MurrayLab_CTX_V01_E172_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              172,
+              32.30479028111658
+            ],
+            [
+              176,
+              32.30479028111658
+            ],
+            [
+              176,
+              36.32226593467266
+            ],
+            [
+              172,
+              36.32226593467266
+            ],
+            [
+              172,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E172_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E172_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 174.0,
+        "tif_name": "MurrayLab_CTX_V01_E172_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              172,
+              36.32226593467266
+            ],
+            [
+              176,
+              36.32226593467266
+            ],
+            [
+              176,
+              40.33343536438517
+            ],
+            [
+              172,
+              40.33343536438517
+            ],
+            [
+              172,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E172_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E172_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 174.0,
+        "tif_name": "MurrayLab_CTX_V01_E172_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              172,
+              40.33343536438517
+            ],
+            [
+              176,
+              40.33343536438517
+            ],
+            [
+              176,
+              44.338095570323915
+            ],
+            [
+              172,
+              44.338095570323915
+            ],
+            [
+              172,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E172_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E172_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 174.0,
+        "tif_name": "MurrayLab_CTX_V01_E172_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              172,
+              44.338095570323915
+            ],
+            [
+              176,
+              44.338095570323915
+            ],
+            [
+              176,
+              48.33617169069096
+            ],
+            [
+              172,
+              48.33617169069096
+            ],
+            [
+              172,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E172_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E172_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 174.0,
+        "tif_name": "MurrayLab_CTX_V01_E172_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              172,
+              48.33617169069096
+            ],
+            [
+              176,
+              48.33617169069096
+            ],
+            [
+              176,
+              52.3277172245716
+            ],
+            [
+              172,
+              52.3277172245716
+            ],
+            [
+              172,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E172_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E172_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 174.0,
+        "tif_name": "MurrayLab_CTX_V01_E172_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              172,
+              52.3277172245716
+            ],
+            [
+              176,
+              52.3277172245716
+            ],
+            [
+              176,
+              56.312911750017534
+            ],
+            [
+              172,
+              56.312911750017534
+            ],
+            [
+              172,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E172_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E172_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 174.0,
+        "tif_name": "MurrayLab_CTX_V01_E172_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              172,
+              56.312911750017534
+            ],
+            [
+              176,
+              56.312911750017534
+            ],
+            [
+              176,
+              60.29205627737859
+            ],
+            [
+              172,
+              60.29205627737859
+            ],
+            [
+              172,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E176_N32",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E176_N32.png",
+        "center_latitude": 34.31352810789462,
+        "center_longitude": 178.0,
+        "tif_name": "MurrayLab_CTX_V01_E176_N32_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              176,
+              32.30479028111658
+            ],
+            [
+              180,
+              32.30479028111658
+            ],
+            [
+              180,
+              36.32226593467266
+            ],
+            [
+              176,
+              36.32226593467266
+            ],
+            [
+              176,
+              32.30479028111658
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E176_N36",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E176_N36.png",
+        "center_latitude": 38.32785064952891,
+        "center_longitude": 178.0,
+        "tif_name": "MurrayLab_CTX_V01_E176_N36_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              176,
+              36.32226593467266
+            ],
+            [
+              180,
+              36.32226593467266
+            ],
+            [
+              180,
+              40.33343536438517
+            ],
+            [
+              176,
+              40.33343536438517
+            ],
+            [
+              176,
+              36.32226593467266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E176_N40",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E176_N40.png",
+        "center_latitude": 42.33576546735454,
+        "center_longitude": 178.0,
+        "tif_name": "MurrayLab_CTX_V01_E176_N40_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              176,
+              40.33343536438517
+            ],
+            [
+              180,
+              40.33343536438517
+            ],
+            [
+              180,
+              44.338095570323915
+            ],
+            [
+              176,
+              44.338095570323915
+            ],
+            [
+              176,
+              40.33343536438517
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E176_N44",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E176_N44.png",
+        "center_latitude": 46.33713363050744,
+        "center_longitude": 178.0,
+        "tif_name": "MurrayLab_CTX_V01_E176_N44_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              176,
+              44.338095570323915
+            ],
+            [
+              180,
+              44.338095570323915
+            ],
+            [
+              180,
+              48.33617169069096
+            ],
+            [
+              176,
+              48.33617169069096
+            ],
+            [
+              176,
+              44.338095570323915
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E176_N48",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E176_N48.png",
+        "center_latitude": 50.33194445763128,
+        "center_longitude": 178.0,
+        "tif_name": "MurrayLab_CTX_V01_E176_N48_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              176,
+              48.33617169069096
+            ],
+            [
+              180,
+              48.33617169069096
+            ],
+            [
+              180,
+              52.3277172245716
+            ],
+            [
+              176,
+              52.3277172245716
+            ],
+            [
+              176,
+              48.33617169069096
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E176_N52",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E176_N52.png",
+        "center_latitude": 54.32031448729457,
+        "center_longitude": 178.0,
+        "tif_name": "MurrayLab_CTX_V01_E176_N52_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              176,
+              52.3277172245716
+            ],
+            [
+              180,
+              52.3277172245716
+            ],
+            [
+              180,
+              56.312911750017534
+            ],
+            [
+              176,
+              56.312911750017534
+            ],
+            [
+              176,
+              52.3277172245716
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "CTX_MOSAIC",
+        "product_id": "CTX_MOSAIC_E176_N56",
+        "quicklook": "/ctx-mosaic/quickview/CTX_MOSAIC_E176_N56.png",
+        "center_latitude": 58.30248401369806,
+        "center_longitude": 178.0,
+        "tif_name": "MurrayLab_CTX_V01_E176_N56_Mosaic.tif"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              176,
+              56.312911750017534
+            ],
+            [
+              180,
+              56.312911750017534
+            ],
+            [
+              180,
+              60.29205627737859
+            ],
+            [
+              176,
+              60.29205627737859
+            ],
+            [
+              176,
+              56.312911750017534
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
