@@ -1,0 +1,6 @@
+streamlit>=1.30
+numpy>=1.24
+Pillow>=10.0
+requests>=2.31
+spiceypy>=6.0
+rasterio>=1.3

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+downloads/
+coregister_data/
+labels/
+*.raw
+.claude/
+.git/
