@@ -84,7 +84,7 @@ def process_sol(sol: int, results: dict) -> bool:
         texture = None
 
     if texture is None:
-        mag = np.sqrt(np.nansum(result["xyz_rover"] ** 2, axis=-1))
+        mag = np.sqrt(np.nansum(result["xyz_site"] ** 2, axis=-1))
         denom = np.nanmax(mag) - np.nanmin(mag)
         if denom == 0:
             denom = 1.0

@@ -195,7 +195,7 @@ def cmd_coregister(args):
     else:
         # Use XYZ magnitude as grayscale fallback
         print("  No texture found, using XYZ magnitude as grayscale")
-        mag = np.sqrt(np.nansum(result["xyz_rover"] ** 2, axis=-1))
+        mag = np.sqrt(np.nansum(result["xyz_site"] ** 2, axis=-1))
         denom = np.nanmax(mag) - np.nanmin(mag)
         if denom == 0:
             denom = 1.0

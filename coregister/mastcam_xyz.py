@@ -151,45 +151,129 @@ def read_xyz_product(data_path: Path, label_path: Path = None) -> tuple[np.ndarr
     return xyz, meta
 
 
-def rover_to_mars_bodyfixed(
-    xyz_rover: np.ndarray,
-    utc_time: str,
+def parse_site_to_rover_transform(data_path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Parse ROVER_COORDINATE_SYSTEM from PDS3 embedded header.
+
+    Returns:
+        offset: (3,) rover position in site frame [meters]
+        quat: (4,) rotation quaternion (s, v1, v2, v3) site→rover
+    """
+    offset = np.zeros(3)
+    quat = np.array([1.0, 0.0, 0.0, 0.0])
+
+    # Read entire header as one string, then parse
+    header_text = ""
+    with open(data_path, "r", errors="replace") as f:
+        for line in f:
+            header_text += line
+            if line.strip() == "END":
+                break
+
+    import re
+
+    # Find ROVER_COORDINATE_SYSTEM group
+    m = re.search(
+        r"GROUP\s*=\s*ROVER_COORDINATE_SYSTEM(.*?)END_GROUP",
+        header_text, re.DOTALL
+    )
+    if not m:
+        return offset, quat
+
+    block = m.group(1)
+
+    # Parse ORIGIN_OFFSET_VECTOR
+    m_off = re.search(r"ORIGIN_OFFSET_VECTOR\s*=\s*\(([^)]+)\)", block)
+    if m_off:
+        parts = [float(x.strip()) for x in m_off.group(1).split(",")]
+        offset = np.array(parts[:3])
+
+    # Parse ORIGIN_ROTATION_QUATERNION (may span lines)
+    m_q = re.search(r"ORIGIN_ROTATION_QUATERNION\s*=\s*\(([^)]+)\)", block)
+    if m_q:
+        raw = m_q.group(1).replace("\n", "").replace("\r", "")
+        parts = [float(x.strip()) for x in raw.split(",") if x.strip()]
+        quat = np.array(parts[:4])
+
+    return offset, quat
+
+
+def quat_to_rotation_matrix(q: np.ndarray) -> np.ndarray:
+    """Convert quaternion (s, v1, v2, v3) to 3x3 rotation matrix."""
+    s, v1, v2, v3 = q
+    return np.array([
+        [1 - 2*(v2**2 + v3**2), 2*(v1*v2 - s*v3),     2*(v1*v3 + s*v2)],
+        [2*(v1*v2 + s*v3),     1 - 2*(v1**2 + v3**2), 2*(v2*v3 - s*v1)],
+        [2*(v1*v3 - s*v2),     2*(v2*v3 + s*v1),     1 - 2*(v1**2 + v2**2)],
+    ])
+
+
+def site_to_rover_frame(
+    xyz_site: np.ndarray,
+    rover_offset: np.ndarray,
+    rover_quat: np.ndarray,
 ) -> np.ndarray:
-    """Transform XYZ from rover frame to Mars body-fixed (IAU_MARS).
+    """Transform XYZ from SITE_FRAME to ROVER_NAV_FRAME.
 
     Args:
-        xyz_rover: (H, W, 3) array, XYZ in rover frame [meters]
-        utc_time: UTC time string for the observation
+        xyz_site: (H, W, 3) in site frame [meters]
+        rover_offset: (3,) rover position in site frame
+        rover_quat: (4,) quaternion (s, v1, v2, v3)
+
+    Returns:
+        xyz_rover: (H, W, 3) in rover frame [meters]
+    """
+    h, w, _ = xyz_site.shape
+    valid = ~np.isnan(xyz_site[:, :, 0])
+    xyz_rover = np.full_like(xyz_site, np.nan)
+
+    # site → rover: subtract offset, then rotate
+    # R_site_to_rover = quat_to_rotation_matrix(quat)
+    # xyz_rover = R @ (xyz_site - offset)
+    rot = quat_to_rotation_matrix(rover_quat)
+
+    pts = xyz_site[valid] - rover_offset  # translate
+    rotated = (rot @ pts.T).T  # rotate
+    xyz_rover[valid] = rotated
+
+    return xyz_rover
+
+
+def site_to_mars_bodyfixed(
+    xyz_site: np.ndarray,
+    utc_time: str,
+    rover_offset: np.ndarray,
+    rover_quat: np.ndarray,
+) -> np.ndarray:
+    """Transform XYZ from SITE_FRAME to Mars body-fixed (IAU_MARS).
+
+    Chain: SITE_FRAME → ROVER_NAV_FRAME → IAU_MARS
+
+    Args:
+        xyz_site: (H, W, 3) array, XYZ in site frame [meters]
+        utc_time: UTC time string
+        rover_offset: (3,) rover position in site frame
+        rover_quat: (4,) site-to-rover quaternion
 
     Returns:
         xyz_mars: (H, W, 3) array, XYZ in IAU_MARS frame [km]
     """
-    # Convert UTC to ephemeris time
+    # Step 1: SITE → ROVER
+    xyz_rover = site_to_rover_frame(xyz_site, rover_offset, rover_quat)
+
+    # Step 2: ROVER → IAU_MARS (via SPICE)
     et = spice.utc2et(utc_time)
-
-    # Get rotation matrix from rover frame to IAU_MARS
-    # M2020_ROVER is the rover body frame defined in the FK
     rot = spice.pxform("M2020_ROVER", "IAU_MARS", et)
-
-    # Get rover position in IAU_MARS frame [km]
     rover_pos_km, _ = spice.spkpos("M2020", et, "IAU_MARS", "NONE", "MARS")
 
-    # Convert rover XYZ from meters to km
     h, w, _ = xyz_rover.shape
     valid = ~np.isnan(xyz_rover[:, :, 0])
-
     xyz_mars = np.full_like(xyz_rover, np.nan)
 
-    # Flatten valid points for batch transformation
-    valid_pts = xyz_rover[valid] / 1000.0  # m -> km
-
-    # Apply rotation: each point = rot @ point + rover_pos
-    # rot is (3,3), valid_pts is (N, 3)
-    rotated = (rot @ valid_pts.T).T  # (N, 3)
-    translated = rotated + rover_pos_km  # broadcast (N,3) + (3,)
+    valid_pts = xyz_rover[valid] / 1000.0  # m → km
+    rotated = (rot @ valid_pts.T).T
+    translated = rotated + rover_pos_km
 
     xyz_mars[valid] = translated
-
     return xyz_mars
 
 
@@ -285,10 +369,10 @@ def process_mastcamz_xyz(
         lon, lat, alt: (H,W) arrays
         meta: label metadata
     """
-    # Read XYZ product
-    xyz_rover, meta = read_xyz_product(data_path, label_path)
-    print(f"  XYZ loaded: {xyz_rover.shape[1]}x{xyz_rover.shape[0]}, "
-          f"{np.sum(~np.isnan(xyz_rover[:,:,0]))} valid points")
+    # Read XYZ product (in SITE_FRAME)
+    xyz_site, meta = read_xyz_product(data_path, label_path)
+    print(f"  XYZ loaded: {xyz_site.shape[1]}x{xyz_site.shape[0]}, "
+          f"{np.sum(~np.isnan(xyz_site[:,:,0]))} valid points")
 
     # Get observation time from label if not provided
     if utc_time is None:
@@ -296,9 +380,13 @@ def process_mastcamz_xyz(
         if not utc_time:
             raise ValueError("No UTC time in label and none provided")
 
-    # Transform to Mars body-fixed
-    print(f"  Transforming to IAU_MARS (t={utc_time})...")
-    xyz_mars = rover_to_mars_bodyfixed(xyz_rover, utc_time)
+    # Parse site→rover transform from PDS3 header
+    rover_offset, rover_quat = parse_site_to_rover_transform(data_path)
+    print(f"  Rover in site frame: offset={rover_offset}, quat={rover_quat}")
+
+    # Transform: SITE_FRAME → ROVER_NAV_FRAME → IAU_MARS
+    print(f"  Transforming SITE→ROVER→IAU_MARS (t={utc_time})...")
+    xyz_mars = site_to_mars_bodyfixed(xyz_site, utc_time, rover_offset, rover_quat)
 
     # Convert to lon/lat
     print(f"  Computing lon/lat...")
@@ -310,7 +398,7 @@ def process_mastcamz_xyz(
               f"lat=[{np.nanmin(lat):.4f}, {np.nanmax(lat):.4f}]")
 
     return {
-        "xyz_rover": xyz_rover,
+        "xyz_site": xyz_site,
         "xyz_mars": xyz_mars,
         "lon": lon,
         "lat": lat,
