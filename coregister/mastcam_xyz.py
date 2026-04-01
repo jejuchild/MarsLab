@@ -125,6 +125,7 @@ def read_xyz_product(data_path: Path, label_path: Path = None) -> tuple[np.ndarr
             )
 
         raw = np.fromfile(str(data_path), dtype=">f4", offset=start_byte)
+        raw = raw.astype(np.float64)  # float32 → float64 BEFORE coordinate transform
 
         # BSQ layout: band, line, sample
         expected = bands * lines * samples
