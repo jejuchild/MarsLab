@@ -4,7 +4,7 @@
 
 ```
 Step 1: Perseverance Mission 조사          → 01_perseverance_mission.md     ✅
-Step 2: Mastcam-Z 상세 조사               → (TODO)
+Step 2: Mastcam-Z 상세 조사               → 05_mastcamz_instrument.md     ✅
 Step 3: HiRISE 상세 조사                  → (TODO)
 Step 4: SPICE + XYZ + 정합 방법론 조사     → (TODO)
 Step 5: 선행 로버(Curiosity) 시도 조사     → (TODO)
