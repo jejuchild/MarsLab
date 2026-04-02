@@ -78,6 +78,42 @@ def parse_pds4_label(label_path: Path) -> dict:
     return meta
 
 
+def parse_pds3_header(data_path: Path) -> dict:
+    """Parse PDS3 embedded header from an IMG file for data offset and dimensions."""
+    meta = {}
+    with open(data_path, "r", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if "=" not in line:
+                if line == "END":
+                    break
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip().upper()
+            val = val.strip().strip('"')
+            if "<" in val:
+                val = val[:val.index("<")].strip()
+            try:
+                if key == "RECORD_BYTES":
+                    meta["record_bytes"] = int(val)
+                elif key == "^IMAGE" and "HEADER" not in line.upper().split("=")[0]:
+                    meta["image_start"] = int(val)
+                elif key == "LINES":
+                    meta["lines"] = int(val)
+                elif key == "LINE_SAMPLES":
+                    meta["samples"] = int(val)
+                elif key == "BANDS":
+                    meta["bands"] = int(val)
+            except ValueError:
+                pass
+            if line == "END":
+                break
+    # Compute data offset
+    if "record_bytes" in meta and "image_start" in meta:
+        meta["start_byte"] = meta["record_bytes"] * (meta["image_start"] - 1)
+    return meta
+
+
 def read_xyz_product(data_path: Path, label_path: Path = None) -> tuple[np.ndarray, dict]:
     """Read a Mastcam-Z XYZ product.
 
@@ -96,6 +132,18 @@ def read_xyz_product(data_path: Path, label_path: Path = None) -> tuple[np.ndarr
     meta = {}
     if label_path.exists():
         meta = parse_pds4_label(label_path)
+
+    # Always parse PDS3 embedded header for reliable data offset
+    pds3_meta = parse_pds3_header(data_path)
+
+    # Use PDS3 offset (reliable) over XML header_bytes (often 0)
+    if pds3_meta.get("start_byte", 0) > 0:
+        meta["start_byte"] = pds3_meta["start_byte"]
+
+    # Fill in dimensions from PDS3 if missing from XML
+    for key in ("lines", "samples", "bands"):
+        if meta.get(key, 0) == 0 and key in pds3_meta:
+            meta[key] = pds3_meta[key]
 
     # Read binary data
     # PDS4 XYZ products are typically 3-band IEEE 754 single precision float, BSQ

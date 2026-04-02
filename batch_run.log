@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/disk1/cspark/mastcam/run_batch.py", line 240, in main
+    meta = process_sol(sol)
+  File "/disk1/cspark/mastcam/run_batch.py", line 79, in process_sol
+    raise ValueError(f"No left linearized XYZ products for sol {sol}")
+ValueError: No left linearized XYZ products for sol 3
+Traceback (most recent call last):
+  File "/disk1/cspark/mastcam/run_batch.py", line 240, in main
+    meta = process_sol(sol)
+  File "/disk1/cspark/mastcam/run_batch.py", line 79, in process_sol
+    raise ValueError(f"No left linearized XYZ products for sol {sol}")
+ValueError: No left linearized XYZ products for sol 4
