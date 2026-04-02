@@ -1,0 +1,203 @@
+Loading HiRISE DTM...
+  DTM loaded (PDS IMG): 6955x14775
+  Elevation range: [-2655.0, -2468.7] m
+  Resolution: 1.01 m/px
+  Bounds: {'min_lon': 77.46147725, 'max_lon': 77.58415512, 'min_lat': 18.336842565755, 'max_lat': 18.588602118832}
+
+Generating orthoimages for 27 sols
+
+[1/27] Sol 9
+  Sol 9: 85,371 points, 1 frames
+  Self-generated grid: 14x15 @ 1.00 m/px
+  Output patch: 14x15 pixels @ 1.00 m/px
+  Loaded 1/1 frame textures
+  Saved: sol00009_ortho.png (14x15, 7 filled pixels, 3.3% coverage)
+
+[2/27] Sol 11
+  Sol 11: 46,210,608 points, 54 frames
+  Self-generated grid: 470x420 @ 1.00 m/px
+  Output patch: 470x420 pixels @ 1.00 m/px
+  Loaded 54/54 frame textures
+  Saved: sol00011_ortho.png (470x420, 57,782 filled pixels, 29.3% coverage)
+
+[3/27] Sol 12
+  Sol 12: 1,479,737 points, 3 frames
+  Self-generated grid: 19x15 @ 1.00 m/px
+  Output patch: 19x15 pixels @ 1.00 m/px
+  Loaded 3/3 frame textures
+  Saved: sol00012_ortho.png (19x15, 11 filled pixels, 3.9% coverage)
+
+[4/27] Sol 15
+  Sol 15: 13,068,395 points, 25 frames
+  Self-generated grid: 112x106 @ 1.00 m/px
+  Output patch: 112x106 pixels @ 1.00 m/px
+  Loaded 25/25 frame textures
+  Saved: sol00015_ortho.png (112x106, 3,549 filled pixels, 29.9% coverage)
+
+[5/27] Sol 16
+  Sol 16: 1,231,966 points, 2 frames
+  Self-generated grid: 15x13 @ 1.00 m/px
+  Output patch: 15x13 pixels @ 1.00 m/px
+  Loaded 2/2 frame textures
+  Saved: sol00016_ortho.png (15x13, 5 filled pixels, 2.6% coverage)
+
+[6/27] Sol 23
+  Sol 23: 363,611 points, 6 frames
+  Self-generated grid: 19x26 @ 1.00 m/px
+  Output patch: 19x26 pixels @ 1.00 m/px
+  Loaded 6/6 frame textures
+  Saved: sol00023_ortho.png (19x26, 8 filled pixels, 1.6% coverage)
+
+[7/27] Sol 24
+  Sol 24: 711,943 points, 4 frames
+  Self-generated grid: 175x123 @ 1.00 m/px
+  Output patch: 175x123 pixels @ 1.00 m/px
+  Loaded 4/4 frame textures
+  Saved: sol00024_ortho.png (175x123, 1,667 filled pixels, 7.7% coverage)
+
+[8/27] Sol 26
+  Sol 26: 719,281 points, 5 frames
+  Self-generated grid: 170x123 @ 1.00 m/px
+  Output patch: 170x123 pixels @ 1.00 m/px
+  Loaded 5/5 frame textures
+  Saved: sol00026_ortho.png (170x123, 1,240 filled pixels, 5.9% coverage)
+
+[9/27] Sol 28
+  Sol 28: 2,153,614 points, 3 frames
+  Self-generated grid: 17x15 @ 1.00 m/px
+  Output patch: 17x15 pixels @ 1.00 m/px
+  Loaded 3/3 frame textures
+  Saved: sol00028_ortho.png (17x15, 8 filled pixels, 3.1% coverage)
+
+[10/27] Sol 29
+  Sol 29: 59,899 points, 13 frames
+  Self-generated grid: 68x81 @ 1.00 m/px
+  Output patch: 68x81 pixels @ 1.00 m/px
+  Loaded 13/13 frame textures
+  Saved: sol00029_ortho.png (68x81, 76 filled pixels, 1.4% coverage)
+
+[11/27] Sol 30
+  Sol 30: 44,714 points, 1 frames
+  Self-generated grid: 12x28 @ 1.00 m/px
+  Output patch: 12x28 pixels @ 1.00 m/px
+  Loaded 1/1 frame textures
+  Saved: sol00030_ortho.png (12x28, 3 filled pixels, 0.9% coverage)
+
+[12/27] Sol 31
+  Sol 31: 73,315 points, 1 frames
+  Self-generated grid: 11x11 @ 1.00 m/px
+  Output patch: 11x11 pixels @ 1.00 m/px
+  Loaded 1/1 frame textures
+  Saved: sol00031_ortho.png (11x11, 1 filled pixels, 0.8% coverage)
+
+[13/27] Sol 33
+  Sol 33: 2,669,710 points, 4 frames
+  Self-generated grid: 51x89 @ 1.00 m/px
+  Output patch: 51x89 pixels @ 1.00 m/px
+  Loaded 4/4 frame textures
+  Saved: sol00033_ortho.png (51x89, 302 filled pixels, 6.7% coverage)
+
+[14/27] Sol 35
+  Sol 35: 2,817 points, 6 frames
+  Self-generated grid: 12x15 @ 1.00 m/px
+  Output patch: 12x15 pixels @ 1.00 m/px
+  Loaded 6/6 frame textures
+  Saved: sol00035_ortho.png (12x15, 9 filled pixels, 5.0% coverage)
+
+[15/27] Sol 36
+  Sol 36: 956,663 points, 3 frames
+  Self-generated grid: 190x154 @ 1.00 m/px
+  Output patch: 190x154 pixels @ 1.00 m/px
+  Loaded 3/3 frame textures
+  Saved: sol00036_ortho.png (190x154, 1,175 filled pixels, 4.0% coverage)
+
+[16/27] Sol 37
+  Sol 37: 7,006,760 points, 37 frames
+  Self-generated grid: 55x142 @ 1.00 m/px
+  Output patch: 55x142 pixels @ 1.00 m/px
+  Loaded 37/37 frame textures
+  Saved: sol00037_ortho.png (55x142, 1,347 filled pixels, 17.2% coverage)
+
+[17/27] Sol 38
+  Sol 38: 3,596,805 points, 9 frames
+  Self-generated grid: 347x173 @ 1.00 m/px
+  Output patch: 347x173 pixels @ 1.00 m/px
+  Loaded 9/9 frame textures
+  Saved: sol00038_ortho.png (347x173, 4,594 filled pixels, 7.7% coverage)
+
+[18/27] Sol 40
+  Sol 40: 138,665 points, 33 frames
+  Self-generated grid: 14x13 @ 1.00 m/px
+  Output patch: 14x13 pixels @ 1.00 m/px
+  Loaded 33/33 frame textures
+  Saved: sol00040_ortho.png (14x13, 10 filled pixels, 5.5% coverage)
+
+[19/27] Sol 41
+  Sol 41: 53,771 points, 1 frames
+  Self-generated grid: 12x15 @ 1.00 m/px
+  Output patch: 12x15 pixels @ 1.00 m/px
+  Loaded 1/1 frame textures
+  Saved: sol00041_ortho.png (12x15, 2 filled pixels, 1.1% coverage)
+
+[20/27] Sol 45
+  Sol 45: 36,129,337 points, 56 frames
+  Self-generated grid: 33x15 @ 1.00 m/px
+  Output patch: 33x15 pixels @ 1.00 m/px
+  Loaded 56/56 frame textures
+  Saved: sol00045_ortho.png (33x15, 23 filled pixels, 4.6% coverage)
+
+[21/27] Sol 46
+  Sol 46: 27,424,883 points, 28 frames
+  Self-generated grid: 14x16 @ 1.00 m/px
+  Output patch: 14x16 pixels @ 1.00 m/px
+  Loaded 28/28 frame textures
+  Saved: sol00046_ortho.png (14x16, 15 filled pixels, 6.7% coverage)
+
+[22/27] Sol 47
+  Sol 47: 10,448,441 points, 24 frames
+  Self-generated grid: 36x14 @ 1.00 m/px
+  Output patch: 36x14 pixels @ 1.00 m/px
+  Loaded 24/24 frame textures
+  Saved: sol00047_ortho.png (36x14, 21 filled pixels, 4.2% coverage)
+
+[23/27] Sol 48
+  Sol 48: 8,052,054 points, 12 frames
+  Self-generated grid: 235x98 @ 1.00 m/px
+  Output patch: 235x98 pixels @ 1.00 m/px
+  Loaded 12/12 frame textures
+  Saved: sol00048_ortho.png (235x98, 2,200 filled pixels, 9.6% coverage)
+
+[24/27] Sol 50
+  Sol 50: 20,261,272 points, 20 frames
+  Self-generated grid: 101x142 @ 1.00 m/px
+  Output patch: 101x142 pixels @ 1.00 m/px
+  Loaded 20/20 frame textures
+  Saved: sol00050_ortho.png (101x142, 6,483 filled pixels, 45.2% coverage)
+
+[25/27] Sol 51
+  Sol 51: 1,352,078 points, 2 frames
+  Self-generated grid: 13x19 @ 1.00 m/px
+  Output patch: 13x19 pixels @ 1.00 m/px
+  Loaded 2/2 frame textures
+  Saved: sol00051_ortho.png (13x19, 9 filled pixels, 3.6% coverage)
+
+[26/27] Sol 53
+  Sol 53: 98,035,777 points, 128 frames
+  Self-generated grid: 24x21 @ 1.00 m/px
+  Output patch: 24x21 pixels @ 1.00 m/px
+  Loaded 128/128 frame textures
+  Saved: sol00053_ortho.png (24x21, 43 filled pixels, 8.5% coverage)
+
+[27/27] Sol 55
+  Sol 55: 1,610,322 points, 2 frames
+  Self-generated grid: 11x11 @ 1.00 m/px
+  Output patch: 11x11 pixels @ 1.00 m/px
+  Loaded 2/2 frame textures
+  Saved: sol00055_ortho.png (11x11, 2 filled pixels, 1.7% coverage)
+
+============================================================
+ORTHO GENERATION COMPLETE!
+  Success: 27
+  Failed:  0
+  Time: 4.4 minutes
+============================================================
