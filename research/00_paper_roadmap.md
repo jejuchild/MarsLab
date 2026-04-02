@@ -6,7 +6,7 @@
 Step 1: Perseverance Mission 조사          → 01_perseverance_mission.md     ✅
 Step 2: Mastcam-Z 상세 조사               → 05_mastcamz_instrument.md     ✅
 Step 3: HiRISE 상세 조사                  → 06_hirise_instrument.md        ✅
-Step 4: SPICE + XYZ + 정합 방법론 조사     → (TODO)
+Step 4: SPICE + XYZ + 정합 방법론 조사     → 07_spice_xyz_methodology.md    ✅
 Step 5: 선행 로버(Curiosity) 시도 조사     → (TODO)
 Step 6: 정합 구현 및 검증                  → (진행 중 - run_batch.py)
 Step 7: 지구 SR 논문 조사                  → 03_super_resolution_literature.md  ✅ (초안)
