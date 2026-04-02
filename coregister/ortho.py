@@ -289,7 +289,7 @@ def generate_ortho(sol: int, dtm: "HiRISEDTM | None" = None,
         "coverage_pct": round(coverage_pct, 1),
         "n_frames_used": len(textures),
         "n_points": n_points,
-        "dtm_resolution_m": dtm.resolution_m,
+        "dtm_resolution_m": dtm.resolution_m if dtm else grid_resolution_m,
     }
     meta_path = output_dir / f"sol{sol:05d}_ortho_meta.json"
     with open(meta_path, "w") as f:
