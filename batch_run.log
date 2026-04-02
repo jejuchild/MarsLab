@@ -6970,3 +6970,207 @@ SPICE initialized with 10 kernels
   Downloading ZLF_0050_0671382102_081XYZLN0031950ZCAM08013_063085J01.IMG ...
     4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
   Downloading ZLF_0050_0671382102_081RASLN0031950ZCAM08013_063085J01.xml ...
+    100% (85 KB)      
+  Downloading ZLF_0050_0671382102_081RASLN0031950ZCAM08013_063085J01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 955703 valid points
+  Rover in site frame: offset=[10.3131   65.9943    0.715083], quat=[ 1.31628e-03  6.46026e-04 -9.20782e-04  9.99999e-01]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-11T03:04:00.183Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4510, 77.4511], lat=[18.4445, 18.4446]
+  Combined: 20,261,272 points, 20 frames
+  Coverage: 91.0m x 131.8m
+
+[30/64] Sol 51  (elapsed: 167.3m, ETA: 218.8m)
+  Found 3 unique XYZ frames
+Downloading static SPICE kernels...
+  [cached] naif0012.tls
+  [cached] pck00010.tpc
+  [cached] de438s.bsp
+  [cached] m2020_v04.tf
+  [cached] m2020_struct_v00.ti
+Downloading sol-specific kernels for sol 51...
+  [cached] m2020_168_sclkscet_refit_v16.tsc
+  SCLK: m2020_168_sclkscet_refit_v16.tsc
+  [cached] m2020_surf_rover_tlm_0000_0089_v1.bc
+  CK (rover): m2020_surf_rover_tlm_0000_0089_v1.bc
+  [cached] m2020_surf_rover_loc_0000_0089_v1.bsp
+  SPK (rover): m2020_surf_rover_loc_0000_0089_v1.bsp
+  [cached] m2020_ls_ops210303_iau2000_v1.bsp
+  SPK (extra): m2020_ls_ops210303_iau2000_v1.bsp
+  [cached] m2020_atls_ops210303_v1.bsp
+  SPK (extra): m2020_atls_ops210303_v1.bsp
+Meta-kernel written: /disk1/cspark/mastcam/coregister_data/spice_kernels/m2020_coregister.tm
+SPICE initialized with 10 kernels
+  [1/3] ZLF_0051_0671470401_092XYZLN0031950ZCAM03111_0340LUJ01
+  [cached] ZLF_0051_0671470401_092XYZLN0031950ZCAM03111_0340LUJ01.xml
+  [cached] ZLF_0051_0671470401_092XYZLN0031950ZCAM03111_0340LUJ01.IMG
+  [cached] ZLF_0051_0671470401_092RASLN0031950ZCAM03111_0340LUJ01.xml
+  [cached] ZLF_0051_0671470401_092RASLN0031950ZCAM03111_0340LUJ01.IMG
+  XYZ loaded: 128x128, 0 valid points
+  Rover in site frame: offset=[10.3131   65.9943    0.715083], quat=[ 1.31628e-03  6.46026e-04 -9.20782e-04  9.99999e-01]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-12T03:37:38.878Z)...
+  Computing lon/lat...
+    SKIP: no valid points
+  [2/3] ZLF_0051_0671470568_081XYZLN0031950ZCAM03111_0340LUJ01
+  Downloading ZLF_0051_0671470568_081XYZLN0031950ZCAM03111_0340LUJ01.xml ...
+    100% (89 KB)      
+  Downloading ZLF_0051_0671470568_081XYZLN0031950ZCAM03111_0340LUJ01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0051_0671470568_081RASLN0031950ZCAM03111_0340LUJ01.xml ...
+    100% (85 KB)      
+  Downloading ZLF_0051_0671470568_081RASLN0031950ZCAM03111_0340LUJ01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 1297459 valid points
+  Rover in site frame: offset=[10.3131   65.9943    0.715083], quat=[ 1.31628e-03  6.46026e-04 -9.20782e-04  9.99999e-01]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-12T03:38:29.889Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4446, 18.4446]
+  [3/3] ZLF_0051_0671470775_488XYZLN0031950ZCAM03011_0480LMJ01
+  Downloading ZLF_0051_0671470775_488XYZLN0031950ZCAM03011_0480LMJ01.xml ...
+    100% (90 KB)      
+  Downloading ZLF_0051_0671470775_488XYZLN0031950ZCAM03011_0480LMJ01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0051_0671470775_488RASLN0031950ZCAM03011_0480LMJ01.xml ...
+    100% (86 KB)      
+  Downloading ZLF_0051_0671470775_488RASLN0031950ZCAM03011_0480LMJ01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 54619 valid points
+  Rover in site frame: offset=[10.3131   65.9943    0.715083], quat=[ 1.31628e-03  6.46026e-04 -9.20782e-04  9.99999e-01]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-12T03:41:55.880Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4446, 18.4447]
+  Combined: 1,352,078 points, 2 frames
+  Coverage: 2.3m x 8.1m
+
+[31/64] Sol 53  (elapsed: 169.3m, ETA: 207.0m)
+  Found 128 unique XYZ frames
+Downloading static SPICE kernels...
+  [cached] naif0012.tls
+  [cached] pck00010.tpc
+  [cached] de438s.bsp
+  [cached] m2020_v04.tf
+  [cached] m2020_struct_v00.ti
+Downloading sol-specific kernels for sol 53...
+  [cached] m2020_168_sclkscet_refit_v16.tsc
+  SCLK: m2020_168_sclkscet_refit_v16.tsc
+  [cached] m2020_surf_rover_tlm_0000_0089_v1.bc
+  CK (rover): m2020_surf_rover_tlm_0000_0089_v1.bc
+  [cached] m2020_surf_rover_loc_0000_0089_v1.bsp
+  SPK (rover): m2020_surf_rover_loc_0000_0089_v1.bsp
+  [cached] m2020_ls_ops210303_iau2000_v1.bsp
+  SPK (extra): m2020_ls_ops210303_iau2000_v1.bsp
+  [cached] m2020_atls_ops210303_v1.bsp
+  SPK (extra): m2020_atls_ops210303_v1.bsp
+Meta-kernel written: /disk1/cspark/mastcam/coregister_data/spice_kernels/m2020_coregister.tm
+SPICE initialized with 10 kernels
+  [1/128] ZLF_0053_0671641656_583XYZLN0032046ZCAM08016_1000LUJ01
+  [cached] ZLF_0053_0671641656_583XYZLN0032046ZCAM08016_1000LUJ01.xml
+  [cached] ZLF_0053_0671641656_583XYZLN0032046ZCAM08016_1000LUJ01.IMG
+  [cached] ZLF_0053_0671641656_583RASLN0032046ZCAM08016_1000LUJ01.xml
+  [cached] ZLF_0053_0671641656_583RASLN0032046ZCAM08016_1000LUJ01.IMG
+  XYZ loaded: 1648x1200, 558473 valid points
+  Rover in site frame: offset=[ 7.74137  73.2275    0.762732], quat=[ 0.0416402 -0.0020286  0.0014392  0.99913  ]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-14T03:12:14.238Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4446, 18.4446]
+  [2/128] ZLF_0053_0671641807_934XYZLN0032046ZCAM03112_0480LUJ01
+  Downloading ZLF_0053_0671641807_934XYZLN0032046ZCAM03112_0480LUJ01.xml ...
+    100% (90 KB)      
+  Downloading ZLF_0053_0671641807_934XYZLN0032046ZCAM03112_0480LUJ01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0053_0671641807_934RASLN0032046ZCAM03112_0480LUJ01.xml ...
+    100% (86 KB)      
+  Downloading ZLF_0053_0671641807_934RASLN0032046ZCAM03112_0480LUJ01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 1024014 valid points
+  Rover in site frame: offset=[ 7.74137  73.2275    0.762732], quat=[ 0.0416402 -0.0020286  0.0014392  0.99913  ]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-14T03:13:26.242Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4446, 18.4446]
+  [3/128] ZLF_0053_0671642116_488XYZLN0032046ZCAM03012_0480LMJ01
+  Downloading ZLF_0053_0671642116_488XYZLN0032046ZCAM03012_0480LMJ01.xml ...
+    100% (90 KB)      
+  Downloading ZLF_0053_0671642116_488XYZLN0032046ZCAM03012_0480LMJ01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0053_0671642116_488RASLN0032046ZCAM03012_0480LMJ01.xml ...
+    100% (86 KB)      
+  Downloading ZLF_0053_0671642116_488RASLN0032046ZCAM03012_0480LMJ01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 43185 valid points
+  Rover in site frame: offset=[ 7.74137  73.2275    0.762732], quat=[ 0.0416402 -0.0020286  0.0014392  0.99913  ]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-14T03:17:36.231Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4446, 18.4447]
+  [4/128] ZLF_0053_0671642129_519XYZLN0032046ZCAM03012_048050J01
+  Downloading ZLF_0053_0671642129_519XYZLN0032046ZCAM03012_048050J01.xml ...
+    100% (91 KB)      
+  Downloading ZLF_0053_0671642129_519XYZLN0032046ZCAM03012_048050J01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0053_0671642129_519RASLN0032046ZCAM03012_048050J01.xml ...
+    100% (87 KB)      
+  Downloading ZLF_0053_0671642129_519RASLN0032046ZCAM03012_048050J01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 20924 valid points
+  Rover in site frame: offset=[ 7.74137  73.2275    0.762732], quat=[ 0.0416402 -0.0020286  0.0014392  0.99913  ]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-14T03:17:55.234Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4446, 18.4447]
+  [5/128] ZLF_0053_0671648551_271XYZLN0032046ZCAM08100_110085J01
+  Downloading ZLF_0053_0671648551_271XYZLN0032046ZCAM08100_110085J01.xml ...
+    100% (89 KB)      
+  Downloading ZLF_0053_0671648551_271XYZLN0032046ZCAM08100_110085J01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0053_0671648551_271RASLN0032046ZCAM08100_110085J01.xml ...
+    100% (85 KB)      
+  Downloading ZLF_0053_0671648551_271RASLN0032046ZCAM08100_110085J01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 1228977 valid points
+  Rover in site frame: offset=[ 7.74137  73.2275    0.762732], quat=[ 0.0416402 -0.0020286  0.0014392  0.99913  ]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-14T05:06:01.292Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4445, 18.4445]
+  [6/128] ZLF_0053_0671648635_269XYZLN0032046ZCAM08100_110085J01
+  Downloading ZLF_0053_0671648635_269XYZLN0032046ZCAM08100_110085J01.xml ...
+    100% (89 KB)      
+  Downloading ZLF_0053_0671648635_269XYZLN0032046ZCAM08100_110085J01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0053_0671648635_269RASLN0032046ZCAM08100_110085J01.xml ...
+    100% (85 KB)      
+  Downloading ZLF_0053_0671648635_269RASLN0032046ZCAM08100_110085J01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 1234730 valid points
+  Rover in site frame: offset=[ 7.74137  73.2275    0.762732], quat=[ 0.0416402 -0.0020286  0.0014392  0.99913  ]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-14T05:06:22.286Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4445, 18.4445]
+  [7/128] ZLF_0053_0671648656_269XYZLN0032046ZCAM08100_110085J01
+  Downloading ZLF_0053_0671648656_269XYZLN0032046ZCAM08100_110085J01.xml ...
+    100% (89 KB)      
+  Downloading ZLF_0053_0671648656_269XYZLN0032046ZCAM08100_110085J01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0053_0671648656_269RASLN0032046ZCAM08100_110085J01.xml ...
+    100% (85 KB)      
+  Downloading ZLF_0053_0671648656_269RASLN0032046ZCAM08100_110085J01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 1226788 valid points
+  Rover in site frame: offset=[ 7.74137  73.2275    0.762732], quat=[ 0.0416402 -0.0020286  0.0014392  0.99913  ]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-14T05:06:36.283Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4445, 18.4445]
+  [8/128] ZLF_0053_0671648670_270XYZLN0032046ZCAM08100_110085J01
+  Downloading ZLF_0053_0671648670_270XYZLN0032046ZCAM08100_110085J01.xml ...
+    100% (89 KB)      
+  Downloading ZLF_0053_0671648670_270XYZLN0032046ZCAM08100_110085J01.IMG ...
+    4% (1024 KB)    9% (2048 KB)    13% (3072 KB)    18% (4096 KB)    22% (5120 KB)    26% (6144 KB)    31% (7168 KB)    35% (8192 KB)    40% (9216 KB)    44% (10240 KB)    48% (11264 KB)    53% (12288 KB)    57% (13312 KB)    62% (14336 KB)    66% (15360 KB)    71% (16384 KB)    75% (17408 KB)    79% (18432 KB)    84% (19456 KB)    88% (20480 KB)    93% (21504 KB)    97% (22528 KB)    100% (23232 KB)      
+  Downloading ZLF_0053_0671648670_270RASLN0032046ZCAM08100_110085J01.xml ...
+    100% (85 KB)      
+  Downloading ZLF_0053_0671648670_270RASLN0032046ZCAM08100_110085J01.IMG ...
+    9% (1024 KB)    18% (2048 KB)    26% (3072 KB)    35% (4096 KB)    44% (5120 KB)    53% (6144 KB)    62% (7168 KB)    70% (8192 KB)    79% (9216 KB)    88% (10240 KB)    97% (11264 KB)    100% (11639 KB)      
+  XYZ loaded: 1648x1200, 1219900 valid points
+  Rover in site frame: offset=[ 7.74137  73.2275    0.762732], quat=[ 0.0416402 -0.0020286  0.0014392  0.99913  ]
+  Transforming SITE→ROVER→IAU_MARS (t=2021-04-14T05:06:49.282Z)...
+  Computing lon/lat...
+  Coverage: lon=[77.4509, 77.4509], lat=[18.4445, 18.4445]
+  [9/128] ZLF_0053_0671648682_269XYZLN0032046ZCAM08100_110085J01
+  Downloading ZLF_0053_0671648682_269XYZLN0032046ZCAM08100_110085J01.xml ...
