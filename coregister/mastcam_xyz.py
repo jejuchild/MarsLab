@@ -104,6 +104,10 @@ def parse_pds3_header(data_path: Path) -> dict:
                     meta["samples"] = int(val)
                 elif key == "BANDS":
                     meta["bands"] = int(val)
+                elif key == "SAMPLE_BITS":
+                    meta["sample_bits"] = int(val)
+                elif key == "SAMPLE_TYPE":
+                    meta["sample_type"] = val
             except ValueError:
                 pass
             if line == "END":
