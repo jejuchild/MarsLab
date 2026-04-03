@@ -77,24 +77,24 @@ export default function useHoverHighlight({
     const setEntityHighlight = (entity: Cesium.Entity | undefined, highlighted: boolean, instrument: InstrumentType) => {
       if (!entity?.rectangle) return;
 
-      if (highlighted) {
+      // Check if this product has an active quickview overlay
+      const pid = entity.id?.replace(/^[A-Z_]+_FP_/, "") ?? "";
+      const hasOverlay = !!viewer.entities.getById(`QUICKVIEW_OVERLAY_${pid}`);
+
+      if (highlighted && !hasOverlay) {
+        // Only apply highlight when no quickview overlay is present
         entity.rectangle.material = getHiliteMaterial(instrument);
         entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.WHITE);
+      } else if (hasOverlay) {
+        // Quickview active — keep footprint fully transparent
+        entity.rectangle.material = new Cesium.ColorMaterialProperty(Cesium.Color.TRANSPARENT);
+        entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.TRANSPARENT);
       } else {
-        // Check if this product has an active quickview overlay — if so,
-        // restore to fully transparent so the overlay image is unobstructed.
-        const pid = entity.id?.replace(/^[A-Z_]+_FP_/, "") ?? "";
-        const hasOverlay = !!viewer.entities.getById(`QUICKVIEW_OVERLAY_${pid}`);
-        if (hasOverlay) {
-          entity.rectangle.material = new Cesium.ColorMaterialProperty(Cesium.Color.TRANSPARENT);
-          entity.rectangle.outlineColor = new Cesium.ConstantProperty(Cesium.Color.TRANSPARENT);
-        } else {
-          // Restore to original light fill using instrument color
-          const rgb = getInstrumentCesiumColor(instrument.toLowerCase());
-          const baseColor = new Cesium.Color(rgb.r, rgb.g, rgb.b, 1.0);
-          entity.rectangle.material = new Cesium.ColorMaterialProperty(baseColor.withAlpha(0.10));
-          entity.rectangle.outlineColor = new Cesium.ConstantProperty(baseColor);
-        }
+        // Restore to original light fill using instrument color
+        const rgb = getInstrumentCesiumColor(instrument.toLowerCase());
+        const baseColor = new Cesium.Color(rgb.r, rgb.g, rgb.b, 1.0);
+        entity.rectangle.material = new Cesium.ColorMaterialProperty(baseColor.withAlpha(0.10));
+        entity.rectangle.outlineColor = new Cesium.ConstantProperty(baseColor);
       }
     };
 

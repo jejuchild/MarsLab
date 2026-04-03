@@ -13,6 +13,7 @@ import CustomDataTab from "./tabs/CustomDataTab";
 import OverlayControls from "./overlays/OverlayControls";
 import ActionBar from "./actions/ActionBar";
 import HiriseLandformPanel from "../HiriseLandformPanel";
+import HiResImageViewer from "./HiResImageViewer";
 
 export default function InspectorPanel({
   selected,
@@ -23,22 +24,34 @@ export default function InspectorPanel({
   onSetOpacity,
   rgbWavelengths,
   onRGBChange,
-  hasHighResData = true,
+  hasHighResData: hasHighResDataProp = true,
   customDataset = null,
   onCustomDatasetOpacity,
   fieldNotes = [],
   onOpenFieldNote,
   onShow3DView,
-  onFindRelated,
+  onFindRelated: _onFindRelated,
   recentProducts = [],
   onSelectRecent,
   onRemoveRecent,
-  onDownloadProduct,
+  onDownloadProduct: _onDownloadProduct,
   onPinSpectrum,
-  onFindTemporalPairs,
+  onFindTemporalPairs: _onFindTemporalPairs,
   onOpenMineralSequence,
   isMobile = false,
 }: InspectorPanelProps) {
+  // ── Check high-res availability directly for selected product ──
+  const [localHighRes, setLocalHighRes] = useState(false);
+  useEffect(() => {
+    if (!selected) { setLocalHighRes(false); return; }
+    const inst = selected.instrument.toLowerCase();
+    fetch(`/api/exists/${inst}/${encodeURIComponent(selected.productId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setLocalHighRes(d?.has_core ?? false))
+      .catch(() => setLocalHighRes(false));
+  }, [selected?.productId, selected?.instrument]);
+  const hasHighResData = hasHighResDataProp || localHighRes;
+
   // ── Keyboard: Escape to close ──
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -167,6 +180,8 @@ export default function InspectorPanel({
 
   // ── Landform panel ──
   const [showLandformPanel, setShowLandformPanel] = useState(false);
+  // ── High-Res Image Viewer ──
+  const [showHiResViewer, setShowHiResViewer] = useState(false);
 
   if (!selected) return null;
 
@@ -283,6 +298,17 @@ export default function InspectorPanel({
           />
         </div>
 
+        {/* ── View High-Res Image Button ── */}
+        {(isHiRISE || isDTM) && (
+          <button
+            onClick={() => setShowHiResViewer(true)}
+            className="flex w-full items-center justify-center gap-2 mt-4 py-3 rounded-lg bg-purple-500/20 border border-purple-500/50 text-purple-300 text-[11px] font-bold uppercase tracking-widest hover:bg-purple-500/30 active:scale-[0.98] transition-all"
+          >
+            <span className="material-symbols-outlined text-base">hd</span>
+            View High-Res Image
+          </button>
+        )}
+
         {/* ── Action Bar ── */}
         <ActionBar
           productId={selected.productId}
@@ -296,9 +322,6 @@ export default function InspectorPanel({
           showingLandform={showLandformPanel}
           fieldNotes={fieldNotes}
           onOpenFieldNote={onOpenFieldNote}
-          onDownloadProduct={onDownloadProduct}
-          onFindRelated={onFindRelated}
-          onFindTemporalPairs={onFindTemporalPairs}
         />
 
         {/* ── Landform Panel ── */}
@@ -313,6 +336,14 @@ export default function InspectorPanel({
           </div>
         )}
       </div>
+
+      {/* ── High-Res Image Viewer (fullscreen popup) ── */}
+      {showHiResViewer && (
+        <HiResImageViewer
+          productId={selected.productId}
+          onClose={() => setShowHiResViewer(false)}
+        />
+      )}
     </aside>
   );
 }

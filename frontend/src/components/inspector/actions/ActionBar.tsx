@@ -17,10 +17,6 @@ type ActionBarProps = {
   // Field Notes
   fieldNotes: FieldNote[];
   onOpenFieldNote?: (productId: string, instrument: string, lat: number, lon: number) => void;
-  // Quick Actions
-  onDownloadProduct?: (productId: string, instrument: string) => void;
-  onFindRelated?: (productId: string, instrument: string) => void;
-  onFindTemporalPairs?: (lat: number, lon: number, instrument: string) => void;
 };
 
 export default function ActionBar({
@@ -35,9 +31,6 @@ export default function ActionBar({
   showingLandform,
   fieldNotes,
   onOpenFieldNote,
-  onDownloadProduct,
-  onFindRelated,
-  onFindTemporalPairs,
 }: ActionBarProps) {
   const hasNote = useMemo(
     () => fieldNotes.some((n) => n.product_id === productId),
@@ -47,8 +40,6 @@ export default function ActionBar({
     () => fieldNotes.filter((n) => n.product_id === productId).length,
     [fieldNotes, productId],
   );
-
-  const isCustom = instrument === "CUSTOM";
 
   return (
     <div className="mt-4 space-y-2">
@@ -76,31 +67,7 @@ export default function ActionBar({
         />
       )}
 
-      {/* ── Tier 2: Common Actions ── */}
-      {!isCustom && (
-        <div className="grid grid-cols-2 gap-2">
-          {onDownloadProduct && (
-            <ActionButton
-              onClick={() => onDownloadProduct(productId, instrument)}
-              icon="download"
-              label="Download"
-              colorScheme="emerald"
-            />
-          )}
-          {onFindRelated && (
-            <ActionButton
-              onClick={() => onFindRelated(productId, instrument)}
-              icon="hub"
-              label="Related"
-              colorScheme="purple"
-            />
-          )}
-        </div>
-      )}
-
-      {/* ── Tier 3: Secondary Actions ── */}
-
-      {/* Field Note */}
+      {/* ── Tier 2: Field Note ── */}
       {onOpenFieldNote && (
         <ActionButton
           onClick={() => onOpenFieldNote(productId, instrument, lat, lon)}
@@ -109,22 +76,6 @@ export default function ActionBar({
           colorScheme={hasNote ? "amber" : "slate"}
         />
       )}
-
-      {/* Temporal Pairs */}
-      {!isCustom && onFindTemporalPairs && (
-        <ActionButton
-          onClick={() => onFindTemporalPairs(lat, lon, instrument)}
-          icon="compare"
-          label="Find Temporal Pairs"
-          colorScheme="amber"
-        />
-      )}
-
-      {/* Export (placeholder) */}
-      <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-primary/20 hover:brightness-110 active:scale-[0.98] transition-all">
-        <span className="material-symbols-outlined text-sm">ios_share</span>
-        Export Statistics
-      </button>
     </div>
   );
 }

@@ -122,3 +122,9 @@ backend/data/crawl_report_*.json
 backend/neural_climate/checkpoints/
 backend/neural_climate/data/
 *.npz
+
+# Large ML output files
+backend/analysis/mars_vqa/output/
+
+# Large ML output files
+scripts/mars_vqa/output/

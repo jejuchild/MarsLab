@@ -118,6 +118,15 @@ export default function AnalysisTools({
             description="Draw polygon for area statistics"
             color="indigo"
           />
+          <ToolButton
+            active={false}
+            onClick={() => window.open("/mastcam-label", "_blank")}
+            icon="panorama_photosphere"
+            title="Mastcam Labeling"
+            description="Label roughness on 360° panoramas"
+            color="amber"
+            badge="NEW"
+          />
         </CategoryCard>
 
         {/* ── AI-Powered ── */}

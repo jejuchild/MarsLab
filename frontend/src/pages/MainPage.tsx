@@ -332,6 +332,32 @@ export default function MainPage() {
   );
   const handleToggleInstrument = useCallback((id: InstrumentId, v: boolean) => {
     setInstrumentVisibility(prev => ({ ...prev, [id]: v }));
+    // When toggling OFF, remove all active overlays for that instrument's products
+    if (!v) {
+      setActiveOverlays(prev => {
+        const next = new Map(prev);
+        let changed = false;
+        for (const [productId] of prev) {
+          const isHiRISE = /^(ESP|PSP|TRA)_\d+/.test(productId);
+          const isCRISM = /^(frt|hrl|hrs|frs|arl|atl)/i.test(productId);
+          const isSHARAD = /^[SR]_\d+/i.test(productId);
+          const isDTM = /^DTE/i.test(productId);
+          let match = false;
+          if (id === "ctx" && !isHiRISE && !isCRISM && !isSHARAD && !isDTM) match = true;
+          else if (id === "hirise" && isHiRISE) match = true;
+          else if (id === "crism" && isCRISM) match = true;
+          else if (id === "sharad" && /^S_/i.test(productId)) match = true;
+          else if (id === "sharad_highres" && /^R_/i.test(productId)) match = true;
+          else if (id === "hirise_dtm" && isDTM) match = true;
+          else if (id === "crism_trr3" && isCRISM) match = true;
+          if (match) {
+            next.delete(productId);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
   }, []);
 
   // Derived booleans for MapView backward compatibility

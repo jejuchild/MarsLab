@@ -473,18 +473,59 @@ export class FootprintManager {
 
         let outlineIndex = -1;
 
-        if (geom.type !== "LineString") {
-          // Render all non-LineString types as bbox rectangles.
-          // This matches the quickview overlay rectangle so footprint and
-          // quickview are always the same shape/size.
+        if (geom.type === "Polygon") {
+          // Use actual polygon coordinates (content-fitted, not bbox)
+          const ring = geom.coordinates?.[0] as [number, number][] | undefined;
+          const positions = ring && ring.length >= 3
+            ? Cesium.Cartesian3.fromDegreesArray(
+                ring.flatMap(([lon, lat]) => [normalizeLon(lon), lat]),
+                this.ellipsoid,
+              )
+            : Cesium.Cartesian3.fromDegreesArray(
+                [bounds.west, bounds.south, bounds.west, bounds.north,
+                 bounds.east, bounds.north, bounds.east, bounds.south],
+                this.ellipsoid,
+              );
+
+          geometryInstances.push(
+            new Cesium.GeometryInstance({
+              geometry: new Cesium.PolygonGeometry({
+                polygonHierarchy: new Cesium.PolygonHierarchy(positions),
+              }),
+              id: entityId,
+              attributes: {
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(0.12)),
+                show: new Cesium.ShowGeometryInstanceAttribute(true),
+              },
+            }),
+          );
+
+          outlineIndex = outlineCollection.length;
+          // Outline follows actual polygon shape
+          const outlinePositions = ring && ring.length >= 3
+            ? Cesium.Cartesian3.fromDegreesArray(
+                [...ring.flatMap(([lon, lat]) => [normalizeLon(lon), lat])],
+                this.ellipsoid,
+              )
+            : Cesium.Cartesian3.fromDegreesArray(
+                [bounds.west, bounds.south, bounds.west, bounds.north,
+                 bounds.east, bounds.north, bounds.east, bounds.south,
+                 bounds.west, bounds.south],
+                this.ellipsoid,
+              );
+          outlineCollection.add({
+            positions: outlinePositions,
+            width: 1.0,
+            material: Cesium.Material.fromType("Color", { color }),
+            id: entityId,
+          });
+        } else if (geom.type !== "LineString") {
+          // Point or other types: use bbox rectangle
           geometryInstances.push(
             new Cesium.GeometryInstance({
               geometry: new Cesium.RectangleGeometry({
                 rectangle: Cesium.Rectangle.fromDegrees(
-                  bounds.west,
-                  bounds.south,
-                  bounds.east,
-                  bounds.north,
+                  bounds.west, bounds.south, bounds.east, bounds.north,
                 ),
               }),
               id: entityId,
@@ -498,18 +539,9 @@ export class FootprintManager {
           outlineIndex = outlineCollection.length;
           outlineCollection.add({
             positions: Cesium.Cartesian3.fromDegreesArray(
-              [
-                bounds.west,
-                bounds.south,
-                bounds.west,
-                bounds.north,
-                bounds.east,
-                bounds.north,
-                bounds.east,
-                bounds.south,
-                bounds.west,
-                bounds.south,
-              ],
+              [bounds.west, bounds.south, bounds.west, bounds.north,
+               bounds.east, bounds.north, bounds.east, bounds.south,
+               bounds.west, bounds.south],
               this.ellipsoid,
             ),
             width: 1.0,
@@ -626,6 +658,22 @@ export class FootprintManager {
   getFeatureBounds(entityId: string): ProductBounds | null {
     const metadata = this.featureMetadata.get(entityId);
     return metadata ? metadata.bounds : null;
+  }
+
+  /**
+   * Find all footprint features whose bounds contain the given lat/lon.
+   * Returns matches sorted by area (smallest first).
+   */
+  getFeaturesAtPosition(lat: number, lon: number): FeatureMetadata[] {
+    const results: { meta: FeatureMetadata; area: number }[] = [];
+    for (const meta of this.featureMetadata.values()) {
+      const b = meta.bounds;
+      if (lat >= b.south && lat <= b.north && lon >= b.west && lon <= b.east) {
+        results.push({ meta, area: (b.east - b.west) * (b.north - b.south) });
+      }
+    }
+    results.sort((a, b) => a.area - b.area);
+    return results.map((r) => r.meta);
   }
 
   setFeatureVisible(instrument: InstrumentType, productId: string, visible: boolean): void {

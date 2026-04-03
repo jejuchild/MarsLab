@@ -1,0 +1,66 @@
+{
+  "date": "2026-04-01",
+  "generated_at": "2026-03-31T22:10:10.863641+00:00",
+  "topic": {
+    "focus": "Ice Detection & Geomorphology",
+    "keywords": [
+      "SHARAD",
+      "subsurface ice",
+      "radar sounding",
+      "lobate debris aprons",
+      "glacial"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Influence mechanism of fabric stiffness on transonic aerodynamic performance of Mars exploration parachutes",
+      "authors": "Yiwei Zhou, Shaoyin Zhao, He Jia, Wenlong Bao, Wei Rong, Tianqi Zou et al.",
+      "year": "2026",
+      "journal": "Aerospace Science and Technology",
+      "key_findings": "This paper explores the influence of fabric stiffness on the transonic aerodynamic performance of Mars exploration parachutes, but the abstract is not provided to give a detailed summary. The study likely investigates the relationship between fabric stiffness and parachute performance.",
+      "methodology": "The methodology is not explicitly stated in the provided information, but it likely involves numerical simulations or wind tunnel experiments to test the aerodynamic performance of parachutes with varying fabric stiffness.",
+      "relevance": "This paper is not directly related to MarsLab's Mars exploration goals, specifically ice detection and geomorphology, but it contributes to the broader context of Mars exploration by investigating parachute performance for landing missions.",
+      "category": "Mars Exploration Engineering",
+      "url": "https://doi.org/10.1016/j.ast.2026.112244",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Enhancement by Ce addition to La-Zr-mixed oxide supported Ni catalysts on the mid-temperature steam reforming of methane",
+      "authors": "Li-Chun Lin, Teng-Li Yu, Cheng-Yao Hung, Guan-Yu Chen, Yi-Ning Chao, Shawn D. Lin",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper discusses the enhancement of Ce addition to La-Zr-mixed oxide supported Ni catalysts on the mid-temperature steam reforming of methane, but the abstract is not provided to give a detailed summary. The study likely examines the effects of Ce addition on catalyst performance.",
+      "methodology": "The methodology is not explicitly stated in the provided information, but it likely involves experimental tests and characterization of catalysts to evaluate their performance in steam reforming reactions.",
+      "relevance": "This paper is not directly related to MarsLab's Mars exploration goals, specifically ice detection and geomorphology, but it could be relevant to in-situ resource utilization (ISRU) for future Mars missions.",
+      "category": "In-Situ Resource Utilization",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139223",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Simultaneous surgical stereo depth and motion estimation via brightness-aware self-supervised learning",
+      "authors": "Yuxuan Liu, Xinyao Zhou, Yating Luo, Yunfei Luan, Zhennan Xiao, Yao Guo et al.",
+      "year": "2026",
+      "journal": "Pattern Recognition",
+      "key_findings": "This paper presents a method for simultaneous surgical stereo depth and motion estimation via brightness-aware self-supervised learning, but the abstract is not provided to give a detailed summary. The study likely proposes a new algorithm for depth and motion estimation in surgical settings.",
+      "methodology": "The methodology is not explicitly stated in the provided information, but it likely involves the development and testing of a machine learning algorithm for stereo depth and motion estimation.",
+      "relevance": "This paper is not directly related to MarsLab's Mars exploration goals, specifically ice detection and geomorphology, but it could be relevant to robotics and computer vision applications in Mars exploration.",
+      "category": "Computer Vision and Robotics",
+      "url": "https://doi.org/10.1016/j.patcog.2026.113510",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Adaptive learning from noisy estimated depth maps benefits monocular RGB-based 3D human pose estimation",
+      "authors": "Mengyuan Liu, Jingting Liu",
+      "year": "2026",
+      "journal": "Pattern Recognition",
+      "key_findings": "This paper discusses the adaptive learning from noisy estimated depth maps for monocular RGB-based 3D human pose estimation, but the abstract is not provided to give a detailed summary. The study likely investigates the use of adaptive learning to improve pose estimation accuracy.",
+      "methodology": "The methodology is not explicitly stated in the provided information, but it likely involves the development and testing of a machine learning algorithm for 3D human pose estimation from RGB images.",
+      "relevance": "This paper is not directly related to MarsLab's Mars exploration goals, specifically ice detection and geomorphology, but it could be relevant to robotics and computer vision applications in Mars exploration, such as astronaut pose estimation.",
+      "category": "Computer Vision and Robotics",
+      "url": "https://doi.org/10.1016/j.patcog.2026.113530",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "The papers fetched from Crossref do not appear to be directly related to MarsLab's specific goals of ice detection and geomorphology. However, they contribute to the broader context of Mars exploration, including parachute performance, in-situ resource utilization, and computer vision applications. The trend suggests a growing interest in interdisciplinary research, with papers from various fields being potentially relevant to Mars exploration. Further analysis of papers specifically focused on ice detection and geomorphology is needed to identify trends in this area.",
+  "connections_to_marslab": "While the papers do not directly address MarsLab's goals, they highlight the importance of interdisciplinary research in advancing Mars exploration. The findings on parachute performance, catalyst enhancement, and computer vision algorithms could be applied to various aspects of Mars exploration, including landing missions, in-situ resource utilization, and robotics. MarsLab can consider exploring these areas further to identify potential connections to their mission, such as using computer vision for ice detection or developing more efficient parachutes for landing missions."
+}

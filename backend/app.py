@@ -471,51 +471,56 @@ def get_hirise_overlay(request: Request, product_id: str, max_size: int = 2048):
         with open(cache_file, "rb") as f:
             return Response(f.read(), media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
-    path = tif_path(product_id)
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail=f"HiRISE TIF not found: {product_id}")
+    # Fast path: use existing quickview JPG (already downsampled, instant)
+    qv_jpg = os.path.join(BASE_DIR, "hirise_quickview", f"{product_id}.jpg")
+    tif = tif_path(product_id)
+    source = qv_jpg if os.path.exists(qv_jpg) else tif if os.path.exists(tif) else None
+
+    if not source:
+        raise HTTPException(status_code=404, detail=f"HiRISE data not found: {product_id}")
 
     try:
-        ds = open_ds(path)
+        if source.endswith(".jpg"):
+            gray = cv2.imread(source, cv2.IMREAD_GRAYSCALE)
+            if gray is None:
+                raise HTTPException(status_code=500, detail="Failed to read quickview")
+            h, w = gray.shape
+            scale = max_size / max(w, h)
+            if scale > 1:
+                gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
+        else:
+            ds = open_ds(source)
+            scale = max(ds.width, ds.height) / max_size
+            if scale < 1:
+                scale = 1
+            out_w, out_h = int(ds.width / scale), int(ds.height / scale)
+            data = ds.read(1, out_shape=(out_h, out_w), resampling=Resampling.bilinear)
+            nonzero = data[data > 0]
+            if nonzero.size > 0:
+                vmin, vmax = float(np.percentile(nonzero, 1)), float(np.percentile(nonzero, 99))
+                gray = np.clip((data.astype(np.float32) - vmin) / max(vmax - vmin, 1) * 255, 0, 255).astype(np.uint8)
+            else:
+                gray = np.zeros_like(data, dtype=np.uint8)
 
-        # Calculate downsampling factor
-        scale = max(ds.width, ds.height) / max_size
-        if scale < 1:
-            scale = 1
+        h, w = gray.shape
+        rgba = np.zeros((h, w, 4), dtype=np.uint8)
+        rgba[:, :, 0] = gray
+        rgba[:, :, 1] = gray
+        rgba[:, :, 2] = gray
+        rgba[:, :, 3] = np.where(gray > 3, 255, 0)
 
-        out_width = int(ds.width / scale)
-        out_height = int(ds.height / scale)
-
-        # Read with resampling
-        data = ds.read(
-            1,
-            out_shape=(out_height, out_width),
-            resampling=Resampling.bilinear
-        )
-
-        # Normalize to 0-255
-        data_norm = np.clip(data / 4, 0, 255).astype(np.uint8)
-
-        # Create RGBA image with transparency for black pixels
-        rgba = np.zeros((out_height, out_width, 4), dtype=np.uint8)
-        rgba[:, :, 0] = data_norm  # R
-        rgba[:, :, 1] = data_norm  # G
-        rgba[:, :, 2] = data_norm  # B
-        # Alpha: 255 for non-zero pixels, 0 for black
-        rgba[:, :, 3] = np.where(data_norm > 5, 255, 0)
-
-        # Encode as PNG
-        ok, png = cv2.imencode(".png", cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA))
+        ok, png = cv2.imencode(".png", cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA),
+                               [cv2.IMWRITE_PNG_COMPRESSION, 4])
         if not ok:
             raise HTTPException(status_code=500, detail="Failed to encode PNG")
 
         png_bytes = png.tobytes()
-
-        # Save to cache
         with open(cache_file, "wb") as f:
             f.write(png_bytes)
 
         return Response(png_bytes, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -667,6 +672,12 @@ app.include_router(rag_router)  # /api/rag/* — Mars Science RAG
 
 from api.mastcam_router import router as mastcam_router
 app.include_router(mastcam_router)  # /api/mastcam/* — Mastcam-Z 360° Panoramas
+
+from api.mastcam_label_router import router as mastcam_label_router
+app.include_router(mastcam_label_router)  # /api/mastcam-label/* — Roughness Labeling
+
+from api.mastcam_spice_router import router as mastcam_spice_router
+app.include_router(mastcam_spice_router)  # /api/mastcam-spice/* — SPICE Co-registration
 
 from neural_climate.climate_router import router as neural_climate_router
 app.include_router(neural_climate_router)  # /api/climate/neural/* — Mars GCM Neural Emulator

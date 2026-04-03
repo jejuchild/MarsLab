@@ -210,14 +210,14 @@ export default function MastcamPanoPage() {
 
   const filtered = scenes.filter(
     (s) =>
-      s.title.toLowerCase().includes(filter.toLowerCase()) ||
-      s.id.toLowerCase().includes(filter.toLowerCase())
+      (s.has_equirectangular || s.has_webview) &&
+      (s.title.toLowerCase().includes(filter.toLowerCase()) ||
+       s.id.toLowerCase().includes(filter.toLowerCase()))
   );
 
   const handleSelect = useCallback((scene: Scene) => {
     setSelected(scene);
-    const has360 = scene.has_equirectangular || scene.has_webview;
-    setViewerMode(has360 ? "panorama" : "preview");
+    setViewerMode("panorama");
   }, []);
 
   // Use webview (4096px, ~2MB) for 3D viewer instead of full-res (100MB+)

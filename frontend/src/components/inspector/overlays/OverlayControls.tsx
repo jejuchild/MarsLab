@@ -48,11 +48,12 @@ export default function OverlayControls({
   }, [collapsed]);
 
   // Available overlay types for this instrument
+  // HiRISE/DTM: no "highres" map overlay — use dedicated "View High-Res Image" viewer instead
   const availableOverlays: OverlayType[] = isTRR3
     ? ["quickview", "mineral_cnn"]
     : isCRISM
       ? ["quickview", "highres", "browse_HYD", "browse_ICE", "browse_IC2", "score_ice", "score_hyd"]
-      : ["quickview", "highres"];
+      : ["quickview"];
 
   const displayOverlays = availableOverlays.filter(
     (type) => type !== "highres" || hasHighResData,

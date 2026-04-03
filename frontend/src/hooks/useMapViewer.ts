@@ -163,6 +163,15 @@ export default function useMapViewer({
   const onOlympusMonsClimberRef = useRef(onOlympusMonsClimber);
   const onHoverProductRef = useRef(onHoverProduct);
 
+  // Cycle-through click: track last click to cycle through overlapping footprints
+  const cycleClickRef = useRef<{
+    candidateIds: string[];
+    index: number;
+    screenX: number;
+    screenY: number;
+    timestamp: number;
+  } | null>(null);
+
   // Easter egg: Olympus Mons triple-click tracking
   const olympusMonsClickCountRef = useRef(0);
   const olympusMonsClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -351,9 +360,18 @@ export default function useMapViewer({
 
       const pickedList = viewer.scene.drillPick(endPosition);
       const picked = pickedList.find((x: any) => x?.id instanceof Cesium.Entity);
-      const pickedPrimitiveId = pickedList.find(
-        (x: any) => typeof x?.id === "string" && x.id.includes("_FP_"),
-      )?.id as string | undefined;
+      // Pick the smallest footprint (most specific) at hover position
+      const hoverCandidates = pickedList
+        .filter((x: any) => typeof x?.id === "string" && x.id.includes("_FP_"))
+        .map((x: any) => {
+          const id = x.id as string;
+          const meta = footprintManagerRef.current?.getFeatureMetadata(id);
+          const b = meta?.bounds;
+          const area = b ? (b.east - b.west) * (b.north - b.south) : Infinity;
+          return { id, area };
+        })
+        .sort((a: { area: number }, b: { area: number }) => a.area - b.area);
+      const pickedPrimitiveId = hoverCandidates.length > 0 ? hoverCandidates[0].id : undefined;
 
       const pickedEnt = picked?.id as Cesium.Entity | undefined;
       const hs = highlightRef.current;
@@ -548,8 +566,24 @@ export default function useMapViewer({
           }
         }
 
+        // Check if this is a cycle-through click (same spot, rapidly repeated)
+        const allFootprintsHere = footprintManagerRef.current?.getFeaturesAtPosition(clickLat, clickLon) ?? [];
+        let isCycleClick = false;
+        if (allFootprintsHere.length > 1) {
+          const prev = cycleClickRef.current;
+          const now = Date.now();
+          if (
+            prev &&
+            now - prev.timestamp < 3000 &&
+            Math.abs(m.position.x - prev.screenX) < 10 &&
+            Math.abs(m.position.y - prev.screenY) < 10
+          ) {
+            isCycleClick = true;
+          }
+        }
+
         // PRIORITY 1: Check if click is within any active overlay bounds
-        // This is more reliable than Cesium picking for image overlays
+        // Skip if cycling through overlapping footprints (let PRIORITY 2 handle)
         let overlayProduct: { productId: string; instrument: InstrumentType } | null = null;
 
         // Check high-res overlays first (higher priority), then quickview
@@ -557,14 +591,19 @@ export default function useMapViewer({
         const quickviewIds = quickviewOverlaysRef.current;
         const allOverlayIds = [...highResIds, ...quickviewIds];
 
-        for (const productId of allOverlayIds) {
+        if (isCycleClick) {
+          // Skip overlay detection — fall through to PRIORITY 2 cycle logic
+        } else for (const productId of allOverlayIds) {
           const highResEnt = viewer.entities.getById(`HIGHRES_OVERLAY_${productId}`);
           const quickviewEnt = viewer.entities.getById(
             `QUICKVIEW_OVERLAY_${productId}`,
           );
           const overlayEnt = highResEnt || quickviewEnt;
+          if (!overlayEnt) continue;
 
-          if (overlayEnt?.rectangle?.coordinates) {
+          // Check if click is within overlay bounds (rectangle or polygon)
+          let isInside = false;
+          if (overlayEnt.rectangle?.coordinates) {
             const rect = overlayEnt.rectangle.coordinates.getValue(
               Cesium.JulianDate.now(),
             ) as Cesium.Rectangle;
@@ -572,27 +611,28 @@ export default function useMapViewer({
             const east = Cesium.Math.toDegrees(rect.east);
             const south = Cesium.Math.toDegrees(rect.south);
             const north = Cesium.Math.toDegrees(rect.north);
+            isInside = clickLon >= west && clickLon <= east &&
+                       clickLat >= south && clickLat <= north;
+          } else {
+            // Polygon-based overlay: use footprint bounds as proxy
+            const fpMeta = footprintManagerRef.current?.getFeaturesAtPosition(clickLat, clickLon);
+            isInside = fpMeta?.some((f) => f.productId === productId) ?? false;
+          }
 
-            if (
-              clickLon >= west &&
-              clickLon <= east &&
-              clickLat >= south &&
-              clickLat <= north
-            ) {
-              const instrumentProp = (
-                overlayEnt.properties as unknown as {
-                  instrument?: Cesium.Property;
-                }
-              )?.instrument;
-              const instrument = instrumentProp?.getValue(
-                Cesium.JulianDate.now(),
-              ) as InstrumentType | undefined;
-              overlayProduct = {
-                productId,
-                instrument: instrument || (productId.startsWith("ESP_") ? "HIRISE" : "CRISM"),
-              };
-              break;
-            }
+          if (isInside) {
+            const instrumentProp = (
+              overlayEnt.properties as unknown as {
+                instrument?: Cesium.Property;
+              }
+            )?.instrument;
+            const instrument = instrumentProp?.getValue(
+              Cesium.JulianDate.now(),
+            ) as InstrumentType | undefined;
+            overlayProduct = {
+              productId,
+              instrument: instrument || (productId.startsWith("ESP_") ? "HIRISE" : "CRISM"),
+            };
+            break;
           }
         }
 
@@ -767,12 +807,41 @@ export default function useMapViewer({
           return !!pid;
         });
 
-        const pickedPrimitiveId = pickedList.find(
-          (p: any) => typeof p?.id === "string" && p.id.includes("_FP_"),
-        )?.id as string | undefined;
-        const pickedPrimitiveMetadata = pickedPrimitiveId
-          ? (footprintManagerRef.current?.getFeatureMetadata(pickedPrimitiveId) ?? null)
-          : null;
+        // Cycle-through: use spatial query results from earlier
+        // (drillPick can't drill through batched Primitive instances)
+        let cycleIndex = 0;
+        if (allFootprintsHere.length > 1) {
+          const prev = cycleClickRef.current;
+          const now = Date.now();
+          const screenX = m.position.x;
+          const screenY = m.position.y;
+          const candidateIds = allFootprintsHere.map((f) => `${f.instrument}_FP_${f.productId}`);
+
+          if (
+            prev &&
+            now - prev.timestamp < 3000 &&
+            Math.abs(screenX - prev.screenX) < 10 &&
+            Math.abs(screenY - prev.screenY) < 10 &&
+            candidateIds.length === prev.candidateIds.length &&
+            candidateIds.every((id: string, i: number) => id === prev.candidateIds[i])
+          ) {
+            // Same spot, same candidates — advance cycle
+            cycleIndex = (prev.index + 1) % candidateIds.length;
+          }
+
+          cycleClickRef.current = {
+            candidateIds,
+            index: cycleIndex,
+            screenX,
+            screenY,
+            timestamp: now,
+          };
+        } else {
+          cycleClickRef.current = null;
+        }
+
+        const pickedFootprint = allFootprintsHere[cycleIndex] ?? allFootprintsHere[0] ?? null;
+        const pickedPrimitiveMetadata = pickedFootprint;
 
         if ((!picked || !(picked.id instanceof Cesium.Entity)) && !pickedPrimitiveMetadata) {
           onTerrainClickRef.current?.(clickLat, clickLon);

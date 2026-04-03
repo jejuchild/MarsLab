@@ -51,7 +51,21 @@ export default function FootprintSection({
       <div className="space-y-1">
         {/* High-Res Only filter toggle */}
         <button
-          onClick={() => onHighResOnlyChange?.(!highResOnly)}
+          onClick={() => {
+            onHighResOnlyChange?.(!highResOnly);
+            // Auto-reload all loaded & visible instruments after state propagates
+            setTimeout(() => {
+              for (const group of INSTRUMENT_GROUPS) {
+                for (const instId of group.instruments) {
+                  const count = footprintCounts[instId] as FootprintCount;
+                  if (count && instrumentVisibility[instId]) {
+                    const inst = INSTRUMENTS[instId];
+                    onLoadFootprints?.(inst.name as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
+                  }
+                }
+              }
+            }, 100);
+          }}
           className={`flex items-center gap-2 w-full px-2.5 py-1.5 rounded transition-colors text-left ${
             highResOnly
               ? "bg-purple-500/20 border border-purple-500/40"

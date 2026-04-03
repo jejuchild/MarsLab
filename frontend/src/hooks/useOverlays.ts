@@ -25,6 +25,7 @@ type ProductBounds = {
   north: number;
   lines?: number;
   samples?: number;
+  polygon?: [number, number][];  // actual polygon corners [lon, lat][] for precise overlay
 };
 
 type UseOverlaysParams = {
@@ -89,7 +90,7 @@ export default function useOverlays({
   // footprint fill from tinting the overlay image.
   const setFootprintTransparent = useCallback((viewer: Cesium.Viewer, productId: string, transparent: boolean) => {
     const footprintManager = footprintManagerRef.current;
-    const isHiRISE = productId.startsWith("ESP_");
+    const isHiRISE = productId.startsWith("ESP_") || productId.startsWith("PSP_") || productId.startsWith("TRA_");
     const isHiRISEDTM = productId.startsWith("DTE");
     const isTRR3 = /^(frt|hrl|hrs|frs)[0-9a-f]+_\d{2}$/i.test(productId);
     const instrument = isHiRISEDTM
@@ -99,7 +100,13 @@ export default function useOverlays({
         : isTRR3
           ? "CRISM_TRR3"
           : "CRISM";
-    // Try FootprintManager ID
+
+    // Use FootprintManager to hide/show both fill AND outline (primitive-based)
+    if (footprintManager) {
+      footprintManager.setFeatureVisible(instrument as any, productId, !transparent);
+    }
+
+    // Also handle Entity-based footprints (legacy)
     const fpEnt = viewer.entities.getById(`${instrument}_FP_${productId}`);
     if (fpEnt?.rectangle) {
       if (transparent) {
@@ -489,29 +496,58 @@ export default function useOverlays({
           const { productId, bounds, imageUrl, instrument } = result;
 
           const isDTM = instrument === "HIRISE_DTM";
-          v.entities.add({
-            id: `QUICKVIEW_OVERLAY_${productId}`,
-            show: isDTM ? showHiRISEDTMRef.current : true,
-            rectangle: {
-              coordinates: Cesium.Rectangle.fromDegrees(
-                bounds.west,
-                bounds.south,
-                bounds.east,
-                bounds.north,
-              ),
-              material: new Cesium.ImageMaterialProperty({
-                image: imageUrl,
-                transparent: true,
-                color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
-              }),
-              height: 0,
-            },
-            properties: {
-              product_id: productId,
-              instrument,
-              kind: "OVERLAY",
-            },
-          });
+          console.log(`[Overlay] ${productId} bounds: W=${bounds.west.toFixed(6)} S=${bounds.south.toFixed(6)} E=${bounds.east.toFixed(6)} N=${bounds.north.toFixed(6)}${bounds.polygon ? ` polygon=${bounds.polygon.length}pts` : ""}`);
+
+          if (bounds.polygon && bounds.polygon.length >= 3) {
+            // Use actual polygon shape for precise alignment with footprint
+            const positions = Cesium.Cartesian3.fromDegreesArray(
+              bounds.polygon.flatMap(([lon, lat]) => [lon, lat]),
+            );
+            v.entities.add({
+              id: `QUICKVIEW_OVERLAY_${productId}`,
+              show: isDTM ? showHiRISEDTMRef.current : true,
+              polygon: {
+                hierarchy: new Cesium.PolygonHierarchy(positions),
+                material: new Cesium.ImageMaterialProperty({
+                  image: imageUrl,
+                  transparent: true,
+                  color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
+                }),
+                height: 0,
+                stRotation: 0,
+              },
+              properties: {
+                product_id: productId,
+                instrument,
+                kind: "OVERLAY",
+              },
+            });
+          } else {
+            // Fallback to axis-aligned rectangle
+            v.entities.add({
+              id: `QUICKVIEW_OVERLAY_${productId}`,
+              show: isDTM ? showHiRISEDTMRef.current : true,
+              rectangle: {
+                coordinates: Cesium.Rectangle.fromDegrees(
+                  bounds.west,
+                  bounds.south,
+                  bounds.east,
+                  bounds.north,
+                ),
+                material: new Cesium.ImageMaterialProperty({
+                  image: imageUrl,
+                  transparent: true,
+                  color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
+                }),
+                height: 0,
+              },
+              properties: {
+                product_id: productId,
+                instrument,
+                kind: "OVERLAY",
+              },
+            });
+          }
 
           // Track blob URL for cleanup
           if (imageUrl.startsWith("blob:")) {
@@ -1175,11 +1211,11 @@ export default function useOverlays({
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    // Update material opacity for a specific product
+    // Update material opacity for a specific product (supports both rectangle and polygon entities)
     const updateMaterial = (ent: Cesium.Entity | undefined, productId: string) => {
-      if (!ent?.rectangle?.material) return;
-      const material = ent.rectangle.material as Cesium.ImageMaterialProperty;
-      if (material.color) {
+      if (!ent) return;
+      const material = (ent.rectangle?.material ?? ent.polygon?.material) as Cesium.ImageMaterialProperty | undefined;
+      if (material?.color) {
         const opacity = getProductOpacity(productId);
         material.color = new Cesium.ConstantProperty(
           Cesium.Color.WHITE.withAlpha(opacity),

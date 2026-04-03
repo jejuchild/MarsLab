@@ -268,19 +268,17 @@ export default function SharadHiresInspector({
             return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
           };
 
-          // Step 1: Fetch metadata first to compute safe downsample
-          const metaRes = await fetchWithTimeout(`/api/sharad_highres/metadata?product_id=${pid}`);
+          // Fetch metadata + radargram in parallel (use conservative downsample guess first)
+          const guessDs = 4; // Safe initial guess — most tracks are ~5000-15000 traces
+          const metaPromise = fetchWithTimeout(`/api/sharad_highres/metadata?product_id=${pid}`);
+          const imgPromise = fetchWithTimeout(`/api/sharad_highres/radargram?product_id=${pid}&downsample=${guessDs}&log=${useLog ? 1 : 0}&pmin=${pmin}&pmax=${pmax}&amplitude=${useAmplitude ? 1 : 0}&per_trace=${usePerTrace ? 1 : 0}`);
+          const rmPromise = fetchWithTimeout(`/api/sharad_highres/radargram_meta?product_id=${pid}&downsample=${guessDs}`);
+
+          const [metaRes, imgRes, rmRes] = await Promise.all([metaPromise, imgPromise, rmPromise]);
+
           if (!metaRes.ok) throw new Error("Failed to load metadata");
           metaData = await metaRes.json();
-
-          // Dynamic downsample: highest resolution that fits in browser canvas limits
           const ds = Math.max(1, Math.ceil(metaData.rows / MAX_IMAGE_WIDTH));
-
-          // Step 2: Fetch radargram + meta (critical), surface + mola (non-blocking)
-          const [imgRes, rmRes] = await Promise.all([
-            fetchWithTimeout(`/api/sharad_highres/radargram?product_id=${pid}&downsample=${ds}&log=${useLog ? 1 : 0}&pmin=${pmin}&pmax=${pmax}&amplitude=${useAmplitude ? 1 : 0}&per_trace=${usePerTrace ? 1 : 0}`),
-            fetchWithTimeout(`/api/sharad_highres/radargram_meta?product_id=${pid}&downsample=${ds}`),
-          ]);
 
           if (!imgRes.ok) throw new Error("Failed to load radargram");
           if (!rmRes.ok) throw new Error("Failed to load radargram meta");

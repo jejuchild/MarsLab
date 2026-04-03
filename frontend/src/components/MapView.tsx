@@ -27,7 +27,7 @@ import type { MapBookmark } from "../hooks/useBookmarks";
 import type FootprintManager from "../utils/FootprintManager";
 import CesiumLoadingPlaceholder from "./map/CesiumLoadingPlaceholder";
 import FootprintLoadingOverlay from "./map/FootprintLoadingOverlay";
-import ZoomGuide from "./map/ZoomGuide";
+// ZoomGuide removed — footprints load on explicit button click
 import BookmarkPanel from "./map/BookmarkPanel";
 import { getEntityInstrument, getEntityProductId } from "../utils/cesiumEntityUtils";
 
@@ -297,6 +297,7 @@ interface ProductBounds {
   north: number;
   lines?: number;
   samples?: number;
+  polygon?: [number, number][];  // actual polygon corners [lon, lat][] for precise overlay
 }
 const boundsCache = new LRUMap<string, ProductBounds>(500);
 
@@ -461,10 +462,14 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
     if (crismTRR3IndexCache?.features) {
       for (const feature of crismTRR3IndexCache.features) {
         if (feature.properties?.product_id === productId) {
-          const coords = feature.geometry?.coordinates?.[0];
-          if (!coords) continue;
-          const bounds = boundsFromPolygon(coords);
-          if (bounds) {
+          const coords = feature.geometry?.coordinates?.[0] as [number, number][] | undefined;
+          if (!coords || coords.length < 4) continue;
+          const bbox = boundsFromPolygon(coords);
+          if (bbox) {
+            const bounds: ProductBounds = {
+              ...bbox,
+              polygon: coords.slice(0, -1),  // strip closing vertex
+            };
             boundsCache.set(productId, bounds);
             return bounds;
           }
@@ -491,13 +496,28 @@ async function getProductBounds(productId: string): Promise<ProductBounds | null
     if (hiriseIndexCache?.features) {
       for (const feature of hiriseIndexCache.features) {
         if (feature.properties?.product_id === productId) {
+          const props = feature.properties;
           const coords = feature.geometry?.coordinates?.[0] as [number, number][] | undefined;
-          if (coords) {
-            const bounds = boundsFromPolygon(coords);
-            if (bounds) {
+          // Use polygon coordinates for precise overlay placement
+          if (coords && coords.length >= 4) {
+            const bbox = boundsFromPolygon(coords);
+            if (bbox) {
+              const bounds: ProductBounds = {
+                ...bbox,
+                polygon: coords.slice(0, -1),  // strip closing vertex
+              };
               boundsCache.set(productId, bounds);
               return bounds;
             }
+          }
+          // Fallback to LBL bbox properties
+          if (props.west != null && props.east != null && props.south != null && props.north != null) {
+            const bounds: ProductBounds = {
+              west: props.west, east: props.east,
+              south: props.south, north: props.north,
+            };
+            boundsCache.set(productId, bounds);
+            return bounds;
           }
           break;
         }
@@ -730,7 +750,7 @@ export default function MapView({
   const [cesiumReady, setCesiumReady] = useState(false);
   const [footprintLoading, setFootprintLoading] = useState(false);
   const [footprintLoadingInstrument, setFootprintLoadingInstrument] = useState<string | undefined>(undefined);
-  const [cameraHeight, setCameraHeight] = useState<number>(20_000_000);
+  // cameraHeight state removed — ZoomGuide was removed
   const [bookmarkPanelOpen, setBookmarkPanelOpen] = useState(false);
   const sharedFootprintManagerRef = useRef<FootprintManager | null>(null);
 
@@ -812,23 +832,7 @@ export default function MapView({
     return () => clearInterval(interval);
   }, [cesiumReady, viewerRef]);
 
-  // ── Track camera height for ZoomGuide ──────────
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer || viewer.isDestroyed()) return;
-    const handler = () => {
-      if (viewer.isDestroyed()) return;
-      const h = viewer.camera.positionCartographic.height;
-      setCameraHeight(h);
-    };
-    viewer.camera.moveEnd.addEventListener(handler);
-    handler();
-    return () => {
-      if (!viewer.isDestroyed()) {
-        viewer.camera.moveEnd.removeEventListener(handler);
-      }
-    };
-  }, [cesiumReady, viewerRef]);
+  // Camera height tracking removed (ZoomGuide removed)
 
   const handleAddBookmark = useCallback(() => {
     const viewer = viewerRef.current;
@@ -1038,7 +1042,7 @@ export default function MapView({
       <div ref={ref} className="absolute inset-0" role="application" aria-label="Mars 3D Globe" />
 
       {/* D3: Zoom guide — visible when camera is too far out to see footprints */}
-      <ZoomGuide visible={cameraHeight > 3_000_000} />
+      {/* ZoomGuide removed — footprints load on explicit button click */}
 
       {/* D2: Footprint loading overlay — shows active loading status */}
       <FootprintLoadingOverlay

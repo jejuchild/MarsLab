@@ -56,15 +56,40 @@ def _match_coordinates(scene_title: str) -> dict | None:
     coords = _load_coordinates()
     title_lower = scene_title.lower().replace("_", " ").replace("-", " ")
 
-    # Try progressively shorter substrings of the title
-    for key, val in coords.items():
-        key_words = set(key.split())
-        # Check if most words from the coordinate name appear in the title
-        if len(key_words) >= 2:
-            matches = sum(1 for w in key_words if w in title_lower)
-            if matches >= len(key_words) * 0.6:
-                return val
+    # Strategy 1: Extract location name from panorama title
+    # e.g. "Mastcam Z 360 Olifants Sol1775 enhanced l" → "olifants"
+    # Remove common prefixes/suffixes
+    import re
+    cleaned = re.sub(r'mastcam[ -]?z?\s*360\s*', '', title_lower)
+    cleaned = re.sub(r'\s*sol[s]?\s*\d[\d\- ]*', '', cleaned)
+    cleaned = re.sub(r'\s*enhanced\s*[lr]?\s*$', '', cleaned)
+    cleaned = re.sub(r'\s*z\d+\s*', ' ', cleaned)  # remove z34, z48 etc
+    cleaned = re.sub(r'\s*full\s*', ' ', cleaned)
+    cleaned = cleaned.strip()
 
+    # Strategy 2: Match each WFS entry's name words against cleaned title
+    best_match = None
+    best_score = 0
+    for key, val in coords.items():
+        key_words = [w for w in key.split() if len(w) > 2]
+        if not key_words:
+            continue
+        # Count how many key words appear in the cleaned title
+        matches = sum(1 for w in key_words if w in cleaned)
+        score = matches / len(key_words)
+        # Also try: does the WFS name appear as substring?
+        if key in cleaned or cleaned in key:
+            score = max(score, 0.9)
+        # Single distinctive word match (e.g. "olifants", "tatarka")
+        for w in key_words:
+            if len(w) >= 5 and w in cleaned:
+                score = max(score, 0.8)
+        if score > best_score:
+            best_score = score
+            best_match = val
+
+    if best_score >= 0.5:
+        return best_match
     return None
 
 

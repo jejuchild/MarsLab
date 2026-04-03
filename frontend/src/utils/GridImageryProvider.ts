@@ -69,7 +69,7 @@ export class MarsGridImageryProvider {
     return [];
   }
 
-  requestImage(x: number, y: number, level: number): HTMLCanvasElement | undefined {
+  requestImage(x: number, y: number, level: number): Promise<HTMLCanvasElement> | undefined {
     const canvas = document.createElement("canvas");
     canvas.width = this._tileWidth;
     canvas.height = this._tileHeight;
@@ -128,6 +128,6 @@ export class MarsGridImageryProvider {
       }
     }
 
-    return canvas;
+    return Promise.resolve(canvas);
   }
 }
