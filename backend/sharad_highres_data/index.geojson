@@ -104306,6 +104306,22 @@
         "dat_file": "r_8530501_001_ss4_700_a.dat",
         "lbl_file": "r_8530501_001_ss4_700_a.lbl"
       }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "instrument": "SHARAD_HIGHRES",
+        "product_id": "S_01346901",
+        "dat_file": null,
+        "lbl_file": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          0,
+          0
+        ]
+      }
     }
   ]
 }

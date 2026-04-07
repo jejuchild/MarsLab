@@ -94907,5 +94907,56 @@
     "error": null,
     "lat": null,
     "lon": null
+  },
+  {
+    "task_id": "ab99c580",
+    "product_id": "s_01346901",
+    "base_key": "S_01346901",
+    "instrument": "sharad_highres",
+    "status": "completed",
+    "files": [],
+    "target_dir": "/disk1/cspark/MarsLab/backend/sharad_highres",
+    "progress_percent": 0.0,
+    "total_bytes": 0,
+    "downloaded_bytes": 0,
+    "created_at": "2026-04-07T07:31:47.429633",
+    "completed_at": "2026-04-07T07:31:48.451113",
+    "error": "No files found for SHARAD High-Res product S_01346901",
+    "lat": null,
+    "lon": null
+  },
+  {
+    "task_id": "18ca58ba",
+    "product_id": "s_01346901_rgram",
+    "base_key": "S_01346901_RGRAM",
+    "instrument": "sharad",
+    "status": "completed",
+    "files": [
+      {
+        "filename": "s_01346901_tiff.tif",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/tiff/s_0134xx/s_01346901_tiff.tif",
+        "status": "completed",
+        "bytes_downloaded": 21136008,
+        "bytes_total": 21136008,
+        "error": null
+      },
+      {
+        "filename": "s_01346901_tiff.lbl",
+        "url": "https://pds-geosciences.wustl.edu/mro/mro-m-sharad-5-radargram-v2/mrosh_2101/browse/tiff/s_0134xx/s_01346901_tiff.lbl",
+        "status": "completed",
+        "bytes_downloaded": 2910,
+        "bytes_total": 2910,
+        "error": null
+      }
+    ],
+    "target_dir": "/disk1/cspark/MarsLab/backend/sharad_data",
+    "progress_percent": 100.0,
+    "total_bytes": 21138918,
+    "downloaded_bytes": 21138918,
+    "created_at": "2026-04-07T07:31:51.313244",
+    "completed_at": "2026-04-07T07:32:11.654559",
+    "error": null,
+    "lat": null,
+    "lon": null
   }
 ]
