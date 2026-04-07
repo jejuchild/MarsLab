@@ -10,10 +10,6 @@ type ActionBarProps = {
   // DTM
   isDTM: boolean;
   onShow3DView?: (productId: string, lat: number, lon: number) => void;
-  // HiRISE
-  isHiRISE: boolean;
-  onShowLandform?: () => void;
-  showingLandform?: boolean;
   // Field Notes
   fieldNotes: FieldNote[];
   onOpenFieldNote?: (productId: string, instrument: string, lat: number, lon: number) => void;
@@ -26,9 +22,6 @@ export default function ActionBar({
   lon,
   isDTM,
   onShow3DView,
-  isHiRISE,
-  onShowLandform,
-  showingLandform,
   fieldNotes,
   onOpenFieldNote,
 }: ActionBarProps) {
@@ -53,17 +46,6 @@ export default function ActionBar({
           label="Show 3D View"
           colorScheme="amber"
           size="lg"
-        />
-      )}
-
-      {/* Classify Landform (HiRISE only) */}
-      {isHiRISE && onShowLandform && (
-        <ActionButton
-          onClick={onShowLandform}
-          icon="image_search"
-          label="Classify Landform"
-          colorScheme="violet"
-          active={showingLandform}
         />
       )}
 

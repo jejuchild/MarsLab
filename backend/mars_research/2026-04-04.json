@@ -1,0 +1,78 @@
+{
+  "date": "2026-04-04",
+  "generated_at": "2026-04-03T22:10:09.873255+00:00",
+  "topic": {
+    "focus": "Surface Processes",
+    "keywords": [
+      "aeolian",
+      "dunes",
+      "impact crater",
+      "mass wasting",
+      "HiRISE"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Chlorine in biomass co-firing: A review on migration, transformation, impacts, and mitigation strategies",
+      "authors": "Hejia Chen, Zihao Zhang, Shangyi Yin, Tao Zhang, Tao Song, Ping Lu",
+      "year": "2026",
+      "journal": "Carbon Neutral Technologies",
+      "key_findings": "This paper reviews the migration, transformation, and impacts of chlorine in biomass co-firing, and discusses mitigation strategies. The main contribution is the comprehensive review of chlorine's effects on the environment and human health.",
+      "methodology": "Literature review and analysis of existing research",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.cnt.2026.100022",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Interface electronic Coupling-Migration and morphology control in NiMnSe Heterostructure: Synergistic sulfur doping and vacancy engineering for efficient water splitting and supercapacitors",
+      "authors": "Zhiwei Lu, Rao Fu, Xi Peng, Xiangyi Long, Yue Zhang, Yidian Yuan et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper investigates the interface electronic coupling-migration and morphology control in NiMnSe heterostructure for efficient water splitting and supercapacitors. The main contribution is the development of a synergistic sulfur doping and vacancy engineering approach.",
+      "methodology": "Experimental and theoretical analysis of NiMnSe heterostructure",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139288",
+      "recency_score": 1.0
+    },
+    {
+      "title": "In-situ evolution of biochar structure along with carbon/nitrogen migration during biomass oxy-fuel combustion",
+      "authors": "Dawei Guo, Shaozeng Sun, Dongdong Feng, Haowei Sun, Yijun Zhao, Qirong Wu et al.",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper studies the in-situ evolution of biochar structure along with carbon/nitrogen migration during biomass oxy-fuel combustion. The main contribution is the understanding of the structural changes and migration of elements during combustion.",
+      "methodology": "In-situ experiments and analysis of biochar structure",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139302",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Study on the O2 migration pathway and critical product formation mechanism in the water immersion coal oxidation",
+      "authors": "Guo-yu Shi, Xin-xiao Lu, Guan Wang, Zhao Yang, Long He, Rui-nan Zhang",
+      "year": "2026",
+      "journal": "Fuel",
+      "key_findings": "This paper investigates the O2 migration pathway and critical product formation mechanism in the water immersion coal oxidation. The main contribution is the understanding of the oxidation mechanism and product formation.",
+      "methodology": "Experimental and theoretical analysis of coal oxidation",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.fuel.2026.139330",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Labor migration of medical specialists: problem statement",
+      "authors": "Nina G. Vishnevskaya",
+      "year": "",
+      "journal": "REMEDIUM",
+      "key_findings": "This paper examines the current trends in labor migration of medical professionals in the context of globalization and growing need for medical services. The main contribution is the analysis of the problem statement and its implications.",
+      "methodology": "Literature review and analysis of labor market trends",
+      "relevance": "Not relevant to MarsLab's Mars exploration goals",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.32687/1561-5936-2026-30-1-88-91",
+      "recency_score": 0.0
+    }
+  ],
+  "trend_analysis": "The papers analyzed do not show any relevant trends related to Mars exploration or surface processes. The research focuses on biomass co-firing, heterostructure development, biochar evolution, coal oxidation, and labor migration, which are not directly related to MarsLab's goals. The lack of relevant research in these papers highlights the need for more focused studies on Mars surface processes and exploration.",
+  "connections_to_marslab": "Unfortunately, the findings of these papers do not connect to MarsLab's mission, which includes mineral classification, ice detection, Arcadia Planitia site selection, and human exploration planning. The research areas presented in the papers are not relevant to Mars exploration, and therefore do not contribute to the understanding of Mars surface processes or the achievement of MarsLab's goals."
+}

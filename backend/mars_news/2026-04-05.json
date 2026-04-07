@@ -1,0 +1,34 @@
+{
+  "date": "2026-04-05",
+  "generated_at": "2026-04-04T22:05:55.056154+00:00",
+  "categories": {
+    "missions": "No new mission-related news, but ongoing research supports future mission planning",
+    "discoveries": "New discoveries about Mars' topography and wind patterns are being made, enhancing our understanding of the planet",
+    "technology": "No significant technological advancements reported, but research relies on existing technologies like CFD modeling",
+    "human_exploration": "Research into making Mars habitable is ongoing, with a focus on understanding the planet's environment and potential for human exploration",
+    "sample_return": "No updates on sample return missions, but ongoing research lays groundwork for future sample return endeavors",
+    "international": "No international collaborations or agreements reported, but global interest in Mars research remains high",
+    "commercial": "No commercial activities or announcements related to Mars exploration or development"
+  },
+  "items": [
+    {
+      "title": "A research roadmap for assessing the feasibility of warming Mars",
+      "date": "2026-04-02",
+      "source": "arXiv",
+      "summary": "This roadmap outlines research pathways to determine whether Mars could be warmed with non-biological methods. It does not presuppose that warming Mars is desirable; its purpose is to identify what would need to be true for Mars to be warmed, what it would cost, and what could go wrong. Three com...",
+      "category": "human_exploration",
+      "significance": "The research roadmap for warming Mars is a crucial step in understanding the feasibility of making Mars habitable for humans",
+      "url": "https://arxiv.org/abs/2604.02242v1"
+    },
+    {
+      "title": "Topographic Modulation of Martian Near-Surface Winds: Insights from Perseverance Measurements and CFD Modeling in Jezero Crater",
+      "date": "2026-04-02",
+      "source": "arXiv",
+      "summary": "Near-surface wind fields on Mars are profoundly modulated by complex topography, yet fine-scale wind field characteristics remain poorly resolved for key geomorphological units such as deltas, valleys, and impact craters, due to the spatial constraints of lander-based wind observations. To addres...",
+      "category": "discoveries",
+      "significance": "The study of near-surface wind fields on Mars provides new insights into the planet's complex topography and its effects on wind patterns",
+      "url": "https://arxiv.org/abs/2604.02095v1"
+    }
+  ],
+  "trend_summary": "Recent Mars research focuses on understanding the planet's environment and potential for human exploration. Studies on Mars' topography and wind patterns are providing new insights, while research into making Mars habitable is ongoing. These efforts support future mission planning and potential human exploration of the planet. As research continues to advance, we can expect a deeper understanding of Mars and its potential for human discovery. Overall, the trend is towards a more comprehensive understanding of Mars, driven by scientific curiosity and the pursuit of human exploration."
+}

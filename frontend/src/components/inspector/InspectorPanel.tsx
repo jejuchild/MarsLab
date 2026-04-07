@@ -12,7 +12,6 @@ import CRISMBandsTab from "./tabs/CRISMBandsTab";
 import CustomDataTab from "./tabs/CustomDataTab";
 import OverlayControls from "./overlays/OverlayControls";
 import ActionBar from "./actions/ActionBar";
-import HiriseLandformPanel from "../HiriseLandformPanel";
 import HiResImageViewer from "./HiResImageViewer";
 
 export default function InspectorPanel({
@@ -178,8 +177,6 @@ export default function InspectorPanel({
     onRGBChange?.(localRGB);
   };
 
-  // ── Landform panel ──
-  const [showLandformPanel, setShowLandformPanel] = useState(false);
   // ── High-Res Image Viewer ──
   const [showHiResViewer, setShowHiResViewer] = useState(false);
 
@@ -317,24 +314,10 @@ export default function InspectorPanel({
           lon={selected.lon}
           isDTM={isDTM}
           onShow3DView={onShow3DView}
-          isHiRISE={isHiRISE}
-          onShowLandform={() => setShowLandformPanel(!showLandformPanel)}
-          showingLandform={showLandformPanel}
           fieldNotes={fieldNotes}
           onOpenFieldNote={onOpenFieldNote}
         />
 
-        {/* ── Landform Panel ── */}
-        {showLandformPanel && isHiRISE && (
-          <div className="border-t border-border-dark -mx-4 mt-4">
-            <HiriseLandformPanel
-              productId={selected.productId}
-              lat={selected.lat}
-              lon={selected.lon}
-              onClose={() => setShowLandformPanel(false)}
-            />
-          </div>
-        )}
       </div>
 
       {/* ── High-Res Image Viewer (fullscreen popup) ── */}

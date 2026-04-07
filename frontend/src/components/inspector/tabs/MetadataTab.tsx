@@ -3,6 +3,7 @@ import ProductIdBadge from "../widgets/ProductIdBadge";
 import CoordinateDisplay from "../widgets/CoordinateDisplay";
 import QuickviewImage from "../widgets/QuickviewImage";
 import DownloadLinks from "../widgets/DownloadLinks";
+import SaveToLocalButton from "../widgets/SaveToLocalButton";
 import TRR3MineralSection from "./TRR3MineralSection";
 
 type MetadataTabProps = {
@@ -130,6 +131,9 @@ export default function MetadataTab({
           <DownloadLinks productId={selected.productId} instrument={selected.instrument} />
         </div>
       )}
+
+      {/* Save to Local — all instruments */}
+      <SaveToLocalButton productId={selected.productId} instrument={selected.instrument} />
 
       {/* TRR3 Mineral Classification */}
       {selected.instrument === "CRISM_TRR3" && (
