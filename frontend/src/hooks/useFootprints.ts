@@ -481,15 +481,16 @@ export default function useFootprints({
       const passingIds = result.get(inst);
       const features = fm.getFeatures(inst);
       // Check if this instrument is toggled on
-      const instrumentOn = {
+      const instrumentOn = ({
         CRISM: showCRISM,
         HIRISE: showHiRISE,
         SHARAD: showSHARAD,
         SHARAD_HIGHRES: showSharadHighres,
         CTX: showCTX,
+        CTX_MOSAIC: false,
         HIRISE_DTM: showHiRISEDTM,
         CRISM_TRR3: showCRISM_TRR3,
-      }[inst] ?? false;
+      } as Record<ExplicitLoadInstrument, boolean>)[inst] ?? false;
 
       if (!instrumentOn) continue;
 

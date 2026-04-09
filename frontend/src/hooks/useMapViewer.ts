@@ -371,7 +371,7 @@ export default function useMapViewer({
           return { id, area };
         })
         .sort((a: { area: number }, b: { area: number }) => a.area - b.area);
-      const pickedPrimitiveId = hoverCandidates.length > 0 ? hoverCandidates[0].id : undefined;
+      const pickedPrimitiveId = hoverCandidates.length > 0 ? hoverCandidates[0]!.id : undefined;
 
       const pickedEnt = picked?.id as Cesium.Entity | undefined;
       const hs = highlightRef.current;

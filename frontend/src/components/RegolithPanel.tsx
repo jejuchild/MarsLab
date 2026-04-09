@@ -353,12 +353,14 @@ export default function RegolithPanel({
                           fontSize: 11,
                           borderRadius: 6,
                         }}
-                        content={({ active, payload }: { active?: boolean; payload?: Array<{ payload: Record<string, number> }> }) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        content={(props: any) => {
+                          const { active, payload } = props;
                           if (active && payload && payload.length > 0) {
-                            const data = payload[0].payload;
+                            const data = payload[0].payload as Record<string, number>;
                             return (
                               <div className="bg-[#101622] border border-[#232f48] rounded-lg p-2 text-[11px]">
-                                <p className="text-slate-400 mb-1.5">{data.km.toFixed(1)} km</p>
+                                <p className="text-slate-400 mb-1.5">{(data.km ?? 0).toFixed(1)} km</p>
                                 <p className="text-[#4f9cf7]">
                                   Thickness: {data.thickness?.toFixed(1)} m
                                 </p>

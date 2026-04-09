@@ -64,6 +64,11 @@ export default function HiResImageViewer({ productId, onClose }: HiResImageViewe
     };
   }, [productId]);
 
+  const clampZoom = (z: number) => Math.min(Math.max(z, ZOOM_MIN), ZOOM_MAX);
+  const zoomBy = useCallback((factor: number) => {
+    setZoom((z) => clampZoom(z * factor));
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -75,11 +80,6 @@ export default function HiResImageViewer({ productId, onClose }: HiResImageViewe
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose, zoomBy]);
-
-  const clampZoom = (z: number) => Math.min(Math.max(z, ZOOM_MIN), ZOOM_MAX);
-  const zoomBy = useCallback((factor: number) => {
-    setZoom((z) => clampZoom(z * factor));
-  }, []);
 
   // Mouse wheel zoom — cursor-centered
   const handleWheel = useCallback((e: React.WheelEvent) => {

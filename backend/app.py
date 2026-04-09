@@ -184,69 +184,9 @@ def _preload_analysis_pipelines():
     """Warm up SWIM and Accessibility pipelines in background threads at startup.
     
     Prevents cold-start latency on first user request by pre-loading pipeline models.
-    Both tasks run in parallel as daemon threads (non-blocking).
+    Phase 1: SWIM and Accessibility pipelines were cut, so this is now a no-op.
     """
-    
-    def _warm_swim_pipelines():
-        """Load all SWIM pipeline models in parallel."""
-        try:
-            from api.swim_ice_router import (
-                _get_neutron,
-                _get_thermal,
-                _get_surface,
-                _get_dielectric,
-                _get_geomorphic,
-                _get_fusion,
-            )
-            
-            logger.info("[PRELOAD] Starting SWIM pipeline warmup...")
-            
-            # Load each pipeline and call _ensure_loaded() if available
-            pipelines = [
-                ("neutron", _get_neutron),
-                ("thermal", _get_thermal),
-                ("surface", _get_surface),
-                ("dielectric", _get_dielectric),
-                ("geomorphic", _get_geomorphic),
-                ("fusion", _get_fusion),
-            ]
-            
-            for name, getter in pipelines:
-                try:
-                    pipeline = getter()
-                    ensure_loaded = getattr(pipeline, "_ensure_loaded", None)
-                    if callable(ensure_loaded):
-                        ensure_loaded()
-                    logger.info(f"[PRELOAD] SWIM {name} pipeline loaded")
-                except Exception as e:
-                    logger.warning(f"[PRELOAD] SWIM {name} pipeline warmup failed (non-fatal): {e}")
-            
-            logger.info("[PRELOAD] SWIM pipeline warmup complete")
-        except Exception as e:
-            logger.warning(f"[PRELOAD] SWIM pipeline warmup failed (non-fatal): {e}")
-    
-    def _warm_accessibility_pipeline():
-        """Load Accessibility pipeline model."""
-        try:
-            from api.accessibility_router import _get_pipeline
-            
-            logger.info("[PRELOAD] Starting Accessibility pipeline warmup...")
-            pipeline = _get_pipeline()
-            ensure_loaded = getattr(pipeline, "_ensure_loaded", None)
-            if callable(ensure_loaded):
-                ensure_loaded()
-            logger.info("[PRELOAD] Accessibility pipeline loaded")
-        except Exception as e:
-            logger.warning(f"[PRELOAD] Accessibility pipeline warmup failed (non-fatal): {e}")
-    
-    # Start both warmup tasks in parallel as daemon threads
-    swim_thread = threading.Thread(target=_warm_swim_pipelines, daemon=True)
-    accessibility_thread = threading.Thread(target=_warm_accessibility_pipeline, daemon=True)
-    
-    swim_thread.start()
-    accessibility_thread.start()
-    
-    logger.info("[PRELOAD] Analysis pipeline warmup threads started (non-blocking)")
+    logger.info("[PRELOAD] No analysis pipelines to warm up (Phase 1 cut SWIM/Accessibility)")
 
 def refresh_geojson_cache(instrument_key: str):
     """Refresh a single instrument's GeoJSON cache from disk after download.
@@ -573,14 +513,8 @@ from api.sharad_highres_router import router as sharad_highres_router
 from api.suggestions_router import router as suggestions_router
 from api.fieldnotes_router import router as fieldnotes_router
 from api.ai_analysis_router import router as ai_analysis_router
-from api.agentic_router import router as agentic_router
-from api.llama_search import router as smart_search_router
-from api.report_router import router as report_router
 from api.mineral_cnn.router import router as mineral_cnn_router
 from api.crism_trr3.router import router as crism_trr3_router
-from api.sharad_report_router import router as sharad_report_router
-from api.multi_report_router import router as multi_report_router
-from api.region_scores import router as region_scores_router
 
 app.include_router(
     hirise_pixel_router,
@@ -592,29 +526,17 @@ app.include_router(sharad_highres_router)  # /api/sharad_highres/*
 app.include_router(suggestions_router)  # /api/feature_suggestions
 app.include_router(fieldnotes_router)  # /api/fieldnotes
 app.include_router(ai_analysis_router)  # /api/ai_analysis
-app.include_router(agentic_router)  # /api/agent/* — Agentic AI
-app.include_router(smart_search_router)  # /api/ai/smart/* — Llama smart search
-app.include_router(report_router)  # /api/report/* — Landing Site Report Generator
 app.include_router(mineral_cnn_router)  # /api/mineral-cnn/* — CNN Mineral Classification
 app.include_router(crism_trr3_router)  # /api/crism-trr3/* — TRR3 Spectrum + RGB
-app.include_router(sharad_report_router)  # /api/sharad-report/* — Subsurface Interface Report
-app.include_router(multi_report_router)  # /api/multi-report/* — Multi-Instrument Report
-app.include_router(region_scores_router)  # /api/regions/scores — Real region scoring
 
 from api.temporal_router import router as temporal_router
 app.include_router(temporal_router)  # /api/temporal/* — Temporal Change Detection
-
-from analysis.ice_evidence.router import router as ice_evidence_router
-app.include_router(ice_evidence_router)  # /api/ice/* — Ice Evidence Synthesizer
 
 from api.mola_detect_router import router as mola_detect_router
 app.include_router(mola_detect_router)  # /api/mola-detect/* — MOLA Landform Detection
 
 from api.terrain_features import router as terrain_features_router
 app.include_router(terrain_features_router)  # /api/terrain/features_in_view
-
-from agent.workflow_router import router as workflow_router
-app.include_router(workflow_router)  # /api/workflow/* — Workflow Research Assistant
 
 from api.marvis_chat import router as marvis_chat_router
 app.include_router(marvis_chat_router)  # /api/marvis/chat — MARVIS lightweight chat
@@ -640,15 +562,6 @@ app.include_router(strat_column_router)  # /api/strat-column/* — Stratigraphic
 from api.product_urls import router as product_urls_router
 app.include_router(product_urls_router)  # /api/product-urls/* — PDS Download URL Resolver
 
-from api.discussions_router import router as discussions_router
-app.include_router(discussions_router)  # /api/discussions — Daily AI Discussions
-
-from api.swim_router import router as swim_router
-app.include_router(swim_router)  # /api/swim/* — SWIM Ice Data
-
-from api.swim_ice_router import router as swim_ice_router
-app.include_router(swim_ice_router)  # /api/swim-ice/* — SWIM Ice Detection Methods
-
 from api.hirise_landforms_router import router as hirise_landforms_router
 app.include_router(hirise_landforms_router)  # /api/hirise-landforms/* — HiRISE Landform Classification
 
@@ -658,31 +571,11 @@ app.include_router(mars_news_router)  # /api/mars-news — Mars News Digest
 from api.mars_research_router import router as mars_research_router
 app.include_router(mars_research_router)  # /api/mars-research — Mars Research Digest
 
-from api.accessibility_router import router as accessibility_router
-app.include_router(accessibility_router)  # /api/accessibility/* — Ice Accessibility Algorithm
-
 from api.ctx_tile_router import router as ctx_tile_router
 app.include_router(ctx_tile_router)  # /api/ctx-mosaic/* — Murray Lab CTX Mosaic Tiles
 
-from api.pathfinder_router import router as pathfinder_router
-app.include_router(pathfinder_router)  # /api/pathfinder/* — AI Rover Route Planning
-
 from rag.rag_router import router as rag_router
 app.include_router(rag_router)  # /api/rag/* — Mars Science RAG
-
-from api.mastcam_router import router as mastcam_router
-app.include_router(mastcam_router)  # /api/mastcam/* — Mastcam-Z 360° Panoramas
-
-from api.mastcam_label_router import router as mastcam_label_router
-app.include_router(mastcam_label_router)  # /api/mastcam-label/* — Roughness Labeling
-
-from api.mastcam_spice_router import router as mastcam_spice_router
-app.include_router(mastcam_spice_router)  # /api/mastcam-spice/* — SPICE Co-registration
-
-from neural_climate.climate_router import router as neural_climate_router
-app.include_router(neural_climate_router)  # /api/climate/neural/* — Mars GCM Neural Emulator
-from pinns_interior.pinns_router import router as pinns_router
-app.include_router(pinns_router)
 
 from analysis.integration.integration_router import router as integration_router
 app.include_router(integration_router)  # /api/integration/* — Cross-system Integration Modules

@@ -45,8 +45,6 @@ from .agent_tasks import (
     recommend_site,
     terrain_epsilon_inversion,
 )
-from .mars_climate import climate_analysis_for_region
-from .thermal_inertia import thermal_inertia_analysis_for_region
 from .science_context import get_context_for_agent, get_region_context_by_name
 
 logger = logging.getLogger(__name__)
@@ -940,21 +938,8 @@ async def _tool_recommend(session: "AgentSession", params: dict):
 
 
 async def _tool_climate(session: "AgentSession", params: dict):
-    """Analyze Mars climate conditions for the target region."""
-    if not session.bbox:
-        return TaskResult(task_type="climate", success=False, error="No bbox"), "No region defined"
-    data = climate_analysis_for_region(
-        session.bbox.min_lat, session.bbox.max_lat,
-        session.bbox.min_lon, session.bbox.max_lon,
-    )
-    result = TaskResult(
-        task_type="climate",
-        success=data.get("success", True),
-        data=data,
-        summary=data.get("climate_summary", "Climate analysis complete"),
-    )
-    session.all_results["climate"] = result
-    return result, data.get("climate_summary", "Climate analysis complete")
+    """Climate analysis was cut in Phase 1 — stub returns no-op."""
+    return TaskResult(task_type="climate", success=False, error="Climate analysis removed in Phase 1"), "Climate analysis unavailable"
 
 
 async def _tool_thermal_inertia(session: "AgentSession", params: dict):
