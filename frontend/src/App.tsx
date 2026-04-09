@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import MainPage from "./pages/MainPage";
 import useServiceWorker from "./hooks/useServiceWorker";
@@ -64,6 +64,8 @@ export default function App() {
           <Route path="/upload" element={<LazyPage scope="DataUpload"><DataUploadPage /></LazyPage>} />
           <Route path="/suggestions" element={<LazyPage scope="Suggestions"><FeatureSuggestionsPage /></LazyPage>} />
           <Route path="/news" element={<LazyPage scope="News"><MarsNewsPage /></LazyPage>} />
+          {/* Legacy route — Research is now a tab inside /news */}
+          <Route path="/research" element={<Navigate to="/news?tab=research" replace />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

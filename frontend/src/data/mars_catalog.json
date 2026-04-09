@@ -1,0 +1,137 @@
+[
+  {
+    "id": "jezero",
+    "name": "Jezero Crater",
+    "lat": 18.41,
+    "lon": 77.69,
+    "zoom_km": 10,
+    "keywords": ["mars 2020", "perseverance", "landing site", "delta", "lake"],
+    "description": "Perseverance landing site (ancient lake delta)"
+  },
+  {
+    "id": "gale",
+    "name": "Gale Crater",
+    "lat": -5.34,
+    "lon": 137.65,
+    "zoom_km": 15,
+    "keywords": ["curiosity", "mount sharp", "aeolis mons"],
+    "description": "Curiosity landing site"
+  },
+  {
+    "id": "valles-marineris",
+    "name": "Valles Marineris",
+    "lat": -11.03,
+    "lon": -60.80,
+    "zoom_km": 200,
+    "keywords": ["canyon", "rift", "tectonic"],
+    "description": "Largest canyon in the solar system"
+  },
+  {
+    "id": "olympus-mons",
+    "name": "Olympus Mons",
+    "lat": 18.58,
+    "lon": -133.52,
+    "zoom_km": 100,
+    "keywords": ["volcano", "tallest", "shield"],
+    "description": "Tallest volcano in the solar system"
+  },
+  {
+    "id": "hellas",
+    "name": "Hellas Basin",
+    "lat": -41.64,
+    "lon": 70.85,
+    "zoom_km": 300,
+    "keywords": ["impact", "basin", "deep", "planitia"],
+    "description": "Largest visible impact basin"
+  },
+  {
+    "id": "syrtis-major",
+    "name": "Syrtis Major",
+    "lat": 8.90,
+    "lon": 68.00,
+    "zoom_km": 100,
+    "keywords": ["dark", "albedo", "volcanic", "planum"],
+    "description": "Dark volcanic plain"
+  },
+  {
+    "id": "nili-fossae",
+    "name": "Nili Fossae",
+    "lat": 22.07,
+    "lon": 76.90,
+    "zoom_km": 30,
+    "keywords": ["trough", "carbonate", "olivine", "clay"],
+    "description": "Carbonate-rich tectonic troughs"
+  },
+  {
+    "id": "mawrth-vallis",
+    "name": "Mawrth Vallis",
+    "lat": 22.46,
+    "lon": -16.60,
+    "zoom_km": 40,
+    "keywords": ["valley", "clay", "phyllosilicate", "outflow"],
+    "description": "Ancient outflow channel with clays"
+  },
+  {
+    "id": "south-pole",
+    "name": "South Polar Region",
+    "lat": -87.0,
+    "lon": 0.0,
+    "zoom_km": 500,
+    "keywords": ["ice", "cap", "polar", "co2", "layered"],
+    "description": "South polar layered deposits"
+  },
+  {
+    "id": "north-pole",
+    "name": "North Polar Region",
+    "lat": 87.0,
+    "lon": 0.0,
+    "zoom_km": 500,
+    "keywords": ["ice", "cap", "polar", "water", "layered", "planum boreum"],
+    "description": "North polar layered deposits"
+  },
+  {
+    "id": "eberswalde",
+    "name": "Eberswalde Crater",
+    "lat": -23.98,
+    "lon": -33.30,
+    "zoom_km": 10,
+    "keywords": ["delta", "sediment", "ancient lake"],
+    "description": "Crater with preserved river delta"
+  },
+  {
+    "id": "columbia-hills",
+    "name": "Columbia Hills",
+    "lat": -14.57,
+    "lon": 175.47,
+    "zoom_km": 5,
+    "keywords": ["spirit", "rover", "gusev", "silica"],
+    "description": "Spirit rover site (Gusev crater)"
+  },
+  {
+    "id": "meridiani",
+    "name": "Meridiani Planum",
+    "lat": 2.39,
+    "lon": -1.95,
+    "zoom_km": 30,
+    "keywords": ["opportunity", "hematite", "rover", "blueberries"],
+    "description": "Opportunity rover site"
+  },
+  {
+    "id": "elysium",
+    "name": "Elysium Planitia",
+    "lat": 1.82,
+    "lon": 153.69,
+    "zoom_km": 50,
+    "keywords": ["insight", "lander", "seismology", "volcanic"],
+    "description": "InSight lander site"
+  },
+  {
+    "id": "tharsis",
+    "name": "Tharsis Rise",
+    "lat": 0.0,
+    "lon": -100.0,
+    "zoom_km": 500,
+    "keywords": ["volcano", "bulge", "ascraeus", "pavonis", "arsia"],
+    "description": "Tharsis volcanic province"
+  }
+]

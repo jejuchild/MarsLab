@@ -1,4 +1,9 @@
 import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense, memo } from "react";
+import useMapNavigation from "../hooks/useMapNavigation";
+import useFootprintLayers from "../hooks/useFootprintLayers";
+import useInspectorContext from "../hooks/useInspectorContext";
+import useActiveOverlays from "../hooks/useActiveOverlays";
+import useCatalogSearch from "../hooks/useCatalogSearch";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -203,6 +208,16 @@ export default function MainPage() {
   const { pushAction, undo, redo, canUndo, canRedo, lastAction } = useUndoRedo();
   const [mobilePanel, setMobilePanel] = useState<'none' | 'layers' | 'inspector'>('none');
 
+  // Phase 2 custom hooks — extract clean state slices out of MainPage.
+  // Hooks that exist but are too entangled with the current MainPage shape
+  // (useFootprintLayers, useActiveOverlays) are deferred to Phase 3 where the
+  // surrounding code is rewritten. Imported here to lock their API.
+  const mapNav = useMapNavigation();
+  void useFootprintLayers;
+  void useInspectorContext;
+  void useActiveOverlays;
+  void useCatalogSearch;
+
   // Field notes hook (extracted from MainPage)
   const {
     fieldNotes, showFieldNoteModal, setShowFieldNoteModal,
@@ -277,22 +292,18 @@ export default function MainPage() {
     });
   }, [refreshFieldNotes]);
 
-  // Base layer selection
-  const [baseLayer, setBaseLayer] = useState<BaseLayerType>("MOLA");
-
-  // Map mode (2D flat view vs 3D globe)
-  const [mapMode, setMapMode] = useState<MapMode>("2D");
-
-  // Bounding box for view restriction
-  const [viewBounds, setViewBounds] = useState<BoundingBox>(null);
-
-  // Camera viewport ref — updated by MapView on camera.moveEnd, read on demand
-  const cameraViewportRef = useRef<{ minLat: number; maxLat: number; westLon: number; eastLon: number } | null>(null);
-
-  // View bound selection mode (drag to select region on map)
-  const [viewBoundSelectionMode, setViewBoundSelectionMode] = useState(false);
+  // Map navigation state — sourced from useMapNavigation hook (Phase 2)
+  const {
+    baseLayer, setBaseLayer,
+    mapMode, setMapMode,
+    viewBounds, setViewBounds,
+    cameraViewportRef,
+    viewBoundSelectionMode, setViewBoundSelectionMode,
+  } = mapNav;
 
   // Footprint layer toggles (visibility only - does NOT trigger loading)
+  // NOTE: useFootprintLayers hook exists but is too entangled with existing
+  // per-instrument shape; full migration deferred to Phase 3.
   type InstrumentVisibility = Record<InstrumentId, boolean>;
   const [instrumentVisibility, setInstrumentVisibility] = useState<InstrumentVisibility>(
     () => Object.fromEntries(getInstrumentIds().map(id => [id, false])) as InstrumentVisibility
@@ -1339,7 +1350,7 @@ export default function MainPage() {
         setShowTourForced(true);
         break;
     }
-  }, [handleAnalysisModeChange, navigate]);
+  }, [handleAnalysisModeChange, navigate, setMapMode]);
 
   // Keyboard shortcut handler
   useEffect(() => {
@@ -1468,7 +1479,7 @@ export default function MainPage() {
   const handleViewBoundSelected = useCallback((bounds: BoundingBox) => {
     setViewBounds(bounds);
     setViewBoundSelectionMode(false); // Exit selection mode after selection
-  }, []);
+  }, [setViewBounds, setViewBoundSelectionMode]);
 
   // Stable ref for visibleProducts
   const visibleProductsRef = useRef(visibleProducts);
