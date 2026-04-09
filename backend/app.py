@@ -580,6 +580,9 @@ app.include_router(rag_router)  # /api/rag/* — Mars Science RAG
 from analysis.integration.integration_router import router as integration_router
 app.include_router(integration_router)  # /api/integration/* — Cross-system Integration Modules
 
+from api.inspector_router import router as inspector_router
+app.include_router(inspector_router)  # /api/inspector/at-point — 4-lane aggregator (Phase 3)
+
 def _get_hirise_rdr_props(product_id: str) -> tuple[int, int] | None:
     """Get (rdr_lines, rdr_samples) from HiRISE index cache for aspect-ratio correction.
     Returns None for polar stereographic products (|proj_center_lat| >= 85)

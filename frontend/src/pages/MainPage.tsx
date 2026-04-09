@@ -4,6 +4,7 @@ import useFootprintLayers from "../hooks/useFootprintLayers";
 import useInspectorContext from "../hooks/useInspectorContext";
 import useActiveOverlays from "../hooks/useActiveOverlays";
 import useCatalogSearch from "../hooks/useCatalogSearch";
+import Inspector2 from "../components/Inspector2";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -210,13 +211,19 @@ export default function MainPage() {
 
   // Phase 2 custom hooks — extract clean state slices out of MainPage.
   // Hooks that exist but are too entangled with the current MainPage shape
-  // (useFootprintLayers, useActiveOverlays) are deferred to Phase 3 where the
-  // surrounding code is rewritten. Imported here to lock their API.
+  // (useFootprintLayers, useActiveOverlays) are deferred to a future iteration
+  // where the surrounding code is rewritten. Imported here to lock their API.
   const mapNav = useMapNavigation();
   void useFootprintLayers;
   void useInspectorContext;
   void useActiveOverlays;
   void useCatalogSearch;
+
+  // Phase 3 feature flag: ?v=new toggles the new 4-lane Inspector
+  const useNewInspector = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("v") === "new";
+  }, []);
 
   // Field notes hook (extracted from MainPage)
   const {
@@ -1677,6 +1684,28 @@ export default function MainPage() {
         onLocatePoint={(lat, lon) => setSharadTracePin({ lat, lon })}
         onOpenRegolith={handleOpenRegolith}
         onOpenAttenuation={handleOpenAttenuation}
+      />
+    ) : selected && useNewInspector ? (
+      <Inspector2
+        context={selected}
+        onClose={() => setSelected(null)}
+        onOpenLegacyProduct={(productId, instrument) => {
+          // Hand-off into legacy inspector by clearing the new flag locally
+          // and selecting the product. Phase 3 keeps both inspectors mounted
+          // for safety.
+          setSelected({
+            instrument: instrument as InspectorContext["instrument"],
+            productId,
+            lat: selected.lat,
+            lon: selected.lon,
+            title: selected.title,
+          });
+          // Remove ?v=new from URL to fall through to legacy
+          const url = new URL(window.location.href);
+          url.searchParams.delete("v");
+          window.history.replaceState({}, "", url.toString());
+          window.location.reload();
+        }}
       />
     ) : selected ? (
       <Inspector
