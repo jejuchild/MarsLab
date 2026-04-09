@@ -185,8 +185,7 @@ App.tsx
 │   │
 │   ├── DataDownloadPage (/download)         (unchanged, internal cleanup later)
 │   ├── DataUploadPage (/upload)             (unchanged)
-│   ├── MarsNewsPage (/news)                 (kept)
-│   ├── MarsResearchPage (/research)         (kept)
+│   ├── MarsNewsPage (/news)                 ★ MERGED: News + Research in tabs
 │   └── FeatureSuggestionsPage (/suggestions)(kept)
 ```
 
@@ -196,7 +195,8 @@ App.tsx
 frontend/src/pages/
 ├── DailyDiscussionsPage.tsx           [DELETE]
 ├── MastcamPanoPage.tsx                [DELETE]
-└── MastcamLabelPage.tsx               [DELETE]
+├── MastcamLabelPage.tsx               [DELETE]
+└── MarsResearchPage.tsx               [MERGE into MarsNewsPage as Research tab] ← Q6
 
 frontend/src/components/
 ├── PathfinderPanel.tsx                [DELETE]
@@ -204,10 +204,13 @@ frontend/src/components/
 ├── ReportPanel.tsx                    [DELETE]
 ├── GuidedWorkflows.tsx                [DELETE]
 ├── RegionDashboard.tsx                [DELETE]
-├── RegionStatsPanel.tsx               [DELETE] (or keep as Cross tool — see Q)
+├── RegionStatsPanel.tsx               [DELETE] ← Q1 answered: cut
 ├── AccessibilityPanel.tsx             [DELETE]
 ├── AccessibilityExplainTooltip.tsx    [DELETE]
 ├── AiAnalysisPanel.tsx                [DELETE]
+├── SwimIcePanel.tsx                   [DELETE] ← Q2 answered: cut all SWIM
+├── SwimMethodLayer.tsx                [DELETE]
+├── IceConsistencyLegend.tsx           [DELETE]
 └── CraterDetectPanel.tsx              [KEEP — HiRISE lane]
 
 frontend/src/hooks/
@@ -446,13 +449,17 @@ backend/api/
 ├── mastcam_label_router.py        [DELETE]
 ├── mastcam_spice_router.py        [DELETE]
 ├── discussions_router.py          [DELETE]
+├── swim_router.py                 [DELETE] ← Q2 answered
+├── swim_ice_router.py             [DELETE]
 └── scoring_methodology.py         [REVIEW — may delete]
 
 backend/analysis/
 ├── thermal_pinn/                  [DELETE]
 ├── pinns_interior/                [DELETE]
 ├── neural_climate/                [DELETE]
-└── pathfinder/                    [DELETE]
+├── pathfinder/                    [DELETE]
+└── swim_*/                        [DELETE] ← all 6 SWIM method modules
+                                    (neutron, thermal, surface, dielectric, geomorphic, fusion)
 
 backend/agent/                     [DELETE — legacy framework]
 ```
@@ -534,7 +541,6 @@ LayerPanel
 │   ├── ▸ Line Profile
 │   └── ▸ Measure
 ├── Overlays
-│   ├── ▸ Ice (SWIM fusion only)
 │   └── ▸ Grid
 ├── ViewMode                    (2D/3D, base layer)
 ├── FieldNotes
@@ -621,9 +627,10 @@ LayerPanel
 
 ## 8. Cross 섹션 스펙
 
-Inspector 하단 collapsible section. 표시 조건:
-- Point mode이고 **2개 이상** lane에 products가 있을 때 자동 표시
-- 또는 사용자가 수동 펼침
+Inspector 하단 collapsible section. **기본은 접힌 상태, 사용자가 수동 펼침** (Q3 answered: B).
+- 항상 Inspector 하단에 collapsed header로 표시 (`▸ Cross-Analysis (N available)`)
+- 사용할 수 있는 도구 개수를 헤더에 뱃지로 표시 (ex: 2+ lane 데이터 있을 때 "2 tools available")
+- 클릭하면 확장
 
 도구들:
 | 도구 | 입력 | 출력 |
@@ -729,34 +736,18 @@ Inspector 하단 collapsible section. 표시 조건:
 
 ---
 
-## 13. Open Questions (사용자 확인 필요)
+## 13. Open Questions — 해결됨 ✅
 
-사용자 답변에 따라 세부 설계가 달라질 수 있는 5가지:
+모든 5개 질문 확정됨 (사용자 답변 2026-04-09):
 
-### Q1. `RegionStatsPanel` (폴리곤 지역 통계)는 유지?
-- **A**: Cut — 정체성 밖 (한 좌표 ≠ 영역)
-- **B**: Map Tools로 이동 — 가끔 유용한 보조 도구
-- **C**: Cross 섹션 도구로 — 영역 기반 비교 분석
-
-### Q2. `SwimIcePanel` + 6개 SWIM methods — 어디까지 유지?
-- **A**: SHARAD lane 안의 "Ice" 서브패널 1개로 통합 (fusion만)
-- **B**: 6개 method 모두 유지 (사용자가 비교)
-- **C**: Cut — SWIM은 연구 level 도구, identity의 "빠르게"와 충돌
-
-### Q3. Cross 섹션 도구 자동 표시 vs 수동 펼침?
-- **A**: 2+ lane에 데이터가 있으면 자동 펼침
-- **B**: 항상 접힌 상태로 시작, 사용자가 펼침
-- **C**: 도구별로 다름 (Temporal은 자동, Stratigraphy는 수동)
-
-### Q4. Easter eggs — SearchBar를 통한 trigger 유지?
-- **A**: 유지 ("game", "watney" 입력 시 그대로 동작)
-- **B**: Cmd+K 팔레트에서만 trigger (search는 실데이터만)
-- **C**: 별도 숨은 단축키로만 (logo 클릭 등)
-
-### Q5. Phase 1 (Cut) 후 바로 배포할지?
-- **A**: Phase 1 후 커밋만, 배포는 Phase 3 완료 후
-- **B**: Phase 1 후 바로 배포 — 당장 UI 정리 효과 보기
-- **C**: Phase 별로 각각 배포
+| # | 질문 | 답변 |
+|---|---|---|
+| Q1 | `RegionStatsPanel` 위치 | **CUT** — 정체성 밖 (한 좌표 ≠ 영역) |
+| Q2 | `SwimIcePanel` + 6 SWIM methods | **CUT all** — 연구 level, "빠르게" 원칙과 충돌 |
+| Q3 | Cross 섹션 표시 | **B** — 기본 접힌 상태, 수동 펼침 |
+| Q4 | Easter egg trigger | **A** — SearchBar에서 직접 유지 ("game", "watney" 등) |
+| Q5 | Phase 1 배포 | **A** — 커밋만, Phase 3 완료 후 배포 |
+| Q6 | News / Research 처리 | **Merge** — `/news` 하나에 News 탭 + Research 탭 |
 
 ---
 
@@ -772,7 +763,7 @@ Inspector 하단 collapsible section. 표시 조건:
 
 | 새 컴포넌트 | 재사용하는 기존 컴포넌트 |
 |---|---|
-| `SharadLane` | `SharadHiresInspector`, `Subsurface3DViewer`, `RegolithPanel` (통합), `AttenuationPanel` (통합), `SwimIcePanel` (통합), `SHARADPopupOverlay` |
+| `SharadLane` | `SharadHiresInspector`, `Subsurface3DViewer`, `RegolithPanel` (통합), `AttenuationPanel` (통합), `SHARADPopupOverlay` |
 | `CrismLane` | `CRISMSpectrumTab`, `CRISMBandsTab`, `SpectralComparison` (basic), `BandRatioCalculator`, `TRR3MineralSection` |
 | `HiriseLane` | `HiResImageViewer`, `HiRiseDTM3DViewer`, `SlopeAnalysis`, `SlopeAnalysis3DTab`, `LineProfile`, `HiRISEPixelTab`, `HiriseLandformPanel`, `CraterDetectPanel` |
 | `CtxLane` | CTX mosaic logic (기존 `ctx_tile_router`에서) |

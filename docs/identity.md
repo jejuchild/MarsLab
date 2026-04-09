@@ -121,20 +121,21 @@
 | `GuidedWorkflows` (36KB) | 단순 UX면 가이드 불필요 |
 | `ReportPanel` (52KB) | "빠른 분석"과 반대 |
 | `RegionDashboard` (32KB) | "한 좌표" 동선과 충돌 |
+| `RegionStatsPanel` (18KB) | "한 좌표" 동선과 충돌 (폴리곤 통계) |
+| `SwimIcePanel` + 6 SWIM methods (`SwimMethodLayer`, `IceHub`, `IceConsistencyLegend`) | 연구 level 도구, "빠르게" 원칙과 충돌 |
 | `AccessibilityPanel` | 미션 플래너용 |
 | `AiAnalysisPanel` | MARVIS chat로 일원화 |
 | `backend/agent/` legacy | CLAUDE.md에서 "old" |
-| Backend: `accessibility_router`, `pathfinder_router`, `thermal_pinn`, `neural_climate_router`, `mars_climate.py`, `multi_report_router`, `report_router`, `agentic_router` | 프론트 cut에 따라 백엔드도 제거 |
+| Backend: `accessibility_router`, `pathfinder_router`, `thermal_pinn`, `neural_climate_router`, `mars_climate.py`, `multi_report_router`, `report_router`, `agentic_router`, `swim_router`, `swim_ice_router` | 프론트 cut에 따라 백엔드도 제거 |
 | 모바일 `BottomSheet` 복잡 분기 | 데스크탑 우선으로 단순화 |
 
 ### ✅ KEEP (정체성 밖이지만 남김 — 사용자 요청)
 
 | 항목 | 비고 |
 |---|---|
-| `MarsNewsPage` `/news` | 사용자 요청 |
-| `MarsResearchPage` `/research` | 사용자 요청 |
+| `MarsNewsPage` `/news` (**Research 통합**) | 단일 `/news` 라우트 안에 News 탭 + Research 탭 |
 | `FeatureSuggestionsPage` `/suggestions` | 사용자 요청 |
-| `EasterEggs.tsx` (Curiosity, Olympus, Watney, Terraform), `SpaceGame.tsx` | 사용자 요청 |
+| `EasterEggs.tsx` (Curiosity, Olympus, Watney, Terraform), `SpaceGame.tsx` | 사용자 요청 — SearchBar에서 직접 trigger 유지 |
 
 ### ✅ KEEP (정체성 직결)
 
