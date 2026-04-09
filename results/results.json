@@ -1,92 +1,64 @@
 {
   "experiment": "E1_sisr_baseline",
-  "model": "swinir",
+  "model": "edsr_small",
   "device": "cpu",
   "gpu": "cpu",
-  "params": 1185219,
-  "best_psnr": 10.480819463729858,
-  "training_time_min": 4.9,
+  "params": 926723,
+  "best_psnr": 12.433950513601303,
+  "training_time_min": 46.8,
   "history": [
     {
       "epoch": 5,
-      "loss": 0.2895108064015706,
-      "psnr": 9.355981826782227,
-      "ssim": 0.04370055422186851,
-      "n_samples": 5
+      "loss": 0.16041098742021453,
+      "psnr": 12.433950513601303,
+      "ssim": 0.17103706219349987,
+      "n_samples": 40
     },
     {
       "epoch": 10,
-      "loss": 0.2667776544888814,
-      "psnr": 10.044799566268921,
-      "ssim": 0.0387235626578331,
-      "n_samples": 5
+      "loss": 0.16020961706009176,
+      "psnr": 12.428151249885559,
+      "ssim": 0.17107808802393265,
+      "n_samples": 40
     },
     {
       "epoch": 15,
-      "loss": 0.2608673373858134,
-      "psnr": 10.28406047821045,
-      "ssim": 0.043419281393289565,
-      "n_samples": 5
+      "loss": 0.16033565873901048,
+      "psnr": 12.428086623549461,
+      "ssim": 0.1712289079936454,
+      "n_samples": 40
     },
     {
       "epoch": 20,
-      "loss": 0.25860027472178143,
-      "psnr": 10.371275186538696,
-      "ssim": 0.04293055757880211,
-      "n_samples": 5
+      "loss": 0.16035407885081238,
+      "psnr": 12.4255251288414,
+      "ssim": 0.17046200320473873,
+      "n_samples": 40
     },
     {
       "epoch": 25,
-      "loss": 0.25744618972142536,
-      "psnr": 10.422405481338501,
-      "ssim": 0.044045474380254745,
-      "n_samples": 5
+      "loss": 0.16005301682485473,
+      "psnr": 12.419384852051735,
+      "ssim": 0.17053691150213127,
+      "n_samples": 40
     },
     {
       "epoch": 30,
-      "loss": 0.25680164496103924,
-      "psnr": 10.450416564941406,
-      "ssim": 0.04432561248540878,
-      "n_samples": 5
-    },
-    {
-      "epoch": 35,
-      "loss": 0.25648927688598633,
-      "psnr": 10.46759557723999,
-      "ssim": 0.04464276283979416,
-      "n_samples": 5
-    },
-    {
-      "epoch": 40,
-      "loss": 0.256195068359375,
-      "psnr": 10.47649335861206,
-      "ssim": 0.044764590263366696,
-      "n_samples": 5
-    },
-    {
-      "epoch": 45,
-      "loss": 0.2561107277870178,
-      "psnr": 10.4801926612854,
-      "ssim": 0.04484540820121765,
-      "n_samples": 5
-    },
-    {
-      "epoch": 50,
-      "loss": 0.25608842571576435,
-      "psnr": 10.480819463729858,
-      "ssim": 0.044855739921331406,
-      "n_samples": 5
+      "loss": 0.16112676138679186,
+      "psnr": 12.420180827379227,
+      "ssim": 0.17056608861021233,
+      "n_samples": 40
     }
   ],
   "config": {
     "experiment": "E1_sisr_baseline",
-    "model": "swinir",
-    "data_dir": "/kaggle/working/marsortho-benchmark",
+    "model": "edsr_small",
+    "data_dir": "/kaggle/input/marsortho-benchmark",
     "output_dir": "/kaggle/working",
     "patch_size": 256,
     "batch_size": 8,
-    "lr": 0.0001,
-    "epochs": 50,
+    "lr": 0.0002,
+    "epochs": 30,
     "scale": 4
   }
 }
