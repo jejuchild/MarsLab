@@ -16,6 +16,27 @@ import time
 import json
 import subprocess
 
+# ── CRITICAL: Disable GPU BEFORE any torch import ─────────────────────
+# Kaggle's free P100 (sm_60) is incompatible with current PyTorch
+# Force CPU mode by hiding CUDA devices before torch initializes
+def _detect_old_gpu():
+    """Quick subprocess check for GPU compute capability."""
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=5,
+        )
+        gpu_name = result.stdout.strip()
+        # P100, K80, M60 etc are all sm_6x or older
+        old_gpus = ["P100", "P40", "K80", "M60", "K40"]
+        return any(g in gpu_name for g in old_gpus)
+    except Exception:
+        return False
+
+if _detect_old_gpu():
+    print("⚠ Detected old GPU (P100 etc.) — forcing CPU mode for compatibility")
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 # ── Install dependencies (skip if already available, e.g. on Kaggle) ──
 def _try_install(packages):
     missing = []
@@ -35,24 +56,7 @@ def _try_install(packages):
 
 _try_install(["torch", "torchvision", "timm", "einops"])
 
-# Check GPU compatibility — P100 (sm_60) needs older PyTorch
-try:
-    import torch as _torch
-    if _torch.cuda.is_available():
-        cap = _torch.cuda.get_device_capability(0)
-        gpu_name = _torch.cuda.get_device_name(0)
-        print(f"  GPU: {gpu_name}, compute capability: sm_{cap[0]}{cap[1]}")
-        if cap[0] < 7:  # P100 = sm_60, T4 = sm_75
-            print(f"  Old GPU detected — installing PyTorch with CUDA 11.8 for sm_60 support")
-            subprocess.check_call([
-                sys.executable, "-m", "pip", "install", "-q", "--force-reinstall",
-                "torch==2.1.0", "torchvision==0.16.0",
-                "--index-url", "https://download.pytorch.org/whl/cu118"
-            ])
-            print(f"  Reinstalled. Need to restart Python to pick up new torch.")
-            os.execv(sys.executable, [sys.executable] + sys.argv)
-except Exception as e:
-    print(f"  GPU check failed: {e}")
+# GPU was already checked at the top of the script (before torch import)
 
 import torch
 import torch.nn as nn
@@ -75,13 +79,13 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Override via environment variables or modify here
 CONFIG = {
     "experiment": os.environ.get("EXPERIMENT", "E1_sisr_baseline"),
-    "model": os.environ.get("MODEL", "edsr"),
+    "model": os.environ.get("MODEL", "edsr_small"),
     "data_dir": "/kaggle/input/marsortho-benchmark",
     "output_dir": "/kaggle/working",
     "patch_size": 256,
-    "batch_size": 16,
+    "batch_size": 8,
     "lr": 2e-4,
-    "epochs": 100,
+    "epochs": 30,
     "scale": 4,
 }
 
