@@ -232,8 +232,8 @@ export default function PathfinderPanel({
         }
       }
     } catch (err: unknown) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        setError(err.message || "Planning failed");
+      if (!(err instanceof Error) || err.name !== "AbortError") {
+        setError(err instanceof Error ? err.message : "Planning failed");
       }
       setPlanning(false);
       setProgress(null);
