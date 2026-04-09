@@ -142,7 +142,7 @@ export default function useDTMHover({
       }
 
       const elevation = getElevationFromGrid(grid, lat, lon);
-      dtmHoverMarker.position = Cesium.Cartesian3.fromDegrees(lon, lat, 0) as any;
+      dtmHoverMarker.position = Cesium.Cartesian3.fromDegrees(lon, lat, 0) as unknown as Cesium.PositionProperty;
       dtmHoverMarker.show = true;
       dtmHoverReadoutRef.current?.update(lat, lon, elevation, grid.productId);
 

@@ -43,10 +43,11 @@ function PanoSphere({ url }: { url: string }) {
       () => setLoading(false)
     );
 
+    const mesh = meshRef.current;
     return () => {
       texture.dispose();
-      if (meshRef.current) {
-        const mat = meshRef.current.material as THREE.MeshBasicMaterial;
+      if (mesh) {
+        const mat = mesh.material as THREE.MeshBasicMaterial;
         if (mat.map) {
           mat.map.dispose();
           mat.map = null;

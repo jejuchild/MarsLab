@@ -353,7 +353,7 @@ export default function RegolithPanel({
                           fontSize: 11,
                           borderRadius: 6,
                         }}
-                        content={({ active, payload }: any) => {
+                        content={({ active, payload }: { active?: boolean; payload?: Array<{ payload: Record<string, number> }> }) => {
                           if (active && payload && payload.length > 0) {
                             const data = payload[0].payload;
                             return (

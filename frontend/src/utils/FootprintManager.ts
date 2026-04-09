@@ -21,10 +21,12 @@ export interface LoadResult {
   total: number;
 }
 
-interface FootprintFeature {
+export interface FootprintFeature {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   properties: { product_id: string; [key: string]: any };
   geometry: {
     type: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     coordinates: any;
   };
 }
@@ -304,12 +306,12 @@ export class FootprintManager {
       this.onLoadEnd?.(instrument, result);
       return result;
 
-    } catch (err: any) {
-      if (err.name === "AbortError") {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") {
         return null;
       }
       console.error(`[FootprintManager] Error loading ${instrument}:`, err);
-      this.onError?.(instrument, err);
+      this.onError?.(instrument, err instanceof Error ? err : new Error(String(err)));
       return null;
     } finally {
       // Only delete controller if it's still ours (prevents race condition)

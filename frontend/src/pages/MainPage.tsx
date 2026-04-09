@@ -518,6 +518,7 @@ export default function MainPage() {
     setMobilePanel,
   });
   // Stable callbacks for memoized children (avoids breaking memo())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleAgenticPanelAttention = useCallback(() => panelManager.ensurePanelVisible("analysis_complete"), [panelManager.ensurePanelVisible]);
 
   // Onboarding tour (force re-trigger)
@@ -544,6 +545,7 @@ export default function MainPage() {
     });
     setShowSpectralComparison(true);
     toast.success("Spectrum pinned for comparison");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Terraform mode: auto-dismiss after 10 seconds
@@ -725,6 +727,7 @@ export default function MainPage() {
     if (activeOverlaysRef.current.has(product.productId)) {
       setBringToFrontId(product.productId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelManager.ensurePanelVisible]);
 
   // Handle fly-to from Active Products section
@@ -813,6 +816,7 @@ export default function MainPage() {
       panelManager.ensurePanelVisible("feature_select");
       setHighlightProductId(best.product_id);
     }, 400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleLoadFootprints, panelManager.ensurePanelVisible]);
 
   // Handle MARVIS "select product" — pick first visible product of the given instrument
@@ -833,6 +837,7 @@ export default function MainPage() {
       setFlyToProductId(product.productId);
       setHighlightProductId(product.productId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelManager.ensurePanelVisible]);
 
 
@@ -931,7 +936,7 @@ export default function MainPage() {
       // ensures each trigger fires in a separate React commit.
       urlState.instruments.forEach((id, i) => {
         setTimeout(() => {
-          setLoadFootprintsTrigger({ instrument: id.toUpperCase() as any, timestamp: Date.now() });
+          setLoadFootprintsTrigger({ instrument: id.toUpperCase() as NonNullable<FootprintLoadTrigger>["instrument"], timestamp: Date.now() });
         }, i * 100);
       });
     }
@@ -1082,7 +1087,7 @@ export default function MainPage() {
           const res = await fetch(`/api/footprints?instrument=SHARAD_HIGHRES&bbox=-180,-90,180,90&limit=5000&lod=poly`);
           if (res.ok) {
             const data = await res.json();
-            const feat = data.features?.find((f: any) => f.properties?.product_id === note.product_id);
+            const feat = data.features?.find((f: { properties?: { product_id?: string }; geometry?: { type: string; coordinates: number[][] } }) => f.properties?.product_id === note.product_id);
             if (feat?.geometry?.coordinates?.length >= 2) {
               const coords = feat.geometry.coordinates;
               const midIdx = Math.floor(coords.length / 2);
@@ -1107,7 +1112,7 @@ export default function MainPage() {
           const res = await fetch(`/api/footprints?instrument=${inst}&bbox=-180,-90,180,90&limit=5000&lod=poly`);
           if (!res.ok) continue;
           const data = await res.json();
-          const feat = data.features?.find((f: any) => f.properties?.product_id === note.product_id);
+          const feat = data.features?.find((f: { properties?: { product_id?: string }; geometry?: { type: string; coordinates: number[][] | number[][][] } }) => f.properties?.product_id === note.product_id);
           if (feat?.geometry?.coordinates) {
             const coords = feat.geometry.coordinates;
             if (feat.geometry.type === "LineString" && coords.length >= 2) {
@@ -1135,6 +1140,7 @@ export default function MainPage() {
       lon,
     });
     panelManager.ensurePanelVisible("feature_select");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelManager.ensurePanelVisible]);
 
   // Handle HiRISE DTM footprint click - One-click inspection flow
@@ -1214,7 +1220,7 @@ export default function MainPage() {
       if (response.ok) {
         const data = await response.json();
         setCustomDatasets(
-          (data.datasets || []).map((d: any) => ({
+          (data.datasets || []).map((d: Omit<CustomDataset, "visible" | "opacity">) => ({
             ...d,
             visible: true,
             opacity: 80,
@@ -1361,6 +1367,7 @@ export default function MainPage() {
       setTerrainPoint(null);
       panelManager.ensurePanelVisible("feature_select");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelManager.ensurePanelVisible]);
 
   // Auto-activate quickview overlay when a product is selected and has no active overlay
@@ -1398,6 +1405,7 @@ export default function MainPage() {
         autoQuickviewTimerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.productId, handleSetOverlay]);
 
   // Analysis mode toggle handler
@@ -1699,13 +1707,14 @@ export default function MainPage() {
       panelManager.ensurePanelVisible("search_result");
     } else if (instrument && instrument !== "CTX") {
       setSelected({
-        instrument: instrument as any,
+        instrument: instrument as InspectorContext["instrument"],
         productId,
         lat: lat ?? 0,
         lon: lon ?? 0,
       });
       panelManager.ensurePanelVisible("search_result");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleSelectProduct, panelManager.ensurePanelVisible]);
 
   // Derive legacy overlay formats for MapView compatibility

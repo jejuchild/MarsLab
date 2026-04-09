@@ -167,14 +167,16 @@ export default function useMapLayers({
 
   // Science layer cleanup on unmount
   useEffect(() => {
+    const viewer = viewerRef.current;
+    const scienceLayers = scienceLayerRefs.current;
+    const scienceDepthLayers = scienceLayerDepthRefs.current;
     return () => {
-      const viewer = viewerRef.current;
       if (!viewer || viewer.isDestroyed()) return;
-      for (const layer of scienceLayerRefs.current.values()) {
+      for (const layer of scienceLayers.values()) {
         viewer.imageryLayers.remove(layer, false);
       }
-      scienceLayerRefs.current.clear();
-      scienceLayerDepthRefs.current.clear();
+      scienceLayers.clear();
+      scienceDepthLayers.clear();
     };
   }, [viewerRef]);
 
@@ -206,14 +208,15 @@ export default function useMapLayers({
     accessibilityLayerRef.current = layer;
     viewer.scene.requestRender();
 
+    const currentLayer = accessibilityLayerRef.current;
     return () => {
       if (!viewer || viewer.isDestroyed()) return;
-      if (accessibilityLayerRef.current) {
-        viewer.imageryLayers.remove(accessibilityLayerRef.current, false);
+      if (currentLayer) {
+        viewer.imageryLayers.remove(currentLayer, false);
         accessibilityLayerRef.current = null;
       }
     };
-  }, [accessibilityVisible, viewerRef]);
+  }, [accessibilityVisible, accessibilityOpacity, viewerRef]);
 
   // Update accessibility layer opacity without recreating
   useEffect(() => {
@@ -251,14 +254,15 @@ export default function useMapLayers({
     fusionLayerRef.current = layer;
     viewer.scene.requestRender();
 
+    const currentFusionLayer = fusionLayerRef.current;
     return () => {
       if (!viewer || viewer.isDestroyed()) return;
-      if (fusionLayerRef.current) {
-        viewer.imageryLayers.remove(fusionLayerRef.current, false);
+      if (currentFusionLayer) {
+        viewer.imageryLayers.remove(currentFusionLayer, false);
         fusionLayerRef.current = null;
       }
     };
-  }, [fusionVisible, viewerRef]);
+  }, [fusionVisible, fusionOpacity, viewerRef]);
 
   // Update fusion layer opacity without recreating
   useEffect(() => {

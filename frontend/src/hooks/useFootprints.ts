@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import * as Cesium from "cesium";
-import FootprintManager from "../utils/FootprintManager";
+import FootprintManager, { type FootprintFeature } from "../utils/FootprintManager";
 import {
   computeOverlapFilter,
   type OverlapResult,
@@ -191,6 +191,7 @@ export default function useFootprints({
         footprintManagerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [marsEllipsoid, viewerRef]);
 
   // Sync highResOnly to FootprintManager
@@ -230,6 +231,7 @@ export default function useFootprints({
     }
 
     viewer.scene.requestRender();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerRef]);
 
   // Toggle footprint visibility (does NOT load new footprints, just shows/hides existing ones)
@@ -270,6 +272,7 @@ export default function useFootprints({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadFootprintsTrigger]);
 
   // Render loaded footprint bounding boxes as dashed rectangles on the map
@@ -353,6 +356,7 @@ export default function useFootprints({
     }
 
     viewer.scene.requestRender();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crismFilteredIds, showCRISM, applyInstrumentVisibility, extractCrismObsId, viewerRef]);
 
   useEffect(() => {
@@ -396,6 +400,7 @@ export default function useFootprints({
       }
     }
     viewer.scene.requestRender();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectedProductId, viewerRef]);
 
   // Note: Legacy footprint overlay hiding is no longer needed since
@@ -444,7 +449,7 @@ export default function useFootprints({
       "HIRISE_DTM",
       "CRISM_TRR3",
     ];
-    const featuresByInstrument = new Map<FPInstrumentType, any[]>();
+    const featuresByInstrument = new Map<FPInstrumentType, FootprintFeature[]>();
     for (const inst of allInstruments) {
       const features = fm.getFeatures(inst);
       if (features.length > 0) {
@@ -535,7 +540,7 @@ export default function useFootprints({
       const seen = new Set<string>();
 
       // Helper to extract center coordinates from feature
-      const getFeatureCenter = (feature: any): { lat: number; lon: number } | null => {
+      const getFeatureCenter = (feature: FootprintFeature): { lat: number; lon: number } | null => {
         const props = feature.properties || {};
         // HiRISE DTM has explicit bounds in properties
         if (
@@ -727,6 +732,7 @@ export default function useFootprints({
       removeListener();
       clearTimeout(initTimeout);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     showHiRISE,
     showCRISM,

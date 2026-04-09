@@ -464,6 +464,7 @@ export default function MeasurementTools({
       // Capture the original cursor BEFORE overwriting
       const originalCursor = canvas.style.cursor;
       cursorStyleRef.current = originalCursor;
+      // eslint-disable-next-line react-hooks/immutability -- DOM element style, not a React prop
       canvas.style.cursor = "crosshair";
       return () => {
         if (viewer.isDestroyed()) return;
@@ -484,7 +485,7 @@ export default function MeasurementTools({
         if (res.ok) {
           const data = await res.json();
           if (data.profile && Array.isArray(data.profile)) {
-            return data.profile.map((p: any) => ({
+            return data.profile.map((p: Record<string, number>) => ({
               distanceKm: p.distance_km ?? 0,
               elevationM: p.elevation_m ?? 0,
             }));
@@ -906,7 +907,6 @@ export default function MeasurementTools({
     };
     // Re-create handler whenever the active tool changes, but NOT on every
     // pending point update (we use refs for that).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewer, activeTool, addEntity, fetchElevationProfile]);
 
   /* ----- Pin submit handler ----- */
@@ -990,7 +990,6 @@ export default function MeasurementTools({
         viewer.scene.requestRender();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewer]);
 
   /* ----- Remove a single measurement ----- */

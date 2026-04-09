@@ -79,10 +79,10 @@ type ProgressData = { stage: string; message: string; pct: number };
 /* =========================================================
  * Custom Tooltip
  * =======================================================*/
-function ProfileTooltip({ active, payload, label }: any) {
+function ProfileTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey: string; value: number }>; label?: number }) {
   if (!active || !payload?.length) return null;
-  const elev = payload.find((p: any) => p.dataKey === "elev");
-  const slope = payload.find((p: any) => p.dataKey === "slope");
+  const elev = payload.find((p) => p.dataKey === "elev");
+  const slope = payload.find((p) => p.dataKey === "slope");
 
   return (
     <div className="bg-[#0a0f18] border border-[#232f48] rounded-md px-3 py-2 text-[11px] shadow-xl">
@@ -164,7 +164,7 @@ export default function PathfinderPanel({
           if (Array.isArray(data.rovers)) {
             for (const r of data.rovers) roversMap[r.id] = r;
           } else {
-            for (const [k, v] of Object.entries(data.rovers as Record<string, any>)) {
+            for (const [k, v] of Object.entries(data.rovers as Record<string, RoverProfile>)) {
               roversMap[k] = v as RoverProfile;
             }
           }
@@ -231,8 +231,8 @@ export default function PathfinderPanel({
           setProgress(null);
         }
       }
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name !== "AbortError") {
         setError(err.message || "Planning failed");
       }
       setPlanning(false);

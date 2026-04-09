@@ -45,8 +45,11 @@ export default function AppShell({
   if (isMobile) {
     return (
       <div className="flex h-screen flex-col overflow-hidden bg-bg-dark">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:top-2 focus:left-2 focus:bg-slate-800 focus:text-white focus:px-4 focus:py-2 focus:rounded">
+          Skip to main content
+        </a>
         <header className="z-50 shrink-0">{header}</header>
-        <main className="relative flex-1 overflow-hidden">{children}</main>
+        <main id="main-content" className="relative flex-1 overflow-hidden">{children}</main>
         {footer && <div className="z-10 shrink-0">{footer}</div>}
         {mobileNav && (
           <nav className="z-50 shrink-0 mobile-bottom-nav">{mobileNav}</nav>
@@ -57,6 +60,9 @@ export default function AppShell({
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-bg-dark">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[9999] focus:top-2 focus:left-2 focus:bg-slate-800 focus:text-white focus:px-4 focus:py-2 focus:rounded">
+        Skip to main content
+      </a>
       {/* Header */}
       <header className="z-50 shrink-0">{header}</header>
 
@@ -66,7 +72,7 @@ export default function AppShell({
         <aside className="z-10 shrink-0">{leftPanel}</aside>
 
         {/* Central Content (Map Canvas) */}
-        <main className="relative flex-1 overflow-hidden">{children}</main>
+        <main id="main-content" className="relative flex-1 overflow-hidden">{children}</main>
 
         {/* Right Panel (Inspector) */}
         {rightPanel && (

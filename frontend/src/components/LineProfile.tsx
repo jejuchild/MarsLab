@@ -49,11 +49,11 @@ function slopeColor(deg: number): string {
 }
 
 /* Custom tooltip for dual-axis chart */
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey: string; value: number; payload?: TransectSample }>; label?: number }) {
   if (!active || !payload || payload.length === 0) return null;
 
-  const elevation = payload.find((p: any) => p.dataKey === "elevation_m");
-  const slope = payload.find((p: any) => p.dataKey === "slope_deg");
+  const elevation = payload.find((p) => p.dataKey === "elevation_m");
+  const slope = payload.find((p) => p.dataKey === "slope_deg");
   const sample = payload[0]?.payload as TransectSample | undefined;
   const slopeDeg = slope?.value ?? 0;
 
@@ -140,7 +140,7 @@ export default function LineProfile({
         const json = await res.json();
 
         // Normalize response from either endpoint
-        const profile: TransectSample[] = json.profile.map((p: any) => ({
+        const profile: TransectSample[] = json.profile.map((p: Record<string, unknown>) => ({
           distance_km: p.distance_km,
           elevation_m: p.elevation_m ?? 0,
           slope_deg: p.slope_deg ?? 0,

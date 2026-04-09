@@ -192,8 +192,10 @@ function HiriseCanvas({
       draw();
     };
     img.src = url;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centerLon, centerLat, radiusM, canvasSize]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { draw(); }, [cursorLon, cursorLat, annotations, hover]);
 
   function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
@@ -305,8 +307,10 @@ function MastcamFullWithMarker({
       draw();
     };
     img.src = `/api/mastcam-spice/texture/${sol}?quality=60`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sol]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { draw(); }, [markerX, markerY, imgNat]);
 
   return (

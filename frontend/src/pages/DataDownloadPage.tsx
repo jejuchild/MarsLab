@@ -2125,7 +2125,7 @@ export default function DataDownloadPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedResult, downloadTask, pageTab]);
+  }, [selectedResult, downloadTask, pageTab, dismissDownloadPanel]);
 
   // Get list of selected datasets
   const getSelectedDatasets = useCallback((): DatasetType[] => {

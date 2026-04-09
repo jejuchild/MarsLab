@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import type React from "react";
 import * as Cesium from "cesium";
 import type FootprintManager from "../utils/FootprintManager";
+import type { InstrumentType as FPInstrumentType } from "../utils/FootprintManager";
 import {
   loadDTMElevationGrid,
   type DTMElevationGrid,
@@ -103,7 +104,7 @@ export default function useOverlays({
 
     // Use FootprintManager to hide/show both fill AND outline (primitive-based)
     if (footprintManager) {
-      footprintManager.setFeatureVisible(instrument as any, productId, !transparent);
+      footprintManager.setFeatureVisible(instrument as FPInstrumentType, productId, !transparent);
     }
 
     // Also handle Entity-based footprints (legacy)
@@ -577,6 +578,7 @@ export default function useOverlays({
     if (needsRender) {
       viewer.scene.requestRender();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     quickviewOverlays,
     showHiRISEDTM,

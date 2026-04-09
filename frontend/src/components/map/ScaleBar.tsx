@@ -74,10 +74,11 @@ const frustum = viewer.camera.frustum;
     // Update on camera move
     const removeListener = viewer.camera.moveEnd.addEventListener(updateScale);
 
+    const raf = rafRef.current;
     return () => {
       removeListener();
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
+      if (raf !== null) {
+        cancelAnimationFrame(raf);
       }
     };
   }, [viewer]);

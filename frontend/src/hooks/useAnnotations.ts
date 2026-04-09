@@ -474,7 +474,7 @@ export default function useAnnotations({
               try {
                 for (const note of notes) {
                   const feat = data.features?.find(
-                    (f: any) => f.properties?.product_id === note.product_id
+                    (f: { properties?: { product_id?: string }; geometry?: { type: string; coordinates: number[][] } }) => f.properties?.product_id === note.product_id
                   );
                   if (!feat?.geometry?.coordinates) continue;
 

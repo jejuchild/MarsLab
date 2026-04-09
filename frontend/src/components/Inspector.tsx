@@ -344,6 +344,7 @@ export default function Inspector({
 
     fetchStats();
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.productId, selected?.pixelLine, selected?.pixelSample, windowSize]);
 
   // Fetch CRISM spectrum when pixel coordinates change
@@ -414,6 +415,7 @@ export default function Inspector({
     }
 
     fetchSpectrum();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.productId, selected?.pixelLine, selected?.pixelSample, selected?.lat, selected?.lon]);
 
   if (!selected) return null;
@@ -1311,8 +1313,8 @@ function SpectrumTab({
  * =======================================================*/
 function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; onOpenMineralSequence?: (obsId: string) => void }) {
   const [status, setStatus] = useState<"checking" | "not_downloaded" | "idle" | "loading" | "done" | "error">("checking");
-  const [stats, setStats] = useState<any>(null);
-  const [legend, setLegend] = useState<any[]>([]);
+  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
+  const [legend, setLegend] = useState<Record<string, unknown>[]>([]);
   const [errorMsg, setErrorMsg] = useState("");
   const [progressMsg, setProgressMsg] = useState("");
   const [progressPct, setProgressPct] = useState<number | null>(null);
@@ -1564,7 +1566,7 @@ function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; o
             <div className="space-y-1">
               <h5 className="text-[9px] uppercase text-slate-500 font-bold">Minerals Detected</h5>
               <div className="max-h-40 overflow-y-auto scrollbar-dark space-y-0.5">
-                {legend.map((item: any) => {
+                {legend.map((item: Record<string, unknown>) => {
                   const conf = item.avg_confidence as number | undefined;
                   const confPct = ((conf ?? 0) * 100);
                   const confColor = confPct >= 95 ? "text-emerald-400" : confPct >= 80 ? "text-amber-400" : "text-red-400";

@@ -174,7 +174,7 @@ export default function useFlyTo({
           const res = await fetch(`/api/footprints?instrument=${inst}&bbox=-180,-90,180,90&limit=5000&lod=poly`);
           if (!res.ok) continue;
           const data = await res.json();
-          const feat = data.features?.find((f: any) => f.properties?.product_id === pid);
+          const feat = data.features?.find((f: { properties?: { product_id?: string }; geometry?: { type: string; coordinates: number[][] | number[][][] } }) => f.properties?.product_id === pid);
           if (!feat?.geometry?.coordinates) continue;
 
           const coords = feat.geometry.coordinates;

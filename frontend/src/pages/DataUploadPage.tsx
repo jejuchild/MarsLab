@@ -387,8 +387,8 @@ function UploadFlow({
         setError(result.crs_error || "File is not a valid Mars GeoTIFF.");
         setStage("error");
       }
-    } catch (err: any) {
-      setError(err.message || "Validation failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Validation failed");
       setStage("error");
     }
 
@@ -427,8 +427,8 @@ function UploadFlow({
         setValidation(null);
         setDatasetName("");
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || "Upload failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Upload failed");
       setStage("error");
     }
   };

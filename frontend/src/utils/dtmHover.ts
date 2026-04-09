@@ -155,6 +155,7 @@ export function clearAllDTMGrids(): void {
 /**
  * Create a throttled function (for hover handlers)
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function throttle<T extends (...args: any[]) => void>(
   fn: T,
   intervalMs: number

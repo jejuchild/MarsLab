@@ -1154,7 +1154,7 @@ export default function SharadHiresInspector({
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     }
-  }, [moveMode, viewX, viewY, adjustMode, molaAlignMode, molaXOffset, molaProfile, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
+  }, [viewX, viewY, adjustMode, molaAlignMode, molaXOffset, molaProfile, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;

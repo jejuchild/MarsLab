@@ -48,6 +48,7 @@ export default function InspectorPanel({
       .then(r => r.ok ? r.json() : null)
       .then(d => setLocalHighRes(d?.has_core ?? false))
       .catch(() => setLocalHighRes(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.productId, selected?.instrument]);
   const hasHighResData = hasHighResDataProp || localHighRes;
 
@@ -144,6 +145,7 @@ export default function InspectorPanel({
 
     fetchStats();
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.productId, selected?.pixelLine, selected?.pixelSample, windowSize]);
 
   // ── CRISM Spectrum ──

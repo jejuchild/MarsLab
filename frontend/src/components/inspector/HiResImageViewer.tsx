@@ -74,7 +74,7 @@ export default function HiResImageViewer({ productId, onClose }: HiResImageViewe
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, zoomBy]);
 
   const clampZoom = (z: number) => Math.min(Math.max(z, ZOOM_MIN), ZOOM_MAX);
   const zoomBy = useCallback((factor: number) => {

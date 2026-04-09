@@ -16,7 +16,9 @@ export interface BBox {
 
 /** GeoJSON feature as stored by FootprintManager */
 export interface OverlapFeature {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   properties: { product_id: string; [key: string]: any };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   geometry: { type: string; coordinates: any };
 }
 

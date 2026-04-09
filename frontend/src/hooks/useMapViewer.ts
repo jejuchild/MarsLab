@@ -359,11 +359,11 @@ export default function useMapViewer({
       viewer.canvas.style.cursor = isOverOverlay ? "crosshair" : "default";
 
       const pickedList = viewer.scene.drillPick(endPosition);
-      const picked = pickedList.find((x: any) => x?.id instanceof Cesium.Entity);
+      const picked = pickedList.find((x: { id?: unknown }) => x?.id instanceof Cesium.Entity);
       // Pick the smallest footprint (most specific) at hover position
       const hoverCandidates = pickedList
-        .filter((x: any) => typeof x?.id === "string" && x.id.includes("_FP_"))
-        .map((x: any) => {
+        .filter((x: { id?: unknown }) => typeof x?.id === "string" && (x.id as string).includes("_FP_"))
+        .map((x: { id?: unknown }) => {
           const id = x.id as string;
           const meta = footprintManagerRef.current?.getFeatureMetadata(id);
           const b = meta?.bounds;
@@ -784,7 +784,7 @@ export default function useMapViewer({
         const pickedList = viewer.scene.drillPick(m.position);
 
         // PRIORITY 2a: Check for field note markers first
-        const pickedFieldNote = pickedList.find((p: any) => {
+        const pickedFieldNote = pickedList.find((p: { id?: unknown }) => {
           if (!(p.id instanceof Cesium.Entity)) return false;
           const type = (p.id as Cesium.Entity).properties?.type?.getValue?.();
           return type === "fieldnote";
@@ -801,7 +801,7 @@ export default function useMapViewer({
           return;
         }
 
-        const picked = pickedList.find((p: any) => {
+        const picked = pickedList.find((p: { id?: unknown }) => {
           if (!(p.id instanceof Cesium.Entity)) return false;
           const pid = (p.id as Cesium.Entity).properties?.product_id?.getValue?.();
           return !!pid;
@@ -1142,6 +1142,7 @@ export default function useMapViewer({
       setInitError(err instanceof Error ? err.message : 'Failed to initialize map viewer');
       return;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keep cameraViewportRef updated on every camera moveEnd (for on-demand reads)

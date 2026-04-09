@@ -98,9 +98,11 @@ export default function useHoverHighlight({
       }
     };
 
+    const fpManager = footprintManagerRef?.current;
+
     // Clear previous highlight if any
     if (!hoveredProductId) {
-      footprintManagerRef?.current?.hideHoverLabel();
+      fpManager?.hideHoverLabel();
       viewer.scene.requestRender();
       return;
     }
@@ -115,8 +117,8 @@ export default function useHoverHighlight({
     if (fpEntity) {
       setEntityHighlight(fpEntity, true, instrument);
       entityIds.push(fpId);
-    } else if (footprintManagerRef?.current?.hasFeature(fpId)) {
-      const metadata = footprintManagerRef.current.getFeatureMetadata(fpId);
+    } else if (fpManager?.hasFeature(fpId)) {
+      const metadata = fpManager.getFeatureMetadata(fpId);
       if (metadata) {
         const pos = Cesium.Cartesian3.fromDegrees(
           (metadata.bounds.west + metadata.bounds.east) / 2,
@@ -124,7 +126,7 @@ export default function useHoverHighlight({
           0,
           viewer.scene.globe.ellipsoid,
         );
-        footprintManagerRef.current.showHoverLabel(pos, metadata.productId);
+        fpManager.showHoverLabel(pos, metadata.productId);
       }
     }
 
@@ -176,7 +178,7 @@ export default function useHoverHighlight({
         pointEnt.point.pixelSize = new Cesium.ConstantProperty(6);
       }
 
-      footprintManagerRef?.current?.hideHoverLabel();
+      fpManager?.hideHoverLabel();
 
       viewer.scene.requestRender();
     };

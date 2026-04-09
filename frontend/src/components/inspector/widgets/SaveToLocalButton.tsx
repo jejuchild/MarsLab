@@ -48,7 +48,7 @@ export default function SaveToLocalButton({ productId, instrument }: SaveToLocal
         setLocalFiles([]);
       })
       .finally(() => setLoading(false));
-  }, [productId, instrument]);
+  }, [productId, instrument, skip]);
 
   if (loading || skip) return null;
   if (localFiles.length === 0) return null;
