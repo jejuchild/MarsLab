@@ -1,0 +1,13 @@
+{
+  "id": "INSERT_YOUR_KAGGLE_USERNAME/marsrefsr-experiment",
+  "title": "MarsRefSR Experiment",
+  "code_file": "train.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "competition_sources": [],
+  "dataset_sources": [],
+  "kernel_sources": []
+}
