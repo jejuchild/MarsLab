@@ -16,9 +16,24 @@ import time
 import json
 import subprocess
 
-# ── Install dependencies ──────────────────────────────────────────────
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
-    "torch", "torchvision", "timm", "einops", "lpips", "kornia"])
+# ── Install dependencies (skip if already available, e.g. on Kaggle) ──
+def _try_install(packages):
+    missing = []
+    for pkg in packages:
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "-q"] + missing,
+                timeout=120,
+            )
+        except Exception as e:
+            print(f"  pip install skipped ({e}), using pre-installed packages")
+
+_try_install(["torch", "torchvision", "timm", "einops", "kornia"])
 
 import torch
 import torch.nn as nn
@@ -42,7 +57,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CONFIG = {
     "experiment": os.environ.get("EXPERIMENT", "E1_sisr_baseline"),
     "model": os.environ.get("MODEL", "swinir"),
-    "data_dir": "/kaggle/input/marsortho-benchmark",
+    "data_dir": "/kaggle/working/marsortho-benchmark",
     "output_dir": "/kaggle/working",
     "patch_size": 256,
     "batch_size": 8,
