@@ -7,7 +7,6 @@ import {
   type JobStatus,
   type AgentReasoning,
 } from "../api/hirise_landforms";
-import { registerLandform } from "../api/accessibility";
 
 /* =========================================================
  * Props
@@ -149,8 +148,6 @@ function AgentReasoningPanel({ reasoning }: { reasoning: AgentReasoning }) {
  * =======================================================*/
 export default function HiriseLandformPanel({
   productId,
-  lat: productLat,
-  lon: productLon,
   onClose,
 }: HiriseLandformPanelProps) {
   const [model, setModel] = useState<ModelType>("v3");
@@ -163,7 +160,6 @@ export default function HiriseLandformPanel({
   const [result, setResult] = useState<ClassifyResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fusionRegistered, setFusionRegistered] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* ── Cleanup polling on unmount ──────────────────────── */
@@ -217,25 +213,7 @@ export default function HiriseLandformPanel({
     }
   }, [productId, model, includeHeatmap]);
 
-  /* ── Auto-register in fusion cache when classification completes ── */
-  useEffect(() => {
-    if (!result || fusionRegistered) return;
-    if (productLat == null || productLon == null) return;
-    if (result.dominant_class === "OTHER") return;
-
-    registerLandform(
-      result.product_id,
-      productLat,
-      productLon,
-      result.dominant_class,
-      result.dominant_confidence,
-      result.model_used,
-    ).then(() => {
-      setFusionRegistered(true);
-    }).catch(() => {
-      // Non-critical — fusion cache registration failed silently
-    });
-  }, [result, fusionRegistered, productLat, productLon]);
+  // Note: fusion cache registration removed in Phase 1 (accessibility cut)
 
   /* ── Progress percentage ─────────────────────────────── */
   const progress = jobStatus?.progress ?? 0;
@@ -362,14 +340,6 @@ export default function HiriseLandformPanel({
                   </span>
                 </div>
               </div>
-
-              {/* Fusion registration badge */}
-              {fusionRegistered && (
-                <div className="flex items-center gap-1.5 rounded border border-violet-500/30 bg-violet-500/10 px-2 py-1">
-                  <span className="material-symbols-outlined text-[12px] text-violet-400">hub</span>
-                  <span className="text-[9px] text-violet-300">Added to ice prospecting fusion</span>
-                </div>
-              )}
 
               {/* Stacked distribution bar */}
               <div className="flex flex-col gap-1">

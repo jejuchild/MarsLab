@@ -33,6 +33,7 @@ type ExplicitLoadInstrument =
   | "SHARAD"
   | "SHARAD_HIGHRES"
   | "CTX"
+  | "CTX_MOSAIC"
   | "HIRISE_DTM"
   | "CRISM_TRR3";
 

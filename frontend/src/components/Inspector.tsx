@@ -1311,10 +1311,22 @@ function SpectrumTab({
 /* =========================================================
  * TRR3 Mineral Classification Section
  * =======================================================*/
+type TRR3Stats = {
+  classified_pixels?: number;
+  confidence_threshold?: number;
+  mean_confidence?: number;
+};
+type TRR3LegendItem = {
+  mineral_id: string;
+  name: string;
+  color_hex: string;
+  pixel_count: number;
+  avg_confidence?: number;
+};
 function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; onOpenMineralSequence?: (obsId: string) => void }) {
   const [status, setStatus] = useState<"checking" | "not_downloaded" | "idle" | "loading" | "done" | "error">("checking");
-  const [stats, setStats] = useState<Record<string, unknown> | null>(null);
-  const [legend, setLegend] = useState<Record<string, unknown>[]>([]);
+  const [stats, setStats] = useState<TRR3Stats | null>(null);
+  const [legend, setLegend] = useState<TRR3LegendItem[]>([]);
   const [errorMsg, setErrorMsg] = useState("");
   const [progressMsg, setProgressMsg] = useState("");
   const [progressPct, setProgressPct] = useState<number | null>(null);
@@ -1566,8 +1578,8 @@ function TRR3MineralSection({ obsId, onOpenMineralSequence }: { obsId: string; o
             <div className="space-y-1">
               <h5 className="text-[9px] uppercase text-slate-500 font-bold">Minerals Detected</h5>
               <div className="max-h-40 overflow-y-auto scrollbar-dark space-y-0.5">
-                {legend.map((item: Record<string, unknown>) => {
-                  const conf = item.avg_confidence as number | undefined;
+                {legend.map((item) => {
+                  const conf = item.avg_confidence;
                   const confPct = ((conf ?? 0) * 100);
                   const confColor = confPct >= 95 ? "text-emerald-400" : confPct >= 80 ? "text-amber-400" : "text-red-400";
                   return (

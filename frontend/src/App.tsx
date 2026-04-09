@@ -10,11 +10,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 const DataDownloadPage = lazy(() => import("./pages/DataDownloadPage"));
 const DataUploadPage = lazy(() => import("./pages/DataUploadPage"));
 const FeatureSuggestionsPage = lazy(() => import("./pages/FeatureSuggestionsPage"));
-const DailyDiscussionsPage = lazy(() => import("./pages/DailyDiscussionsPage"));
 const MarsNewsPage = lazy(() => import("./pages/MarsNewsPage"));
-const MarsResearchPage = lazy(() => import("./pages/MarsResearchPage"));
-const MastcamPanoPage = lazy(() => import("./pages/MastcamPanoPage"));
-const MastcamLabelPage = lazy(() => import("./pages/MastcamLabelPage"));
 
 const PageLoading = () => (
   <div className="h-screen w-screen flex items-center justify-center bg-[#0a0f18] text-[#6b7c9c]">
@@ -67,11 +63,7 @@ export default function App() {
           <Route path="/download" element={<LazyPage scope="DataDownload"><DataDownloadPage /></LazyPage>} />
           <Route path="/upload" element={<LazyPage scope="DataUpload"><DataUploadPage /></LazyPage>} />
           <Route path="/suggestions" element={<LazyPage scope="Suggestions"><FeatureSuggestionsPage /></LazyPage>} />
-          <Route path="/discussions" element={<LazyPage scope="Discussions"><DailyDiscussionsPage /></LazyPage>} />
           <Route path="/news" element={<LazyPage scope="News"><MarsNewsPage /></LazyPage>} />
-          <Route path="/research" element={<LazyPage scope="Research"><MarsResearchPage /></LazyPage>} />
-          <Route path="/mastcam" element={<LazyPage scope="Mastcam"><MastcamPanoPage /></LazyPage>} />
-          <Route path="/mastcam-label" element={<LazyPage scope="MastcamLabel"><MastcamLabelPage /></LazyPage>} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

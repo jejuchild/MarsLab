@@ -47,7 +47,6 @@ function CategoryCard({
 export default function AnalysisTools({
   analysisMode,
   onAnalysisModeChange,
-  onShowRegionDashboard,
   showMeasurementTools,
   onToggleMeasurementTools,
 }: AnalysisToolsProps) {
@@ -61,14 +60,6 @@ export default function AnalysisTools({
     analysisMode === "slope",
     analysisMode === "line",
     showMeasurementTools,
-    analysisMode === "region_stats",
-  ].filter(Boolean).length;
-
-  const aiActive = [
-    analysisMode === "agentic",
-    analysisMode === "report",
-    analysisMode === "guided",
-    analysisMode === "pathfinder",
   ].filter(Boolean).length;
 
   const detectActive = [
@@ -110,75 +101,12 @@ export default function AnalysisTools({
             description="Distance, area, elevation, pins"
             color="cyan"
           />
-          <ToolButton
-            active={analysisMode === "region_stats"}
-            onClick={() => toggle("region_stats")}
-            icon="pentagon"
-            title="Region Stats"
-            description="Draw polygon for area statistics"
-            color="indigo"
-          />
-          <ToolButton
-            active={false}
-            onClick={() => window.open("/mastcam-label", "_blank")}
-            icon="panorama_photosphere"
-            title="Mastcam Labeling"
-            description="Label roughness on 360° panoramas"
-            color="amber"
-            badge="NEW"
-          />
         </CategoryCard>
 
-        {/* ── AI-Powered ── */}
-        <CategoryCard
-          icon="auto_awesome"
-          label="AI-Powered"
-          tint="border-fuchsia-500/20 bg-fuchsia-500/[0.03]"
-          count={aiActive}
-          defaultOpen={aiActive > 0}
-        >
-          <ToolButton
-            active={analysisMode === "agentic"}
-            onClick={() => toggle("agentic")}
-            icon="smart_toy"
-            title="Agentic AI"
-            description="Autonomous multi-instrument analysis"
-            color="fuchsia"
-            badge="BETA"
-          />
-          <ToolButton
-            active={analysisMode === "report"}
-            onClick={() => toggle("report")}
-            icon="assignment"
-            title="AI Landing Site Report"
-            description="Compare regions with ground rules"
-            color="amber"
-            badge="BETA"
-          />
-          <ToolButton
-            active={analysisMode === "guided"}
-            onClick={() => toggle("guided")}
-            icon="explore"
-            title="Guided Workflows"
-            description="Step-by-step investigation guides"
-            color="sky"
-            badge="NEW"
-          />
-          <ToolButton
-            active={analysisMode === "pathfinder"}
-            onClick={() => toggle("pathfinder")}
-            icon="route"
-            title="Pathfinder"
-            description="AI rover route planning (Field D*)"
-            color="orange"
-            badge="NEW"
-          />
-        </CategoryCard>
-
-        {/* ── Detection & Dashboard ── */}
+        {/* ── Detection ── */}
         <CategoryCard
           icon="search"
-          label="Detection & Dashboard"
+          label="Detection"
           tint="border-rose-500/20 bg-rose-500/[0.03]"
           count={detectActive}
           defaultOpen={detectActive > 0}
@@ -190,15 +118,6 @@ export default function AnalysisTools({
             title="Landform Detect"
             description="Find craters, channels, LDAs from MOLA DEM"
             color="rose"
-            badge="NEW"
-          />
-          <ToolButton
-            active={false}
-            onClick={() => onShowRegionDashboard?.()}
-            icon="public"
-            title="Region Dashboard"
-            description="Browse all 55 regions at a glance"
-            color="teal"
             badge="NEW"
           />
         </CategoryCard>

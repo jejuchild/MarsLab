@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import DOMPurify from "dompurify";
+import MarsResearchPage from "./MarsResearchPage";
 
 /* =========================================================
  * Types
@@ -246,6 +247,14 @@ function EmptyState() {
  * =======================================================*/
 
 export default function MarsNewsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab: "news" | "research" = searchParams.get("tab") === "research" ? "research" : "news";
+  const setTab = (t: "news" | "research") => {
+    const next = new URLSearchParams(searchParams);
+    if (t === "research") next.set("tab", "research"); else next.delete("tab");
+    setSearchParams(next, { replace: true });
+  };
+
   const [news, setNews] = useState<NewsSummary[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [detail, setDetail] = useState<NewsDetail | null>(null);
@@ -329,16 +338,96 @@ export default function MarsNewsPage() {
           </Link>
           <div className="h-5 w-px bg-border-dark" />
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-xl">newspaper</span>
-            <h1 className="text-lg font-bold tracking-tight">Mars News</h1>
+            <span className="material-symbols-outlined text-primary text-xl">
+              {tab === "research" ? "science" : "newspaper"}
+            </span>
+            <h1 className="text-lg font-bold tracking-tight">
+              {tab === "research" ? "Mars Research" : "Mars News"}
+            </h1>
+          </div>
+          {/* Tab switcher */}
+          <div className="flex items-center gap-1 ml-4 bg-white/5 rounded-lg p-1 border border-border-dark">
+            <button
+              onClick={() => setTab("news")}
+              className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                tab === "news" ? "bg-primary/20 text-primary" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              News
+            </button>
+            <button
+              onClick={() => setTab("research")}
+              className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${
+                tab === "research" ? "bg-primary/20 text-primary" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Research
+            </button>
           </div>
         </div>
 
         <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span className="font-mono">{news.length} edition{news.length !== 1 ? "s" : ""}</span>
+          {tab === "news" && (
+            <span className="font-mono">{news.length} edition{news.length !== 1 ? "s" : ""}</span>
+          )}
         </div>
       </header>
 
+      {/* Research tab — render embedded MarsResearchPage and skip the rest */}
+      {tab === "research" ? (
+        <MarsResearchPage embedded />
+      ) : (
+        <NewsBody
+          news={news}
+          loading={loading}
+          detail={detail}
+          detailLoading={detailLoading}
+          selectedDate={selectedDate}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          categoryFilter={categoryFilter}
+          setCategoryFilter={setCategoryFilter}
+          uniqueCategories={uniqueCategories}
+          filteredNews={filteredNews}
+          handleSelect={handleSelect}
+          mobileListOpen={mobileListOpen}
+          setMobileListOpen={setMobileListOpen}
+          renderedHtml={renderedHtml}
+        />
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────
+// News body extracted as a sub-component for the tabbed layout
+// ───────────────────────────────────────────────────────────
+type NewsBodyProps = {
+  news: NewsSummary[];
+  loading: boolean;
+  detail: NewsDetail | null;
+  detailLoading: boolean;
+  selectedDate: string | null;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  categoryFilter: string | null;
+  setCategoryFilter: (c: string | null) => void;
+  uniqueCategories: string[];
+  filteredNews: NewsSummary[];
+  handleSelect: (date: string) => void;
+  mobileListOpen: boolean;
+  setMobileListOpen: (v: boolean | ((p: boolean) => boolean)) => void;
+  renderedHtml: string;
+};
+
+function NewsBody({
+  news, loading, detail, detailLoading, selectedDate,
+  searchQuery, setSearchQuery, categoryFilter, setCategoryFilter,
+  uniqueCategories, filteredNews, handleSelect,
+  mobileListOpen, setMobileListOpen, renderedHtml,
+}: NewsBodyProps) {
+  return (
+    <>
       {/* Mobile list toggle */}
       <div className="md:hidden flex items-center border-b border-border-dark px-4 py-2 bg-bg-dark">
         <button
@@ -500,6 +589,6 @@ export default function MarsNewsPage() {
           )}
         </main>
       </div>
-    </div>
+    </>
   );
 }

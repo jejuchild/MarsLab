@@ -14,7 +14,6 @@ import type {
 } from "../../pages/MainPage";
 import type { FieldNote } from "../../api/fieldnotes";
 import type { OverlapStats } from "../../utils/overlapFilter";
-import type { SwimMethod, DepthRange } from "../../api/swim_ice";
 import type { InstrumentId } from "../../config/instrumentRegistry";
 
 // ── Re-exports ──
@@ -29,8 +28,6 @@ export type {
   OverlapFilter,
   FieldNote,
   OverlapStats,
-  SwimMethod,
-  DepthRange,
   InstrumentId,
 };
 
@@ -41,18 +38,12 @@ export type AnalysisMode =
   | "slope"
   | "hirise_dtm_3d"
   | "line"
-  | "ai_analysis"
-  | "agentic"
-  | "report"
-  | "guided"
-  | "region_stats"
   | "crater_detect"
   | "regolith"
   | "stratigraphy"
   | "attenuation"
   | "mineral_sequence"
   | "strat_column"
-  | "pathfinder"
   | null;
 
 // ── Section Props ──
@@ -76,29 +67,6 @@ export interface NavigationSectionProps {
   onToggleRegionLayer?: (v: boolean) => void;
 }
 
-export interface IceHubProps {
-  scienceLayerVisibility?: Record<SwimMethod, boolean>;
-  onScienceLayerToggle?: (method: SwimMethod, visible: boolean) => void;
-  scienceLayerDepth?: DepthRange;
-  onScienceLayerDepthChange?: (depth: DepthRange) => void;
-  scienceLayerOpacities?: Record<SwimMethod, number>;
-  onScienceLayerOpacity?: (method: SwimMethod, opacity: number) => void;
-  swimLayer?: string | false;
-  onSwimLayerChange?: (layer: string | false) => void;
-  swimIceLat?: number | null;
-  swimIceLon?: number | null;
-  accessibilityVisible?: boolean;
-  onAccessibilityVisibleChange?: (v: boolean) => void;
-  accessibilityOpacity?: number;
-  onAccessibilityOpacityChange?: (v: number) => void;
-  accessibilityExplainMode?: boolean;
-  onAccessibilityExplainModeChange?: (v: boolean) => void;
-  fusionVisible?: boolean;
-  onFusionVisibleChange?: (v: boolean) => void;
-  fusionOpacity?: number;
-  onFusionOpacityChange?: (v: number) => void;
-}
-
 export interface FootprintSectionProps {
   instrumentVisibility: InstrumentVisibility;
   onToggleInstrument: (id: InstrumentId, v: boolean) => void;
@@ -118,7 +86,6 @@ export interface FootprintSectionProps {
 export interface AnalysisToolsProps {
   analysisMode?: AnalysisMode;
   onAnalysisModeChange?: (mode: AnalysisMode) => void;
-  onShowRegionDashboard?: () => void;
   showMeasurementTools?: boolean;
   onToggleMeasurementTools?: (v: boolean) => void;
 }
@@ -179,21 +146,10 @@ export interface LayerPanelProps {
   onFlyToCoords?: (lat: number, lon: number) => void;
   viewBoundSelectionMode?: boolean;
   onViewBoundSelectionModeChange?: (active: boolean) => void;
-  onShowRegionDashboard?: () => void;
   showGrid?: boolean;
   onToggleGrid?: (v: boolean) => void;
   showRegionLayer?: boolean;
   onToggleRegionLayer?: (v: boolean) => void;
-  swimLayer?: string | false;
-  onSwimLayerChange?: (layer: string | false) => void;
-  swimIceLat?: number | null;
-  swimIceLon?: number | null;
-  scienceLayerVisibility?: Record<SwimMethod, boolean>;
-  onScienceLayerToggle?: (method: SwimMethod, visible: boolean) => void;
-  scienceLayerDepth?: DepthRange;
-  onScienceLayerDepthChange?: (depth: DepthRange) => void;
-  scienceLayerOpacities?: Record<SwimMethod, number>;
-  onScienceLayerOpacity?: (method: SwimMethod, opacity: number) => void;
   fieldNotes?: FieldNote[];
   showFieldNotesOnMap?: boolean;
   onToggleFieldNotesOnMap?: (v: boolean) => void;
@@ -202,16 +158,6 @@ export interface LayerPanelProps {
   overlapFilter?: OverlapFilter;
   onOverlapFilterChange?: (filter: OverlapFilter) => void;
   overlapStats?: OverlapStats | null;
-  accessibilityVisible?: boolean;
-  onAccessibilityVisibleChange?: (v: boolean) => void;
-  accessibilityOpacity?: number;
-  onAccessibilityOpacityChange?: (v: number) => void;
-  accessibilityExplainMode?: boolean;
-  onAccessibilityExplainModeChange?: (v: boolean) => void;
-  fusionVisible?: boolean;
-  onFusionVisibleChange?: (v: boolean) => void;
-  fusionOpacity?: number;
-  onFusionOpacityChange?: (v: number) => void;
   ctxMosaicOpacity?: number;
   onCtxMosaicOpacityChange?: (v: number) => void;
   showMeasurementTools?: boolean;

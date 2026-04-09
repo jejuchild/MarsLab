@@ -18,8 +18,6 @@ import useAnnotations from "../hooks/useAnnotations";
 import useHoverHighlight from "../hooks/useHoverHighlight";
 import useGridOverlay from "../hooks/useGridOverlay";
 import useCustomDatasets from "../hooks/useCustomDatasets";
-import usePathfinderOverlay from "../hooks/usePathfinderOverlay";
-import useRoverSimulation from "../hooks/useRoverSimulation";
 import { useHighContrastMode } from "../hooks/useHighContrastMode";
 import useMapKeyboard from "../hooks/useMapKeyboard";
 import useBookmarks from "../hooks/useBookmarks";
@@ -162,8 +160,6 @@ type MapViewProps = {
   // Coordinate grid overlay
   showGrid?: boolean;
   showRegionLayer?: boolean;
-  // AI Analysis pin location
-  aiAnalysisPin?: { lat: number; lon: number } | null;
   // Multi-Instrument Overlap Filter
   overlapFilter?: { enabled: boolean; instruments: string[] };
   onOverlapStatsChange?: (stats: OverlapStats | null) => void;
@@ -198,35 +194,12 @@ type MapViewProps = {
 
   // Easter eggs
   terraformMode?: boolean;
-  /** SWIM layer: "0-1m" | "1-5m" | ">5m" | false */
-  swimLayer?: string | false;
-  scienceLayerVisibility?: Record<string, boolean>;
-  scienceLayerDepth?: string;
-  scienceLayerOpacities?: Record<string, number>;
   onOlympusMonsTripleClick?: () => void;
-  // Ice Accessibility heatmap overlay
-  accessibilityVisible?: boolean;
-  accessibilityOpacity?: number;
-  // Ice Prospecting Fusion overlay
-  fusionVisible?: boolean;
-  fusionOpacity?: number;
   // CTX Mosaic overlay opacity (Murray Lab 5m, Arcadia Planitia)
   ctxMosaicOpacity?: number;
   // High-Res Only filter
   highResOnly?: boolean;
   onOlympusMonsClimber?: () => void;
-  // Pathfinder route overlay
-  pathfinderStart?: { lat: number; lon: number } | null;
-  pathfinderGoal?: { lat: number; lon: number } | null;
-  pathfinderRoute?: import("../api/pathfinder").RouteResult | null;
-  // Rover simulation
-  simPlaying?: boolean;
-  simSpeed?: number;
-  simCameraFollow?: boolean;
-  simSeekTo?: number | null;
-  onSimProgress?: (progress: number) => void;
-  onSimTelemetry?: (telemetry: import("../hooks/useRoverSimulation").RoverTelemetry) => void;
-  onSimComplete?: () => void;
 };
 
 /* ==================================================
@@ -709,7 +682,6 @@ export default function MapView({
   onFieldNoteClick,
   showGrid = false,
   showRegionLayer = false,
-  aiAnalysisPin = null,
   overlapFilter,
   onOverlapStatsChange,
   highlightProductId,
@@ -721,28 +693,10 @@ export default function MapView({
   craterDetectFeatures,
   cameraViewportRef,
   terraformMode = false,
-  swimLayer = false,
-  scienceLayerVisibility = {},
-  scienceLayerDepth = "1-5m",
-  scienceLayerOpacities = {},
-  accessibilityVisible = false,
-  accessibilityOpacity = 0.6,
-  fusionVisible = false,
-  fusionOpacity = 0.6,
   ctxMosaicOpacity: _ctxMosaicOpacity = 1.0,
   highResOnly = false,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,
-  pathfinderStart = null,
-  pathfinderGoal = null,
-  pathfinderRoute = null,
-  simPlaying = false,
-  simSpeed = 1,
-  simCameraFollow = false,
-  simSeekTo = null,
-  onSimProgress,
-  onSimTelemetry,
-  onSimComplete,
 }: MapViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -925,14 +879,6 @@ export default function MapView({
 
   useMapLayers({
     viewerRef,
-    swimLayer,
-    scienceLayerVisibility,
-    scienceLayerDepth,
-    scienceLayerOpacities,
-    accessibilityVisible,
-    accessibilityOpacity,
-    fusionVisible,
-    fusionOpacity,
   });
 
   useFlyTo({
@@ -968,34 +914,9 @@ export default function MapView({
     analysisMode,
     linePoints,
     fieldNotes,
-    aiAnalysisPin,
     sharadTracePin,
     terraformMode,
     craterDetectFeatures,
-  });
-
-  usePathfinderOverlay({
-    viewerRef,
-    marsEllipsoid: MARS_ELLIPSOID,
-    analysisMode,
-    startPoint: pathfinderStart,
-    goalPoint: pathfinderGoal,
-    routeResult: pathfinderRoute,
-  });
-
-  useRoverSimulation({
-    viewerRef,
-    marsEllipsoid: MARS_ELLIPSOID,
-    routeResult: pathfinderRoute,
-    vlmAnalysis: pathfinderRoute?.vlm_analysis,
-    analysisMode,
-    isPlaying: simPlaying,
-    speed: (simSpeed as 1 | 2 | 5 | 10) || 1,
-    cameraFollow: simCameraFollow,
-    seekTo: simSeekTo,
-    onProgress: onSimProgress,
-    onTelemetry: onSimTelemetry,
-    onComplete: onSimComplete,
   });
 
   useHoverHighlight({

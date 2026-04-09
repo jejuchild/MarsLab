@@ -5,7 +5,6 @@ import { lp, PANEL_COLLAPSED_KEY } from "./tokens";
 // Section components
 import ViewModeSection from "./sections/ViewModeSection";
 import NavigationSection from "./sections/NavigationSection";
-import IceHub from "./sections/IceHub";
 import FootprintSection from "./sections/FootprintSection";
 import AnalysisTools from "./sections/AnalysisTools";
 import ProductsHub from "./sections/ProductsHub";
@@ -27,27 +26,6 @@ export default function LayerPanel({
   onToggleGrid,
   showRegionLayer = false,
   onToggleRegionLayer,
-  // Ice
-  scienceLayerVisibility = {} as Record<string, boolean>,
-  onScienceLayerToggle,
-  scienceLayerDepth = "1-5m" as "0-1m" | "1-5m" | "5m-plus",
-  onScienceLayerDepthChange,
-  scienceLayerOpacities = {} as Record<string, number>,
-  onScienceLayerOpacity,
-  swimLayer = false,
-  onSwimLayerChange,
-  swimIceLat = null,
-  swimIceLon = null,
-  accessibilityVisible = false,
-  onAccessibilityVisibleChange,
-  accessibilityOpacity = 0.6,
-  onAccessibilityOpacityChange,
-  accessibilityExplainMode = false,
-  onAccessibilityExplainModeChange,
-  fusionVisible = false,
-  onFusionVisibleChange,
-  fusionOpacity = 0.6,
-  onFusionOpacityChange,
   ctxMosaicOpacity: _ctxMosaicOpacity = 1.0,
   onCtxMosaicOpacityChange: _onCtxMosaicOpacityChange,
   // Footprints
@@ -67,7 +45,6 @@ export default function LayerPanel({
   // Analysis
   analysisMode = null,
   onAnalysisModeChange,
-  onShowRegionDashboard,
   showMeasurementTools = false,
   onToggleMeasurementTools,
   // Products
@@ -222,29 +199,6 @@ export default function LayerPanel({
           onToggleRegionLayer={onToggleRegionLayer}
         />
 
-        <IceHub
-          scienceLayerVisibility={scienceLayerVisibility}
-          onScienceLayerToggle={onScienceLayerToggle}
-          scienceLayerDepth={scienceLayerDepth}
-          onScienceLayerDepthChange={onScienceLayerDepthChange}
-          scienceLayerOpacities={scienceLayerOpacities}
-          onScienceLayerOpacity={onScienceLayerOpacity}
-          swimLayer={swimLayer}
-          onSwimLayerChange={onSwimLayerChange}
-          swimIceLat={swimIceLat}
-          swimIceLon={swimIceLon}
-          accessibilityVisible={accessibilityVisible}
-          onAccessibilityVisibleChange={onAccessibilityVisibleChange}
-          accessibilityOpacity={accessibilityOpacity}
-          onAccessibilityOpacityChange={onAccessibilityOpacityChange}
-          accessibilityExplainMode={accessibilityExplainMode}
-          onAccessibilityExplainModeChange={onAccessibilityExplainModeChange}
-          fusionVisible={fusionVisible}
-          onFusionVisibleChange={onFusionVisibleChange}
-          fusionOpacity={fusionOpacity}
-          onFusionOpacityChange={onFusionOpacityChange}
-        />
-
         <FootprintSection
           instrumentVisibility={instrumentVisibility}
           onToggleInstrument={onToggleInstrument}
@@ -264,7 +218,6 @@ export default function LayerPanel({
         <AnalysisTools
           analysisMode={analysisMode}
           onAnalysisModeChange={onAnalysisModeChange}
-          onShowRegionDashboard={onShowRegionDashboard}
           showMeasurementTools={showMeasurementTools}
           onToggleMeasurementTools={onToggleMeasurementTools}
         />

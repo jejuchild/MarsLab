@@ -13,10 +13,6 @@ import TopBar from "../components/TopBar";
 import LayerPanelRaw from "../components/layerpanel/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
 import FieldNoteModal from "../components/FieldNoteModal";
-import AiAnalysisPanelRaw from "../components/AiAnalysisPanel";
-import AgenticPanelRaw from "../components/AgenticPanel";
-import GuidedWorkflowsRaw from "../components/GuidedWorkflows";
-import type { WorkflowAction } from "../components/GuidedWorkflows";
 import CopilotFab from "../components/CopilotFab";
 import type { FieldNote } from "../api/fieldnotes";
 import useFieldNotes from "../hooks/useFieldNotes";
@@ -29,7 +25,6 @@ import useCommandPalette from "../hooks/useCommandPalette";
 import usePanelManager from "../hooks/usePanelManager";
 import PanelAttentionWrapper from "../components/PanelAttentionWrapper";
 import { useUndoRedo } from "../hooks/useUndoRedo";
-import AccessibilityExplainTooltip from "../components/AccessibilityExplainTooltip";
 import CommandPalette from "../components/CommandPalette";
 import type { CommandAction } from "../components/CommandPalette";
 import EmptyState from "../components/EmptyState";
@@ -43,26 +38,16 @@ import SpectralComparison from "../components/SpectralComparison";
 import type { PinnedSpectrum } from "../components/SpectralComparison";
 import { CuriositySelfieModal, OlympusMonsPanel, OlympusMonsClimber, TerraformOverlay } from "../components/EasterEggs";
 import type { DetectedFeature } from "../components/CraterDetectPanel";
-import type { SwimMethod, DepthRange } from "../api/swim_ice";
-import { SWIM_METHODS } from "../api/swim_ice";
-import type { RouteResult } from "../api/pathfinder";
-import type { RoverTelemetry, SpeedOption } from "../hooks/useRoverSimulation";
 
 // Memoize heavy child components to prevent unnecessary re-renders
 const MapView = memo(MapViewRaw);
 const Inspector = memo(InspectorPanelRaw);
 const LayerPanel = memo(LayerPanelRaw);
-const AiAnalysisPanel = memo(AiAnalysisPanelRaw);
-const AgenticPanel = memo(AgenticPanelRaw);
-const GuidedWorkflows = memo(GuidedWorkflowsRaw);
 
 // Lazy-loaded heavy components (Three.js / Recharts)
 const HiRiseDTM3DViewer = lazy(() => import("../components/HiRiseDTM3DViewer"));
 const LineProfile = lazy(() => import("../components/LineProfile"));
-const ReportPanel = lazy(() => import("../components/ReportPanel"));
-const RegionDashboard = lazy(() => import("../components/RegionDashboard"));
 const SpaceGame = lazy(() => import("../components/SpaceGame"));
-const RegionStatsPanel = lazy(() => import("../components/RegionStatsPanel"));
 const CraterDetectPanel = lazy(() => import("../components/CraterDetectPanel"));
 const TemporalComparison = lazy(() => import("../components/TemporalComparison"));
 const RegolithPanel = lazy(() => import("../components/RegolithPanel"));
@@ -70,7 +55,6 @@ const StratigraphyPanel = lazy(() => import("../components/StratigraphyPanel"));
 const AttenuationPanel = lazy(() => import("../components/AttenuationPanel"));
 const MineralSequencePanel = lazy(() => import("../components/MineralSequencePanel"));
 const StratColumnPanel = lazy(() => import("../components/StratColumnPanel"));
-const PathfinderPanel = lazy(() => import("../components/PathfinderPanel"));
 
 // Default CRISM wavelengths (in micrometers)
 const DEFAULT_RGB_WAVELENGTHS: RGBWavelengths = {
@@ -233,26 +217,9 @@ export default function MainPage() {
   // Terrain click point for slope analysis (when clicking empty terrain)
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
 
-  // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / ai_analysis / agentic
-  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | "pathfinder" | null;
+  // Analysis mode: mutually exclusive slope / hirise_dtm_3d / line / specialized panels
+  type AnalysisMode = "slope" | "hirise_dtm_3d" | "line" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | null;
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(null);
-
-  // Guided Workflow: user-selected location
-  const [guidedLocation, setGuidedLocation] = useState<{ lat: number; lon: number } | null>(null);
-
-  // Pathfinder: start/goal points and route result
-  const [pathfinderStart, setPathfinderStart] = useState<{ lat: number; lon: number } | null>(null);
-  const [pathfinderGoal, setPathfinderGoal] = useState<{ lat: number; lon: number } | null>(null);
-  const [pathfinderRoute, setPathfinderRoute] = useState<RouteResult | null>(null);
-
-  // Rover simulation state
-  const [simPlaying, setSimPlaying] = useState(false);
-  const [simSpeed, setSimSpeed] = useState<SpeedOption>(1);
-  const [simCameraFollow, setSimCameraFollow] = useState(true);
-  const [simSeekTo, setSimSeekTo] = useState<number | null>(null);
-  const [simProgress, setSimProgress] = useState(0);
-  const [simTelemetry, setSimTelemetry] = useState<RoverTelemetry | null>(null);
-  const [simComplete, setSimComplete] = useState(false);
 
   // HiRISE DTM 3D analysis point (requires product_id + lat/lon)
   const [hiRiseDTM3DPoint, setHiRiseDTM3DPoint] = useState<HiRiseDTMPoint | null>(null);
@@ -456,34 +423,7 @@ export default function MainPage() {
   // Coordinate grid
   const [showGrid, setShowGrid] = useState(false);
   const [showRegionLayer, setShowRegionLayer] = useState(false);
-  const [swimLayer, setSwimLayer] = useState<string | false>(false);
-  const [accessibilityVisible, setAccessibilityVisible] = useState(false);
-  const [accessibilityOpacity, setAccessibilityOpacity] = useState(0.6);
-  const [fusionVisible, setFusionVisible] = useState(false);
-  const [fusionOpacity, setFusionOpacity] = useState(0.6);
   const [ctxMosaicOpacity, setCtxMosaicOpacity] = useState(1.0);
-  const [accessibilityExplainMode, setAccessibilityExplainMode] = useState(false);
-  const [accessibilityExplainPoint, setAccessibilityExplainPoint] = useState<{ lat: number; lon: number } | null>(null);
-  const [scienceLayerVisibility, setScienceLayerVisibility] = useState<Record<SwimMethod, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    for (const m of SWIM_METHODS) init[m] = false;
-    return init as Record<SwimMethod, boolean>;
-  });
-  const [scienceLayerDepth, setScienceLayerDepth] = useState<DepthRange>("1-5m");
-  const [scienceLayerOpacities, setScienceLayerOpacities] = useState<Record<SwimMethod, number>>(() => {
-    const init: Record<string, number> = {};
-    for (const m of SWIM_METHODS) init[m] = 0.7;
-    return init as Record<SwimMethod, number>;
-  });
-  const handleScienceLayerToggle = useCallback((method: SwimMethod, visible: boolean) => {
-    setScienceLayerVisibility(prev => ({ ...prev, [method]: visible }));
-  }, []);
-  const handleScienceLayerOpacity = useCallback((method: SwimMethod, opacity: number) => {
-    setScienceLayerOpacities(prev => ({ ...prev, [method]: opacity }));
-  }, []);
-
-  // Region Dashboard overlay
-  const [showRegionDashboard, setShowRegionDashboard] = useState(false);
 
   // Easter egg game
   const [showGame, setShowGame] = useState(false);
@@ -491,9 +431,6 @@ export default function MainPage() {
   const [showCuriosity, setShowCuriosity] = useState(false);
   const [showOlympusMons, setShowOlympusMons] = useState(false);
   const [showOlympusMonsClimber, setShowOlympusMonsClimber] = useState(false);
-
-  // Region Stats polygon vertices
-  const [regionVertices, setRegionVertices] = useState<{lat: number; lon: number}[]>([]);
 
   // Crater/Landform Detection
   const [, setCraterDetectCenter] = useState<{lat: number; lon: number} | null>(null);
@@ -517,10 +454,6 @@ export default function MainPage() {
     isMobile,
     setMobilePanel,
   });
-  // Stable callbacks for memoized children (avoids breaking memo())
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleAgenticPanelAttention = useCallback(() => panelManager.ensurePanelVisible("analysis_complete"), [panelManager.ensurePanelVisible]);
-
   // Onboarding tour (force re-trigger)
   const [showTourForced, setShowTourForced] = useState(false);
 
@@ -586,9 +519,6 @@ export default function MainPage() {
 
   // Memoized inspected product ID for MapView (avoids re-render on unrelated state changes)
   const inspectedProductId = useMemo(() => selected?.productId ?? null, [selected?.productId]);
-
-  // AI Analysis pin
-  const [aiAnalysisPin, setAiAnalysisPin] = useState<TerrainPoint | null>(null);
 
   // Default opacity for new overlays
   const DEFAULT_OPACITY = 100;
@@ -1273,92 +1203,11 @@ export default function MainPage() {
       setSelected(null);
       setTerrainPoint({ lat, lon });
     }
-    if (analysisMode === "ai_analysis") {
-      // AI Analysis mode: set pin and open panel
-      setSelected(null);
-      setAiAnalysisPin({ lat, lon });
-    }
-    if (analysisMode === "guided") {
-      // Guided workflow mode: update selected location
-      setGuidedLocation({ lat, lon });
-    }
-    if (analysisMode === "region_stats") {
-      // Region Stats mode: add vertex to polygon
-      setRegionVertices((prev) => [...prev, { lat, lon }]);
-    }
     if (analysisMode === "crater_detect") {
       // Crater detection: set scan center point
       setCraterDetectCenter({ lat, lon });
     }
-    if (analysisMode === "pathfinder") {
-      // Pathfinder mode: first click = start, second click = goal
-      if (!pathfinderStart) {
-        setPathfinderStart({ lat, lon });
-      } else if (!pathfinderGoal) {
-        setPathfinderGoal({ lat, lon });
-      } else {
-        // Reset and start new route
-        setPathfinderRoute(null);
-        setPathfinderStart({ lat, lon });
-        setPathfinderGoal(null);
-      }
-      return;
-    }
-    // Accessibility explain mode: show tooltip on any terrain click
-    if (accessibilityVisible && accessibilityExplainMode) {
-      setAccessibilityExplainPoint({ lat, lon });
-    }
-  }, [analysisMode, accessibilityVisible, accessibilityExplainMode, pathfinderStart, pathfinderGoal]);
-
-  // ── Simulation Callbacks ─────────────────────────────────
-  const handleSimProgress = useCallback((progress: number) => {
-    setSimProgress(progress);
-    setSimSeekTo(null);
-  }, []);
-
-  const handleSimTelemetry = useCallback((telemetry: RoverTelemetry) => {
-    setSimTelemetry(telemetry);
-  }, []);
-
-  const handleSimComplete = useCallback(() => {
-    setSimPlaying(false);
-    setSimComplete(true);
-  }, []);
-
-  // Reset simulation when a new route is planned
-  useEffect(() => {
-    setSimPlaying(false);
-    setSimProgress(0);
-    setSimTelemetry(null);
-    setSimComplete(false);
-    setSimSeekTo(null);
-  }, [pathfinderRoute]);
-
-  const simControls = useMemo(() => ({
-    play: () => { setSimComplete(false); setSimPlaying(true); },
-    pause: () => setSimPlaying(false),
-    togglePlayPause: () => {
-      if (simComplete) {
-        setSimSeekTo(0);
-        setSimComplete(false);
-        setSimPlaying(true);
-      } else {
-        setSimPlaying(p => !p);
-      }
-    },
-    setSpeed: (s: SpeedOption) => setSimSpeed(s),
-    seek: (p: number) => {
-      setSimSeekTo(p);
-      setSimPlaying(false);
-      if (p < 1) setSimComplete(false);
-    },
-    reset: () => {
-      setSimSeekTo(0);
-      setSimPlaying(false);
-      setSimComplete(false);
-    },
-    toggleCamera: () => setSimCameraFollow(c => !c),
-  }), [simComplete]);
+  }, [analysisMode]);
 
   // When a product is selected, clear terrain point
   const handleSelect = useCallback((ctx: InspectorContext | null) => {
@@ -1412,12 +1261,6 @@ export default function MainPage() {
   const handleAnalysisModeChange = useCallback((mode: AnalysisMode) => {
     setAnalysisMode(mode);
     // Clear state for all modes — ensures the selected mode's panel actually renders
-    // (rightPanelContent priority chain: selected > terrainPoint > ... > analysisMode)
-    if (mode === "agentic") {
-      // These modes MUST clear higher-priority panel states to render
-      setSelected(null);
-      setSharadHiresProductId(null);
-    }
     if (mode !== "slope") {
       setTerrainPoint(null);
     }
@@ -1429,20 +1272,11 @@ export default function MainPage() {
       setLinePoints([]);
       setLineProfileData(null);
     }
-    if (mode !== "ai_analysis") {
-      setAiAnalysisPin(null);
-    }
-    if (mode !== "guided") {
-      setGuidedLocation(null);
-    }
-    if (mode !== "region_stats") {
-      setRegionVertices([]);
-    }
     if (mode !== "crater_detect") {
       setCraterDetectCenter(null);
       setCraterDetectFeatures([]);
     }
-    if (mode !== "agentic" && mode !== "stratigraphy") {
+    if (mode !== "stratigraphy") {
       setEpsilonTarget(null);
     }
     if (mode !== "regolith") {
@@ -1457,16 +1291,6 @@ export default function MainPage() {
     if (mode !== "strat_column") {
       setStratColumnTarget(null);
     }
-    if (mode !== "pathfinder") {
-      setPathfinderStart(null);
-      setPathfinderGoal(null);
-      setPathfinderRoute(null);
-      setSimPlaying(false);
-      setSimProgress(0);
-      setSimTelemetry(null);
-      setSimComplete(false);
-      setSimSeekTo(null);
-    }
   }, []);
 
   // Handle "Run ε Inversion" from CraterDetectPanel → opens StratigraphyPanel
@@ -1480,35 +1304,6 @@ export default function MainPage() {
     setStratColumnTarget(feature);
     setAnalysisMode("strat_column");
   }, []);
-
-  // Guided Workflow action handler
-  const handleWorkflowAction = useCallback((action: WorkflowAction) => {
-    switch (action.type) {
-      case "fly_to":
-        setFlyToCoords({ lat: action.lat, lon: action.lon });
-        break;
-      case "load_instrument": {
-        const inst = action.instrument as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM";
-        const id = inst.toLowerCase() as InstrumentId;
-        setInstrumentVisibility(prev => ({ ...prev, [id]: true }));
-        setLoadFootprintsTrigger({ instrument: inst, timestamp: Date.now() });
-        break;
-      }
-      case "set_analysis_mode":
-        // Temporarily switch to the requested analysis mode, but keep guided active
-        // For now, just trigger slope if that is what is requested
-        if (action.mode === "slope" && guidedLocation) {
-          setTerrainPoint({ lat: guidedLocation.lat, lon: guidedLocation.lon });
-        }
-        break;
-      case "run_agentic":
-        toast.success("Launching Agentic AI analysis...");
-        break;
-      case "show_results":
-        toast.success("Step completed. Results available in the relevant panel.");
-        break;
-    }
-  }, [guidedLocation]);
 
   // Command Palette action handler
   const handleCommandAction = useCallback((cmd: CommandAction) => {
@@ -1797,8 +1592,6 @@ export default function MainPage() {
       // Analysis mode
       analysisMode={analysisMode}
       onAnalysisModeChange={handleAnalysisModeChange}
-      // Region Dashboard
-      onShowRegionDashboard={() => setShowRegionDashboard(true)}
       // Fly-To navigation
       onFlyToCoords={handleFlyToCoords}
       // View bound selection mode
@@ -1809,16 +1602,6 @@ export default function MainPage() {
       onToggleGrid={setShowGrid}
       showRegionLayer={showRegionLayer}
       onToggleRegionLayer={setShowRegionLayer}
-      swimLayer={swimLayer}
-      onSwimLayerChange={setSwimLayer}
-      swimIceLat={terrainPoint?.lat ?? null}
-      swimIceLon={terrainPoint?.lon ?? null}
-      scienceLayerVisibility={scienceLayerVisibility}
-      onScienceLayerToggle={handleScienceLayerToggle}
-      scienceLayerDepth={scienceLayerDepth}
-      onScienceLayerDepthChange={setScienceLayerDepth}
-      scienceLayerOpacities={scienceLayerOpacities}
-      onScienceLayerOpacity={handleScienceLayerOpacity}
       // Field Notes
       fieldNotes={fieldNotes}
       showFieldNotesOnMap={showFieldNotesOnMap}
@@ -1832,18 +1615,6 @@ export default function MainPage() {
       // Measurement Tools
       showMeasurementTools={showMeasurementTools}
       onToggleMeasurementTools={setShowMeasurementTools}
-      // Ice Accessibility
-      accessibilityVisible={accessibilityVisible}
-      onAccessibilityVisibleChange={setAccessibilityVisible}
-      accessibilityOpacity={accessibilityOpacity}
-      onAccessibilityOpacityChange={setAccessibilityOpacity}
-      accessibilityExplainMode={accessibilityExplainMode}
-      onAccessibilityExplainModeChange={setAccessibilityExplainMode}
-      // Ice Prospecting (Fusion)
-      fusionVisible={fusionVisible}
-      onFusionVisibleChange={setFusionVisible}
-      fusionOpacity={fusionOpacity}
-      onFusionOpacityChange={setFusionOpacity}
       ctxMosaicOpacity={ctxMosaicOpacity}
       onCtxMosaicOpacityChange={setCtxMosaicOpacity}
     />
@@ -1851,13 +1622,7 @@ export default function MainPage() {
 
   const rightPanelContent =
     // Explicit analysis modes take priority (user deliberately opened these)
-    analysisMode === "agentic" ? (
-      <AgenticPanel
-        onClose={() => { setAnalysisMode(null); setEpsilonTarget(null); }}
-        initialObjective={epsilonTarget ? `Run terrain εr inversion for terraced crater at (${epsilonTarget.lat.toFixed(3)}, ${epsilonTarget.lon.toFixed(3)}), diameter ${epsilonTarget.diameter_km?.toFixed(1) ?? "?"} km, terrace depth ${epsilonTarget.terrace_depth_m?.toFixed(0) ?? "?"} m. Search for SHARAD and HiRISE DTM data, then compute dielectric constant.` : undefined}
-        onPanelAttention={handleAgenticPanelAttention}
-      />
-    ) : regolithProductId && analysisMode === "regolith" ? (
+    regolithProductId && analysisMode === "regolith" ? (
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading regolith analysis...</div>}>
         <RegolithPanel
           productId={regolithProductId}
@@ -1951,33 +1716,6 @@ export default function MainPage() {
           }}
         />
       </Suspense>
-    ) : aiAnalysisPin ? (
-      <AiAnalysisPanel
-        pin={aiAnalysisPin}
-        onClose={() => {
-          setAiAnalysisPin(null);
-          setAnalysisMode(null);
-        }}
-      />
-    ) : analysisMode === "report" ? (
-      <Suspense fallback={<div className="flex items-center justify-center h-full text-[#6b7c9c] text-xs">Loading...</div>}>
-        <ReportPanel onClose={() => setAnalysisMode(null)} isMobile={isMobile} />
-      </Suspense>
-    ) : analysisMode === "guided" ? (
-      <GuidedWorkflows
-        isOpen={true}
-        onClose={() => { setAnalysisMode(null); setGuidedLocation(null); }}
-        onAction={handleWorkflowAction}
-        currentLocation={guidedLocation}
-      />
-    ) : analysisMode === "region_stats" ? (
-      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading region analysis...</div>}>
-        <RegionStatsPanel
-          vertices={regionVertices}
-          onClose={() => { setAnalysisMode(null); setRegionVertices([]); }}
-          onClearPolygon={() => setRegionVertices([])}
-        />
-      </Suspense>
     ) : analysisMode === "crater_detect" ? (
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading landform detector...</div>}>
         <CraterDetectPanel
@@ -1995,36 +1733,12 @@ export default function MainPage() {
           onOpenStratColumn={handleOpenStratColumn}
         />
       </Suspense>
-    ) : analysisMode === "pathfinder" ? (
-      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading pathfinder...</div>}>
-        <PathfinderPanel
-          startPoint={pathfinderStart}
-          goalPoint={pathfinderGoal}
-          onRouteReady={(route) => setPathfinderRoute(route)}
-          onClear={() => { setPathfinderStart(null); setPathfinderGoal(null); setPathfinderRoute(null); }}
-          onSuggestRoute={(start, goal) => {
-            setPathfinderStart(start);
-            setPathfinderGoal(goal);
-            setPathfinderRoute(null);
-            setFlyToCoords({ lat: (start.lat + goal.lat) / 2, lon: (start.lon + goal.lon) / 2 });
-          }}
-          simPlaying={simPlaying}
-          simSpeed={simSpeed}
-          simProgress={simProgress}
-          simTelemetry={simTelemetry}
-          simComplete={simComplete}
-          simCameraFollow={simCameraFollow}
-          simControls={simControls}
-        />
-      </Suspense>
     ) : (
       <div className="h-full flex items-center justify-center bg-[#101622]">
         <EmptyState
           icon="explore"
           title="No product selected"
           description="Click a footprint on the map or search for a product to inspect it. Load instrument layers from the Layers panel to get started."
-          actionLabel="Open Agentic AI"
-          onAction={() => handleAnalysisModeChange("agentic")}
         />
       </div>
     );
@@ -2172,11 +1886,6 @@ export default function MainPage() {
         activeDTMProductId={activeDTMProduct}
         showGrid={showGrid}
         showRegionLayer={showRegionLayer}
-        swimLayer={swimLayer}
-        scienceLayerVisibility={scienceLayerVisibility}
-        scienceLayerDepth={scienceLayerDepth}
-        scienceLayerOpacities={scienceLayerOpacities}
-        aiAnalysisPin={aiAnalysisPin}
         overlapFilter={overlapFilter}
         onOverlapStatsChange={handleOverlapStatsChange}
         highlightProductId={highlightProductId}
@@ -2190,37 +1899,13 @@ export default function MainPage() {
         onOlympusMonsClimber={handleOlympusMonsClimber}
         craterDetectFeatures={craterDetectFeatures}
         cameraViewportRef={cameraViewportRef}
-        accessibilityVisible={accessibilityVisible}
-        accessibilityOpacity={accessibilityOpacity}
-        fusionVisible={fusionVisible}
-        fusionOpacity={fusionOpacity}
         ctxMosaicOpacity={ctxMosaicOpacity}
         highResOnly={highResOnly}
-        pathfinderStart={pathfinderStart}
-        pathfinderGoal={pathfinderGoal}
-        pathfinderRoute={pathfinderRoute}
-        simPlaying={simPlaying}
-        simSpeed={simSpeed}
-        simCameraFollow={simCameraFollow}
-        simSeekTo={simSeekTo}
-        onSimProgress={handleSimProgress}
-        onSimTelemetry={handleSimTelemetry}
-        onSimComplete={handleSimComplete}
       />
-
-      {/* Accessibility Explain Tooltip — floating on map */}
-      {accessibilityExplainPoint && (
-        <AccessibilityExplainTooltip
-          lat={accessibilityExplainPoint.lat}
-          lon={accessibilityExplainPoint.lon}
-          onClose={() => setAccessibilityExplainPoint(null)}
-        />
-      )}
 
       {/* MARVIS FAB — floating chat widget with grounded tool calling */}
       {!isMobile && (
         <CopilotFab
-          hidden={analysisMode === "agentic"}
           inspectorOpen={selected !== null}
           onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
           onLoadInstrument={(inst) => handleLoadFootprints(inst as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3")}
@@ -2380,26 +2065,6 @@ export default function MainPage() {
         onClose={commandPalette.close}
         onAction={handleCommandAction}
       />
-
-      {/* Region Dashboard full-viewport overlay */}
-      {showRegionDashboard && (
-        <ErrorBoundary scope="RegionDashboard">
-          <Suspense fallback={null}>
-            <RegionDashboard
-              isOpen={showRegionDashboard}
-              onClose={() => setShowRegionDashboard(false)}
-              onFlyTo={(lat, lon) => {
-                setShowRegionDashboard(false);
-                setFlyToCoords({ lat, lon });
-              }}
-              onRunReport={() => {
-                setShowRegionDashboard(false);
-                setAnalysisMode("report");
-              }}
-            />
-          </Suspense>
-        </ErrorBoundary>
-      )}
 
       {/* Easter egg: Space Shooter Game */}
       {showGame && (

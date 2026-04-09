@@ -217,7 +217,7 @@ function EmptyState() {
  * Main Page Component
  * =======================================================*/
 
-export default function MarsResearchPage() {
+export default function MarsResearchPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [research, setResearch] = useState<ResearchSummary[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [detail, setDetail] = useState<ResearchDetail | null>(null);
@@ -288,28 +288,30 @@ export default function MarsResearchPage() {
     : "";
 
   return (
-    <div className="h-screen flex flex-col bg-[#0a0f18] text-slate-200">
-      {/* Top bar */}
-      <header className="flex items-center justify-between h-14 px-6 border-b border-border-dark bg-bg-dark shrink-0">
-        <div className="flex items-center gap-4">
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg">arrow_back</span>
-            <span className="text-sm font-medium">Workbench</span>
-          </Link>
-          <div className="h-5 w-px bg-border-dark" />
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-xl">science</span>
-            <h1 className="text-lg font-bold tracking-tight">Mars Research</h1>
+    <div className={embedded ? "flex flex-col flex-1 overflow-hidden bg-[#0a0f18] text-slate-200" : "h-screen flex flex-col bg-[#0a0f18] text-slate-200"}>
+      {/* Top bar — hidden when embedded */}
+      {!embedded && (
+        <header className="flex items-center justify-between h-14 px-6 border-b border-border-dark bg-bg-dark shrink-0">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/"
+              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg">arrow_back</span>
+              <span className="text-sm font-medium">Workbench</span>
+            </Link>
+            <div className="h-5 w-px bg-border-dark" />
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-xl">science</span>
+              <h1 className="text-lg font-bold tracking-tight">Mars Research</h1>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span className="font-mono">{research.length} update{research.length !== 1 ? "s" : ""}</span>
-        </div>
-      </header>
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span className="font-mono">{research.length} update{research.length !== 1 ? "s" : ""}</span>
+          </div>
+        </header>
+      )}
 
       {/* Mobile list toggle */}
       <div className="md:hidden flex items-center border-b border-border-dark px-4 py-2 bg-bg-dark">

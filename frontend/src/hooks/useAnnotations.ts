@@ -57,7 +57,6 @@ type UseAnnotationsParams = {
   analysisMode: string | null;
   linePoints: Array<{ lat: number; lon: number }>;
   fieldNotes: FieldNote[];
-  aiAnalysisPin: { lat: number; lon: number } | null;
   sharadTracePin: { lat: number; lon: number } | null;
   terraformMode: boolean;
   craterDetectFeatures?: Array<{
@@ -82,7 +81,6 @@ export default function useAnnotations({
   analysisMode,
   linePoints,
   fieldNotes,
-  aiAnalysisPin,
   sharadTracePin,
   terraformMode,
   craterDetectFeatures,
@@ -525,82 +523,6 @@ export default function useAnnotations({
       cancelled = true;
     };
   }, [fieldNotes, viewerRef]);
-
-  // AI Analysis Pin + Radius Circle
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-
-    const PIN_ID = "AI_ANALYSIS_PIN";
-    const RADIUS_ID = "AI_ANALYSIS_RADIUS";
-
-    // Remove existing entities
-    const oldPin = viewer.entities.getById(PIN_ID);
-    if (oldPin) viewer.entities.remove(oldPin);
-    const oldRadius = viewer.entities.getById(RADIUS_ID);
-    if (oldRadius) viewer.entities.remove(oldRadius);
-
-    if (!aiAnalysisPin) {
-      viewer.scene.requestRender();
-      return;
-    }
-
-    const { lat, lon } = aiAnalysisPin;
-
-    // Pin point
-    viewer.entities.add({
-      id: PIN_ID,
-      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, marsEllipsoid),
-      point: {
-        pixelSize: 10,
-        color: Cesium.Color.fromCssColorString("#8b5cf6"),
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-      label: {
-        text: `AI Analysis\n${lat.toFixed(3)}°, ${lon.toFixed(3)}°`,
-        font: "11px sans-serif",
-        fillColor: Cesium.Color.fromCssColorString("#8b5cf6"),
-        outlineColor: Cesium.Color.BLACK,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        pixelOffset: new Cesium.Cartesian2(0, -14),
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      },
-    });
-
-    // Radius circle (10 km default; visual only)
-    viewer.entities.add({
-      id: RADIUS_ID,
-      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, marsEllipsoid),
-      ellipse: {
-        semiMajorAxis: 10000,  // 10 km
-        semiMinorAxis: 10000,
-        material: Cesium.Color.fromCssColorString("#8b5cf6").withAlpha(0.12),
-        outline: true,
-        outlineColor: Cesium.Color.fromCssColorString("#8b5cf6").withAlpha(0.5),
-        outlineWidth: 1,
-      },
-    });
-
-    viewer.scene.requestRender();
-  }, [aiAnalysisPin, viewerRef, marsEllipsoid]);
-
-  // Clean up AI Analysis entities when mode changes
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-
-    if (analysisMode !== "ai_analysis") {
-      const pin = viewer.entities.getById("AI_ANALYSIS_PIN");
-      if (pin) viewer.entities.remove(pin);
-      const radius = viewer.entities.getById("AI_ANALYSIS_RADIUS");
-      if (radius) viewer.entities.remove(radius);
-      viewer.scene.requestRender();
-    }
-  }, [analysisMode, viewerRef]);
 
   // SHARAD Trace Pin
   useEffect(() => {
