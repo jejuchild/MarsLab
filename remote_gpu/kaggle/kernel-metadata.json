@@ -6,8 +6,9 @@
   "kernel_type": "script",
   "is_private": true,
   "enable_gpu": true,
+  "enable_tpu": false,
   "enable_internet": true,
   "competition_sources": [],
-  "dataset_sources": [],
+  "dataset_sources": ["carsonparksnu/marsortho-benchmark"],
   "kernel_sources": []
 }

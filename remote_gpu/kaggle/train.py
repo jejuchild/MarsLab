@@ -33,7 +33,26 @@ def _try_install(packages):
         except Exception as e:
             print(f"  pip install skipped ({e}), using pre-installed packages")
 
-_try_install(["torch", "torchvision", "timm", "einops", "kornia"])
+_try_install(["torch", "torchvision", "timm", "einops"])
+
+# Check GPU compatibility — P100 (sm_60) needs older PyTorch
+try:
+    import torch as _torch
+    if _torch.cuda.is_available():
+        cap = _torch.cuda.get_device_capability(0)
+        gpu_name = _torch.cuda.get_device_name(0)
+        print(f"  GPU: {gpu_name}, compute capability: sm_{cap[0]}{cap[1]}")
+        if cap[0] < 7:  # P100 = sm_60, T4 = sm_75
+            print(f"  Old GPU detected — installing PyTorch with CUDA 11.8 for sm_60 support")
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install", "-q", "--force-reinstall",
+                "torch==2.1.0", "torchvision==0.16.0",
+                "--index-url", "https://download.pytorch.org/whl/cu118"
+            ])
+            print(f"  Reinstalled. Need to restart Python to pick up new torch.")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+except Exception as e:
+    print(f"  GPU check failed: {e}")
 
 import torch
 import torch.nn as nn
@@ -48,7 +67,7 @@ print(f"PyTorch: {torch.__version__}")
 print(f"CUDA available: {torch.cuda.is_available()}")
 if torch.cuda.is_available():
     print(f"GPU: {torch.cuda.get_device_name(0)}")
-    print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+    print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -56,13 +75,13 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Override via environment variables or modify here
 CONFIG = {
     "experiment": os.environ.get("EXPERIMENT", "E1_sisr_baseline"),
-    "model": os.environ.get("MODEL", "swinir"),
-    "data_dir": "/kaggle/working/marsortho-benchmark",
+    "model": os.environ.get("MODEL", "edsr"),
+    "data_dir": "/kaggle/input/marsortho-benchmark",
     "output_dir": "/kaggle/working",
     "patch_size": 256,
-    "batch_size": 8,
-    "lr": 1e-4,
-    "epochs": 50,
+    "batch_size": 16,
+    "lr": 2e-4,
+    "epochs": 100,
     "scale": 4,
 }
 
@@ -163,6 +182,44 @@ class ResBlock(nn.Module):
         return x + self.conv(x) * 0.1
 
 
+class EDSR(nn.Module):
+    """EDSR — Enhanced Deep Super-Resolution baseline."""
+    def __init__(self, scale=4, n_feats=128, n_blocks=16):
+        super().__init__()
+        self.head = nn.Conv2d(3, n_feats, 3, padding=1)
+        self.body = nn.Sequential(*[ResBlock(n_feats) for _ in range(n_blocks)])
+        self.body_tail = nn.Conv2d(n_feats, n_feats, 3, padding=1)
+
+        # Pixel shuffle upsampling
+        upsample_layers = []
+        for _ in range(int(np.log2(scale))):
+            upsample_layers.append(nn.Conv2d(n_feats, 4 * n_feats, 3, padding=1))
+            upsample_layers.append(nn.PixelShuffle(2))
+        self.upsample = nn.Sequential(*upsample_layers)
+
+        self.tail = nn.Conv2d(n_feats, 3, 3, padding=1)
+
+    def forward(self, x):
+        h = self.head(x)
+        body = self.body_tail(self.body(h)) + h
+        return self.tail(self.upsample(body))
+
+
+def build_model(name, scale=4):
+    """Factory for SR models."""
+    name = name.lower()
+    if name == "edsr":
+        return EDSR(scale=scale, n_feats=128, n_blocks=16)
+    elif name == "edsr_small":
+        return EDSR(scale=scale, n_feats=64, n_blocks=8)
+    elif name == "simple_baseline":
+        return SimpleSRBaseline(scale=scale)
+    else:
+        # Default to EDSR
+        print(f"  Unknown model {name}, using EDSR")
+        return EDSR(scale=scale, n_feats=128, n_blocks=16)
+
+
 # ── Metrics ───────────────────────────────────────────────────────────
 def compute_psnr(sr, hr):
     mse = F.mse_loss(sr, hr)
@@ -261,25 +318,19 @@ def main():
 
     data_dir = Path(cfg["data_dir"])
 
-    # Check if data exists
     if not data_dir.exists():
-        print(f"Data dir {data_dir} not found.")
-        print("Creating synthetic test data for pipeline validation...")
+        # Try alternative paths for Kaggle dataset
+        for alt in ["/kaggle/input/marsortho-benchmark", "/kaggle/working/marsortho-benchmark"]:
+            if Path(alt).exists():
+                data_dir = Path(alt)
+                cfg["data_dir"] = alt
+                break
 
-        # Generate synthetic patches for testing
-        for split in ["train", "test"]:
-            for subdir in ["lr", "hr"]:
-                d = data_dir / split / subdir
-                d.mkdir(parents=True, exist_ok=True)
+    if not data_dir.exists():
+        print(f"ERROR: Data dir {data_dir} not found")
+        sys.exit(1)
 
-                for i in range(20 if split == "train" else 5):
-                    if subdir == "lr":
-                        img = np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)
-                    else:
-                        img = np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8)
-                    Image.fromarray(img).save(d / f"patch_{i:04d}.png")
-
-        print(f"  Created synthetic data in {data_dir}")
+    print(f"Using data: {data_dir}")
 
     # Load data
     use_ref = "refsr" in cfg["experiment"].lower()
@@ -294,13 +345,8 @@ def main():
     print(f"Train: {len(train_ds)} patches, Test: {len(test_ds)} patches")
 
     # Create model
-    if cfg["model"] == "simple_baseline":
-        model = SimpleSRBaseline(scale=cfg["scale"]).to(DEVICE)
-    else:
-        # For other models (swinir, hat, etc.), load pretrained
-        # This is the simple baseline for pipeline testing
-        model = SimpleSRBaseline(scale=cfg["scale"]).to(DEVICE)
-        print(f"  Using SimpleSRBaseline (replace with {cfg['model']} for full experiment)")
+    model = build_model(cfg["model"], cfg["scale"]).to(DEVICE)
+    print(f"  Model: {cfg['model']}")
 
     params = sum(p.numel() for p in model.parameters())
     print(f"  Model parameters: {params:,}")

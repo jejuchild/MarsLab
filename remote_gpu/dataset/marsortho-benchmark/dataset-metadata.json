@@ -1,0 +1,17 @@
+{
+  "title": "MarsOrtho Benchmark",
+  "id": "carsonparksnu/marsortho-benchmark",
+  "licenses": [
+    {
+      "name": "CC0-1.0"
+    }
+  ],
+  "keywords": [
+    "mars",
+    "super-resolution",
+    "remote-sensing",
+    "planetary-science"
+  ],
+  "subtitle": "Cross-sensor SR benchmark from Mastcam-Z + HiRISE",
+  "description": "MarsOrtho is the first cross-sensor super-resolution benchmark for Mars, derived from Perseverance Mastcam-Z (HR, ~6.25cm/px) and MRO HiRISE (LR, ~25cm/px) co-registered via SPICE kernels.\n\n- Train: 281 patches from 48 sols\n- Test: 40 patches from 7 sols\n- Patch sizes: HR 256x256, LR 64x64 (x4 SR)\n- Coverage: Jezero Crater, Mars\n"
+}
