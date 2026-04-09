@@ -5,7 +5,8 @@
 
 export type InstrumentId = 'crism' | 'hirise' | 'sharad' | 'sharad_highres' | 'ctx' | 'ctx_mosaic' | 'hirise_dtm' | 'crism_trr3';
 export type GeometryType = 'Polygon' | 'LineString' | 'Point';
-export type InstrumentGroupId = 'spectral' | 'imaging' | 'radar';
+/** 4-lane Inspector groups (Phase 3): SHARAD / CRISM / HiRISE / CTX */
+export type InstrumentGroupId = 'sharad' | 'crism' | 'hirise' | 'ctx';
 
 export interface InstrumentGroup {
   id: InstrumentGroupId;
@@ -53,12 +54,15 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 }
 
 /**
- * Instrument groups for hierarchical display
+ * Instrument groups — 4-lane Inspector layout (Phase 3).
+ * Each group corresponds to one Inspector lane and lists its variants
+ * (e.g. SHARAD has Standard + Hi-res, HiRISE has Image + DTM).
  */
 export const INSTRUMENT_GROUPS: InstrumentGroup[] = [
-  { id: 'spectral', displayName: 'Spectrum',  icon: 'science',       instruments: ['crism', 'crism_trr3'] },
-  { id: 'imaging',  displayName: 'Imagery',   icon: 'photo_camera',  instruments: ['hirise', 'hirise_dtm', 'ctx', 'ctx_mosaic'] },
-  { id: 'radar',    displayName: 'Radar',     icon: 'radar',         instruments: ['sharad', 'sharad_highres'] },
+  { id: 'sharad', displayName: 'SHARAD', icon: 'radar',        instruments: ['sharad', 'sharad_highres'] },
+  { id: 'crism',  displayName: 'CRISM',  icon: 'science',      instruments: ['crism', 'crism_trr3'] },
+  { id: 'hirise', displayName: 'HiRISE', icon: 'photo_camera', instruments: ['hirise', 'hirise_dtm'] },
+  { id: 'ctx',    displayName: 'CTX',    icon: 'satellite',    instruments: ['ctx', 'ctx_mosaic'] },
 ];
 
 /**
@@ -70,7 +74,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     name: 'CRISM',
     displayName: 'Compact Reconnaissance Imaging Spectrometer for Mars',
     subLabel: 'CRISM MTRDR',
-    group: 'spectral',
+    group: 'crism',
     geometryType: 'Polygon',
     color: '#00FFFF',
     cesiumColor: hexToRgb('#00FFFF'),
@@ -83,7 +87,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     name: 'HiRISE',
     displayName: 'High Resolution Imaging Science Experiment',
     subLabel: 'HiRISE JP2',
-    group: 'imaging',
+    group: 'hirise',
     geometryType: 'Polygon',
     color: '#FFFF00',
     cesiumColor: hexToRgb('#FFFF00'),
@@ -96,7 +100,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     name: 'SHARAD',
     displayName: 'SHAllow RADar',
     subLabel: 'SHARAD THM',
-    group: 'radar',
+    group: 'sharad',
     geometryType: 'LineString',
     color: '#FFA500',
     cesiumColor: hexToRgb('#FFA500'),
@@ -109,7 +113,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     name: 'SHARAD_HIGHRES',
     displayName: 'SHARAD High-Resolution RDR',
     subLabel: 'SHARAD RDR',
-    group: 'radar',
+    group: 'sharad',
     geometryType: 'LineString',
     color: '#FFD700',
     cesiumColor: hexToRgb('#FFD700'),
@@ -122,7 +126,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     name: 'CTX',
     displayName: 'Context Camera (MRO)',
     subLabel: 'CTX',
-    group: 'imaging',
+    group: 'ctx',
     geometryType: 'Polygon',
     color: '#FF69B4',
     cesiumColor: hexToRgb('#FF69B4'),
@@ -135,7 +139,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     name: 'HIRISE_DTM',
     displayName: 'HiRISE Digital Terrain Model',
     subLabel: 'HiRISE DTM',
-    group: 'imaging',
+    group: 'hirise',
     geometryType: 'Polygon',
     color: '#8B4513',
     cesiumColor: hexToRgb('#8B4513'),
@@ -148,7 +152,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     name: 'CTX_MOSAIC',
     displayName: 'CTX Mosaic (Murray Lab 5m)',
     subLabel: 'CTX 5m Mosaic',
-    group: 'imaging',
+    group: 'ctx',
     geometryType: 'Polygon',
     color: '#DAA520',
     cesiumColor: hexToRgb('#DAA520'),
@@ -161,7 +165,7 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentConfig> = {
     name: 'CRISM_TRR3',
     displayName: 'CRISM Targeted Reduced Data Record v3',
     subLabel: 'CRISM TRDR',
-    group: 'spectral',
+    group: 'crism',
     geometryType: 'Polygon',
     color: '#00CED1',
     cesiumColor: hexToRgb('#00CED1'),

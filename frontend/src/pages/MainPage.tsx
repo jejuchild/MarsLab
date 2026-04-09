@@ -219,10 +219,11 @@ export default function MainPage() {
   void useActiveOverlays;
   void useCatalogSearch;
 
-  // Phase 3 feature flag: ?v=new toggles the new 4-lane Inspector
+  // Phase 3: 4-lane Inspector is now the default.
+  // Use ?v=legacy to opt back into the legacy Inspector temporarily.
   const useNewInspector = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return new URLSearchParams(window.location.search).get("v") === "new";
+    if (typeof window === "undefined") return true;
+    return new URLSearchParams(window.location.search).get("v") !== "legacy";
   }, []);
 
   // Field notes hook (extracted from MainPage)
@@ -895,25 +896,11 @@ export default function MainPage() {
       setFlyToProductId(urlState.product);
     }
 
-    // Restore analysis mode — with crash-loop protection.
-    // If we're reloading into ?mode=assistant within 3 seconds of the
-    // last page load, skip restoring it (likely an infinite-reload crash).
-    if (urlState.mode) {
-      const now = Date.now();
-      const lastLoad = Number(sessionStorage.getItem("_marslab_last_load") || "0");
-      sessionStorage.setItem("_marslab_last_load", String(now));
-      const isCrashLoop =
-        urlState.mode === "agentic" &&
-        lastLoad > 0 &&
-        now - lastLoad < 3000;
-      if (!isCrashLoop) {
-        setAnalysisMode(urlState.mode as AnalysisMode);
-      } else {
-        // Break the loop: clear mode from URL
-
-        updateUrl({ mode: undefined });
-      }
-    }
+    // Note: legacy ?mode= URL parameter removed in Phase 3 follow-up D.
+    // The cut analysis modes (agentic, ai_analysis, report, guided,
+    // region_stats, pathfinder) no longer exist; the surviving modes
+    // (slope, line, hirise_dtm_3d, etc.) are not deep-linked.
+    // crash-loop sessionStorage workaround removed alongside.
 
     // Restore base layer
     if (urlState.base === "MOLA" || urlState.base === "HRSC") {
@@ -964,11 +951,9 @@ export default function MainPage() {
     updateUrl({ product: selected?.productId ?? undefined });
   }, [selected?.productId, updateUrl]);
 
-  // Sync analysisMode → mode in URL
-  useEffect(() => {
-    if (!urlWriteReadyRef.current) return;
-    updateUrl({ mode: analysisMode ?? undefined });
-  }, [analysisMode, updateUrl]);
+  // Note: analysisMode → URL sync removed in Phase 3 follow-up D
+  // (legacy mode= param caused crash-loops; analysis mode is no longer
+  // bookmarkable).
 
   // Sync baseLayer → base in URL (only write non-default)
   useEffect(() => {
@@ -1690,9 +1675,9 @@ export default function MainPage() {
         context={selected}
         onClose={() => setSelected(null)}
         onOpenLegacyProduct={(productId, instrument) => {
-          // Hand-off into legacy inspector by clearing the new flag locally
-          // and selecting the product. Phase 3 keeps both inspectors mounted
-          // for safety.
+          // Hand-off into legacy detail Inspector by setting ?v=legacy
+          // and selecting the product. Inspector.tsx is kept as a deep
+          // detail-view fallback for sub-panels not yet migrated.
           setSelected({
             instrument: instrument as InspectorContext["instrument"],
             productId,
@@ -1700,9 +1685,8 @@ export default function MainPage() {
             lon: selected.lon,
             title: selected.title,
           });
-          // Remove ?v=new from URL to fall through to legacy
           const url = new URL(window.location.href);
-          url.searchParams.delete("v");
+          url.searchParams.set("v", "legacy");
           window.history.replaceState({}, "", url.toString());
           window.location.reload();
         }}

@@ -5,7 +5,10 @@ import { isInstrumentId, type InstrumentId } from "../config/instrumentRegistry"
 /**
  * Supported URL state parameters for bookmarkable/shareable links.
  *
- * Example URL: /?lat=18.44&lon=77.45&instruments=crism,hirise&product=FRT0001&mode=slope&base=MOLA
+ * Example URL: /?lat=18.44&lon=77.45&instruments=crism,hirise&product=FRT0001&base=MOLA&view=2D
+ *
+ * Phase 3 follow-up D removed legacy `mode=` parameter (was source of
+ * a crash-loop that required a sessionStorage workaround).
  */
 export interface UrlState {
   lat?: number;
@@ -15,7 +18,6 @@ export interface UrlState {
   camHeight?: number;
   instruments?: InstrumentId[];
   product?: string;
-  mode?: string;
   base?: string;
   view?: string;
 }
@@ -85,10 +87,6 @@ function parseParams(params: URLSearchParams): UrlState {
     state.product = flyTo;
   }
 
-  // mode
-  const mode = params.get("mode");
-  if (mode) state.mode = mode;
-
   // base
   const base = params.get("base");
   if (base) state.base = base;
@@ -114,7 +112,6 @@ function serializeState(state: UrlState): URLSearchParams {
     params.set("instruments", state.instruments.join(","));
   }
   if (state.product) params.set("product", state.product);
-  if (state.mode) params.set("mode", state.mode);
   if (state.base) params.set("base", state.base);
   if (state.view) params.set("view", state.view);
 

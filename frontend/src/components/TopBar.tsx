@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
+import useCatalogSearch from "../hooks/useCatalogSearch";
 
 /* =========================================================
  * Types
@@ -141,6 +142,17 @@ export default function TopBar({
   const [totalProducts, setTotalProducts] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Catalog (place name) search — Phase 3 follow-up
+  const catalogSearch = useCatalogSearch();
+  const catalogMatches = useMemo(() => {
+    if (!query.trim()) return [];
+    return catalogSearch
+      .suggestions(query, 5)
+      .filter((s) => s.type === "catalog")
+      .map((s) => (s.type === "catalog" ? s.entry : null))
+      .filter((e): e is NonNullable<typeof e> => e !== null);
+  }, [query, catalogSearch]);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -268,6 +280,7 @@ export default function TopBar({
 
     setQuery(value);
     setShowDropdown(value.trim().length > 0);
+    // Catalog matches show in the dropdown without needing a backend hit
 
     // Only do backend search for non-coordinate modes
     const mode = detectSearchMode(value);
@@ -423,11 +436,45 @@ export default function TopBar({
       )}
 
       {/* Search Results Dropdown */}
-      {showDropdown && searchMode !== "coordinates" && results.length > 0 && (
+      {showDropdown && searchMode !== "coordinates" && (results.length > 0 || catalogMatches.length > 0) && (
         <div
           ref={dropdownRef}
           className="absolute top-full left-0 right-0 z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-border-dark bg-surface-dark shadow-xl"
         >
+          {/* Places (catalog) section */}
+          {catalogMatches.length > 0 && (
+            <>
+              <div className="px-3 py-1.5 border-b border-border-dark/50">
+                <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold">Places</span>
+              </div>
+              <div className="p-1 border-b border-border-dark/50">
+                {catalogMatches.map((entry) => (
+                  <button
+                    key={entry.id}
+                    onClick={() => {
+                      setQuery("");
+                      setResults([]);
+                      setShowDropdown(false);
+                      setMobileMenuOpen(false);
+                      onSelectResult?.(entry.name, "REGION", entry.lat, entry.lon);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors text-slate-300 hover:bg-emerald-500/10 hover:text-white"
+                  >
+                    <span className="material-symbols-outlined text-sm text-emerald-400 flex-shrink-0">place</span>
+                    <div className="flex flex-col flex-1 min-w-0">
+                      <span className="text-sm font-semibold truncate">{entry.name}</span>
+                      <span className="text-[10px] text-slate-500 truncate">{entry.description}</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-500 flex-shrink-0">
+                      {entry.lat.toFixed(2)}°, {entry.lon.toFixed(2)}°
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {results.length > 0 && (
           <div className="px-3 py-1.5 border-b border-border-dark/50 flex justify-between">
             <span className="text-[10px] text-slate-500">
               {results.length} result{results.length !== 1 ? "s" : ""}
@@ -438,6 +485,7 @@ export default function TopBar({
               </span>
             )}
           </div>
+          )}
 
           <div className="p-1">
             {results.map((item, index) => {
