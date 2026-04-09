@@ -21,6 +21,27 @@ from PIL import Image
 
 from .config import OUTPUT_DIR
 
+
+def normalize_to_uint8(rgb: np.ndarray) -> np.ndarray:
+    """Normalize a float RGB array to uint8 using 2-98 percentile stretch.
+
+    Args:
+        rgb: (H, W, 3) or (N, 3) float array
+
+    Returns:
+        uint8 array of same shape, clipped to [0, 255]
+    """
+    positive = rgb[rgb > 0]
+    if positive.size > 0:
+        vmin, vmax = np.nanpercentile(positive, [2, 98])
+    else:
+        vmin, vmax = np.nanmin(rgb), np.nanmax(rgb)
+    denom = vmax - vmin
+    if denom == 0:
+        denom = 1.0
+    return np.clip((rgb - vmin) / denom * 255, 0, 255).astype(np.uint8)
+
+
 # Mars 2000 geographic CRS in WKT (avoids PROJ4 DB version issues)
 MARS_CRS_WKT = (
     'GEOGCRS["Mars 2000",'
@@ -69,16 +90,7 @@ def _read_pds_img_texture(image_path: Path) -> np.ndarray:
     else:
         rgb = np.stack([raw[0]] * 3, axis=-1).astype(np.float64)
 
-    # Normalize to uint8
-    positive = rgb[rgb > 0]
-    if positive.size > 0:
-        vmin, vmax = np.nanpercentile(positive, [2, 98])
-    else:
-        vmin, vmax = np.nanmin(rgb), np.nanmax(rgb)
-    denom = vmax - vmin
-    if denom == 0:
-        denom = 1.0
-    return np.clip((rgb - vmin) / denom * 255, 0, 255).astype(np.uint8)
+    return normalize_to_uint8(rgb)
 
 
 def load_mastcamz_texture(image_path: Path) -> np.ndarray:
@@ -98,15 +110,7 @@ def load_mastcamz_texture(image_path: Path) -> np.ndarray:
                 rgb = np.stack([bands[0]] * 3, axis=-1)
 
             if rgb.dtype != np.uint8:
-                positive = rgb[rgb > 0]
-                if positive.size > 0:
-                    vmin, vmax = np.nanpercentile(positive, [2, 98])
-                else:
-                    vmin, vmax = np.nanmin(rgb), np.nanmax(rgb)
-                denom = vmax - vmin
-                if denom == 0:
-                    denom = 1.0
-                rgb = np.clip((rgb - vmin) / denom * 255, 0, 255).astype(np.uint8)
+                rgb = normalize_to_uint8(rgb)
             return rgb
 
     if suffix == ".img":

@@ -27,7 +27,7 @@ def load_results():
         # Filter valid Jezero coordinates
         valid = {}
         for sol, info in data.items():
-            lr = info.get("lon_range", [0, 0])
+            lr = info.get("lon_range") or info.get("combined_lon_range", [0, 0])
             if 77.3 < lr[0] < 77.7:
                 valid[sol] = info
         return valid
@@ -82,13 +82,8 @@ def load_texture(sol: int):
         else:
             rgb = np.stack([raw[0]] * 3, axis=-1).astype(np.float64)
 
-        positive = rgb[rgb > 0]
-        if positive.size > 0:
-            vmin, vmax = np.nanpercentile(positive, [2, 98])
-        else:
-            vmin, vmax = np.nanmin(rgb), np.nanmax(rgb)
-        denom = vmax - vmin if vmax != vmin else 1.0
-        return np.clip((rgb - vmin) / denom * 255, 0, 255).astype(np.uint8)
+        from coregister.drape import normalize_to_uint8
+        return normalize_to_uint8(rgb)
     except Exception as e:
         st.warning(f"Texture load error: {e}")
         return None
@@ -123,10 +118,13 @@ selected_sol = st.sidebar.selectbox(
 info = results[str(selected_sol)]
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Product Info**")
-st.sidebar.text(f"ID: {info['product_id'][:40]}...")
-st.sidebar.text(f"Valid pts: {info['valid_points']:,}")
-st.sidebar.text(f"Lon: [{info['lon_range'][0]:.4f}, {info['lon_range'][1]:.4f}]")
-st.sidebar.text(f"Lat: [{info['lat_range'][0]:.4f}, {info['lat_range'][1]:.4f}]")
+pid = info.get('product_id', f"{info.get('n_frames', '?')} frames")
+st.sidebar.text(f"ID: {str(pid)[:40]}...")
+st.sidebar.text(f"Valid pts: {info.get('valid_points', info.get('total_valid_points', 0)):,}")
+lon_range = info.get('lon_range') or info.get('combined_lon_range', [0, 0])
+lat_range = info.get('lat_range') or info.get('combined_lat_range', [0, 0])
+st.sidebar.text(f"Lon: [{lon_range[0]:.4f}, {lon_range[1]:.4f}]")
+st.sidebar.text(f"Lat: [{lat_range[0]:.4f}, {lat_range[1]:.4f}]")
 
 # ── Labels storage ────────────────────────────────────────────────────
 

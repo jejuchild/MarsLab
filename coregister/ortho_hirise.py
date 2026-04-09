@@ -15,6 +15,7 @@ import rasterio
 from rasterio.transform import rowcol, xy
 
 from .config import OUTPUT_DIR, PDS_CACHE
+from .drape import normalize_to_uint8
 from .ortho import load_ras_texture
 
 
@@ -189,12 +190,11 @@ def generate_ortho_on_hirise(sol: int, hir_ds, scale: int = 4,
     lr_data = hir_ds.read(1, window=window).astype(np.float64)
 
     # Normalize LR
-    valid_lr = lr_data[lr_data > 0]
-    if len(valid_lr) > 0:
-        vmin, vmax = np.percentile(valid_lr, [2, 98])
-        lr_uint8 = np.clip((lr_data - vmin) / max(vmax - vmin, 1) * 255, 0, 255).astype(np.uint8)
+    if lr_data.ndim == 2:
+        lr_rgb = np.stack([lr_data] * 3, axis=-1)
     else:
-        lr_uint8 = np.zeros_like(lr_data, dtype=np.uint8)
+        lr_rgb = lr_data
+    lr_uint8 = normalize_to_uint8(lr_rgb.astype(np.float64))[:, :, 0]
 
     # Align HR to exact LR*scale size
     aligned_h = lr_h * scale

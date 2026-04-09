@@ -18,6 +18,7 @@ import numpy as np
 from PIL import Image
 
 from .config import OUTPUT_DIR, PDS_CACHE
+from .drape import normalize_to_uint8
 from .hirise_dtm import HiRISEDTM
 from .mastcam_xyz import parse_pds3_header, parse_pds4_label
 
@@ -78,14 +79,7 @@ def load_ras_texture(sol: int, frame_idx: int, metadata: dict) -> np.ndarray | N
         else:
             rgb = np.stack([raw[0]] * 3, axis=-1).astype(np.float64)
 
-        # Stretch to uint8
-        positive = rgb[rgb > 0]
-        if positive.size > 0:
-            vmin, vmax = np.nanpercentile(positive, [2, 98])
-        else:
-            vmin, vmax = 0, 1
-        denom = vmax - vmin if vmax != vmin else 1.0
-        return np.clip((rgb - vmin) / denom * 255, 0, 255).astype(np.uint8)
+        return normalize_to_uint8(rgb)
     except Exception as e:
         print(f"    Texture load error: {e}")
         return None

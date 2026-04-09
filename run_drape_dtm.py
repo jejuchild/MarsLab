@@ -41,8 +41,9 @@ def main():
     # Filter sols that fall within DTM coverage
     valid_sols = {}
     for sol_str, info in results.items():
-        lon_range = info.get("lon_range", [0, 0])
-        lat_range = info.get("lat_range", [0, 0])
+        # Support both single-frame (lon_range) and allframes (combined_lon_range) result schemas
+        lon_range = info.get("lon_range") or info.get("combined_lon_range", [0, 0])
+        lat_range = info.get("lat_range") or info.get("combined_lat_range", [0, 0])
 
         # Check if Mastcam-Z coverage overlaps DTM (with generous margin)
         margin = 0.05  # ~3 km margin
@@ -78,7 +79,8 @@ def main():
             failed += 1
             continue
 
-        print(f"[{i}/{len(valid_sols)}] Sol {sol}  ({info['product_id']})")
+        label = info.get("product_id", f"{info.get('n_frames', '?')} frames")
+        print(f"[{i}/{len(valid_sols)}] Sol {sol}  ({label})")
 
         try:
             # Load lon/lat

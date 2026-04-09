@@ -246,7 +246,7 @@ def cmd_coregister(args):
     print(f"Step 5: Draping and output")
     print(f"{'='*60}")
 
-    output_path = Path(args.output) if args.output else OUTPUT_DIR / f"sol{sol:04d}_coregistered.tif"
+    output_path = Path(args.output) if args.output else OUTPUT_DIR / f"sol{sol:05d}_coregistered.tif"
 
     if args.no_dtm:
         result_path = drape_simple_overlay(lon, lat, texture, output_path)

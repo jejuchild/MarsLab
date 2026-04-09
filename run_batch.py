@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Batch process ALL Mastcam-Z frames per sol through the coregistration pipeline.
+"""Batch process Mastcam-Z frames per sol through the coregistration pipeline.
+
+By default processes all left-eye linearized XYZ frames per sol.
 
 For each sol:
   1. Find all left-eye linearized XYZ products (ZLF_*XYZLN*)
@@ -11,6 +13,7 @@ For each sol:
 import sys
 import time
 import json
+import argparse
 import traceback
 from pathlib import Path
 
@@ -26,13 +29,16 @@ from coregister.config import OUTPUT_DIR, PDS_CACHE
 import numpy as np
 
 
-def get_unique_xyz_products(sol: int) -> list[dict]:
-    """Get all unique left-eye linearized XYZ products for a sol."""
-    all_xyz = search_mastcamz_products(sol, "XYZ")
-    # Filter: ZLF = left eye, XYZLN = linearized
-    left_lin = [p for p in all_xyz if "ZLF" in p["product_id"] and "XYZLN" in p["product_id"]]
+def get_left_linearized_products(sol: int) -> list[dict]:
+    """Get only left-eye linearized XYZ products (ZLF_*XYZLN*).
 
-    # Deduplicate by SCLK timestamp (field 2 in product ID)
+    Linearized (L) products have corrected lens distortion.
+    We skip right-eye (ZRF) and non-linearized (XYZ_) variants.
+    """
+    all_xyz = search_mastcamz_products(sol, "XYZ")
+    # Filter: ZLF = left, XYZLN = linearized XYZ
+    left_lin = [p for p in all_xyz if "ZLF" in p["product_id"] and "XYZLN" in p["product_id"]]
+    # Deduplicate by SCLK timestamp
     seen = set()
     unique = []
     for p in left_lin:
@@ -66,7 +72,7 @@ def get_matching_ras(sol: int, xyz_product: dict) -> dict | None:
     return None
 
 
-def process_sol(sol: int) -> dict:
+def process_sol(sol: int, validate_jezero: bool = True) -> dict:
     """Process all Mastcam-Z frames for a sol.
 
     Returns metadata dict with per-frame and combined results.
@@ -74,7 +80,7 @@ def process_sol(sol: int) -> dict:
     sol_dir = OUTPUT_DIR / f"sol{sol:05d}"
     sol_dir.mkdir(parents=True, exist_ok=True)
 
-    products = get_unique_xyz_products(sol)
+    products = get_left_linearized_products(sol)
     if not products:
         raise ValueError(f"No left linearized XYZ products for sol {sol}")
 
@@ -125,11 +131,12 @@ def process_sol(sol: int) -> dict:
             continue
 
         # Validate: must be in Jezero area
-        lon_med = np.nanmedian(lon)
-        lat_med = np.nanmedian(lat)
-        if not (77.0 < lon_med < 78.0 and 18.0 < lat_med < 19.0):
-            print(f"    SKIP: coordinates outside Jezero (lon={lon_med:.2f}, lat={lat_med:.2f})")
-            continue
+        if validate_jezero:
+            lon_med = np.nanmedian(lon)
+            lat_med = np.nanmedian(lat)
+            if not (77.0 < lon_med < 78.0 and 18.0 < lat_med < 19.0):
+                print(f"    SKIP: coordinates outside Jezero (lon={lon_med:.2f}, lat={lat_med:.2f})")
+                continue
 
         # Save per-frame lon/lat
         frame_npz = sol_dir / f"frame_{i:03d}_lonlat.npz"
@@ -200,18 +207,23 @@ def process_sol(sol: int) -> dict:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Batch Mastcam-Z coregistration")
+    parser.add_argument("sols", nargs="*", type=int, help="Specific sol numbers (default: all)")
+    parser.add_argument("--results-file", default="batch_results.json",
+                        help="Output results filename (default: batch_results.json)")
+    args = parser.parse_args()
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Process specific sols or all
-    if len(sys.argv) > 1:
-        sols = [int(s) for s in sys.argv[1:]]
+    if args.sols:
+        sols = args.sols
     else:
         sols = list_available_sols("stereo")
 
     print(f"Processing {len(sols)} sols (all frames per sol)")
 
     results = {}
-    results_path = OUTPUT_DIR / "batch_results.json"
+    results_path = OUTPUT_DIR / args.results_file
 
     t0 = time.time()
     success = 0
