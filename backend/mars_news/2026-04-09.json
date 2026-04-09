@@ -1,0 +1,43 @@
+{
+  "date": "2026-04-09",
+  "generated_at": "2026-04-08T22:05:47.229235+00:00",
+  "categories": {
+    "missions": "Ongoing support for current and future space missions, such as Artemis II",
+    "discoveries": "Continued observation and study of celestial bodies, including Mars and its craters",
+    "technology": "No significant trend observed in the given news items",
+    "human_exploration": "Increased focus on enabling sustained human presence on the Moon and beyond",
+    "sample_return": "No significant trend observed in the given news items",
+    "international": "No significant trend observed in the given news items, although ESA is involved",
+    "commercial": "No significant trend observed in the given news items"
+  },
+  "items": [
+    {
+      "title": "Twin NASA Control Rooms Support Artemis Safety, Success",
+      "date": "Wed, 08 Apr 2026 18:13:42 +0000",
+      "source": "NASA",
+      "summary": "Twin control rooms at NASA’s Marshall Space Flight Center in Huntsville, Alabama, are actively supporting real-time mission operations in lunar orbit as part of the agency’s Artemis II mission, helping ensure astronaut safety and mission success as the crew prepares to return to Earth Friday, April 10. The LUCA (Lunar Utilization Control Area) and LESA [&#8230;]",
+      "category": "missions",
+      "significance": "Supporting real-time mission operations for Artemis II",
+      "url": "https://www.nasa.gov/directorates/esdmd/artemis-campaign-development-division/human-landing-system-program/twin-nasa-control-rooms-support-artemis-safety-success/"
+    },
+    {
+      "title": "Counting craters",
+      "date": "Wed, 04 Mar 2026 11:00:00 +0100",
+      "source": "ESA",
+      "summary": "Craters, craters, and yet more craters: this snapshot from ESA’s Mars Express is packed full of them, each as fascinating as the last.",
+      "category": "discoveries",
+      "significance": "Observing craters on Mars using Mars Express",
+      "url": "https://www.esa.int/Science_Exploration/Space_Science/Mars_Express/Counting_craters"
+    },
+    {
+      "title": "Emerging trends in Cislunar Space for Lunar Science Exploration and Space Robotics aiding Human Spaceflight Safety",
+      "date": "2026-03-03",
+      "source": "arXiv",
+      "summary": "In recent years, the Moon has emerged as an unparalleled extraterrestrial testbed for advancing cuttingedge technological and scientific research critical to enabling sustained human presence on its surface and supporting future interplanetary exploration. This study identifies and investigates t...",
+      "category": "human_exploration",
+      "significance": "Advancing technological and scientific research for human presence on the Moon",
+      "url": "https://arxiv.org/abs/2603.02878v1"
+    }
+  ],
+  "trend_summary": "The current trend in Mars and space news focuses on supporting ongoing missions, such as Artemis II, and advancing human exploration capabilities. There is also a continued emphasis on making new discoveries, like observing craters on Mars. The involvement of international space agencies, such as NASA and ESA, highlights the global cooperation in space exploration. Overall, these trends indicate a steady progression towards further human presence in space and a deeper understanding of celestial bodies. The lack of significant trends in areas like technology, sample return, and commercial space activities suggests that these areas may not be as prominent in current news."
+}

@@ -309,7 +309,7 @@ export default function AccessibilityPanel({ lat, lon }: AccessibilityPanelProps
                     <div key={k} className="flex justify-between">
                       <span className="truncate">{k}:</span>
                       <span className="text-slate-400 ml-1">
-                        {v == null ? "—" : typeof v === "number" ? v.toFixed(1) : String(v)}
+                        {v == null ? "—" : typeof v === "number" ? v.toFixed(1) : v}
                       </span>
                     </div>
                   ))}

@@ -68,20 +68,6 @@ function HiriseCanvas({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [hover, setHover] = useState<{ lon: number; lat: number } | null>(null);
 
-  // Load HiRISE tile
-  useEffect(() => {
-    const url = `/api/mastcam-label/hirise-tile?lon=${centerLon}&lat=${centerLat}&radius_m=${radiusM}&width=${canvasSize}&height=${canvasSize}`;
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imgRef.current = img;
-      draw();
-    };
-    img.src = url;
-  }, [centerLon, centerLat, radiusM, canvasSize]);
-
-  useEffect(() => { draw(); }, [cursorLon, cursorLat, annotations, hover]);
-
   function pixelToGround(px: number, py: number): [number, number] {
     const [cx, cy] = lonlatToProj(centerLon, centerLat);
     const scale = canvasSize / (radiusM * 2);
@@ -196,6 +182,20 @@ function HiriseCanvas({
     ctx.stroke();
   }
 
+  // Load HiRISE tile
+  useEffect(() => {
+    const url = `/api/mastcam-label/hirise-tile?lon=${centerLon}&lat=${centerLat}&radius_m=${radiusM}&width=${canvasSize}&height=${canvasSize}`;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      imgRef.current = img;
+      draw();
+    };
+    img.src = url;
+  }, [centerLon, centerLat, radiusM, canvasSize]);
+
+  useEffect(() => { draw(); }, [cursorLon, cursorLat, annotations, hover]);
+
   function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
     const rect = canvasRef.current!.getBoundingClientRect();
     const px = e.clientX - rect.left;
@@ -259,19 +259,6 @@ function MastcamFullWithMarker({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [imgNat, setImgNat] = useState({ w: 1648, h: 1200 });
 
-  useEffect(() => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imgRef.current = img;
-      setImgNat({ w: img.naturalWidth, h: img.naturalHeight });
-      draw();
-    };
-    img.src = `/api/mastcam-spice/texture/${sol}?quality=60`;
-  }, [sol]);
-
-  useEffect(() => { draw(); }, [markerX, markerY, imgNat]);
-
   function draw() {
     const canvas = canvasRef.current;
     const img = imgRef.current;
@@ -308,6 +295,19 @@ function MastcamFullWithMarker({
       ctx.stroke();
     }
   }
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      imgRef.current = img;
+      setImgNat({ w: img.naturalWidth, h: img.naturalHeight });
+      draw();
+    };
+    img.src = `/api/mastcam-spice/texture/${sol}?quality=60`;
+  }, [sol]);
+
+  useEffect(() => { draw(); }, [markerX, markerY, imgNat]);
 
   return (
     <div className="h-48 border-b border-[#1e293b] p-1 flex items-center justify-center bg-black">

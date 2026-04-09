@@ -48,8 +48,8 @@ export default function LayerPanel({
   onFusionVisibleChange,
   fusionOpacity = 0.6,
   onFusionOpacityChange,
-  ctxMosaicOpacity = 1.0,
-  onCtxMosaicOpacityChange,
+  ctxMosaicOpacity: _ctxMosaicOpacity = 1.0,
+  onCtxMosaicOpacityChange: _onCtxMosaicOpacityChange,
   // Footprints
   instrumentVisibility,
   onToggleInstrument,

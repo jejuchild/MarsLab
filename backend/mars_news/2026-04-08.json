@@ -1,0 +1,43 @@
+{
+  "date": "2026-04-08",
+  "generated_at": "2026-04-07T22:05:47.879823+00:00",
+  "categories": {
+    "missions": "No recent news items related to specific Mars missions",
+    "discoveries": "Research focus on understanding Martian planetary dynamics and orbital patterns",
+    "technology": "No significant technological advancements reported in recent news items",
+    "human_exploration": "Increased interest in terraforming and long-term human settlement on Mars",
+    "sample_return": "No updates on sample return missions or initiatives",
+    "international": "No news items highlighting international collaborations or agreements",
+    "commercial": "No recent news items related to commercial activities or investments in Mars exploration"
+  },
+  "items": [
+    {
+      "title": "A 1151-Year Quasi-Commensurability Among the Pre-Uranian Planets: Empirical Detection and Statistical Characterization",
+      "date": "2026-04-03",
+      "source": "arXiv",
+      "summary": "We report the empirical detection of a multi-planet quasi-commensurability in the Solar System. A computational exhaustive search identifies T* = 420,403 days (~1,151 years) as the global minimum of a series-comparison similarity metric applied to daily heliocentric ecliptic longitudes of the six...",
+      "category": "discoveries",
+      "significance": "Study of planetary orbits and quasi-commensurability",
+      "url": "https://arxiv.org/abs/2604.03049v1"
+    },
+    {
+      "title": "Modelling the long-term impacts of artificial warming on the Martian water cycle and surface ice distribution",
+      "date": "2026-03-02",
+      "source": "arXiv",
+      "summary": "Recent papers by Ansari et al. (2024, Science Advances 10, eadn4650) and Richardson et al. (2025, arXiv eprint 2504.01455) have suggested that global warming of the Martian surface ('terraforming') by 35 K to sustain local habitats above the melting point of water could be achieved through the in...",
+      "category": "human_exploration",
+      "significance": "Research on terraforming and its effects on Martian environment",
+      "url": "https://arxiv.org/abs/2603.01539v1"
+    },
+    {
+      "title": "Terraforming Mars: Mass, Forcing, and Industrial Throughput Constraints",
+      "date": "2026-02-28",
+      "source": "arXiv",
+      "summary": "Terraforming Mars can be evaluated with a small set of system-level feasibility constraints linking (i) target pressures and compositions to required atmospheric inventories, (ii) target surface temperatures to required radiative control authority, (iii) inventories and radiative agents to sustai...",
+      "category": "human_exploration",
+      "significance": "Evaluation of feasibility constraints for terraforming Mars",
+      "url": "https://arxiv.org/abs/2603.00402v3"
+    }
+  ],
+  "trend_summary": "Recent Mars news items indicate a growing interest in human exploration and terraforming of the planet. Research studies are focused on understanding the Martian environment and evaluating the feasibility of long-term human settlement. The absence of news items related to specific missions, technological advancements, and commercial activities suggests a current emphasis on theoretical and scientific research. Overall, the trend suggests a shift towards planning and preparing for potential human exploration and settlement of Mars in the future. This shift is driven by ongoing research and studies that aim to better understand the Martian environment and the challenges associated with terraforming and human settlement."
+}

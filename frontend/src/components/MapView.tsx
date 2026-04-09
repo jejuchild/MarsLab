@@ -729,7 +729,7 @@ export default function MapView({
   accessibilityOpacity = 0.6,
   fusionVisible = false,
   fusionOpacity = 0.6,
-  ctxMosaicOpacity = 1.0,
+  ctxMosaicOpacity: _ctxMosaicOpacity = 1.0,
   highResOnly = false,
   onOlympusMonsTripleClick,
   onOlympusMonsClimber,

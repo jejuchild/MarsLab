@@ -1,0 +1,66 @@
+{
+  "date": "2026-04-09",
+  "generated_at": "2026-04-08T22:10:10.098135+00:00",
+  "topic": {
+    "focus": "Mars Geochemistry",
+    "keywords": [
+      "geochemistry",
+      "PIXL",
+      "elemental composition",
+      "Perseverance",
+      "Jezero"
+    ]
+  },
+  "papers": [
+    {
+      "title": "Pike perch (Sander lucioperca)-chemical composition",
+      "authors": "Cristina Mitroi, Marius Cugerean, Nicoleta Gabriela Hădărugă",
+      "year": "2026",
+      "journal": "Romanian Journal of Veterinary Sciences",
+      "key_findings": "This paper discusses the chemical composition of pike perch, highlighting its nutritional quality and essential amino acids, unsaturated fatty acids, minerals, and vitamins. However, it does not relate to Mars geochemistry.",
+      "methodology": "The paper likely involves the analysis of fish samples to determine their chemical composition, but the specifics are not provided.",
+      "relevance": "This paper has no relevance to MarsLab's Mars exploration goals.",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.59463/rjvs.2025.4.13",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Biochemical predictors of udder health: linking milk composition to somatic cell distribution",
+      "authors": "Daniel George Bratu, Șerban Blaga, Dorin Alexandru Vizitiu, Bianca Lungu, Elena Daniela Ilie, Eugeniu Alexandru Mizeranschi et al.",
+      "year": "2026",
+      "journal": "Romanian Journal of Veterinary Sciences",
+      "key_findings": "This paper explores the relationship between milk composition and udder health in dairy cows, using somatic cell count and differential somatic cell count as indicators. Again, it does not pertain to Mars geochemistry.",
+      "methodology": "The research probably involves statistical modeling and analysis of milk samples from dairy cows.",
+      "relevance": "This paper has no connection to MarsLab's objectives.",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.59463/rjvs.2025.4.11",
+      "recency_score": 1.0
+    },
+    {
+      "title": "Influence of polyester/Cotton fabric composition on Ultraviolet Protection Factor Following Treatment with ZnONPs Embedded in Cellulosic and Pro-teinaceous from Waste Substrates",
+      "authors": "Samah M. E. Elrys, ٍSherrok Elaraby, Kholoud Mahmoud, Rouida Abdalmagid, Marwa Abdalatif, Mohamed Magdy et al.",
+      "year": "2026",
+      "journal": "Egyptian Journal of Chemistry",
+      "key_findings": "This paper investigates how the composition of polyester/cotton fabric affects its Ultraviolet Protection Factor after treatment with ZnONPs embedded in cellulosic and proteinaceous materials from waste substrates. It is unrelated to Mars geochemistry.",
+      "methodology": "The study likely involves the creation and testing of fabric samples with varying compositions and treatments.",
+      "relevance": "This paper does not relate to MarsLab's Mars exploration goals.",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.21608/ejchem.2026.455911.12840",
+      "recency_score": 1.0
+    },
+    {
+      "title": "A bootstrap test for the one-sided two-sample right-censored model",
+      "authors": "Grzegorz Wyłupek",
+      "year": "2026",
+      "journal": "Journal of Statistical Planning and Inference",
+      "key_findings": "This paper presents a bootstrap test for the one-sided two-sample right-censored model, which is a statistical method. It does not pertain to Mars geochemistry or any related field.",
+      "methodology": "The research involves the development and testing of a statistical test.",
+      "relevance": "This paper has no relevance to MarsLab's objectives.",
+      "category": "Not applicable",
+      "url": "https://doi.org/10.1016/j.jspi.2026.106410",
+      "recency_score": 1.0
+    }
+  ],
+  "trend_analysis": "The papers provided do not show any trends related to Mars geochemistry, as they all pertain to unrelated fields such as fish nutrition, dairy cow health, fabric composition, and statistical modeling. There is no apparent connection between these papers and Mars exploration research. The lack of relevant papers suggests a need to refocus the search to find studies that align with MarsLab's goals. Further research is necessary to identify trends and patterns in Mars geochemistry.",
+  "connections_to_marslab": "Unfortunately, none of the papers provided have any direct connections to MarsLab's mission, including mineral classification, ice detection, Arcadia Planitia site selection, or human exploration planning. To establish meaningful connections, it is essential to analyze papers that specifically address Mars geochemistry and related topics."
+}

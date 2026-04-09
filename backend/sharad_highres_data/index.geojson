@@ -17962,10 +17962,10 @@
     {
       "type": "Feature",
       "properties": {
-        "product_id": "R_0653001_001_SS19_700_A",
         "instrument": "SHARAD_HIGHRES",
+        "product_id": "R_0653001_001_SS19_700_A",
         "dat_file": "r_0653001_001_ss19_700_a.dat",
-        "lbl_file": null
+        "lbl_file": "r_0653001_001_ss19_700_a.lbl"
       },
       "geometry": {
         "type": "LineString",

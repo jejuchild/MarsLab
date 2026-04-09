@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import type { InstrumentType } from "../types";
 
 type QuickviewImageProps = {
@@ -45,26 +45,26 @@ export default function QuickviewImage({ productId, instrument }: QuickviewImage
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [currentUrl, setCurrentUrl] = useState("");
 
-  const tryLoadImage = useCallback((urls: string[], index: number) => {
-    if (index >= urls.length) {
-      setStatus("error");
-      return;
-    }
-
-    const img = new Image();
-    img.onload = () => {
-      setCurrentUrl(urls[index] ?? "");
-      setStatus("loaded");
-    };
-    img.onerror = () => {
-      tryLoadImage(urls, index + 1);
-    };
-    img.src = urls[index] ?? "";
-  }, []);
-
   useEffect(() => {
     setStatus("loading");
     setCurrentUrl("");
+
+    function tryLoadImage(urls: string[], index: number) {
+      if (index >= urls.length) {
+        setStatus("error");
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        setCurrentUrl(urls[index] ?? "");
+        setStatus("loaded");
+      };
+      img.onerror = () => {
+        tryLoadImage(urls, index + 1);
+      };
+      img.src = urls[index] ?? "";
+    }
 
     const urlOrUrls = getImageUrl(productId, instrument);
 
@@ -81,7 +81,7 @@ export default function QuickviewImage({ productId, instrument }: QuickviewImage
       };
       img.src = urlOrUrls;
     }
-  }, [productId, instrument, tryLoadImage]);
+  }, [productId, instrument]);
 
   if (status === "loading") {
     return (
