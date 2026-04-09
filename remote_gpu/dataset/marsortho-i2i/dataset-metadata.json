@@ -1,0 +1,11 @@
+{
+  "title": "MarsOrtho I2I",
+  "id": "carsonparksnu/marsortho-i2i",
+  "licenses": [
+    {
+      "name": "CC0-1.0"
+    }
+  ],
+  "subtitle": "HiRISE \u2192 Mastcam-Z paired image-to-image translation dataset",
+  "description": "Paired HiRISE (orbital, 1ch) and Mastcam-Z (ground-projected, 3ch) patches for cross-perspective texture translation on Mars.\n\n- Train: 384 patches\n- Test: 60 patches\n- Patch size: 256x256 (both)\n- Coverage: Jezero Crater\n"
+}

@@ -9,6 +9,6 @@
   "enable_tpu": false,
   "enable_internet": true,
   "competition_sources": [],
-  "dataset_sources": ["carsonparksnu/marsortho-benchmark"],
+  "dataset_sources": ["carsonparksnu/marsortho-i2i"],
   "kernel_sources": []
 }
