@@ -126,6 +126,8 @@ type MapViewProps = {
   bringToFrontId?: string | null;
   onBringToFrontComplete?: () => void;
   rgbWavelengths?: RGBWavelengths;
+  /** Product open in the Inspector — its footprint gets a visible fill. */
+  selectedProductId?: string | null;
   // Bidirectional hover highlight for Active Products Panel
   hoveredProductId?: string | null;
   onHoverProduct?: (productId: string | null) => void;
@@ -671,6 +673,7 @@ export default function MapView({
   bringToFrontId,
   onBringToFrontComplete,
   rgbWavelengths = { r: 2.53, g: 1.51, b: 1.08 },
+  selectedProductId = null,
   hoveredProductId = null,
   onHoverProduct,
   crismFilteredIds = null,
@@ -932,6 +935,12 @@ export default function MapView({
     hoveredProductId,
     onHoverProduct,
   });
+
+  // Fill only the selected footprint (others are outlines) so overlapping
+  // footprints don't wash out the map and image overlays.
+  useEffect(() => {
+    footprintManagerRef.current?.setSelectedProduct(selectedProductId);
+  }, [selectedProductId, footprintManagerRef]);
 
   useGridOverlay({
     viewerRef,

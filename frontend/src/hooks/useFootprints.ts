@@ -244,35 +244,39 @@ export default function useFootprints({
     applyInstrumentVisibility("CRISM", showCRISM);
   }, [showCRISM, applyInstrumentVisibility]);
 
-  // Explicit footprint loading - triggered by loadFootprintsTrigger prop
-  // After loading completes, ensure visibility is set correctly (fixes reload visibility bug)
+  // Explicit footprint loading - triggered by loadFootprintsTrigger prop.
+  // A newer trigger only supersedes an in-flight load of the *same*
+  // instrument. (Previously any new trigger cancelled the previous effect, so
+  // clicking "Load" on CRISM while HiRISE was still loading silently dropped
+  // HiRISE: loaded but never shown.)
+  const loadTokenRef = useRef<Map<string, number>>(new Map());
+  const unmountedRef = useRef(false);
+  useEffect(() => () => { unmountedRef.current = true; }, []);
+
   useEffect(() => {
     if (!loadFootprintsTrigger || !footprintManagerRef.current) return;
 
-    const { instrument } = loadFootprintsTrigger;
+    const { instrument, timestamp } = loadFootprintsTrigger;
     const fm = footprintManagerRef.current;
-    let cancelled = false;
+    loadTokenRef.current.set(instrument, timestamp);
+    const superseded = () =>
+      unmountedRef.current || loadTokenRef.current.get(instrument) !== timestamp;
 
-    // Load footprints and then ensure visibility is set correctly
-    // This fixes the issue where reloading doesn't show footprints because
-    // the visibility effect doesn't re-run (show state unchanged)
+    // Load, then make the instrument visible (fixes reload visibility bug:
+    // the visibility effect doesn't re-run when the show state is unchanged).
     (async () => {
       try {
         const result = await fm.loadFootprints(instrument);
-        if (cancelled) return;
+        if (superseded()) return;
         if (result && result.count > 0) {
           fm.setVisible(instrument, true);
           setFootprintVersion((v) => v + 1);
         }
       } catch (e) {
-        if (!cancelled) toast.error(`Failed to load ${instrument} footprints`);
+        if (!superseded()) toast.error(`Failed to load ${instrument} footprints`);
         console.error("Footprint load error:", e);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadFootprintsTrigger]);
 

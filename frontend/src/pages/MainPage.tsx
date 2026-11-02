@@ -545,7 +545,9 @@ export default function MainPage() {
     // Auto-enable visibility when loading
     const id = instrument.toLowerCase() as InstrumentId;
     setInstrumentVisibility(prev => ({ ...prev, [id]: true }));
-    setLoadFootprintsTrigger({ instrument: instrument as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3", timestamp: Date.now() });
+    // Footprint entity ids are `${INSTRUMENT}_FP_${pid}`; always use the
+    // upper-case id (a display name like "HiRISE" broke every id lookup).
+    setLoadFootprintsTrigger({ instrument: instrument.toUpperCase() as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3", timestamp: Date.now() });
   }, []);
 
   const handleFootprintsLoading = useCallback((instrument: "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CTX_MOSAIC" | "HIRISE_DTM" | "CRISM_TRR3", loading: boolean) => {
@@ -1885,6 +1887,7 @@ export default function MainPage() {
     >
       {/* Map Canvas */}
       <MapView
+        selectedProductId={selected?.productId ?? null}
         mapMode={mapMode}
         baseLayer={baseLayer}
         viewBounds={viewBounds}

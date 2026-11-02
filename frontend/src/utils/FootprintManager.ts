@@ -67,6 +67,19 @@ export interface FeatureMetadata {
 // Using shared normalizeLonForMap from coordinates.ts
 const normalizeLon = normalizeLonForMap;
 
+/**
+ * Footprint fill opacity. Footprints are drawn as outlines; only the hovered
+ * and the selected footprint get a visible fill. A uniform 12% fill stacked
+ * across dozens of overlapping footprints turned the map (and any image
+ * overlay underneath) solid yellow. `idle` is 1/255 rather than 0 because
+ * Cesium discards fully transparent fragments when picking, and hover/click
+ * detection relies on picking these fills.
+ */
+const FILL_ALPHA = { idle: 1 / 255, hover: 0.15 } as const;
+/** The selected footprint is marked by a thicker outline, not a fill, so it
+ * never tints an image overlay lying underneath it. */
+const SELECTED_OUTLINE_WIDTH = 3.5;
+
 export class FootprintManager {
   private viewer: Cesium.Viewer;
   private ellipsoid: Cesium.Ellipsoid;
@@ -85,6 +98,9 @@ export class FootprintManager {
 
   private featureMetadata: Map<string, FeatureMetadata> = new Map();
   private featureVisibility: Map<string, boolean> = new Map();
+  private hoveredId: string | null = null;
+  private baseOutlineWidth: Map<string, number> = new Map();
+  private selectedProductId: string | null = null;
 
   private hoverLabelEntity: Cesium.Entity | null = null;
 
@@ -325,6 +341,9 @@ export class FootprintManager {
    * Clear all footprints for an instrument
    */
   clearFootprints(instrument: InstrumentType): void {
+    for (const id of this.baseOutlineWidth.keys()) {
+      if (id.startsWith(`${instrument}_FP_`)) this.baseOutlineWidth.delete(id);
+    }
     // Guard: viewer may already be destroyed during error cascade
     const sceneAlive = this.viewer && !this.viewer.isDestroyed();
 
@@ -496,7 +515,7 @@ export class FootprintManager {
               }),
               id: entityId,
               attributes: {
-                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(0.12)),
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(FILL_ALPHA.idle)),
                 show: new Cesium.ShowGeometryInstanceAttribute(true),
               },
             }),
@@ -532,7 +551,7 @@ export class FootprintManager {
               }),
               id: entityId,
               attributes: {
-                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(0.12)),
+                color: Cesium.ColorGeometryInstanceAttribute.fromColor(color.withAlpha(FILL_ALPHA.idle)),
                 show: new Cesium.ShowGeometryInstanceAttribute(true),
               },
             }),
@@ -607,6 +626,8 @@ export class FootprintManager {
             this.featureVisibility.get(id) ?? true,
           );
         }
+        this.applyFillStyle(this.hoveredId);
+        this.applySelectedStyle();
         this.viewer.scene.requestRender();
       })();
     }
@@ -730,6 +751,51 @@ export class FootprintManager {
     }
 
     this.viewer.scene.requestRender();
+  }
+
+  /** Highlight the footprint under the cursor (entity id `INSTR_FP_pid`), or clear it. */
+  setHoveredFeature(entityId: string | null): void {
+    if (entityId === this.hoveredId) return;
+    const prev = this.hoveredId;
+    this.hoveredId = entityId;
+    this.applyFillStyle(prev);
+    this.applyFillStyle(entityId);
+    this.viewer.scene.requestRender();
+  }
+
+  /** Highlight the selected product's footprint(s) across instruments, or clear it. */
+  setSelectedProduct(productId: string | null): void {
+    if (productId === this.selectedProductId) return;
+    const prev = this.selectedProductId;
+    this.selectedProductId = productId;
+    if (prev) for (const inst of this.outlineCollections.keys()) this.applyFillStyle(`${inst}_FP_${prev}`);
+    this.applySelectedStyle();
+    this.viewer.scene.requestRender();
+  }
+
+  private applySelectedStyle(): void {
+    if (!this.selectedProductId) return;
+    for (const inst of this.outlineCollections.keys()) {
+      this.applyFillStyle(`${inst}_FP_${this.selectedProductId}`);
+    }
+  }
+
+  private applyFillStyle(entityId: string | null): void {
+    if (!entityId) return;
+    const meta = this.featureMetadata.get(entityId);
+    if (!meta) return;
+    const primitive = this.fillPrimitives.get(meta.instrument);
+    const isSelected = meta.productId === this.selectedProductId;
+    const attrs = primitive?.ready ? primitive.getGeometryInstanceAttributes(entityId) : undefined;
+    if (attrs) {
+      const alpha = entityId === this.hoveredId ? FILL_ALPHA.hover : FILL_ALPHA.idle;
+      attrs.color = Cesium.ColorGeometryInstanceAttribute.toValue(this.getColor(meta.instrument).withAlpha(alpha));
+    }
+    const polyline = this.outlineCollections.get(meta.instrument)?.get(meta.outlineIndex);
+    if (polyline) {
+      if (!this.baseOutlineWidth.has(entityId)) this.baseOutlineWidth.set(entityId, polyline.width);
+      polyline.width = isSelected ? SELECTED_OUTLINE_WIDTH : this.baseOutlineWidth.get(entityId)!;
+    }
   }
 
   hideHoverLabel(): void {

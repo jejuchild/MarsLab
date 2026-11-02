@@ -60,7 +60,7 @@ export default function FootprintSection({
                   const count = footprintCounts[instId] as FootprintCount;
                   if (count && instrumentVisibility[instId]) {
                     const inst = INSTRUMENTS[instId];
-                    onLoadFootprints?.(inst.name as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
+                    onLoadFootprints?.(inst.id.toUpperCase() as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
                   }
                 }
               }
@@ -134,7 +134,7 @@ export default function FootprintSection({
                     if (isLoading) return;
                     if (!isLoaded) {
                       onToggleInstrument(instId, true);
-                      onLoadFootprints?.(inst.name as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
+                      onLoadFootprints?.(inst.id.toUpperCase() as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
                     } else {
                       onToggleInstrument(instId, !isVisible);
                     }
@@ -144,7 +144,7 @@ export default function FootprintSection({
                     e.stopPropagation();
                     if (isLoading) return;
                     onToggleInstrument(instId, true);
-                    onLoadFootprints?.(inst.name as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
+                    onLoadFootprints?.(inst.id.toUpperCase() as "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "HIRISE_DTM" | "CRISM_TRR3");
                   };
 
                   return (

@@ -290,6 +290,8 @@ export default function useMapViewer({
     );
 
     viewerRef.current = viewer;
+    // Dev-only handle for browser tests/debugging (stripped from production builds).
+    if (import.meta.env.DEV) (window as unknown as { __marslabViewer?: Cesium.Viewer }).__marslabViewer = viewer;
 
     // P1+P0: Suppress Cesium tile-load and render errors (network CORS failures,
     // trek.nasa.gov opaque responses) so they don't crash the page.
@@ -372,6 +374,7 @@ export default function useMapViewer({
         })
         .sort((a: { area: number }, b: { area: number }) => a.area - b.area);
       const pickedPrimitiveId = hoverCandidates.length > 0 ? hoverCandidates[0]!.id : undefined;
+      footprintManagerRef.current?.setHoveredFeature(pickedPrimitiveId ?? null);
 
       const pickedEnt = picked?.id as Cesium.Entity | undefined;
       const hs = highlightRef.current;
