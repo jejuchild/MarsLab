@@ -1360,8 +1360,14 @@ export default function MainPage() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't fire when typing in an input or textarea
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const isTextEntry =
+        tag === "TEXTAREA" ||
+        (tag === "INPUT" && !["range", "checkbox", "radio", "button"].includes((target as HTMLInputElement).type));
+      // Escape must still work after touching a slider/checkbox in a viewer.
+      if (e.key !== "Escape" && (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT")) return;
+      if (e.key === "Escape" && isTextEntry) return;
       // Don't fire if Command Palette is open
       if (commandPalette.isOpen) return;
 
@@ -1394,13 +1400,37 @@ export default function MainPage() {
           setShowKeyboardHelp(false);
           return;
         }
+        // Close the top-most right-panel view, in render-priority order.
+        const analysisPanelOpen =
+          (analysisMode === "regolith" && regolithProductId) ||
+          (analysisMode === "stratigraphy" && epsilonTarget) ||
+          (analysisMode === "attenuation" && attenuationProductId) ||
+          (analysisMode === "mineral_sequence" && mineralSequenceObsId) ||
+          (analysisMode === "strat_column" && stratColumnTarget);
+        if (analysisPanelOpen) {
+          handleAnalysisModeChange(null);
+          return;
+        }
         if (sharadHiresProductId) {
           setSharadHiresProductId(null);
           setSharadTracePin(null);
           return;
         }
+        if (analysisMode === "crater_detect") {
+          handleAnalysisModeChange(null);
+          return;
+        }
+        if (hiRiseDTM3DPoint) {
+          setHiRiseDTM3DPoint(null);
+          setActiveDTMProduct(null);
+          return;
+        }
         if (selected) {
           setSelected(null);
+          return;
+        }
+        if (terrainPoint) {
+          setTerrainPoint(null);
           return;
         }
         if (analysisMode) {
@@ -1465,7 +1495,7 @@ export default function MainPage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [commandPalette.isOpen, showKeyboardHelp, sharadHiresProductId, selected, analysisMode, sharadPopup, handleSelectProduct, undo, redo, showCuriosity, showOlympusMons, showOlympusMonsClimber, showTerraform]);
+  }, [commandPalette.isOpen, showKeyboardHelp, sharadHiresProductId, selected, analysisMode, regolithProductId, epsilonTarget, attenuationProductId, mineralSequenceObsId, stratColumnTarget, hiRiseDTM3DPoint, terrainPoint, handleAnalysisModeChange, sharadPopup, handleSelectProduct, undo, redo, showCuriosity, showOlympusMons, showOlympusMonsClimber, showTerraform]);
 
   // (flyToCoords state moved earlier — before URL state effects)
 

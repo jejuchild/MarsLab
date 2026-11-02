@@ -110,15 +110,7 @@ export default function Inspector({
     };
   }, [response, context, clicked]);
 
-  // ── Escape closes the panel ──
-  useEffect(() => {
-    if (!context) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [context, onClose]);
+  // Escape is handled centrally in MainPage (closes the top-most panel).
 
   // ── Resizable width (desktop) ──
   const [panelWidth, setPanelWidth] = useState(440);

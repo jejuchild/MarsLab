@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 type HiResImageViewerProps = {
   productId: string;
@@ -72,13 +73,17 @@ export default function HiResImageViewer({ productId, onClose }: HiResImageViewe
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "=" || e.key === "+") zoomBy(1.2);
+      if (e.key === "Escape") {
+        // Close only this viewer — not the Inspector/panels underneath.
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        onClose();
+      } else if (e.key === "=" || e.key === "+") zoomBy(1.2);
       else if (e.key === "-") zoomBy(1 / 1.2);
       else if (e.key === "0") { setZoom(1); setPan({ x: 0, y: 0 }); }
     };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    document.addEventListener("keydown", handler, { capture: true });
+    return () => document.removeEventListener("keydown", handler, { capture: true });
   }, [onClose, zoomBy]);
 
   // Mouse wheel zoom — cursor-centered
@@ -118,7 +123,9 @@ export default function HiResImageViewer({ productId, onClose }: HiResImageViewe
   };
   const handleMouseUp = () => setDragging(false);
 
-  return (
+  // Portal to <body>: rendered inside the Inspector panel it sat under the
+  // app header (hiding its close button) and below map controls.
+  return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm">
       {/* Close overlay — click outside header/image to close */}
 
@@ -239,6 +246,7 @@ export default function HiResImageViewer({ productId, onClose }: HiResImageViewe
           Scroll to zoom · Drag to pan · +/- keys · Press 0 to reset · Esc to close
         </span>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

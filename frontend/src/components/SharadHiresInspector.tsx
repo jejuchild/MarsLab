@@ -221,16 +221,7 @@ export default function SharadHiresInspector({
   const plotsWrapperRef = useRef<HTMLDivElement>(null);
   const [cursor, setCursor] = useState<{ normX: number; normY: number } | null>(null);
 
-  // ── Escape key to close ─────────────────────────────
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  // Escape is handled centrally in MainPage (closes the top-most panel).
 
   // ── Data fetching (with module-level cache) ────────────
   useEffect(() => {
