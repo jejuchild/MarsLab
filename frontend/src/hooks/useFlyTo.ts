@@ -220,16 +220,32 @@ export default function useFlyTo({
   // Fly to lat/lon coordinates (for search results not on map)
   useEffect(() => {
     if (!flyToCoords) return;
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-
     const { lat, lon } = flyToCoords;
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(lon, lat, 50000, marsEllipsoid),
-      duration: 1.0,
-    });
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    onFlyToCoordsComplete?.();
+    // A shared link sets flyToCoords on mount, before the viewer exists.
+    // Previously that returned early and the link's location was never
+    // applied; wait (up to ~10 s) for the viewer instead.
+    const attempt = (n: number) => {
+      if (cancelled) return;
+      const viewer = viewerRef.current;
+      if (!viewer || viewer.isDestroyed()) {
+        if (n < 100) timer = setTimeout(() => attempt(n + 1), 100);
+        return;
+      }
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(lon, lat, 50000, marsEllipsoid),
+        duration: 1.0,
+      });
+      onFlyToCoordsComplete?.();
+    };
+    attempt(0);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [flyToCoords, onFlyToCoordsComplete, viewerRef, marsEllipsoid]);
 
   // Temporarily highlight a product after fly-to (deep-link from DataDownloadPage)

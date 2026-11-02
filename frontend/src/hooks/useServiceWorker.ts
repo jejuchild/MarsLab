@@ -36,6 +36,8 @@ export default function useServiceWorker(): ServiceWorkerState {
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
 
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  // Reload only when the user asked for the update (banner button).
+  const updateRequestedRef = useRef(false);
 
   // ----- Online / Offline listeners -----
   useEffect(() => {
@@ -95,10 +97,13 @@ export default function useServiceWorker(): ServiceWorkerState {
       })
       .catch(() => {});
 
-    // When the new SW takes over, reload the page for a clean state
+    // Reload when a new SW takes over — but only after the user clicked
+    // "update". sw.js claims clients on install, so this event also fires on
+    // every first visit; reloading then loaded the whole app twice (dropping
+    // shared-link params) and could reload mid-session on a SW update.
     let refreshing = false;
     const handleControllerChange = () => {
-      if (refreshing) return;
+      if (refreshing || !updateRequestedRef.current) return;
       refreshing = true;
       window.location.reload();
     };
@@ -155,9 +160,12 @@ export default function useServiceWorker(): ServiceWorkerState {
 
   // ----- Actions -----
   const updateApp = useCallback(() => {
+    updateRequestedRef.current = true;
     const waiting = registrationRef.current?.waiting;
     if (waiting) {
       waiting.postMessage({ type: "SKIP_WAITING" });
+    } else {
+      window.location.reload(); // new SW already active; just pick it up
     }
   }, []);
 

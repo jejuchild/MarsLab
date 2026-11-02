@@ -42,6 +42,8 @@ interface TopBarProps {
   lastActionDescription?: string;
   onUndo?: () => void;
   onRedo?: () => void;
+  /** Copy a link that reopens the current view (location, layers, product). */
+  onCopyLink?: () => void;
 }
 
 /* =========================================================
@@ -133,6 +135,7 @@ export default function TopBar({
   lastActionDescription,
   onUndo,
   onRedo,
+  onCopyLink,
 }: TopBarProps) {
   const [query, setQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -556,6 +559,16 @@ export default function TopBar({
       >
         <span className="material-symbols-outlined text-lg">redo</span>
       </button>
+      {onCopyLink && (
+        <button
+          onClick={onCopyLink}
+          className="p-1.5 rounded transition-colors text-[#92a4c9] hover:text-white hover:bg-[#232f48]"
+          title="Copy link to this view"
+          aria-label="Copy link to this view"
+        >
+          <span className="material-symbols-outlined text-lg">link</span>
+        </button>
+      )}
     </div>
   );
 

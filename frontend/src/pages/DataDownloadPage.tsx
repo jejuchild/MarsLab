@@ -2032,7 +2032,7 @@ export default function DataDownloadPage() {
   const [alreadyDownloadedProducts, setAlreadyDownloadedProducts] = useState<Set<string>>(new Set());
 
   // URL search params for deep-linking from Inspector
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Polling interval ref
   const pollIntervalRef = useRef<number | null>(null);
@@ -2066,6 +2066,9 @@ export default function DataDownloadPage() {
     if (!pid) return;
 
     if (autoDownload && inst) {
+      // One-shot: drop the deep-link params right away so reloading this
+      // page doesn't start the same download again.
+      setSearchParams({}, { replace: true });
       // Auto-download: start download immediately and switch to downloads tab
       (async () => {
         try {

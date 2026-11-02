@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useMemo } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { isInstrumentId, type InstrumentId } from "../config/instrumentRegistry";
 
@@ -21,9 +21,6 @@ export interface UrlState {
   base?: string;
   view?: string;
 }
-
-/** Debounce interval for URL writes (ms) */
-const DEBOUNCE_MS = 500;
 
 /**
  * Parse current URL search params into a typed UrlState object.
@@ -119,81 +116,53 @@ function serializeState(state: UrlState): URLSearchParams {
 }
 
 /**
- * Custom hook that syncs app state with URL query parameters.
+ * One-time deep links + explicit share links.
  *
- * - Reads state from URL on mount (returned as `urlState`).
- * - Provides `updateUrl(partial)` which debounces writes by 500ms
- *   and uses `replaceState` to avoid polluting browser history.
- * - Handles legacy `?flyTo=PRODUCT_ID` by mapping it to `product`.
+ * The app used to mirror its state into the address bar continuously
+ * (debounced replaceState). A plain reload or revisit then replayed stale
+ * state: fly to the last product, auto-load every layer that had been on.
+ * Now:
+ *   - `urlState` is read ONCE on mount (shared links, `/?flyTo=` from the
+ *     download page) and the params are immediately stripped from the URL,
+ *     so the next reload starts clean.
+ *   - `updateUrl(partial)` only records the current view in memory.
+ *   - `getShareUrl()` builds a link to the current view on demand
+ *     (the "Copy link" button).
+ * The legacy `?flyTo=PRODUCT_ID` param is read as `product`.
  */
 export default function useUrlState() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Parse current params on every render (cheap operation).
-  // But `urlState` is only used for the initial mount read in MainPage,
-  // so we memoize based on the raw search string.
-  const urlState = useMemo(
-    () => parseParams(searchParams),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [searchParams.toString()],
-  );
+  // Frozen initial state: later URL changes never re-trigger a restore.
+  const initialRef = useRef<UrlState | null>(null);
+  if (initialRef.current === null) initialRef.current = parseParams(searchParams);
+  const urlState = initialRef.current;
 
-  // Internal accumulated state for debounced writes.
-  // This merges successive updateUrl calls into one URL write.
-  const pendingRef = useRef<UrlState>({});
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Keep a ref to the latest setSearchParams to avoid stale closures
-  const setParamsRef = useRef(setSearchParams);
-  setParamsRef.current = setSearchParams;
-
-  // On mount: if legacy "flyTo" param is present, clean it up
-  // (the parsed urlState.product already captured the value above).
+  // Strip state params once they have been read.
   useEffect(() => {
-    if (searchParams.has("flyTo")) {
-      const next = new URLSearchParams(searchParams);
-      const flyTo = next.get("flyTo");
-      next.delete("flyTo");
-      if (flyTo) next.set("product", flyTo);
-      setSearchParams(next, { replace: true });
-    }
+    const STATE_KEYS = ["lat", "lon", "camLat", "camLon", "camHeight", "instruments", "product", "flyTo", "base", "view", "instrument"];
+    if (!STATE_KEYS.some((k) => searchParams.has(k))) return;
+    const next = new URLSearchParams(searchParams);
+    for (const k of STATE_KEYS) next.delete(k);
+    setSearchParams(next, { replace: true });
     // Run only once on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Merge partial state into the URL. Debounced by 500ms.
-   * Uses `replace: true` so the back button is not polluted.
-   *
-   * Pass `undefined` for a key to remove it from the URL.
-   */
+  // Current view, accumulated from updateUrl calls (memory only).
+  const viewRef = useRef<UrlState>({});
+
+  /** Record part of the current view (no address-bar write). `undefined` clears a key. */
   const updateUrl = useCallback((partial: Partial<UrlState>) => {
-    // Merge into pending state
-    pendingRef.current = { ...pendingRef.current, ...partial };
-
-    // Reset debounce timer
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current);
-    }
-
-    timerRef.current = setTimeout(() => {
-      const merged = pendingRef.current;
-      const params = serializeState(merged);
-      setParamsRef.current(params, { replace: true });
-      // Don't clear pendingRef -- it represents the full accumulated state.
-      // Next updateUrl calls will merge on top of it.
-      timerRef.current = null;
-    }, DEBOUNCE_MS);
+    viewRef.current = { ...viewRef.current, ...partial };
   }, []);
 
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) {
-        clearTimeout(timerRef.current);
-      }
-    };
+  /** Absolute link that restores the current view once when opened. */
+  const getShareUrl = useCallback((): string => {
+    const params = serializeState(viewRef.current);
+    const query = params.toString();
+    return `${window.location.origin}${window.location.pathname}${query ? `?${query}` : ""}`;
   }, []);
 
-  return { urlState, updateUrl };
+  return { urlState, updateUrl, getShareUrl };
 }

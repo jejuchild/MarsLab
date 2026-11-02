@@ -201,7 +201,7 @@ export function getScoreType(type: OverlayType): "score_ice" | "score_hyd" | nul
 }
 
 export default function MainPage() {
-  const { urlState, updateUrl } = useUrlState();
+  const { urlState, updateUrl, getShareUrl } = useUrlState();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const commandPalette = useCommandPalette();
@@ -903,21 +903,11 @@ export default function MainPage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally run once on mount
 
-  // --- URL State: Write on state change (debounced) ---
-  // Skip writes until the initial URL state has been applied to avoid
-  // overwriting URL params with default state during the first render.
-  const urlWriteReadyRef = useRef(false);
-  useEffect(() => {
-    // Wait one tick after mount effects have run before enabling writes.
-    const id = setTimeout(() => { urlWriteReadyRef.current = true; }, 600);
-    return () => clearTimeout(id);
-  }, []);
-
+  // --- Current view → share link (memory only; see useUrlState) ---
   // Sync flyToCoords → lat/lon in URL.
   // Only write when flyToCoords is set (not when cleared to null after fly-to
   // completes), so the URL retains the last navigated position for bookmarking.
   useEffect(() => {
-    if (!urlWriteReadyRef.current) return;
     if (flyToCoords) {
       updateUrl({
         lat: flyToCoords.lat,
@@ -928,7 +918,6 @@ export default function MainPage() {
 
   // Sync instrumentVisibility → instruments in URL
   useEffect(() => {
-    if (!urlWriteReadyRef.current) return;
     const active = (Object.entries(instrumentVisibility) as [InstrumentId, boolean][])
       .filter(([, v]) => v)
       .map(([k]) => k);
@@ -937,7 +926,6 @@ export default function MainPage() {
 
   // Sync selected product → product in URL
   useEffect(() => {
-    if (!urlWriteReadyRef.current) return;
     updateUrl({ product: selected?.productId ?? undefined });
   }, [selected?.productId, updateUrl]);
 
@@ -947,15 +935,23 @@ export default function MainPage() {
 
   // Sync baseLayer → base in URL (only write non-default)
   useEffect(() => {
-    if (!urlWriteReadyRef.current) return;
     updateUrl({ base: baseLayer !== "MOLA" ? baseLayer : undefined });
   }, [baseLayer, updateUrl]);
 
   // Sync mapMode → view in URL (only write non-default)
   useEffect(() => {
-    if (!urlWriteReadyRef.current) return;
     updateUrl({ view: mapMode !== "2D" ? mapMode : undefined });
   }, [mapMode, updateUrl]);
+
+  // Share links are built on demand (the address bar is no longer kept in
+  // sync, so a reload starts fresh instead of replaying the last session).
+  const handleCopyLink = useCallback(() => {
+    const url = getShareUrl();
+    navigator.clipboard?.writeText(url).then(
+      () => toast.success("Link to this view copied"),
+      () => toast.error("Could not copy link"),
+    );
+  }, [getShareUrl]);
 
   // Track recently inspected products
   useEffect(() => {
@@ -1805,6 +1801,7 @@ export default function MainPage() {
           lastActionDescription={lastAction?.description}
           onUndo={undo}
           onRedo={redo}
+          onCopyLink={handleCopyLink}
         />
       }
       footer={<Footer />}
