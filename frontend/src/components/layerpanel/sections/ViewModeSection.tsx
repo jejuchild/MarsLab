@@ -1,6 +1,13 @@
 import type { ViewModeSectionProps } from "../types";
 import { lp } from "../tokens";
 
+const BASE_LAYERS: { id: "MOLA" | "HRSC" | "THEMIS"; label: string; hint: string }[] = [
+  { id: "MOLA", label: "MGS MOLA ColorShade", hint: "Colour-coded elevation (463 m)" },
+  { id: "THEMIS", label: "THEMIS Day IR (greyscale)", hint: "Neutral backdrop for comparing overlays (100 m)" },
+  // id kept as "HRSC" for saved links; the tiles are Viking MDIM 2.1 colour.
+  { id: "HRSC", label: "Viking MDIM 2.1 colour", hint: "Global colour image mosaic (232 m)" },
+];
+
 export default function ViewModeSection({
   mapMode,
   onMapModeChange,
@@ -38,41 +45,32 @@ export default function ViewModeSection({
         </button>
       </div>
 
-      {/* Base Map (MOLA / HRSC) */}
+      {/* Base Map */}
       <h3 className={`${lp.h3} mb-3 mt-4`}>Base Map</h3>
       <div className="space-y-2">
-        <label
-          className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-            baseLayer === "MOLA"
-              ? "bg-primary/20 border border-primary/50"
-              : "bg-[#1a2333] border border-[#232f48] hover:border-primary/30"
-          }`}
-        >
-          <input
-            type="radio"
-            name="baseLayer"
-            checked={baseLayer === "MOLA"}
-            onChange={() => onBaseLayerChange("MOLA")}
-            className="rounded-full bg-[#0a0f18] border-[#232f48] text-primary focus:ring-0 focus:ring-offset-0"
-          />
-          <span className={lp.body}>MGS MOLA ColorShade</span>
-        </label>
-        <label
-          className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-            baseLayer === "HRSC"
-              ? "bg-primary/20 border border-primary/50"
-              : "bg-[#1a2333] border border-[#232f48] hover:border-primary/30"
-          }`}
-        >
-          <input
-            type="radio"
-            name="baseLayer"
-            checked={baseLayer === "HRSC"}
-            onChange={() => onBaseLayerChange("HRSC")}
-            className="rounded-full bg-[#0a0f18] border-[#232f48] text-primary focus:ring-0 focus:ring-offset-0"
-          />
-          <span className={lp.body}>Mars Express HRSC</span>
-        </label>
+        {BASE_LAYERS.map((b) => (
+          <label
+            key={b.id}
+            className={`flex items-start gap-2 p-2 rounded cursor-pointer transition-colors ${
+              baseLayer === b.id
+                ? "bg-primary/20 border border-primary/50"
+                : "bg-[#1a2333] border border-[#232f48] hover:border-primary/30"
+            }`}
+            title={b.hint}
+          >
+            <input
+              type="radio"
+              name="baseLayer"
+              checked={baseLayer === b.id}
+              onChange={() => onBaseLayerChange(b.id)}
+              className="mt-0.5 rounded-full bg-[#0a0f18] border-[#232f48] text-primary focus:ring-0 focus:ring-offset-0"
+            />
+            <span className="flex flex-col">
+              <span className={lp.body}>{b.label}</span>
+              <span className="text-[10px] text-slate-500">{b.hint}</span>
+            </span>
+          </label>
+        ))}
       </div>
     </div>
   );

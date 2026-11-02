@@ -153,7 +153,7 @@ export type ProductOverlay = {
 export type ActiveOverlays = Map<string, ProductOverlay>;
 
 // Base map layer types
-export type BaseLayerType = "MOLA" | "HRSC";
+export type BaseLayerType = "MOLA" | "HRSC" | "THEMIS";
 
 // Map mode types (2D flat view vs 3D globe)
 export type MapMode = "2D" | "3D";
@@ -831,7 +831,7 @@ export default function MainPage() {
     // crash-loop sessionStorage workaround removed alongside.
 
     // Restore base layer
-    if (urlState.base === "MOLA" || urlState.base === "HRSC") {
+    if (urlState.base === "MOLA" || urlState.base === "HRSC" || urlState.base === "THEMIS") {
       setBaseLayer(urlState.base);
     }
 

@@ -8,7 +8,9 @@ import type { FieldNote } from "../api/fieldnotes";
 import type FootprintManager from "../utils/FootprintManager";
 
 type LatLon = { lat: number; lon: number };
-type BaseLayerType = "MOLA" | "HRSC";
+type BaseLayerType = "MOLA" | "HRSC" | "THEMIS";
+/** Deepest tile level each base layer serves (requests beyond it 404). */
+const BASE_MAX_LEVEL: Record<BaseLayerType, number | undefined> = { MOLA: undefined, HRSC: undefined, THEMIS: 8 };
 type MapMode = "2D" | "3D";
 type InstrumentType =
   | "CRISM"
@@ -301,6 +303,7 @@ export default function useMapViewer({
     viewer.imageryLayers.addImageryProvider(
       new Cesium.UrlTemplateImageryProvider({
         url: baseLayerUrls[baseLayer],
+        maximumLevel: BASE_MAX_LEVEL[baseLayer],
         rectangle: marsRect,
         tilingScheme: new Cesium.GeographicTilingScheme({
           ellipsoid: marsEllipsoid,
@@ -1194,10 +1197,14 @@ export default function useMapViewer({
       const viewer = viewerRef.current;
       if (!viewer) return;
 
-      viewer.imageryLayers.removeAll();
+      // Replace only the base layer (index 0). removeAll() also dropped the
+      // CTX mosaic and other imagery layers while their refs stayed "active".
+      const base = viewer.imageryLayers.length > 0 ? viewer.imageryLayers.get(0) : undefined;
+      if (base) viewer.imageryLayers.remove(base, true);
       viewer.imageryLayers.addImageryProvider(
         new Cesium.UrlTemplateImageryProvider({
           url: baseLayerUrls[layer],
+          maximumLevel: BASE_MAX_LEVEL[layer],
           rectangle: marsRect,
           tilingScheme: new Cesium.GeographicTilingScheme({
             ellipsoid: marsEllipsoid,
@@ -1205,6 +1212,7 @@ export default function useMapViewer({
             numberOfLevelZeroTilesY: 1,
           }),
         }),
+        0, // keep the base map underneath every other imagery layer
       );
 
       viewer.scene.requestRender();

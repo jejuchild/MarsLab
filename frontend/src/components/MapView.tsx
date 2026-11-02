@@ -66,7 +66,7 @@ type RGBWavelengths = {
 type BrowseProductType = "HYD" | "ICE" | "IC2";
 type ScoreProductType = "score_ice" | "score_hyd";
 
-type BaseLayerType = "MOLA" | "HRSC";
+type BaseLayerType = "MOLA" | "HRSC" | "THEMIS";
 
 type MapMode = "2D" | "3D";
 
@@ -234,7 +234,11 @@ const MARS_RECT = Cesium.Rectangle.fromDegrees(-180, -90, 180, 90);
 // Base layer URLs from Trek API
 const BASE_LAYER_URLS: Record<BaseLayerType, string> = {
   MOLA: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MGS_MOLA_ClrShade_merge_global_463m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg",
+  // Key kept as "HRSC" for saved links; the layer is the Viking MDIM 2.1 colour mosaic.
   HRSC: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_Viking_MDIM21_ClrMosaic_global_232m/1.0.0/default/default028mm/{z}/{y}/{x}.jpg",
+  // Neutral greyscale (THEMIS daytime IR, 100 m): image overlays and coloured
+  // footprints compare better on grey than on the colour-coded MOLA relief.
+  THEMIS: "https://trek.nasa.gov/tiles/Mars/EQ/Mars_MO_THEMIS-IR-Day_mosaic_global_100m_v12_clon0_ly/1.0.0/default/default028mm/{z}/{y}/{x}.png",
 };
 
 /* ==================================================
