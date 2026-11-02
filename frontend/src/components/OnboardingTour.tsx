@@ -37,23 +37,16 @@ const TOUR_STEPS: TourStep[] = [
   {
     title: "Inspect Observations",
     description:
-      "Click any footprint on the map to open the Inspector panel. View metadata, activate quickview image overlays, browse spectral data, compare products side-by-side, and download raw files from PDS.",
+      "Click any point or footprint on the map to open the Inspector. Data at that location is grouped into four lanes \u2014 SHARAD, CRISM, HiRISE, and CTX \u2014 with spectra, radargrams, DTM tools, and PDS downloads inside each lane.",
     icon: "info",
     target: "right-panel",
   },
   {
-    title: "Explore Ice Detection",
+    title: "Measure & Compare",
     description:
-      "The Ice Detection section combines five independent techniques \u2014 neutron spectroscopy, thermal inertia, radar surface, radar dielectric, and geomorphology \u2014 to map subsurface water ice. Toggle methods and adjust depth ranges.",
-    icon: "ac_unit",
-    target: "left-panel",
-  },
-  {
-    title: "Analysis & AI Tools",
-    description:
-      "Use Terrain Analysis tools for slope analysis, elevation profiles, and measurements. AI-powered tools include Agentic AI for autonomous investigation, Landing Site Reports for region comparison, and Guided Workflows for step-by-step research.",
-    icon: "build",
-    target: "left-panel",
+      "Use the map tools to measure distances, areas, and elevation profiles (exportable as CSV). Cross-instrument views such as stratigraphy and mineral sequences live at the bottom of the Inspector.",
+    icon: "straighten",
+    target: "center",
   },
   {
     title: "Meet MARVIS",

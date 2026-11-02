@@ -165,8 +165,8 @@ async def seed_knowledge_endpoint(force: bool = False):
     """
     Seed the vector store with built-in Mars science knowledge.
 
-    Also auto-ingests documents from knowledge/, mars_research/,
-    and agent_reports/ directories.
+    Also auto-ingests documents from the knowledge/ and agent_reports/
+    directories.
     """
     from .mars_knowledge import seed_knowledge, auto_ingest_local_knowledge
 

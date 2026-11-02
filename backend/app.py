@@ -565,20 +565,11 @@ app.include_router(product_urls_router)  # /api/product-urls/* — PDS Download 
 from api.hirise_landforms_router import router as hirise_landforms_router
 app.include_router(hirise_landforms_router)  # /api/hirise-landforms/* — HiRISE Landform Classification
 
-from api.mars_news_router import router as mars_news_router
-app.include_router(mars_news_router)  # /api/mars-news — Mars News Digest
-
-from api.mars_research_router import router as mars_research_router
-app.include_router(mars_research_router)  # /api/mars-research — Mars Research Digest
-
 from api.ctx_tile_router import router as ctx_tile_router
 app.include_router(ctx_tile_router)  # /api/ctx-mosaic/* — Murray Lab CTX Mosaic Tiles
 
 from rag.rag_router import router as rag_router
 app.include_router(rag_router)  # /api/rag/* — Mars Science RAG
-
-from analysis.integration.integration_router import router as integration_router
-app.include_router(integration_router)  # /api/integration/* — Cross-system Integration Modules
 
 from api.inspector_router import router as inspector_router
 app.include_router(inspector_router)  # /api/inspector/at-point — 4-lane aggregator (Phase 3)

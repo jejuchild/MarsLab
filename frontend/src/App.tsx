@@ -10,7 +10,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 const DataDownloadPage = lazy(() => import("./pages/DataDownloadPage"));
 const DataUploadPage = lazy(() => import("./pages/DataUploadPage"));
 const FeatureSuggestionsPage = lazy(() => import("./pages/FeatureSuggestionsPage"));
-const MarsNewsPage = lazy(() => import("./pages/MarsNewsPage"));
 
 const PageLoading = () => (
   <div className="h-screen w-screen flex items-center justify-center bg-[#0a0f18] text-[#6b7c9c]">
@@ -63,9 +62,8 @@ export default function App() {
           <Route path="/download" element={<LazyPage scope="DataDownload"><DataDownloadPage /></LazyPage>} />
           <Route path="/upload" element={<LazyPage scope="DataUpload"><DataUploadPage /></LazyPage>} />
           <Route path="/suggestions" element={<LazyPage scope="Suggestions"><FeatureSuggestionsPage /></LazyPage>} />
-          <Route path="/news" element={<LazyPage scope="News"><MarsNewsPage /></LazyPage>} />
-          {/* Legacy route — Research is now a tab inside /news */}
-          <Route path="/research" element={<Navigate to="/news?tab=research" replace />} />
+          {/* Unknown or removed routes (e.g. /news, /research) fall back to the map */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

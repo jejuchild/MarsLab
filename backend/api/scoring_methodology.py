@@ -8,7 +8,6 @@ synthesize_results and compare_regions.
 
 Importable by:
   - agent_tasks.py  (single-region assessment)
-  - report_orchestrator.py  (multi-region comparison)
 
 All sub-scores are normalized to 0.0-1.0.  The composite score is a weighted
 linear combination with optional science-distance penalty.
@@ -799,8 +798,7 @@ def compute_composite_score(
 ) -> Dict[str, Any]:
     """Compute the full weighted composite score with all sub-scores.
 
-    This is the main entry point for both ``agent_tasks.py`` (single region)
-    and ``report_orchestrator.py`` (multi-region comparison).
+    This is the main entry point for ``agent_tasks.py`` (single region).
 
     Parameters
     ----------

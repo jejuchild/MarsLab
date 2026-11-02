@@ -446,14 +446,13 @@ def seed_knowledge(collection: str = _COLLECTION, force: bool = False) -> Dict:
 
 def auto_ingest_local_knowledge(collection: str = _COLLECTION) -> Dict:
     """
-    Auto-ingest documents from MarsLab's knowledge/ and mars_research/ dirs.
+    Auto-ingest documents from MarsLab's knowledge/ and agent_reports/ dirs.
     """
     from .ingestion import ingest_directory
 
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dirs_to_scan = [
         os.path.join(base, "..", "knowledge"),
-        os.path.join(base, "mars_research"),
         os.path.join(base, "agent_reports"),
     ]
 

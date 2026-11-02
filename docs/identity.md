@@ -128,12 +128,13 @@
 | `backend/agent/` legacy | CLAUDE.md에서 "old" |
 | Backend: `accessibility_router`, `pathfinder_router`, `thermal_pinn`, `neural_climate_router`, `mars_climate.py`, `multi_report_router`, `report_router`, `agentic_router`, `swim_router`, `swim_ice_router` | 프론트 cut에 따라 백엔드도 제거 |
 | 모바일 `BottomSheet` 복잡 분기 | 데스크탑 우선으로 단순화 |
+| `MarsNewsPage` `/news` + `MarsResearchPage` + `mars_news`/`mars_research` 크롤러·router (2026-11-02 cut) | 데이터 도구 아님 — 사용자 결정으로 KEEP → CUT 변경 |
+| `/api/integration/*` (착륙지·얼음진화·지진) + `neural_climate`, `pinns_interior` (2026-11-02 cut) | 미션 플래너 영역, 프론트 미사용, `mars_climate` 삭제 후 degrade 상태였음 |
 
 ### ✅ KEEP (정체성 밖이지만 남김 — 사용자 요청)
 
 | 항목 | 비고 |
 |---|---|
-| `MarsNewsPage` `/news` (**Research 통합**) | 단일 `/news` 라우트 안에 News 탭 + Research 탭 |
 | `FeatureSuggestionsPage` `/suggestions` | 사용자 요청 |
 | `EasterEggs.tsx` (Curiosity, Olympus, Watney, Terraform), `SpaceGame.tsx` | 사용자 요청 — SearchBar에서 직접 trigger 유지 |
 
