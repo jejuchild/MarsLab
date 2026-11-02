@@ -1,0 +1,18 @@
+{
+  "_comment": "Priority sites for scripts/background_fetch.py. lat/lon are planetocentric degrees, lon in -180..180 (east positive). priority: 1 = most important (tie-breaker only; sites with fewest local products are always served first). radius_km: fallback search radius used when no footprint contains the site point. Coordinates are the bounding-box centres of the matching api/mars_regions.py entries (which are sourced from the IAU/USGS Gazetteer of Planetary Nomenclature).",
+  "instruments": ["sharad", "crism", "hirise"],
+  "sites": [
+    {"id": "jezero",     "name": "Jezero Crater",              "lat": 18.41,   "lon": 77.69,    "radius_km": 10, "priority": 1, "source": "mars_regions.jezero_crater bbox centre"},
+    {"id": "gale",       "name": "Gale Crater",                "lat": -5.335,  "lon": 137.65,   "radius_km": 15, "priority": 1, "source": "mars_regions.gale_crater bbox centre"},
+    {"id": "arcadia",    "name": "Arcadia Planitia (ice)",     "lat": 49.02,   "lon": -171.855, "radius_km": 25, "priority": 1, "source": "mars_regions.arcadia_planitia bbox centre (antimeridian-wrapped)"},
+    {"id": "gusev",      "name": "Gusev Crater",               "lat": -14.53,  "lon": 175.53,   "radius_km": 15, "priority": 2, "source": "mars_regions.gusev_crater bbox centre"},
+    {"id": "meridiani",  "name": "Meridiani Planum",           "lat": 2.39,    "lon": -1.95,    "radius_km": 25, "priority": 2, "source": "mars_regions.meridiani_planum bbox centre"},
+    {"id": "holden",     "name": "Holden Crater",              "lat": -26.04,  "lon": -34.015,  "radius_km": 15, "priority": 2, "source": "mars_regions.holden_crater bbox centre"},
+    {"id": "eberswalde", "name": "Eberswalde Crater",          "lat": -23.98,  "lon": -33.3,    "radius_km": 10, "priority": 2, "source": "mars_regions.eberswalde_crater bbox centre"},
+    {"id": "mawrth",     "name": "Mawrth Vallis",              "lat": 22.46,   "lon": -16.6,    "radius_km": 20, "priority": 2, "source": "mars_regions.mawrth_vallis bbox centre"},
+    {"id": "nili",       "name": "Nili Fossae",                "lat": 22.065,  "lon": 76.9,     "radius_km": 20, "priority": 2, "source": "mars_regions.nili_fossae bbox centre"},
+    {"id": "utopia",     "name": "Utopia Planitia",            "lat": 43.045,  "lon": 118.375,  "radius_km": 25, "priority": 3, "source": "mars_regions.utopia_planitia bbox centre"},
+    {"id": "olympus",    "name": "Olympus Mons",               "lat": 18.58,   "lon": -133.52,  "radius_km": 20, "priority": 3, "source": "mars_regions.olympus_mons bbox centre"},
+    {"id": "coprates",   "name": "Valles Marineris (Coprates)", "lat": -13.1,  "lon": -60.8,    "radius_km": 20, "priority": 3, "source": "mars_regions.coprates_chasma bbox centre"}
+  ]
+}
