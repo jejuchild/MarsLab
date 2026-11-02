@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import type React from "react";
 import * as Cesium from "cesium";
+import { decodeImage, renderUntilSettled } from "../utils/overlayImage";
 import type FootprintManager from "../utils/FootprintManager";
 import type { InstrumentType as FPInstrumentType } from "../utils/FootprintManager";
 import {
@@ -56,35 +57,15 @@ type UseOverlaysParams = {
 
 const isHiRISEProduct = (id: string) => /^(ESP|PSP|TRA)_/.test(id);
 
-/**
- * Load and decode an overlay image before handing it to Cesium.
- *
- * The viewer runs in requestRenderMode. Given a URL string, Cesium loads the
- * texture asynchronously and nothing requests a new frame when it arrives, so
- * the overlay stayed a flat grey placeholder until the user moved the map.
- * A decoded HTMLImageElement becomes a texture on the very next render.
- * Resolves null when the image is missing or undecodable.
- */
-/**
- * Cesium prepares entity geometry and material textures asynchronously and,
- * in requestRenderMode, does not request a frame when they become ready — the
- * overlay showed as a grey placeholder until the user moved the map. Request a
- * few frames over the next ~3 s so newly added overlays actually appear.
- */
-function renderUntilSettled(viewer: Cesium.Viewer): void {
-  for (const ms of [0, 100, 300, 700, 1500, 3000]) {
-    setTimeout(() => {
-      if (!viewer.isDestroyed()) viewer.scene.requestRender();
-    }, ms);
-  }
-}
-
-async function decodeImage(url: string): Promise<HTMLImageElement | null> {
-  const img = new Image();
-  img.src = url;
+/** Parse the X-Geo-Bounds header of a georeferenced overlay image, if present. */
+function readGeoBounds(res: Response): ProductBounds | null {
+  const raw = res.headers.get("X-Geo-Bounds");
+  if (!raw) return null;
   try {
-    await img.decode();
-    return img;
+    const b = JSON.parse(raw) as { west: number; south: number; east: number; north: number };
+    return [b.west, b.south, b.east, b.north].every(Number.isFinite)
+      ? { west: b.west, south: b.south, east: b.east, north: b.north }
+      : null;
   } catch {
     return null;
   }
@@ -143,6 +124,19 @@ export default function useOverlays({
         : isTRR3
           ? "CRISM_TRR3"
           : "CRISM";
+
+    // Don't bring the footprint back while another overlay type is still
+    // showing for this product (e.g. quickview turned off, high-res still on).
+    if (!transparent) {
+      const prefixes = ["QUICKVIEW_OVERLAY_", "HIGHRES_OVERLAY_", "MINERAL_OVERLAY_"];
+      const stillCovered =
+        prefixes.some((p) => viewer.entities.getById(`${p}${productId}`)?.show) ||
+        viewer.entities.values.some(
+          (e) => e.show && typeof e.id === "string" &&
+            (e.id.startsWith(`BROWSE_OVERLAY_${productId}_`) || e.id.startsWith(`SCORE_OVERLAY_${productId}_`)),
+        );
+      if (stillCovered) return;
+    }
 
     // Use FootprintManager to hide/show both fill AND outline (primitive-based)
     if (footprintManager) {
@@ -506,7 +500,9 @@ export default function useOverlays({
               imageUrl = `/hirise/quickview/${productId}.png`;
               instrument = "HIRISE";
             } else if (isTRR3) {
-              imageUrl = `/api/mineral-cnn/quickview/${productId}`;
+              // Georeferenced (north-up) variant; the raw TRR3 image is in
+              // sensor geometry and appeared rotated/mirrored on the map.
+              imageUrl = `/api/mineral-cnn/quickview/${productId}?geo=1`;
               instrument = "CRISM_TRR3";
             } else {
               // Smart backend endpoint handles all naming patterns
@@ -522,6 +518,10 @@ export default function useOverlays({
               toast.error(`Quickview not available for ${productId}`);
               return null;
             }
+            // Georeferenced images report the exact box they were resampled
+            // into; drape on that rectangle (not the index polygon).
+            const geoBounds = readGeoBounds(imgRes);
+            if (geoBounds) bounds = geoBounds;
             const blob = await imgRes.blob();
             const blobUrl = URL.createObjectURL(blob);
             const image = await decodeImage(blobUrl);
@@ -1220,13 +1220,15 @@ export default function useOverlays({
               return null;
             }
 
-            const mapUrl = `/api/mineral-cnn/result/${productId}/mineral-map.png`;
+            const mapUrl = `/api/mineral-cnn/result/${productId}/mineral-map.png?geo=1`;
 
             const res = await fetch(mapUrl);
             if (!res.ok) {
               toast.error(`Mineral map not available for ${productId}`);
               return null;
             }
+            const geoBounds = readGeoBounds(res);
+            if (geoBounds) bounds = geoBounds;
 
             const blob = await res.blob();
             const blobUrl = URL.createObjectURL(blob);

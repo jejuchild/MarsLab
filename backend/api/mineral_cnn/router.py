@@ -220,14 +220,34 @@ _MINERAL_COLORS = {
 
 
 @router.get("/result/{obs_id}/mineral-map.png")
-async def get_mineral_map_png(obs_id: str):
-    """Serve colored PNG mineral classification map."""
+async def get_mineral_map_png(
+    obs_id: str,
+    geo: bool = Query(False, description="Return a north-up lat/lon georeferenced image (map overlays)"),
+):
+    """Serve colored PNG mineral classification map (sensor geometry unless geo=1)."""
     obs_id = _validate_obs_id_or_400(obs_id)
 
     try:
         _ = has_cached_result(obs_id)  # validates obs_id
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    if geo:
+        if not has_cached_result(obs_id):
+            raise HTTPException(status_code=404, detail=f"No classification result for {obs_id}")
+        from .constants import TRR_DATA_DIR
+
+        def sensor_image():
+            result = load_cached_result(obs_id)
+            rgba = np.zeros((result.rows, result.cols, 4), dtype=np.uint8)
+            for mineral_id, color in _MINERAL_COLORS.items():
+                mask = result.mineral_map == mineral_id
+                rgba[mask, :3] = color[:3]
+                rgba[mask, 3] = 255
+            return rgba, rgba[..., 3] > 0
+
+        return _geo_png_response(_result_dir(obs_id), "mineral_map",
+                                 os.path.join(TRR_DATA_DIR, obs_id), sensor_image)
 
     cache_png = os.path.join(_result_dir(obs_id), "mineral_map.png")
 
@@ -444,12 +464,64 @@ async def get_mineral_legend(obs_id: str):
     return JSONResponse({"obs_id": obs_id, "legend": legend})
 
 
+
+# ============================================================
+# Georeferenced (north-up lat/lon) variants for map overlays
+# ============================================================
+def _geo_png_response(cache_dir: str, name: str, obs_dir: str, make_sensor_image) -> Response:
+    """
+    Serve a georeferenced PNG (cached as <name>_geo.png + <name>_geo.json).
+
+    ``make_sensor_image`` returns (image uint8 (rows, cols[, C]), valid mask).
+    The covered lat/lon box is returned in the X-Geo-Bounds header so the map
+    places the image exactly where it was resampled to.
+    """
+    from .georef import find_ddr, load_ddr_latlon, warp_to_latlon
+
+    png_path = os.path.join(cache_dir, f"{name}_geo.png")
+    meta_path = os.path.join(cache_dir, f"{name}_geo.json")
+    if os.path.exists(png_path) and os.path.exists(meta_path):
+        with open(png_path, "rb") as f:
+            png = f.read()
+        with open(meta_path) as f:
+            bounds = json.load(f)
+    else:
+        ddr = find_ddr(obs_dir) if os.path.isdir(obs_dir) else None
+        if not ddr:
+            raise HTTPException(status_code=404, detail="DDR not found; cannot georeference")
+        image, valid = make_sensor_image()
+        try:
+            rgba, bounds = warp_to_latlon(image, valid, load_ddr_latlon(*ddr))
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=f"Cannot georeference: {e}")
+        buf = io.BytesIO()
+        Image.fromarray(rgba, mode="RGBA").save(buf, format="PNG")
+        png = buf.getvalue()
+        os.makedirs(cache_dir, exist_ok=True)
+        with open(png_path, "wb") as f:
+            f.write(png)
+        with open(meta_path, "w") as f:
+            json.dump(bounds, f)
+    return Response(
+        png,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Geo-Bounds": json.dumps(bounds),
+            "Access-Control-Expose-Headers": "X-Geo-Bounds",
+        },
+    )
+
 # ============================================================
 # GET /quickview/{obs_id} — VNIR single-band quickview PNG
 # ============================================================
 @router.get("/quickview/{obs_id}")
-async def get_trr3_quickview(obs_id: str, band: int = Query(None, description="Band index (0-based). Default: middle VNIR band")):
-    """Serve a grayscale PNG quickview from a TRR3 VNIR band."""
+async def get_trr3_quickview(
+    obs_id: str,
+    band: int = Query(None, description="Band index (0-based). Default: middle VNIR band"),
+    geo: bool = Query(False, description="Return a north-up lat/lon georeferenced image (map overlays)"),
+):
+    """Serve a grayscale PNG quickview from a TRR3 VNIR band (sensor geometry unless geo=1)."""
     obs_id = _validate_obs_id_or_400(obs_id)
 
     from .constants import TRR_DATA_DIR
@@ -458,7 +530,41 @@ async def get_trr3_quickview(obs_id: str, band: int = Query(None, description="B
     if not os.path.isdir(obs_dir):
         raise HTTPException(status_code=404, detail=f"Observation {obs_id} not found")
 
-    # Find TRR3 files
+    try:
+        if geo and band is None:
+            return _geo_png_response(
+                obs_dir, "quickview", obs_dir,
+                lambda: (lambda a: (a, a > 0))(_quickview_array(obs_dir, None)),
+            )
+
+        cache_path = os.path.join(obs_dir, "quickview.png")
+        if band is None and os.path.exists(cache_path):
+            with open(cache_path, "rb") as f:
+                return Response(f.read(), media_type="image/png",
+                                headers={"Cache-Control": "public, max-age=86400"})
+
+        stretched = _quickview_array(obs_dir, band)
+        buf = io.BytesIO()
+        Image.fromarray(stretched, mode="L").save(buf, format="PNG")
+        png_bytes = buf.getvalue()
+        if band is None:
+            with open(cache_path, "wb") as f:
+                f.write(png_bytes)
+        return Response(png_bytes, media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to generate quickview for %s", obs_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _quickview_array(obs_dir: str, band: int | None) -> np.ndarray:
+    """Sensor-geometry quickview (uint8, 0 = no data) for one TRR3 band."""
+    cache_path = os.path.join(obs_dir, "quickview.png")
+    if band is None and os.path.exists(cache_path):
+        return np.asarray(Image.open(cache_path).convert("L"))
+
     trr_img = trr_lbl = None
     for fname in os.listdir(obs_dir):
         upper = fname.upper()
@@ -466,66 +572,26 @@ async def get_trr3_quickview(obs_id: str, band: int = Query(None, description="B
             trr_img = os.path.join(obs_dir, fname)
         elif upper.endswith("_TRR3.LBL"):
             trr_lbl = os.path.join(obs_dir, fname)
-
     if not trr_img or not trr_lbl:
         raise HTTPException(status_code=404, detail="TRR3 files not found")
 
-    # Check for cached quickview
-    cache_path = os.path.join(obs_dir, "quickview.png")
-    if band is None and os.path.exists(cache_path):
-        with open(cache_path, "rb") as f:
-            return Response(
-                f.read(),
-                media_type="image/png",
-                headers={"Cache-Control": "public, max-age=86400"},
-            )
+    from .data_loader import load_trr_cube
 
-    try:
-        from .data_loader import load_trr_cube
+    cube, rows, cols = load_trr_cube(trr_img, trr_lbl)
+    n_bands = cube.shape[2]
+    # Default: ~60% through bands (roughly 0.7 µm for S-sensor)
+    if band is None:
+        band = int(n_bands * 0.6)
+    band = max(0, min(band, n_bands - 1))
+    single = cube[:, :, band].astype(np.float64)
 
-        cube, rows, cols = load_trr_cube(trr_img, trr_lbl)
-        n_bands = cube.shape[2]
-
-        # Pick band: default to ~60% through bands (roughly 0.7 µm for S-sensor)
-        if band is None:
-            band = int(n_bands * 0.6)
-        band = max(0, min(band, n_bands - 1))
-
-        single = cube[:, :, band].astype(np.float64)
-
-        # Replace fill/invalid values
-        valid = (single > 0) & (single < 1.5) & np.isfinite(single)
-        if valid.sum() < 10:
-            raise HTTPException(status_code=500, detail="No valid data in selected band")
-
-        # Stretch to 0-255 using 2-98 percentile
-        p2 = float(np.percentile(single[valid], 2))
-        p98 = float(np.percentile(single[valid], 98))
-        if p98 <= p2:
-            p98 = p2 + 0.01
-
-        stretched = np.clip((single - p2) / (p98 - p2) * 255, 0, 255).astype(np.uint8)
-        stretched[~valid] = 0
-
-        img = Image.fromarray(stretched, mode="L")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
-        png_bytes = buf.read()
-
-        # Cache default band
-        if band == int(n_bands * 0.6):
-            with open(cache_path, "wb") as f:
-                f.write(png_bytes)
-
-        return Response(
-            png_bytes,
-            media_type="image/png",
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Failed to generate quickview for %s", obs_id)
-        raise HTTPException(status_code=500, detail=str(e))
+    valid = (single > 0) & (single < 1.5) & np.isfinite(single)
+    if valid.sum() < 10:
+        raise HTTPException(status_code=500, detail="No valid data in selected band")
+    p2 = float(np.percentile(single[valid], 2))
+    p98 = float(np.percentile(single[valid], 98))
+    if p98 <= p2:
+        p98 = p2 + 0.01
+    stretched = np.clip((single - p2) / (p98 - p2) * 255, 0, 255).astype(np.uint8)
+    stretched[~valid] = 0
+    return stretched

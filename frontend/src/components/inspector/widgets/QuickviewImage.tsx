@@ -30,10 +30,10 @@ function getImageUrl(productId: string, instrument: InstrumentType): string | st
       ];
     case "HIRISE_DTM":
       return `/hirise_dtm/overlay/${productId}.png`;
-    case "CRISM_TRR3": {
-      const obsId = productId.replace(/_\d{2}$/, "");
-      return `/api/mineral-cnn/quickview/${obsId}`;
-    }
+    case "CRISM_TRR3":
+      // The endpoint expects the full obs id (e.g. frt00003452_07); stripping
+      // the suffix 404'd. geo=1 → north-up, matching the map overlay.
+      return `/api/mineral-cnn/quickview/${encodeURIComponent(productId)}?geo=1`;
     case "CRISM":
       return buildCrismUrls(productId);
     default:

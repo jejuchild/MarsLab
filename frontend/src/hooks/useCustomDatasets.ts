@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import * as Cesium from "cesium";
+import { decodeImage, renderUntilSettled } from "../utils/overlayImage";
 
 type UseCustomDatasetsParams = {
   viewerRef: React.MutableRefObject<Cesium.Viewer | null>;
@@ -10,7 +11,7 @@ type UseCustomDatasetsParams = {
     name: string;
     bounds: { west: number; south: number; east: number; north: number };
     visible: boolean;
-    opacity: number;
+    opacity: number; // 0-100
   }>;
 };
 
@@ -19,6 +20,21 @@ export default function useCustomDatasets({
   showCustomData,
   customDatasets,
 }: UseCustomDatasetsParams): void {
+  // Decoded overlay images per dataset id. The uploaded raster used to be
+  // drawn only as an outline + label, so the opacity slider had no effect.
+  const imagesRef = useRef<Map<string, HTMLImageElement | "loading" | "missing">>(new Map());
+  const [imagesVersion, setImagesVersion] = useState(0);
+
+  useEffect(() => {
+    for (const dataset of customDatasets) {
+      if (imagesRef.current.has(dataset.id)) continue;
+      imagesRef.current.set(dataset.id, "loading");
+      decodeImage(`/api/custom/${encodeURIComponent(dataset.id)}/overlay.png`).then((img) => {
+        imagesRef.current.set(dataset.id, img ?? "missing");
+        setImagesVersion((v) => v + 1);
+      });
+    }
+  }, [customDatasets]);
 
   // Custom dataset overlay rendering
   useEffect(() => {
@@ -70,6 +86,33 @@ export default function useCustomDatasets({
             );
           }
 
+          // Raster image overlay (respects the per-dataset opacity slider)
+          const overlayId = `CUSTOM_OVERLAY_${dataset.id}`;
+          const image = imagesRef.current.get(dataset.id);
+          if (image instanceof HTMLImageElement) {
+            desiredIds.add(overlayId);
+            const color = Cesium.Color.WHITE.withAlpha(Math.max(0, Math.min(100, dataset.opacity)) / 100);
+            const overlayEnt = viewer.entities.getById(overlayId);
+            if (!overlayEnt) {
+              viewer.entities.add({
+                id: overlayId,
+                rectangle: {
+                  coordinates: rect,
+                  material: new Cesium.ImageMaterialProperty({ image, transparent: true, color }),
+                  height: 0,
+                },
+                properties: { product_id: dataset.id, instrument: "CUSTOM", kind: "OVERLAY" },
+              });
+              renderUntilSettled(viewer);
+            } else {
+              const material = overlayEnt.rectangle?.material as Cesium.ImageMaterialProperty | undefined;
+              const current = material?.color?.getValue(Cesium.JulianDate.now()) as Cesium.Color | undefined;
+              if (material && (!current || Math.abs(current.alpha - color.alpha) > 1e-3)) {
+                material.color = new Cesium.ConstantProperty(color);
+              }
+            }
+          }
+
           // Add or update label entity
           const labelId = `CUSTOM_LABEL_${dataset.id}`;
           desiredIds.add(labelId);
@@ -107,6 +150,8 @@ export default function useCustomDatasets({
           if (outlineEnt) viewer.entities.remove(outlineEnt);
           const labelEnt = viewer.entities.getById(`CUSTOM_LABEL_${dataset.id}`);
           if (labelEnt) viewer.entities.remove(labelEnt);
+          const overlayEnt = viewer.entities.getById(`CUSTOM_OVERLAY_${dataset.id}`);
+          if (overlayEnt) viewer.entities.remove(overlayEnt);
         }
       }
 
@@ -128,5 +173,5 @@ export default function useCustomDatasets({
     }
 
     viewer.scene.requestRender();
-  }, [showCustomData, customDatasets, viewerRef]);
+  }, [showCustomData, customDatasets, viewerRef, imagesVersion]);
 }

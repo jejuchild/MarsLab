@@ -364,18 +364,32 @@ let hiriseDTMIndexCache: GeoJsonIndex | null = null;
 // Cache for CRISM TRR3 index
 let crismTRR3IndexCache: GeoJsonIndex | null = null;
 
-// Compute bounding box from GeoJSON polygon coordinates
-function boundsFromPolygon(coords: number[][]): ProductBounds | null {
+// Compute bounding box from GeoJSON polygon coordinates.
+// Longitudes are normalized to [-180, 180] (indexes mix 0-360 and ±180), so
+// a footprint straddling 0°/360° no longer yields a ~360°-wide box. A
+// footprint straddling ±180° gets west > east, which Cesium's Rectangle
+// treats as crossing the antimeridian. Previously both cases produced a
+// near-global rectangle with the image stretched across the planet.
+export function boundsFromPolygon(coords: number[][]): ProductBounds | null {
   if (!coords || coords.length < 3) return null;
-  let west = Infinity, east = -Infinity, south = Infinity, north = -Infinity;
+  const lons: number[] = [];
+  let south = Infinity, north = -Infinity;
   for (const pair of coords) {
     const lon = pair[0];
     const lat = pair[1];
     if (lon == null || lat == null) continue;
-    if (lon < west) west = lon;
-    if (lon > east) east = lon;
+    lons.push(lon > 180 ? lon - 360 : lon < -180 ? lon + 360 : lon);
     if (lat < south) south = lat;
     if (lat > north) north = lat;
+  }
+  if (lons.length < 3) return null;
+  let west = Math.min(...lons);
+  let east = Math.max(...lons);
+  if (east - west > 180) {
+    // Crosses the antimeridian: measure in 0-360 instead.
+    const shifted = lons.map((l) => (l < 0 ? l + 360 : l));
+    west = Math.min(...shifted);
+    east = Math.max(...shifted) - 360;
   }
   return { west, east, south, north };
 }
