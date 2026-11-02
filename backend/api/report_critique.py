@@ -2,8 +2,7 @@
 Report Self-Critique — Automated quality review for agentic AI reports.
 
 Implements a review loop that checks report completeness, εr consistency,
-figure coverage, and section presence. Uses Ollama/Llama first, falls back
-to rule-based checklist when LLM is unavailable.
+figure coverage, and section presence. Rule-based only (no LLM).
 """
 
 from __future__ import annotations
@@ -102,20 +101,9 @@ async def _run_critique(
     evidence_pack: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """
-    Run critique using LLM first, then fall back to rule-based.
+    Run the rule-based critique.
     """
-    # Try Ollama/Llama first
-    try:
-        from .agent_orchestrator import _check_groq
-        ollama_ok = await _check_groq()
-        if ollama_ok:
-            result = await _critique_with_ollama(report_md, evidence_pack)
-            if result is not None:
-                return result
-    except Exception as e:
-        logger.debug(f"Ollama critique failed: {e}")
-
-    # Fallback: rule-based critique (always available)
+    # Rule-based critique (the local Ollama LLM critique was removed).
     return _rule_based_critique(report_md, evidence_pack)
 
 
@@ -221,85 +209,7 @@ def _rule_based_critique(
     return issues
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# LLM-Based Critique (Ollama/Llama)
-# ═══════════════════════════════════════════════════════════════════════
 
-async def _critique_with_ollama(
-    report_md: str,
-    evidence_pack: Dict[str, Any],
-) -> Optional[List[Dict[str, Any]]]:
-    """
-    Use Ollama/Llama to critique the report. Returns issues list or None on failure.
-    """
-    try:
-        import httpx
-    except ImportError:
-        return None
-
-    # Build a summary of the evidence pack for the prompt (not the full thing — too large)
-    ep_summary = {
-        "region": evidence_pack.get("region", {}).get("name"),
-        "sharad_detections": evidence_pack.get("sharad", {}).get("subsurface_detections", 0),
-        "epsilon_r": evidence_pack.get("dielectric", {}).get("epsilon_r"),
-        "epsilon_r_method": evidence_pack.get("dielectric", {}).get("best_method"),
-        "is_fallback": evidence_pack.get("dielectric", {}).get("is_fallback"),
-        "has_sensitivity": evidence_pack.get("dielectric", {}).get("sensitivity_table") is not None,
-        "crism_ice_count": evidence_pack.get("crism", {}).get("high_ice_count", 0),
-        "cnn_ice": evidence_pack.get("cnn", {}).get("ice_detected", False),
-        "overall_score": evidence_pack.get("scoring", {}).get("overall_score", 0),
-    }
-
-    prompt = f"""You are a reviewer for a Mars mission assessment report.
-Given the report and evidence summary, check for these issues:
-
-1. MISSING SECTIONS: Required sections: Mission Objective (1), Subsurface (2), Dielectric (2b), Surface (3), Cross-Instrument (4), Engineering (5), Climate (6), Assessment Score (7). List any missing.
-2. EPSILON CONFUSION: If is_fallback=true, the report must NOT describe εr as "measured" or "physics-based". Check.
-3. FIGURE COUNT: Report must reference at least 3 figures. Count "Figure N" references.
-4. SENSITIVITY TABLE: If has_sensitivity=true and is_fallback=false, a sensitivity table must be present.
-5. EMPTY SECTIONS: Any section with no meaningful content needs explanation.
-
-Evidence summary: {json.dumps(ep_summary)}
-
-Report (first 3000 chars):
-{report_md[:3000]}
-
-Respond with ONLY a JSON array of issues. Each issue: {{"section": "2b", "type": "issue_type", "fix": "description"}}
-If no issues, respond with: []"""
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": "llama3.3",
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {"temperature": 0.1, "num_predict": 500},
-                },
-            )
-            if resp.status_code != 200:
-                return None
-
-            result_text = resp.json().get("response", "")
-
-            # Parse JSON from response
-            # Try to find JSON array in the response
-            json_match = re.search(r"\[.*\]", result_text, re.DOTALL)
-            if json_match:
-                issues = json.loads(json_match.group())
-                if isinstance(issues, list):
-                    return issues
-            return []
-
-    except Exception as e:
-        logger.debug(f"Ollama critique request failed: {e}")
-        return None
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# Report Patching
-# ═══════════════════════════════════════════════════════════════════════
 
 def _patch_report(
     report_md: str,

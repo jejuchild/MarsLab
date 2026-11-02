@@ -583,7 +583,7 @@ function SmartSearchPanel({
             {icon}
           </span>
           <p className="text-purple-400 font-bold">{stageMessage || "Starting..."}</p>
-          <p className="text-xs text-slate-500 mt-2">Llama is thinking...</p>
+          <p className="text-xs text-slate-500 mt-2">Thinking...</p>
           <button
             onClick={onCancel}
             className="mt-4 px-4 py-1.5 rounded-lg text-xs font-bold text-slate-400 border border-border-dark hover:text-white hover:border-slate-500 transition-colors"
@@ -602,9 +602,6 @@ function SmartSearchPanel({
         <div className="text-center max-w-sm">
           <span className="material-symbols-outlined text-4xl mb-2 text-red-400">error</span>
           <p className="text-red-400 text-sm">{error}</p>
-          {error.includes("Ollama") && (
-            <p className="text-xs text-slate-500 mt-2 font-mono">ollama serve && ollama pull llama3.3</p>
-          )}
         </div>
       </div>
     );
@@ -620,7 +617,7 @@ function SmartSearchPanel({
           </span>
           <p className="text-lg">Smart AI Search</p>
           <p className="text-sm mt-1 max-w-md">
-            Describe what data you want. Llama will reason, search, pick the best products, and download them automatically.
+            Describe what data you want. The AI will reason, search, pick the best products, and download them automatically.
           </p>
           <div className="mt-4 text-xs text-slate-600 space-y-1">
             <p>Examples:</p>
@@ -658,7 +655,7 @@ function SmartSearchPanel({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-purple-400 text-lg">psychology</span>
-            <span className="text-sm font-bold text-white">Llama Smart Search</span>
+            <span className="text-sm font-bold text-white">Smart Search</span>
           </div>
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <span>{response.total_found} found</span>
@@ -672,7 +669,7 @@ function SmartSearchPanel({
           </div>
         </div>
 
-        {/* Reasoning from Llama */}
+        {/* Model reasoning */}
         {response.reasoning && (
           <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 mt-2">
             <div className="flex items-start gap-2">
@@ -748,7 +745,7 @@ function SmartResultItem({ product }: { product: SmartProductSelection }) {
           </span>
         )}
       </div>
-      {/* Per-product reasoning from Llama */}
+      {/* Per-product reasoning */}
       {product.reason && (
         <p className="text-[11px] text-slate-500 leading-snug italic">{product.reason}</p>
       )}
@@ -1976,7 +1973,7 @@ export default function DataDownloadPage() {
   // Search state
   const [searchMode, setSearchMode] = useState<SearchMode>("id");
 
-  // Smart AI Search state (single-step: Llama reasons + downloads)
+  // Smart AI Search state (single-step: LLM reasons + downloads)
   const [aiQuery, setAiQuery] = useState("");
   const [aiMaxResults, setAiMaxResults] = useState(20);
   const [smartSearchResponse, setSmartSearchResponse] = useState<SmartSearchResponse | null>(null);
@@ -2230,7 +2227,7 @@ export default function DataDownloadPage() {
     }
   }, [searchMode, query, spatialSearch, pointSearch, getSelectedDatasets]);
 
-  // Handle Smart AI search — single step: Llama reasons + searches + downloads
+  // Handle Smart AI search — single step: LLM reasons + searches + downloads
   const handleSmartSearch = useCallback(async () => {
     if (!aiQuery.trim()) {
       setSearchError("Enter a search query");
@@ -2887,7 +2884,7 @@ export default function DataDownloadPage() {
                     ? "Search ODE by coordinate. Enter latitude (-90 to 90) and longitude. Radius controls the search area in degrees."
                     : searchMode === "product"
                     ? "Find products that overlap with or are near a given product. Enter a product ID from any instrument. Toggle between 'Overlap' (geometry intersection) and 'Nearest' (ranked by distance)."
-                    : "Smart AI Search: Describe what data you want. Llama will reason about your request, search, pick the best products, and auto-download. Powered by Llama 3.3 (local)."}
+                    : "Smart AI Search: Describe what data you want. The AI will reason about your request, search, pick the best products, and auto-download."}
                 </div>
               </div>
 

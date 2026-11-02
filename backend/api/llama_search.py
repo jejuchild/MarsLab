@@ -4,7 +4,7 @@ Llama-powered Smart AI Search.
 Single-step: User query → Llama parses → search executes → Llama picks best
 products → auto-download → return results with reasoning.
 
-Uses Groq API (cloud Llama 3.1) for fast inference.
+Uses the Groq API (cloud; model from MARVIS_LLM_LIGHT) for fast inference.
 """
 
 import json
@@ -55,9 +55,6 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("MARVIS_LLM_LIGHT", "openai/gpt-oss-20b")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Ollama config (unused — kept for reference)
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.1:8b"
 
 
 # =============================================================================
@@ -349,7 +346,7 @@ Output ONLY the JSON object."""
             targets=[],
             region=GeminiRegion(type="global"),
             filters=GeminiFilters(maxResults=max_results),
-            error="Llama returned empty response",
+            error="LLM returned empty response",
         )
 
     # Extract JSON from response using bracket-counting
@@ -360,7 +357,7 @@ Output ONLY the JSON object."""
             targets=[],
             region=GeminiRegion(type="global"),
             filters=GeminiFilters(maxResults=max_results),
-            error="Could not extract valid JSON from Llama response",
+            error="Could not extract valid JSON from LLM response",
         )
 
     # Build GeminiPlan from parsed data
@@ -539,8 +536,8 @@ async def _run_smart_search(
             return
 
         # ── Step 2: Parse with Llama ─────────────────
-        session.stage_message = "Groq Llama is analyzing your request..."
-        await emit("stage", {"status": "parsing", "message": "Groq Llama is analyzing your request..."})
+        session.stage_message = "Analyzing your request..."
+        await emit("stage", {"status": "parsing", "message": "Analyzing your request..."})
 
         plan = await _parse_with_llama(session.query, max_results)
 
@@ -600,8 +597,8 @@ async def _run_smart_search(
 
         # ── Step 4: Llama Analyzes & Selects ─────────
         session.status = "analyzing"
-        session.stage_message = "Llama is choosing the best products..."
-        await emit("stage", {"status": "analyzing", "message": "Llama is choosing the best products..."})
+        session.stage_message = "Choosing the best products..."
+        await emit("stage", {"status": "analyzing", "message": "Choosing the best products..."})
 
         selection = await _select_with_llama(
             session.query, results, plan, max_select=max_results,
@@ -761,7 +758,7 @@ async def smart_search_status():
     return {
         "ollama_available": available,
         "model": GROQ_MODEL,
-        "message": "Groq Llama ready for smart search" if available else "GROQ_API_KEY not set",
+        "message": "Smart search ready" if available else "GROQ_API_KEY not set",
     }
 
 

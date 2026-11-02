@@ -1,7 +1,7 @@
 """
 MARVIS Chat — Grounded, tool-calling chat endpoint (Llama 3.1 8B only).
 
-Cascade: Groq (MARVIS_LLM_LIGHT, default openai/gpt-oss-20b) → local Ollama fallback.
+Cascade: Groq (MARVIS_LLM_LIGHT, default openai/gpt-oss-20b) → offline regex tool dispatch.
 
 POST /api/marvis/chat  →  SSE stream of response tokens + tool_call events.
 """
@@ -1027,7 +1027,7 @@ async def _stream_groq(
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 if resp.status == 429:
-                    logger.warning("Groq rate limited, cascading to local LLaMA")
+                    logger.warning("Groq rate limited, using offline tool dispatch")
                     return False
                 if resp.status != 200:
                     body = await resp.text()
@@ -1121,10 +1121,15 @@ async def _stream_groq(
         return False
 
 
-# ── LLaMA fallback (with prompt-based tool calling) ──────────────────
+# ── Offline fallback (regex tool dispatch, no LLM) ───────────────────
+# Map commands ("fly to Jezero", "load CRISM") still work when Groq is
+# unreachable. The former local Ollama text fallback was removed: on this
+# CPU-only host it pinned 5.2 GB RAM and could not answer within minutes.
 
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "llama3.1:8b"
+_OFFLINE_MESSAGE = (
+    "MARVIS can't reach its language model right now. Map commands such as "
+    "\"fly to Jezero crater\" or \"load CRISM\" still work — please try your question again shortly."
+)
 
 # Region keywords for LLaMA prompt-based tool routing
 _NAV_RE = re.compile(
@@ -1164,13 +1169,13 @@ _MINERAL_TYPE_RE = re.compile(
 )
 
 
-async def _stream_llama(
+async def _stream_offline(
     message: str,
     history: List[ChatMessage],
     context: Optional[SessionContext],
     queue: asyncio.Queue,
 ):
-    """LLaMA fallback with regex-based tool dispatch for navigation/instrument loading."""
+    """Offline fallback: regex-based tool dispatch for navigation/instrument loading."""
     import aiohttp
 
     # ── Server-side intent guard: skip regex tool dispatch for informational queries
@@ -1285,57 +1290,10 @@ async def _stream_llama(
             await queue.put(None)
             return
 
-    # ── Regular text response via LLaMA streaming
-    system = _build_system(context.model_dump() if context else None)
-    conversation = ""
-    for entry in history[-MAX_HISTORY_TURNS:]:
-        tag = "User" if entry.role == "user" else "MARVIS"
-        conversation += f"{tag}: {entry.content}\n"
-    prompt = f"{conversation}User: {message}\nMARVIS:"
-
-    payload = {
-        "model": OLLAMA_MODEL,
-        "prompt": prompt,
-        "system": system,
-        "stream": True,
-        "keep_alive": -1,
-        "options": {"temperature": 0.3, "num_predict": 300, "num_ctx": 4096},
-    }
-
-    full_text = ""
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{OLLAMA_BASE_URL}/api/generate",
-                json=payload,
-                timeout=aiohttp.ClientTimeout(total=120),
-            ) as resp:
-                if resp.status != 200:
-                    await queue.put({"event": "error", "data": {"error": f"LLaMA error {resp.status}"}})
-                    await queue.put(None)
-                    return
-                async for line in resp.content:
-                    line_str = line.decode("utf-8").strip()
-                    if not line_str:
-                        continue
-                    try:
-                        chunk = json.loads(line_str)
-                        token = chunk.get("response", "")
-                        if token:
-                            full_text += token
-                            await queue.put({"event": "chunk", "data": {"text": token}})
-                    except json.JSONDecodeError:
-                        continue
-
-        # Anti-hallucination + sanitize
-        full_text = _fix_pretend_actions(full_text, False)
-        clean = _sanitize_respond(full_text) if full_text else full_text
-        await queue.put({"event": "done", "data": {"full_text": clean or full_text}})
-    except Exception as exc:
-        logger.error(f"LLaMA chat error: {exc}")
-        await queue.put({"event": "error", "data": {"error": str(exc)}})
-    finally:
-        await queue.put(None)
+    # No LLM available offline: say so immediately instead of hanging.
+    await queue.put({"event": "chunk", "data": {"text": _OFFLINE_MESSAGE}})
+    await queue.put({"event": "done", "data": {"full_text": _OFFLINE_MESSAGE}})
+    await queue.put(None)
 
 
 # ── Endpoint ─────────────────────────────────────────────────────────
@@ -1346,14 +1304,13 @@ async def _cascade(
     context: Optional[SessionContext],
     queue: asyncio.Queue,
 ):
-    """Try providers: Groq (llama-3.1-8b) → LLaMA local fallback."""
+    """Groq first; if unreachable, offline regex tool dispatch."""
     ok = await _stream_groq(message, history, context, queue)
     if ok:
         return
 
-    # Groq unavailable — fall back to local LLaMA
-    logger.warning("Groq unavailable, falling back to local LLaMA")
-    await _stream_llama(message, history, context, queue)
+    logger.warning("Groq unavailable, using offline tool dispatch")
+    await _stream_offline(message, history, context, queue)
 
 
 @router.post("/chat")
