@@ -76,7 +76,9 @@ async def main() -> None:
                 break
         check(await inspector.count() == 1, "clicking a footprint opens the Inspector")
         text = await inspector.inner_text() if await inspector.count() else ""
-        check("covers" in text.lower(), "lane lists products that cover the point")
+        check("compare at point" in text.lower() and " cover" in text.lower(), "Compare view lists instruments covering the point")
+        cards = await inspector.locator("section[aria-label$='at this point']").count()
+        check(cards == 4, f"Compare view shows one card per instrument ({cards})")
 
         # 3. Auto quickview renders as imagery (not a grey placeholder).
         await page.mouse.move(1150, 950)
@@ -86,6 +88,9 @@ async def main() -> None:
 
         # 4. Fullscreen viewer: Escape closes only the viewer.
         if await inspector.count():
+            await inspector.get_by_role("tab", name="By instrument").click()
+            await page.wait_for_timeout(1500)
+            check("covers" in (await inspector.inner_text()).lower(), "lane view marks products that cover the point")
             await inspector.get_by_role("button", name="View High-Res Image").first.click()
             await page.wait_for_timeout(3000)
             viewer_open = await page.locator("div.fixed.inset-0").count()
