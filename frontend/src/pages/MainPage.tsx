@@ -1,9 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense, memo } from "react";
 import useMapNavigation from "../hooks/useMapNavigation";
-import useFootprintLayers from "../hooks/useFootprintLayers";
-import useInspectorContext from "../hooks/useInspectorContext";
 import useActiveOverlays from "../hooks/useActiveOverlays";
-import useCatalogSearch from "../hooks/useCatalogSearch";
 import Inspector from "../components/Inspector";
 import type { ProductDetailHandlers } from "../components/inspector/ProductDetail";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -208,15 +205,7 @@ export default function MainPage() {
   const { pushAction, undo, redo, canUndo, canRedo, lastAction } = useUndoRedo();
   const [mobilePanel, setMobilePanel] = useState<'none' | 'layers' | 'inspector'>('none');
 
-  // Phase 2 custom hooks — extract clean state slices out of MainPage.
-  // Hooks that exist but are too entangled with the current MainPage shape
-  // (useFootprintLayers, useActiveOverlays) are deferred to a future iteration
-  // where the surrounding code is rewritten. Imported here to lock their API.
   const mapNav = useMapNavigation();
-  void useFootprintLayers;
-  void useInspectorContext;
-  void useActiveOverlays;
-  void useCatalogSearch;
 
 
   // Field notes hook (extracted from MainPage)
@@ -229,6 +218,12 @@ export default function MainPage() {
 
   // Selected footprint for Inspector
   const [selected, setSelected] = useState<InspectorContext | null>(null);
+
+  // Active overlays per product (productId → { type, opacity })
+  const {
+    activeOverlays, activeOverlaysRef,
+    setOverlay, setOpacity: setOverlayOpacity, removeMany: removeOverlays, clear: clearOverlays,
+  } = useActiveOverlays();
 
   // Terrain click point for slope analysis (when clicking empty terrain)
   const [terrainPoint, setTerrainPoint] = useState<TerrainPoint | null>(null);
@@ -303,8 +298,6 @@ export default function MainPage() {
   } = mapNav;
 
   // Footprint layer toggles (visibility only - does NOT trigger loading)
-  // NOTE: useFootprintLayers hook exists but is too entangled with existing
-  // per-instrument shape; full migration deferred to Phase 3.
   type InstrumentVisibility = Record<InstrumentId, boolean>;
   const [instrumentVisibility, setInstrumentVisibility] = useState<InstrumentVisibility>(
     () => Object.fromEntries(getInstrumentIds().map(id => [id, false])) as InstrumentVisibility
@@ -313,31 +306,25 @@ export default function MainPage() {
     setInstrumentVisibility(prev => ({ ...prev, [id]: v }));
     // When toggling OFF, remove all active overlays for that instrument's products
     if (!v) {
-      setActiveOverlays(prev => {
-        const next = new Map(prev);
-        let changed = false;
-        for (const [productId] of prev) {
-          const isHiRISE = /^(ESP|PSP|TRA)_\d+/.test(productId);
-          const isCRISM = /^(frt|hrl|hrs|frs|arl|atl)/i.test(productId);
-          const isSHARAD = /^[SR]_\d+/i.test(productId);
-          const isDTM = /^DTE/i.test(productId);
-          let match = false;
-          if (id === "ctx" && !isHiRISE && !isCRISM && !isSHARAD && !isDTM) match = true;
-          else if (id === "hirise" && isHiRISE) match = true;
-          else if (id === "crism" && isCRISM) match = true;
-          else if (id === "sharad" && /^S_/i.test(productId)) match = true;
-          else if (id === "sharad_highres" && /^R_/i.test(productId)) match = true;
-          else if (id === "hirise_dtm" && isDTM) match = true;
-          else if (id === "crism_trr3" && isCRISM) match = true;
-          if (match) {
-            next.delete(productId);
-            changed = true;
-          }
-        }
-        return changed ? next : prev;
-      });
+      const toRemove: string[] = [];
+      for (const productId of activeOverlaysRef.current.keys()) {
+        const isHiRISE = /^(ESP|PSP|TRA)_\d+/.test(productId);
+        const isCRISM = /^(frt|hrl|hrs|frs|arl|atl)/i.test(productId);
+        const isSHARAD = /^[SR]_\d+/i.test(productId);
+        const isDTM = /^DTE/i.test(productId);
+        const match =
+          (id === "ctx" && !isHiRISE && !isCRISM && !isSHARAD && !isDTM) ||
+          (id === "hirise" && isHiRISE) ||
+          (id === "crism" && isCRISM) ||
+          (id === "sharad" && /^S_/i.test(productId)) ||
+          (id === "sharad_highres" && /^R_/i.test(productId)) ||
+          (id === "hirise_dtm" && isDTM) ||
+          (id === "crism_trr3" && isCRISM);
+        if (match) toRemove.push(productId);
+      }
+      if (toRemove.length > 0) removeOverlays(toRemove);
     }
-  }, []);
+  }, [activeOverlaysRef, removeOverlays]);
 
   // Derived booleans for MapView backward compatibility
   const showCRISM = instrumentVisibility.crism;
@@ -375,7 +362,7 @@ export default function MainPage() {
   const [visibleProducts, setVisibleProducts] = useState<VisibleProduct[]>([]);
 
   // Unified active overlays - ONE overlay per product with per-product opacity
-  const [activeOverlays, setActiveOverlays] = useState<ActiveOverlays>(new Map());
+  // Active overlays: see useActiveOverlays (declared near the top of the component)
 
   // Product to fly to (set when clicking product_id in LayerPanel)
   const [flyToProductId, setFlyToProductId] = useState<string | null>(null);
@@ -427,7 +414,6 @@ export default function MainPage() {
   const [customDatasets, setCustomDatasets] = useState<CustomDataset[]>([]);
 
   // Filtered product IDs (null = no filtering active)
-  const [filteredProductIds] = useState<Set<string> | null>(null);
 
   // Field Notes state
   // (field notes state moved to useFieldNotes hook)
@@ -445,7 +431,6 @@ export default function MainPage() {
   const [showOlympusMonsClimber, setShowOlympusMonsClimber] = useState(false);
 
   // Crater/Landform Detection
-  const [, setCraterDetectCenter] = useState<{lat: number; lon: number} | null>(null);
   const [craterDetectFeatures, setCraterDetectFeatures] = useState<DetectedFeature[]>([]);
   const [epsilonTarget, setEpsilonTarget] = useState<DetectedFeature | null>(null);
   const [stratColumnTarget, setStratColumnTarget] = useState<DetectedFeature | null>(null);
@@ -583,74 +568,27 @@ export default function MainPage() {
   // Set overlay for a product (or clear if type is null)
   // This enforces single-overlay-per-product rule
   const handleSetOverlay = useCallback((productId: string, type: OverlayType | null, opacity?: number) => {
-    // Capture previous state for undo
     const prevOverlay = activeOverlaysRef.current.get(productId) ?? null;
-    const prevType = prevOverlay?.type ?? null;
+    const next = (): ProductOverlay | null => {
+      if (type === null) return null;
+      const existingOpacity = activeOverlaysRef.current.get(productId)?.opacity ?? DEFAULT_OPACITY;
+      return { type, opacity: opacity ?? existingOpacity };
+    };
+    setOverlay(productId, next());
 
-    // Apply the change
-    setActiveOverlays((prev) => {
-      const newMap = new Map(prev);
-
-      if (type === null) {
-        // Clear overlay for this product
-        newMap.delete(productId);
-      } else {
-        // Set new overlay (replaces any existing overlay for this product)
-        const existingOpacity = prev.get(productId)?.opacity ?? DEFAULT_OPACITY;
-        newMap.set(productId, {
-          type,
-          opacity: opacity ?? existingOpacity,
-        });
-      }
-
-      return newMap;
-    });
-
-    // Push undo action
     pushAction({
       type: "overlay",
       description: type ? `Set ${type} overlay on ${productId.slice(0, 12)}` : `Remove overlay from ${productId.slice(0, 12)}`,
-      undo: () => {
-        setActiveOverlays((prev) => {
-          const newMap = new Map(prev);
-          if (prevType === null) {
-            newMap.delete(productId);
-          } else {
-            newMap.set(productId, prevOverlay!);
-          }
-          return newMap;
-        });
-      },
-      redo: () => {
-        setActiveOverlays((prev) => {
-          const newMap = new Map(prev);
-          if (type === null) {
-            newMap.delete(productId);
-          } else {
-            const existingOpacity = prev.get(productId)?.opacity ?? DEFAULT_OPACITY;
-            newMap.set(productId, { type, opacity: opacity ?? existingOpacity });
-          }
-          return newMap;
-        });
-      },
+      undo: () => setOverlay(productId, prevOverlay),
+      redo: () => setOverlay(productId, next()),
     });
-  }, [pushAction]);
+  }, [pushAction, setOverlay, activeOverlaysRef]);
 
   // Update opacity for a product's overlay
   const handleSetOpacity = useCallback((productId: string, opacity: number) => {
-    setActiveOverlays((prev) => {
-      const existing = prev.get(productId);
-      if (!existing) return prev;
+    setOverlayOpacity(productId, opacity);
+  }, [setOverlayOpacity]);
 
-      const newMap = new Map(prev);
-      newMap.set(productId, { ...existing, opacity });
-      return newMap;
-    });
-  }, []);
-
-  // Stable ref for activeOverlays to avoid callback dependency on Map reference
-  const activeOverlaysRef = useRef(activeOverlays);
-  activeOverlaysRef.current = activeOverlays;
 
   // Handle clicking product_id - fly to it, select it, and bring overlay to front
   const handleSelectProduct = useCallback((product: VisibleProduct) => {
@@ -682,7 +620,7 @@ export default function MainPage() {
     if (activeOverlaysRef.current.has(productId)) {
       setBringToFrontId(productId);
     }
-  }, []);
+  }, [activeOverlaysRef]);
 
   // Stable ref for flyToProductId
   const flyToProductIdRef = useRef(flyToProductId);
@@ -983,13 +921,9 @@ export default function MainPage() {
       panelManager.ensurePanelVisible("feature_select");
 
       // Enable quickview overlay (same as handleHiRiseDTMClick)
-      setActiveOverlays((prev) => {
-        const newMap = new Map(prev);
-        if (!newMap.has(note.product_id)) {
-          newMap.set(note.product_id, { type: "quickview", opacity: 80 });
-        }
-        return newMap;
-      });
+      if (!activeOverlaysRef.current.has(note.product_id)) {
+        setOverlay(note.product_id, { type: "quickview", opacity: 80 });
+      }
 
       setActiveDTMProduct(note.product_id);
       return;
@@ -1076,14 +1010,9 @@ export default function MainPage() {
     });
 
     // 2. Automatically enable quickview overlay
-    setActiveOverlays((prev) => {
-      const newMap = new Map(prev);
-      // Only add if not already active
-      if (!newMap.has(productId)) {
-        newMap.set(productId, { type: "quickview", opacity: 80 });
-      }
-      return newMap;
-    });
+    if (!activeOverlaysRef.current.has(productId)) {
+      setOverlay(productId, { type: "quickview", opacity: 80 });
+    }
 
     // 3. Store the active DTM product (for "Show 3D View" button in Inspector)
     setActiveDTMProduct(productId);
@@ -1091,13 +1020,13 @@ export default function MainPage() {
     // 4. Clear other analysis state
     setTerrainPoint(null);
     setHiRiseDTM3DPoint(null);
-  }, []);
+  }, [activeOverlaysRef, setOverlay]);
 
   // Deactivate all overlays
   const handleDeactivateAll = useCallback(() => {
-    setActiveOverlays(new Map());
+    clearOverlays();
     toast("All overlays cleared", { icon: "🗑" });
-  }, []);
+  }, [clearOverlays]);
 
   // Check high-res availability for visible products
   useEffect(() => {
@@ -1194,7 +1123,6 @@ export default function MainPage() {
     }
     if (analysisMode === "crater_detect") {
       // Crater detection: set scan center point
-      setCraterDetectCenter({ lat, lon });
     }
   }, [analysisMode]);
 
@@ -1276,7 +1204,6 @@ export default function MainPage() {
       setLineProfileData(null);
     }
     if (mode !== "crater_detect") {
-      setCraterDetectCenter(null);
       setCraterDetectFeatures([]);
     }
     if (mode !== "stratigraphy") {
@@ -1733,7 +1660,7 @@ export default function MainPage() {
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading landform detector...</div>}>
         <CraterDetectPanel
           cameraViewportRef={cameraViewportRef}
-          onClose={() => { setAnalysisMode(null); setCraterDetectCenter(null); setCraterDetectFeatures([]); }}
+          onClose={() => { setAnalysisMode(null); setCraterDetectFeatures([]); }}
           onFlyTo={(lat, lon) => setFlyToCoords({ lat, lon })}
           onSearchHiRISE={(lat, lon) => {
             navigate(`/download?lat=${lat}&lon=${lon}&instrument=HIRISE`);
@@ -1915,7 +1842,6 @@ export default function MainPage() {
         bringToFrontId={bringToFrontId}
         onBringToFrontComplete={handleBringToFrontComplete}
         rgbWavelengths={rgbWavelengths}
-        crismFilteredIds={filteredProductIds}
         loadFootprintsTrigger={loadFootprintsTrigger}
         onFootprintsLoaded={handleFootprintsLoaded}
         onFootprintsLoading={handleFootprintsLoading}
