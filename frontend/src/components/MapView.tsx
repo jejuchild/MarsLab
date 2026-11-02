@@ -218,6 +218,12 @@ const MARS_ELLIPSOID = new Cesium.Ellipsoid(
   MARS_EQUATORIAL_RADIUS,
   MARS_POLAR_RADIUS
 );
+// Entity geometries (overlay rectangles/polygons, labels, pins) and any
+// Cartesian3.fromDegrees call without an explicit ellipsoid use
+// Ellipsoid.default, which is Earth (WGS84) unless set. That placed overlays
+// ~1 km off the Mars-ellipsoid footprints at mid latitudes. Must run before
+// the Viewer is created.
+Cesium.Ellipsoid.default = MARS_ELLIPSOID;
 
 const MARS_RECT = Cesium.Rectangle.fromDegrees(-180, -90, 180, 90);
 

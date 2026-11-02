@@ -357,11 +357,14 @@ export default function useFlyTo({
     const entityId = `HIGHRES_OVERLAY_${bringToFrontId}`;
     const entity = viewer.entities.getById(entityId);
 
-    if (entity) {
+    // Hidden overlays (toggled off / switched to quickview) must stay hidden:
+    // re-adding without `show` would resurrect them on top of the new overlay.
+    if (entity && entity.show) {
       // Remove and re-add to bring to front
       const savedProps = {
         id: entity.id,
         rectangle: entity.rectangle,
+        polygon: entity.polygon,
         properties: entity.properties,
       };
 
@@ -369,6 +372,7 @@ export default function useFlyTo({
       viewer.entities.add({
         id: savedProps.id,
         rectangle: savedProps.rectangle,
+        polygon: savedProps.polygon,
         properties: savedProps.properties,
       });
 

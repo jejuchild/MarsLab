@@ -54,6 +54,48 @@ type UseOverlaysParams = {
   normalizeLonTo180: (lon: number) => number;
 };
 
+const isHiRISEProduct = (id: string) => /^(ESP|PSP|TRA)_/.test(id);
+
+/**
+ * Load and decode an overlay image before handing it to Cesium.
+ *
+ * The viewer runs in requestRenderMode. Given a URL string, Cesium loads the
+ * texture asynchronously and nothing requests a new frame when it arrives, so
+ * the overlay stayed a flat grey placeholder until the user moved the map.
+ * A decoded HTMLImageElement becomes a texture on the very next render.
+ * Resolves null when the image is missing or undecodable.
+ */
+/**
+ * Cesium prepares entity geometry and material textures asynchronously and,
+ * in requestRenderMode, does not request a frame when they become ready — the
+ * overlay showed as a grey placeholder until the user moved the map. Request a
+ * few frames over the next ~3 s so newly added overlays actually appear.
+ */
+function renderUntilSettled(viewer: Cesium.Viewer): void {
+  for (const ms of [0, 100, 300, 700, 1500, 3000]) {
+    setTimeout(() => {
+      if (!viewer.isDestroyed()) viewer.scene.requestRender();
+    }, ms);
+  }
+}
+
+async function decodeImage(url: string): Promise<HTMLImageElement | null> {
+  const img = new Image();
+  img.src = url;
+  try {
+    await img.decode();
+    return img;
+  } catch {
+    return null;
+  }
+}
+
+/** Remove an entity by id if present, so a re-add never throws on a duplicate id. */
+function removeEntityIfExists(viewer: Cesium.Viewer, id: string): void {
+  const ent = viewer.entities.getById(id);
+  if (ent) viewer.entities.remove(ent);
+}
+
 export default function useOverlays({
   viewerRef,
   footprintManagerRef,
@@ -154,6 +196,10 @@ export default function useOverlays({
 
   // Guard against duplicate quickview fetches (prevents 429 retry loops)
   const quickviewFetchingRef = useRef<Set<string>>(new Set());
+  // Latest requested IDs — async results for anything no longer requested are dropped.
+  const quickviewWantedRef = useRef<Set<string>>(new Set());
+  const highResWantedRef = useRef<Set<string>>(new Set());
+  const highResFetchingRef = useRef<Set<string>>(new Set());
 
   // Track blob URLs for CRISM RGB images to clean up later
   const crismBlobUrlsRef = useRef<Map<string, string>>(new Map());
@@ -242,6 +288,7 @@ export default function useOverlays({
     if (!viewer) return;
 
     const currentIds = new Set(quickviewOverlays);
+    quickviewWantedRef.current = currentIds;
     const existingIds = quickviewOverlayIdsRef.current;
 
     let needsRender = false;
@@ -323,7 +370,9 @@ export default function useOverlays({
       // Hide entity overlay (CRISM/HiRISE/HiRISE DTM)
       const ent = viewer.entities.getById(`QUICKVIEW_OVERLAY_${id}`);
       if (ent) {
-        ent.show = false;
+        // Remove rather than hide: its blob URL is revoked below, and re-showing
+        // an entity with a revoked image renders Cesium's grey fallback texture.
+        viewer.entities.remove(ent);
         needsRender = true;
       }
       // Clean up quickview blob URL
@@ -475,8 +524,14 @@ export default function useOverlays({
             }
             const blob = await imgRes.blob();
             const blobUrl = URL.createObjectURL(blob);
+            const image = await decodeImage(blobUrl);
+            if (!image) {
+              URL.revokeObjectURL(blobUrl);
+              toast.error(`Quickview not available for ${productId}`);
+              return null;
+            }
 
-            return { productId, bounds, imageUrl: blobUrl, instrument };
+            return { productId, bounds, imageUrl: blobUrl, image, instrument };
           } catch (e) {
             console.error("[Quickview] Failed to add overlay:", productId, e);
             toast.error(`Failed to load quickview for ${productId}`);
@@ -489,12 +544,21 @@ export default function useOverlays({
         const v = viewerRef.current;
         if (!v) return;
 
-        // Batch entity creation
+        // Batch entity creation. resumeEvents() must always run: a throw while
+        // suspended freezes every later overlay add/remove on the map.
         v.entities.suspendEvents();
-
+        try {
         for (const result of results) {
           if (!result) continue;
-          const { productId, bounds, imageUrl, instrument } = result;
+          const { productId, bounds, imageUrl, image, instrument } = result;
+          // User turned this overlay off (or switched product) while it loaded.
+          if (!quickviewWantedRef.current.has(productId)) {
+            if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
+            continue;
+          }
+          removeEntityIfExists(v, `QUICKVIEW_OVERLAY_${productId}`);
+          const oldBlob = quickviewBlobUrlsRef.current.get(productId);
+          if (oldBlob && oldBlob !== imageUrl) URL.revokeObjectURL(oldBlob);
 
           const isDTM = instrument === "HIRISE_DTM";
           console.log(`[Overlay] ${productId} bounds: W=${bounds.west.toFixed(6)} S=${bounds.south.toFixed(6)} E=${bounds.east.toFixed(6)} N=${bounds.north.toFixed(6)}${bounds.polygon ? ` polygon=${bounds.polygon.length}pts` : ""}`);
@@ -503,6 +567,7 @@ export default function useOverlays({
             // Use actual polygon shape for precise alignment with footprint
             const positions = Cesium.Cartesian3.fromDegreesArray(
               bounds.polygon.flatMap(([lon, lat]) => [lon, lat]),
+              marsEllipsoid,
             );
             v.entities.add({
               id: `QUICKVIEW_OVERLAY_${productId}`,
@@ -510,7 +575,7 @@ export default function useOverlays({
               polygon: {
                 hierarchy: new Cesium.PolygonHierarchy(positions),
                 material: new Cesium.ImageMaterialProperty({
-                  image: imageUrl,
+                  image,
                   transparent: true,
                   color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
                 }),
@@ -536,7 +601,7 @@ export default function useOverlays({
                   bounds.north,
                 ),
                 material: new Cesium.ImageMaterialProperty({
-                  image: imageUrl,
+                  image,
                   transparent: true,
                   color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
                 }),
@@ -570,8 +635,10 @@ export default function useOverlays({
           }
         }
 
-        v.entities.resumeEvents();
-        v.scene.requestRender();
+        } finally {
+          v.entities.resumeEvents();
+        }
+        renderUntilSettled(v);
       });
     }
 
@@ -601,6 +668,7 @@ export default function useOverlays({
     if (!viewer) return;
 
     const currentIds = new Set(highResOverlays);
+    highResWantedRef.current = currentIds;
     const existingIds = highResOverlayIdsRef.current;
 
     let needsRender = false;
@@ -623,7 +691,7 @@ export default function useOverlays({
         URL.revokeObjectURL(blobUrl);
         crismBlobUrlsRef.current.delete(id);
         // Also remove the hidden entity for CRISM to force reload with potentially new wavelengths
-        if (!id.startsWith("ESP_") && ent) {
+        if (!isHiRISEProduct(id) && ent) {
           viewer.entities.remove(ent);
         }
       }
@@ -635,19 +703,20 @@ export default function useOverlays({
       if (existingIds.has(productId)) continue;
 
       const existingEnt = viewer.entities.getById(`HIGHRES_OVERLAY_${productId}`);
-      if (existingEnt && productId.startsWith("ESP_")) {
+      if (existingEnt && isHiRISEProduct(productId)) {
         // HiRISE entity exists - just show it
         existingEnt.show = true;
         setFootprintTransparent(viewer, productId, true);
         existingIds.add(productId);
         needsRender = true;
-      } else {
+      } else if (!highResFetchingRef.current.has(productId)) {
         toCreate.push(productId);
       }
     }
 
     // STEP 3: Create new overlays (async)
     if (toCreate.length > 0) {
+      for (const id of toCreate) highResFetchingRef.current.add(id);
       Promise.all(
         toCreate.map(async (productId) => {
           try {
@@ -697,7 +766,12 @@ export default function useOverlays({
               crismBlobUrlsRef.current.set(productId, imageUrl);
             }
 
-            return { productId, bounds, imageUrl, isHiRISE };
+            const image = await decodeImage(imageUrl);
+            if (!image) {
+              toast.error(`High-res overlay not available for ${productId}`);
+              return null;
+            }
+            return { productId, bounds, imageUrl, image, isHiRISE };
           } catch (e) {
             console.error("[HighRes] Failed to add overlay:", productId, e);
             toast.error(`Failed to load high-res overlay for ${productId}`);
@@ -705,14 +779,20 @@ export default function useOverlays({
           }
         }),
       ).then((results) => {
+        for (const id of toCreate) highResFetchingRef.current.delete(id);
         const v = viewerRef.current;
         if (!v) return;
 
         v.entities.suspendEvents();
-
+        try {
         for (const result of results) {
           if (!result) continue;
-          const { productId, bounds, imageUrl, isHiRISE } = result;
+          const { productId, bounds, imageUrl, image, isHiRISE } = result;
+          if (!highResWantedRef.current.has(productId)) {
+            if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
+            continue;
+          }
+          removeEntityIfExists(v, `HIGHRES_OVERLAY_${productId}`);
 
           v.entities.add({
             id: `HIGHRES_OVERLAY_${productId}`,
@@ -724,7 +804,7 @@ export default function useOverlays({
                 bounds.north,
               ),
               material: new Cesium.ImageMaterialProperty({
-                image: imageUrl,
+                image,
                 transparent: true,
                 color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
               }),
@@ -745,9 +825,10 @@ export default function useOverlays({
           setFootprintTransparent(v, productId, true);
           highResOverlayIdsRef.current.add(productId);
         }
-
-        v.entities.resumeEvents();
-        v.scene.requestRender();
+        } finally {
+          v.entities.resumeEvents();
+        }
+        renderUntilSettled(v);
       });
     }
 
@@ -896,10 +977,10 @@ export default function useOverlays({
           // Arcadia products: frt00003156_07_brcarj_mtr3 -> frt00003156_HYD.png
           const baseObsId = productId.split("_")[0];
           const imageUrl = `/crism/browse/${baseObsId}_${browseType}.png`;
+          const image = await decodeImage(imageUrl);
 
           // Pre-validate image exists to avoid gray rectangles
-          const headRes = await fetch(imageUrl, { method: "HEAD" });
-          if (!headRes.ok) {
+          if (!image) {
             continue;
           }
 
@@ -910,7 +991,7 @@ export default function useOverlays({
             rectangle: {
               coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
               material: new Cesium.ImageMaterialProperty({
-                image: imageUrl,
+                image,
                 transparent: true,
                 color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
               }),
@@ -932,6 +1013,7 @@ export default function useOverlays({
       }
       // Update tracking
       existingOverlays.set(productId, new Set(types));
+      renderUntilSettled(viewer);
     });
 
     viewer.scene.requestRender();
@@ -1042,10 +1124,10 @@ export default function useOverlays({
           // Score files: frt00003156_score_ice.png, frt00003156_score_hyd.png
           const baseObsId = productId.split("_")[0];
           const imageUrl = `/crism/browse/${baseObsId}_${scoreType}.png`;
+          const image = await decodeImage(imageUrl);
 
           // Pre-validate image exists to avoid gray rectangles
-          const headRes = await fetch(imageUrl, { method: "HEAD" });
-          if (!headRes.ok) {
+          if (!image) {
             continue;
           }
 
@@ -1056,7 +1138,7 @@ export default function useOverlays({
             rectangle: {
               coordinates: Cesium.Rectangle.fromDegrees(west, south, east, north),
               material: new Cesium.ImageMaterialProperty({
-                image: imageUrl,
+                image,
                 transparent: true,
                 color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
               }),
@@ -1078,6 +1160,7 @@ export default function useOverlays({
       }
       // Update tracking
       existingOverlays.set(productId, new Set(types));
+      renderUntilSettled(viewer);
     });
 
     viewer.scene.requestRender();
@@ -1147,8 +1230,14 @@ export default function useOverlays({
 
             const blob = await res.blob();
             const blobUrl = URL.createObjectURL(blob);
+            const image = await decodeImage(blobUrl);
+            if (!image) {
+              URL.revokeObjectURL(blobUrl);
+              toast.error(`Mineral map not available for ${productId}`);
+              return null;
+            }
 
-            return { productId, bounds, blobUrl };
+            return { productId, bounds, blobUrl, image };
           } catch (e) {
             console.error("[Mineral] Failed to add overlay:", productId, e);
             toast.error(`Failed to load mineral overlay for ${productId}`);
@@ -1162,7 +1251,8 @@ export default function useOverlays({
         v.entities.suspendEvents();
         for (const result of results) {
           if (!result) continue;
-          const { productId, bounds, blobUrl } = result;
+          const { productId, bounds, blobUrl, image } = result;
+          removeEntityIfExists(v, `MINERAL_OVERLAY_${productId}`);
 
           v.entities.add({
             id: `MINERAL_OVERLAY_${productId}`,
@@ -1174,7 +1264,7 @@ export default function useOverlays({
                 bounds.north,
               ),
               material: new Cesium.ImageMaterialProperty({
-                image: blobUrl,
+                image,
                 transparent: true,
                 color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
               }),
@@ -1192,7 +1282,7 @@ export default function useOverlays({
           mineralOverlayIdsRef.current.add(productId);
         }
         v.entities.resumeEvents();
-        v.scene.requestRender();
+        renderUntilSettled(v);
       });
     }
 
@@ -1219,6 +1309,8 @@ export default function useOverlays({
       const material = (ent.rectangle?.material ?? ent.polygon?.material) as Cesium.ImageMaterialProperty | undefined;
       if (material?.color) {
         const opacity = getProductOpacity(productId);
+        const current = material.color.getValue(Cesium.JulianDate.now()) as Cesium.Color | undefined;
+        if (current && Math.abs(current.alpha - opacity) < 1e-3) return;
         material.color = new Cesium.ConstantProperty(
           Cesium.Color.WHITE.withAlpha(opacity),
         );

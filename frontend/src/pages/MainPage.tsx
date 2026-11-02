@@ -1213,6 +1213,8 @@ export default function MainPage() {
   // Auto-activate quickview overlay when a product is selected and has no active overlay
   // Respects user preference stored in localStorage
   const autoQuickviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Product whose quickview was turned on automatically (not by the user).
+  const autoQuickviewIdRef = useRef<string | null>(null);
   useEffect(() => {
     // Clear any pending timer on rapid product switches
     if (autoQuickviewTimerRef.current) {
@@ -1221,6 +1223,17 @@ export default function MainPage() {
     }
 
     if (!selected) return;
+
+    // Switching products removes the previous auto-enabled quickview so
+    // clicked products don't pile up on the map. Overlays the user changed
+    // (e.g. to high-res) are left alone.
+    const prevAuto = autoQuickviewIdRef.current;
+    if (prevAuto && prevAuto !== selected.productId) {
+      if (activeOverlaysRef.current.get(prevAuto)?.type === "quickview") {
+        handleSetOverlay(prevAuto, null);
+      }
+      autoQuickviewIdRef.current = null;
+    }
 
     // Respect user preference (default: enabled)
     const pref = localStorage.getItem("marslab.autoQuickview");
@@ -1237,6 +1250,7 @@ export default function MainPage() {
       // Re-check conditions after debounce
       if (activeOverlaysRef.current.has(selected.productId)) return;
       handleSetOverlay(selected.productId, "quickview");
+      autoQuickviewIdRef.current = selected.productId;
     }, 300);
 
     return () => {
