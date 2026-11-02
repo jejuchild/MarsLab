@@ -71,3 +71,13 @@ export default defineConfig([
   },
 ])
 ```
+
+## Tests
+
+- Unit: `npm test` (Vitest + Testing Library)
+- E2E smoke (needs the dev server and backend running):
+  `pip install playwright && python -m playwright install chromium`, then
+  `BASE_URL=http://localhost:5173 python frontend/e2e/smoke.py [screenshot_dir]` from the repo root.
+  Covers shared-link restore, footprint → Inspector at a point, overlay imagery
+  (not a grey placeholder), fullscreen viewer Escape, and removed-route fallback.
+- Backend: `cd backend && python -m pytest tests -q`
