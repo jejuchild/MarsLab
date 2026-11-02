@@ -19,16 +19,23 @@ Usage:
 import argparse
 import asyncio
 import json
-import os
-import re
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 import aiohttp
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fetch_lib import (  # noqa: E402  (shared with background_fetch.py)
+    ODE_REST,
+    _float,
+    convert_jp2_to_tif,
+    run_aria2,
+    update_hirise_index,
+    update_sharad_index,
+)
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).parent
@@ -41,9 +48,6 @@ SHARAD_HR_DIR = BACKEND_DIR / "sharad_highres"
 SHARAD_HR_INDEX = BACKEND_DIR / "sharad_highres_data" / "index.geojson"
 
 CRISM_CNN_DIR = BACKEND_DIR / "mineral_cnn_data"
-
-# ─── ODE endpoint ────────────────────────────────────────────────────────────
-ODE_REST = "https://oderest.rsl.wustl.edu/live2"
 
 # ─── Region definitions (minlat, maxlat, westernlon_360, easternlon_360) ─────
 REGIONS = {
@@ -79,109 +83,6 @@ def parse_args():
 # Utility functions
 # ═════════════════════════════════════════════════════════════════════════════
 
-def _float(v):
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
-
-
-def lon_to_180(lon: float) -> float:
-    """Convert 0-360 lon to -180..180."""
-    return ((lon + 180) % 360) - 180
-
-
-def run_aria2(download_list: List[Tuple[str, str, str]], concurrent: int = 4,
-              label: str = "") -> Tuple[int, int]:
-    """
-    Batch download via aria2c.
-
-    download_list: [(url, output_dir, filename), ...]
-    Returns: (ok_count, fail_count)
-    """
-    if not download_list:
-        return 0, 0
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False,
-                                     prefix="aria2_bulk_") as f:
-        input_path = f.name
-        for url, out_dir, filename in download_list:
-            f.write(f"{url}\n")
-            f.write(f"  dir={out_dir}\n")
-            f.write(f"  out={filename}\n\n")
-
-    print(f"\n  aria2c: {len(download_list)} files, {concurrent} concurrent {label}")
-
-    cmd = [
-        "aria2c",
-        "-i", input_path,
-        "-j", str(concurrent),
-        "-x", "16", "-s", "16", "-k", "1M",
-        "--continue=true",
-        "--file-allocation=trunc",
-        "--auto-file-renaming=false",
-        "--allow-overwrite=false",
-        "--retry-wait=3",
-        "--max-tries=5",
-        "--timeout=600",
-        "--connect-timeout=30",
-        "--summary-interval=15",
-    ]
-
-    try:
-        result = subprocess.run(cmd)
-        os.remove(input_path)
-        if result.returncode == 0:
-            return len(download_list), 0
-        ok = sum(1 for _, d, fn in download_list if os.path.exists(os.path.join(d, fn)))
-        return ok, len(download_list) - ok
-    except FileNotFoundError:
-        print("  ERROR: aria2c not found! Install: conda install -c conda-forge aria2")
-        os.remove(input_path)
-        return 0, len(download_list)
-
-
-def convert_jp2_to_tif(jp2_path: Path, skip_gdal: bool = False) -> Optional[Path]:
-    """Convert JP2 to GeoTIFF using rasterio (windowed read for large files)."""
-    if skip_gdal:
-        return None
-    tif_path = jp2_path.with_suffix(".tif")
-    if tif_path.exists():
-        return tif_path
-    try:
-        import rasterio
-        from rasterio.windows import Window
-
-        with rasterio.open(str(jp2_path)) as src:
-            profile = src.profile.copy()
-            profile.update(
-                driver="GTiff",
-                compress="lzw",
-                tiled=True,
-                blockxsize=512,
-                blockysize=512,
-                bigtiff="IF_SAFER",
-            )
-            with rasterio.open(str(tif_path), "w", **profile) as dst:
-                tile = 2048
-                for row_off in range(0, src.height, tile):
-                    for col_off in range(0, src.width, tile):
-                        win = Window(
-                            col_off, row_off,
-                            min(tile, src.width - col_off),
-                            min(tile, src.height - row_off),
-                        )
-                        dst.write(src.read(window=win), window=win)
-        return tif_path
-    except ImportError:
-        print("    rasterio not installed, skipping JP2 conversion")
-    except Exception as e:
-        print(f"    Conversion error: {e}")
-        if tif_path.exists():
-            tif_path.unlink(missing_ok=True)
-    return None
-
-
 async def ode_query_with_retry(session, url, retries=3, timeout=120):
     """Query ODE with retry on transient errors."""
     for attempt in range(retries):
@@ -202,13 +103,6 @@ async def ode_query_with_retry(session, url, retries=3, timeout=120):
                 print(f"    ODE failed after {retries} attempts")
                 return None
     return None
-
-
-def parse_footprint_wkt(wkt: str) -> Optional[List]:
-    numbers = re.findall(r'(-?\d+\.?\d*)\s+(-?\d+\.?\d*)', str(wkt))
-    if not numbers:
-        return None
-    return [[float(n[0]), float(n[1])] for n in numbers]
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -323,53 +217,8 @@ async def download_jezero_sharad(args):
 
 async def _update_sharad_index(tracks: List[Dict]):
     """Add new SHARAD tracks to sharad_highres_data/index.geojson."""
-    if SHARAD_HR_INDEX.exists():
-        with open(SHARAD_HR_INDEX) as f:
-            index = json.load(f)
-    else:
-        index = {"type": "FeatureCollection", "features": []}
-
-    existing_ids = {feat["properties"]["product_id"].upper()
-                    for feat in index["features"]}
-
-    added = 0
-    for t in tracks:
-        pid = t["pid"]
-        if pid in existing_ids:
-            continue
-
-        # Check file actually exists
-        dat_path = SHARAD_HR_DIR / f"{pid.lower()}.dat"
-        if not dat_path.exists():
-            continue
-
-        # Build LineString from product footprint if available
-        footprint_wkt = t.get("footprint_wkt", "")
-        coords = parse_footprint_wkt(footprint_wkt)
-
-        if coords and len(coords) >= 2:
-            geometry = {"type": "LineString", "coordinates": coords}
-        else:
-            lon = lon_to_180(t["lon"]) if t["lon"] else 0
-            geometry = {"type": "Point", "coordinates": [lon, t["lat"] or 0]}
-
-        feature = {
-            "type": "Feature",
-            "geometry": geometry,
-            "properties": {
-                "instrument": "SHARAD_HIGHRES",
-                "product_id": pid,
-                "dat_file": f"{pid.lower()}.dat",
-                "lbl_file": f"{pid.lower()}.lbl",
-            }
-        }
-        index["features"].append(feature)
-        existing_ids.add(pid)
-        added += 1
-
-    with open(SHARAD_HR_INDEX, "w") as f:
-        json.dump(index, f, indent=2)
-    print(f"  Index: +{added} entries (total: {len(index['features'])})")
+    added, total = update_sharad_index(tracks, SHARAD_HR_DIR, SHARAD_HR_INDEX)
+    print(f"  Index: +{added} entries (total: {total})")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -561,63 +410,8 @@ async def download_hirise_region(args, region_name: str, step_label: str):
 
 def _update_hirise_index(new_items: List[Dict]):
     """Add new HiRISE products to hirise_data/index.geojson."""
-    if HIRISE_INDEX.exists():
-        with open(HIRISE_INDEX) as f:
-            index = json.load(f)
-    else:
-        index = {"type": "FeatureCollection", "features": []}
-
-    existing_ids = {feat["properties"].get("product_id", "")
-                    for feat in index["features"]}
-
-    added = 0
-    for meta in new_items:
-        base_id = meta["base_id"]
-        if base_id in existing_ids:
-            continue
-
-        jp2_path = HIRISE_DATA_DIR / meta["jp2_fn"]
-        if not jp2_path.exists():
-            continue
-
-        tif_name = meta["jp2_fn"].replace(".JP2", ".tif").replace(".jp2", ".tif")
-        tif_path = HIRISE_DATA_DIR / tif_name
-
-        # Build geometry from footprint or center point
-        coords = parse_footprint_wkt(meta.get("footprint_wkt", ""))
-        if coords and len(coords) >= 4:
-            lons = [c[0] for c in coords]
-            lats = [c[1] for c in coords]
-            west, east = min(lons), max(lons)
-            south, north = min(lats), max(lats)
-            ring = [[west, south], [east, south], [east, north],
-                    [west, north], [west, south]]
-            geometry = {"type": "Polygon", "coordinates": [ring]}
-        else:
-            lat = meta["lat"] or 0
-            lon = lon_to_180(meta["lon"]) if meta["lon"] else 0
-            geometry = {"type": "Point", "coordinates": [lon, lat]}
-
-        feature = {
-            "type": "Feature",
-            "geometry": geometry,
-            "properties": {
-                "instrument": "HIRISE",
-                "product_id": base_id,
-                "quicklook": f"/hirise/quickview/{base_id}.jpg",
-                "red_tif": tif_name if tif_path.exists() else None,
-                "red_jp2": meta["jp2_fn"],
-                "center_latitude": meta["lat"],
-                "center_longitude": meta["lon"],
-            }
-        }
-        index["features"].append(feature)
-        existing_ids.add(base_id)
-        added += 1
-
-    with open(HIRISE_INDEX, "w") as f:
-        json.dump(index, f, indent=2)
-    print(f"  Index: +{added} entries (total: {len(index['features'])})")
+    added, total = update_hirise_index(new_items, HIRISE_DATA_DIR, HIRISE_INDEX)
+    print(f"  Index: +{added} entries (total: {total})")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
