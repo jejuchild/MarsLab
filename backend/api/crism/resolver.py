@@ -12,8 +12,16 @@ CRISM_DATA_ROOT = os.path.join(BASE_DIR, "crism_data")
 def resolve_crism_paths(product_id: str):
     product_id = validate_product_id(product_id)
 
-    hdr = os.path.join(CRISM_DATA_ROOT, f"{product_id}.hdr")
-    img = os.path.join(CRISM_DATA_ROOT, f"{product_id}.img")
+    # Older products sit flat in crism_data/; newer downloads live in a
+    # per-observation folder (crism_data/frt000047a3_07/...). Previously only
+    # the flat layout was checked, so ~218 products had no spectra.
+    root = CRISM_DATA_ROOT
+    obs_dir = os.path.join(CRISM_DATA_ROOT, "_".join(product_id.split("_")[:2]))
+    if not os.path.exists(os.path.join(root, f"{product_id}.hdr")) and os.path.isdir(obs_dir):
+        root = obs_dir
+
+    hdr = os.path.join(root, f"{product_id}.hdr")
+    img = os.path.join(root, f"{product_id}.img")
 
     # if → wv substitution
     wv_product_id = re.sub(
@@ -22,7 +30,7 @@ def resolve_crism_paths(product_id: str):
         product_id,
         flags=re.I,
     )
-    wv = os.path.join(CRISM_DATA_ROOT, f"{wv_product_id}.tab")
+    wv = os.path.join(root, f"{wv_product_id}.tab")
 
     for p in [hdr, img, wv]:
         if not os.path.exists(p):

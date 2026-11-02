@@ -3,6 +3,7 @@ import LaneTabs, { type LaneTabConfig } from "./inspector/lanes/LaneTabs";
 import Lane from "./inspector/lanes/Lane";
 import CrossSection, { type CrossActions } from "./inspector/cross/CrossSection";
 import ProductDetail, { type ProductDetailHandlers } from "./inspector/ProductDetail";
+import ComparePanel from "./inspector/ComparePanel";
 import { LANES, LANE_CONFIG, laneForInstrument } from "./inspector/laneConfig";
 import { fetchAtPoint, pickDefaultLane, type AtPointResponse, type Lane as LaneId, type LaneVariant } from "../api/inspector";
 import type { InspectorContext, RecentProduct } from "./inspector/types";
@@ -21,6 +22,16 @@ export interface InspectorProps {
   onOpenRadargram?: (productId: string) => void;
   /** Launchers for the Cross-Analysis tools at the bottom of the panel. */
   crossActions?: CrossActions;
+}
+
+type InspectorView = "compare" | "lanes";
+const VIEW_KEY = "marslab.inspectorView";
+function loadView(): InspectorView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "lanes" ? "lanes" : "compare";
+  } catch {
+    return "compare";
+  }
 }
 
 const DEFAULT_VARIANTS: Record<LaneId, LaneVariant> = {
@@ -56,6 +67,15 @@ export default function Inspector({
   const [activeLane, setActiveLane] = useState<LaneId>("HIRISE");
   const [activeProductByLane, setActiveProductByLane] = useState<Partial<Record<LaneId, string>>>({});
   const [variantByLane, setVariantByLane] = useState<Record<LaneId, LaneVariant>>(DEFAULT_VARIANTS);
+  const [view, setViewState] = useState<InspectorView>(loadView);
+  const setView = useCallback((v: InspectorView) => {
+    setViewState(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* storage unavailable — view just isn't remembered */
+    }
+  }, []);
 
   const clicked = useMemo(() => (context ? laneForInstrument(context.instrument) : null), [context]);
   const isCustom = context?.instrument === "CUSTOM";
@@ -137,6 +157,14 @@ export default function Inspector({
     [panelWidth],
   );
 
+  const openLane = (lane: LaneId, productId: string) => {
+    const variant = lanes?.[lane]?.find((p) => p.product_id === productId)?.variant;
+    setActiveLane(lane);
+    if (variant) setVariantByLane((prev) => ({ ...prev, [lane]: variant }));
+    setActiveProductByLane((prev) => ({ ...prev, [lane]: productId }));
+    setView("lanes");
+  };
+
   if (!context) return null;
 
   const tabs: LaneTabConfig[] = LANES.map((lane) => ({
@@ -195,6 +223,25 @@ export default function Inspector({
         </div>
       </header>
 
+      {!isCustom && (
+        <div className="flex gap-1 px-3 py-1.5 border-b border-border-dark" role="tablist" aria-label="Inspector view">
+          {(["compare", "lanes"] as InspectorView[]).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                view === v ? "bg-primary/20 text-primary" : "text-slate-500 hover:text-white"
+              }`}
+            >
+              {v === "compare" ? "Compare at point" : "By instrument"}
+            </button>
+          ))}
+        </div>
+      )}
+
       {recentProducts.length > 1 && onSelectRecent && (
         <RecentChips
           products={recentProducts}
@@ -210,7 +257,7 @@ export default function Inspector({
         </div>
       ) : (
         <>
-          <LaneTabs tabs={tabs} active={activeLane} onChange={setActiveLane} />
+          {view === "lanes" && <LaneTabs tabs={tabs} active={activeLane} onChange={setActiveLane} />}
           <div className="flex-1 overflow-hidden flex flex-col">
             {loading && (
               <div className="flex-1 flex items-center justify-center text-xs text-slate-500">
@@ -223,7 +270,16 @@ export default function Inspector({
                 Failed to load: {error}
               </div>
             )}
-            {!loading && !error && lanes && (
+            {!loading && !error && lanes && view === "compare" && (
+              <ComparePanel
+                lanes={lanes}
+                context={context}
+                handlers={handlers}
+                onOpenLane={openLane}
+                onOpenRadargram={onOpenRadargram}
+              />
+            )}
+            {!loading && !error && lanes && view === "lanes" && (
               <Lane
                 key={activeLane}
                 lane={activeLane}

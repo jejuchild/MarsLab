@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { fetchHiRISEWindow } from "../../api/hirise";
-import { fetchTrr3Pixel } from "../../api/inspector";
-import { crismPixelAt } from "../../utils/pdsLabels";
 import type { OverlayType, ProductOverlay, CustomDataset } from "../../pages/MainPage";
 import type { FieldNote } from "../../api/fieldnotes";
 import type { InspectorContext, RGBWavelengths, WindowStats } from "./types";
 import { DEFAULT_RGB } from "./types";
 import useProductMetadata from "./hooks/useProductMetadata";
 import useSpectrumData from "./hooks/useSpectrumData";
+import usePixelAtPoint from "./hooks/usePixelAtPoint";
 import MetadataTab from "./tabs/MetadataTab";
 import HiRISEPixelTab from "./tabs/HiRISEPixelTab";
 import CRISMSpectrumTab from "./tabs/CRISMSpectrumTab";
@@ -107,31 +106,13 @@ export default function ProductDetail({
     return () => { cancelled = true; };
   }, [isHiRISE, productId, pixelLine, pixelSample, windowSize]);
 
-  // ── CRISM pixel at the inspected point ──
-  // Products listed in a lane (not the one clicked) arrive without pixel
-  // coordinates; resolve them (TRR3: DDR lookup; MTRDR: projection-aware
-  // label mapping) so every CRISM product covering the point can show its
-  // spectrum there (same-location comparison).
-  const [resolvedPixel, setResolvedPixel] = useState<{ line: number; sample: number } | null>(null);
-  useEffect(() => {
-    setResolvedPixel(null);
-    if (pixelLine !== undefined) return;
-    const lookup =
-      instrument === "CRISM_TRR3" ? fetchTrr3Pixel(productId, product.lat, product.lon)
-      : instrument === "CRISM" ? crismPixelAt(productId, product.lat, product.lon)
-      : null;
-    if (!lookup) return;
-    let cancelled = false;
-    lookup.then((px) => {
-      if (!cancelled) setResolvedPixel(px);
-    });
-    return () => { cancelled = true; };
-  }, [instrument, productId, pixelLine, product.lat, product.lon]);
+  // ── CRISM pixel at the inspected point (clicked or resolved) ──
+  const pixel = usePixelAtPoint(product);
 
   // ── CRISM spectrum + metadata ──
   const { spectrumData, dustAssessment, loading: spectrumLoading } = useSpectrumData(
     productId, instrument,
-    pixelLine ?? resolvedPixel?.line, pixelSample ?? resolvedPixel?.sample,
+    pixel.line, pixel.sample,
     product.lat, product.lon,
   );
   const { metadata, loading: metadataLoading } = useProductMetadata(productId, instrument);

@@ -24,6 +24,10 @@ export async function loadCRISMLBL(id: string): Promise<string | null> {
     `${CRISM_LBL_BASE}/${baseKey}_brcarj_mtr3.lbl`,
     `${CRISM_LBL_BASE}/${baseKey}.lbl`,
     `${CRISM_LBL_BASE}/${id}.lbl`,
+    // Newer downloads live in per-observation folders (218 products);
+    // without this they never got a click spectrum.
+    `${CRISM_LBL_BASE}/${baseKey}/${id}.lbl`,
+    `${CRISM_LBL_BASE}/${baseKey}/${baseKey}_if166j_mtr3.lbl`,
   ];
 
   for (const url of patterns) {
