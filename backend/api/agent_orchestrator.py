@@ -56,8 +56,9 @@ _load_dotenv(_Path(__file__).parent.parent / ".env")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL_LIGHT = "llama-3.1-8b-instant"       # ReAct loop, planning (fast)
-GROQ_MODEL_HEAVY = "llama-3.3-70b-versatile"     # Narrative synthesis (quality)
+# Groq retired llama-3.1-8b-instant / llama-3.3-70b-versatile (404 model_not_found).
+GROQ_MODEL_LIGHT = os.environ.get("MARVIS_LLM_LIGHT", "openai/gpt-oss-20b")  # ReAct loop, planning (fast)
+GROQ_MODEL_HEAVY = os.environ.get("MARVIS_LLM_HEAVY", "openai/gpt-oss-120b")  # Narrative synthesis (quality)
 
 
 # =============================================================================

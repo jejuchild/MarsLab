@@ -1,3 +1,4 @@
+import type { AnalysisMode } from "./layerpanel/types";
 // src/MapView.tsx
 import { useRef, useState, useEffect, useCallback } from "react";
 import * as Cesium from "cesium";
@@ -146,7 +147,7 @@ type MapViewProps = {
     opacity: number;
   }>;
   // Analysis mode
-  analysisMode?: "slope" | "hirise_dtm_3d" | "line" | "ai_analysis" | "agentic" | "report" | "guided" | "region_stats" | "crater_detect" | "regolith" | "stratigraphy" | "attenuation" | "mineral_sequence" | "strat_column" | "pathfinder" | null;
+  analysisMode?: AnalysisMode;
   // Active HiRISE DTM product for hover elevation probing
   activeDTMProductId?: string | null;
   linePoints?: Array<{ lat: number; lon: number }>;

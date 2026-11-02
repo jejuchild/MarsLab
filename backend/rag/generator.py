@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Model selection: use 70B for complex science, 8B for simple queries
-MODEL_EASY = "llama-3.1-8b-instant"
-MODEL_HARD = "llama-3.3-70b-versatile"
+# Groq retired llama-3.1-8b-instant / llama-3.3-70b-versatile (404 model_not_found).
+# Model selection: larger model for complex science, light model for simple queries
+MODEL_EASY = os.environ.get("MARVIS_LLM_LIGHT", "openai/gpt-oss-20b")
+MODEL_HARD = os.environ.get("MARVIS_LLM_HEAVY", "openai/gpt-oss-120b")
 
 RAG_SYSTEM_PROMPT = """\
 You are a Mars science research assistant with deep expertise in planetary science, \

@@ -490,7 +490,6 @@ from api.search_router import router as search_router
 from api.footprints_router import router as footprints_router
 from api.custom_router import router as custom_router
 from api.point_search import router as point_search_router
-from api.ai_search import router as ai_search_router
 from api.proximity_router import router as proximity_router
 
 app.include_router(crism_router, prefix="/crism")
@@ -498,7 +497,6 @@ app.include_router(search_router)  # Mounts at /api/*
 app.include_router(footprints_router)  # Viewport-based footprint API
 app.include_router(custom_router)  # Custom user data upload
 app.include_router(point_search_router)  # Point-based coordinate search
-app.include_router(ai_search_router)  # AI-assisted natural language search
 app.include_router(proximity_router)  # Product proximity + region lookup
 
 app.mount(
@@ -512,7 +510,6 @@ from api.terrain_router import router as terrain_router
 from api.sharad_highres_router import router as sharad_highres_router
 from api.suggestions_router import router as suggestions_router
 from api.fieldnotes_router import router as fieldnotes_router
-from api.ai_analysis_router import router as ai_analysis_router
 from api.mineral_cnn.router import router as mineral_cnn_router
 from api.crism_trr3.router import router as crism_trr3_router
 
@@ -525,7 +522,6 @@ app.include_router(terrain_router)  # /api/terrain/slope_stats
 app.include_router(sharad_highres_router)  # /api/sharad_highres/*
 app.include_router(suggestions_router)  # /api/feature_suggestions
 app.include_router(fieldnotes_router)  # /api/fieldnotes
-app.include_router(ai_analysis_router)  # /api/ai_analysis
 app.include_router(mineral_cnn_router)  # /api/mineral-cnn/* — CNN Mineral Classification
 app.include_router(crism_trr3_router)  # /api/crism-trr3/* — TRR3 Spectrum + RGB
 
@@ -570,6 +566,11 @@ app.include_router(ctx_tile_router)  # /api/ctx-mosaic/* — Murray Lab CTX Mosa
 
 from rag.rag_router import router as rag_router
 app.include_router(rag_router)  # /api/rag/* — Mars Science RAG
+
+# Download page "Smart Search" (natural language → products). Its mount was
+# dropped in the April phase-1 cut while the UI stayed, so it 404'd since.
+from api.llama_search import router as smart_search_router
+app.include_router(smart_search_router)  # /api/ai/smart/*
 
 from api.inspector_router import router as inspector_router
 app.include_router(inspector_router)  # /api/inspector/at-point — 4-lane aggregator (Phase 3)

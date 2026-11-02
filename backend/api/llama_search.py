@@ -51,7 +51,8 @@ router = APIRouter(prefix="/api/ai/smart", tags=["smart-search"])
 
 # Groq config (fast cloud inference — primary)
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = "llama-3.1-8b-instant"
+# Groq retired llama-3.1-8b-instant (404 model_not_found).
+GROQ_MODEL = os.environ.get("MARVIS_LLM_LIGHT", "openai/gpt-oss-20b")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # Ollama config (unused — kept for reference)

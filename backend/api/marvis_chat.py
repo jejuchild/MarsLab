@@ -1,7 +1,7 @@
 """
 MARVIS Chat — Grounded, tool-calling chat endpoint (Llama 3.1 8B only).
 
-Cascade: Groq (llama-3.1-8b-instant) → LLaMA local fallback.
+Cascade: Groq (MARVIS_LLM_LIGHT, default openai/gpt-oss-20b) → local Ollama fallback.
 
 POST /api/marvis/chat  →  SSE stream of response tokens + tool_call events.
 """
@@ -537,11 +537,12 @@ def compound_search(
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/marvis", tags=["marvis-chat"])
 
-# ── Groq config (primary — llama 3.1 8B, fast + cheap) ──────────────
+# ── Groq config (primary — fast cloud model, no local server load) ──
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.1-8b-instant"
+# Groq retired llama-3.1-8b-instant / llama-3.3-70b-versatile (404 model_not_found).
+GROQ_MODEL = os.environ.get("MARVIS_LLM_LIGHT", "openai/gpt-oss-20b")
 
 
 # ── Region lookup ────────────────────────────────────────────────────

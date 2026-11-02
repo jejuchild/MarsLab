@@ -1,3 +1,4 @@
+import type { AnalysisMode } from "./layerpanel/types";
 import {
   useState,
   useEffect,
@@ -31,7 +32,7 @@ export interface CommandAction {
   action:
     | { type: "fly_to"; lat: number; lon: number }
     | { type: "toggle_instrument"; instrumentId: string }
-    | { type: "set_analysis"; mode: string }
+    | { type: "set_analysis"; mode: Exclude<AnalysisMode, null> }
     | { type: "set_map_mode"; mode: "2D" | "3D" }
     | { type: "toggle_grid" }
     | { type: "navigate_page"; path: string }
@@ -254,38 +255,6 @@ const ACTIONS: CommandAction[] = [
     icon: "landscape",
     keywords: ["slope", "gradient", "terrain", "elevation", "safety"],
     action: { type: "set_analysis", mode: "slope" },
-  },
-  {
-    id: "analysis-agentic",
-    label: "Open Agentic AI",
-    category: "analysis",
-    icon: "smart_toy",
-    keywords: ["agent", "ai", "llm", "autonomous", "investigate"],
-    action: { type: "set_analysis", mode: "agentic" },
-  },
-  {
-    id: "analysis-assistant",
-    label: "Open MARVIS Agent",
-    category: "analysis",
-    icon: "smart_toy",
-    keywords: ["assistant", "marvis", "agent", "workflow", "research", "plan", "sharad", "ice", "terrace"],
-    action: { type: "set_analysis", mode: "agentic" },
-  },
-  {
-    id: "analysis-report",
-    label: "Generate Landing Site Report",
-    category: "analysis",
-    icon: "summarize",
-    keywords: ["report", "landing", "compare", "regions", "multi"],
-    action: { type: "set_analysis", mode: "report" },
-  },
-  {
-    id: "analysis-ai",
-    label: "Open AI Analysis",
-    category: "analysis",
-    icon: "psychology",
-    keywords: ["ai", "analysis", "gemini", "context", "science"],
-    action: { type: "set_analysis", mode: "ai_analysis" },
   },
   {
     id: "analysis-line",
