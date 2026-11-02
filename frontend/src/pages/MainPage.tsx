@@ -147,6 +147,8 @@ export type OverlayType =
 export type ProductOverlay = {
   type: OverlayType;
   opacity: number;  // 0-100
+  /** Temporarily hidden (kept active, opacity preserved) — e.g. A/B flip. */
+  hidden?: boolean;
 };
 
 // Active overlays map: productId -> overlay state
@@ -588,6 +590,24 @@ export default function MainPage() {
   const handleSetOpacity = useCallback((productId: string, opacity: number) => {
     setOverlayOpacity(productId, opacity);
   }, [setOverlayOpacity]);
+
+  // Hide/show an overlay without dropping it (opacity is preserved).
+  const handleToggleOverlayHidden = useCallback((productId: string) => {
+    const cur = activeOverlaysRef.current.get(productId);
+    if (cur) setOverlay(productId, { ...cur, hidden: !cur.hidden });
+  }, [activeOverlaysRef, setOverlay]);
+
+  // A/B flip: swap visibility of two overlays (the comparison pair). With
+  // exactly one of them hidden, each press shows the other one.
+  const handleFlipOverlays = useCallback((a: string, b: string) => {
+    const oa = activeOverlaysRef.current.get(a);
+    const ob = activeOverlaysRef.current.get(b);
+    if (!oa || !ob) return;
+    // Show A only if it is currently hidden; otherwise show B.
+    const showA = !!oa.hidden;
+    setOverlay(a, { ...oa, hidden: !showA });
+    setOverlay(b, { ...ob, hidden: showA });
+  }, [activeOverlaysRef, setOverlay]);
 
 
   // Handle clicking product_id - fly to it, select it, and bring overlay to front
@@ -1483,7 +1503,7 @@ export default function MainPage() {
     const opacities = new Map<string, number>();
 
     for (const [productId, overlay] of activeOverlays) {
-      opacities.set(productId, overlay.opacity / 100);
+      opacities.set(productId, overlay.hidden ? 0 : overlay.opacity / 100);
 
       if (overlay.type === "quickview") {
         quickviewOverlays.push(productId);
@@ -1539,6 +1559,8 @@ export default function MainPage() {
       // Overlay handlers
       onSetOverlay={handleSetOverlay}
       onSetOpacity={handleSetOpacity}
+      onToggleOverlayHidden={handleToggleOverlayHidden}
+      onFlipOverlays={handleFlipOverlays}
       onSelectProduct={handleSelectProduct}
       onFlyToProduct={handleFlyToProduct}
       onDeactivateAll={handleDeactivateAll}

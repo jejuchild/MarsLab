@@ -262,6 +262,11 @@ export default function useMapViewer({
     viewer = new Cesium.Viewer(containerRef.current, {
       sceneMode: Cesium.SceneMode.SCENE2D,
       mapProjection: new Cesium.GeographicProjection(marsEllipsoid),
+      // Image overlays are drawn in the translucent pass. With order-
+      // independent translucency two overlapping, fully opaque overlays were
+      // blended ~50/50 regardless of which was "on top"; sorted translucency
+      // lets the most recently added (or brought-to-front) overlay win.
+      orderIndependentTranslucency: false,
       requestRenderMode: true,
       maximumRenderTimeChange: Infinity,
       animation: false,

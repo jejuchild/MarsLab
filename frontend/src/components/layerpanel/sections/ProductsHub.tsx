@@ -276,6 +276,8 @@ function ActiveOverlaysTab({
   visibleProducts,
   onSetOverlay,
   onSetOpacity,
+  onToggleOverlayHidden,
+  onFlipOverlays,
   onFlyToProduct,
   onDeactivateAll,
 }: Pick<
@@ -284,6 +286,8 @@ function ActiveOverlaysTab({
   | "visibleProducts"
   | "onSetOverlay"
   | "onSetOpacity"
+  | "onToggleOverlayHidden"
+  | "onFlipOverlays"
   | "onFlyToProduct"
   | "onDeactivateAll"
 >) {
@@ -337,7 +341,16 @@ function ActiveOverlaysTab({
     <div>
       {/* Clear All header */}
       {activeCount > 0 && (
-        <div className="flex justify-end mb-1.5">
+        <div className="flex justify-end gap-1.5 mb-1.5">
+          {activeCount >= 2 && onFlipOverlays && (
+            <button
+              onClick={() => onFlipOverlays(activeProducts[0]!.productId, activeProducts[1]!.productId)}
+              className="text-[8px] px-1.5 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors border border-primary/30 font-bold uppercase"
+              title={`Flip between ${activeProducts[0]!.productId} and ${activeProducts[1]!.productId}`}
+            >
+              A/B flip
+            </button>
+          )}
           <button
             onClick={() => onDeactivateAll?.()}
             className="text-[8px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors border border-red-500/30 font-bold uppercase"
@@ -415,6 +428,18 @@ function ActiveOverlaysTab({
                             <span className="material-symbols-outlined text-[10px]">close</span>
                           </button>
 
+                          {/* Hide/show without removing */}
+                          {onToggleOverlayHidden && (
+                            <button
+                              onClick={() => onToggleOverlayHidden(productId)}
+                              className={`p-0.5 rounded transition-colors ${overlay.hidden ? "text-slate-600 hover:text-slate-400" : "text-slate-300 hover:text-white"}`}
+                              title={overlay.hidden ? "Show on map" : "Hide (keep active)"}
+                              aria-pressed={!overlay.hidden}
+                            >
+                              <span className="material-symbols-outlined text-xs">{overlay.hidden ? "visibility_off" : "visibility"}</span>
+                            </button>
+                          )}
+
                           {/* Opacity toggle */}
                           <button
                             onClick={() =>
@@ -476,6 +501,8 @@ export default function ProductsHub({
   activeOverlays,
   onSetOverlay,
   onSetOpacity,
+  onToggleOverlayHidden,
+  onFlipOverlays,
   onSelectProduct,
   onFlyToProduct,
   onDeactivateAll,
@@ -550,6 +577,8 @@ export default function ProductsHub({
           visibleProducts={visibleProducts}
           onSetOverlay={onSetOverlay}
           onSetOpacity={onSetOpacity}
+          onToggleOverlayHidden={onToggleOverlayHidden}
+          onFlipOverlays={onFlipOverlays}
           onFlyToProduct={onFlyToProduct}
           onDeactivateAll={onDeactivateAll}
         />

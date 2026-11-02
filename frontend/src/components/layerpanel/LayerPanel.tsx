@@ -52,6 +52,8 @@ export default function LayerPanel({
   activeOverlays = new Map(),
   onSetOverlay,
   onSetOpacity,
+  onToggleOverlayHidden,
+  onFlipOverlays,
   onSelectProduct,
   onFlyToProduct,
   onDeactivateAll,
@@ -227,6 +229,8 @@ export default function LayerPanel({
           activeOverlays={activeOverlays}
           onSetOverlay={onSetOverlay}
           onSetOpacity={onSetOpacity}
+          onToggleOverlayHidden={onToggleOverlayHidden}
+          onFlipOverlays={onFlipOverlays}
           onSelectProduct={onSelectProduct}
           onFlyToProduct={onFlyToProduct}
           onDeactivateAll={onDeactivateAll}

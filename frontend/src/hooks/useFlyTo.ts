@@ -364,36 +364,29 @@ export default function useFlyTo({
     };
   }, [highlightProductId, onHighlightComplete, onSelect, onToggleOverlay, viewerRef, marsEllipsoid]);
 
-  // Bring high-res overlay to front when bringToFrontId changes
+  // Bring a product's overlay to the top of the stack when bringToFrontId
+  // changes (any overlay type, not just high-res). Entities are drawn in
+  // add order, so the overlay is removed and re-added.
   useEffect(() => {
     if (!bringToFrontId) return;
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    const entityId = `HIGHRES_OVERLAY_${bringToFrontId}`;
-    const entity = viewer.entities.getById(entityId);
-
-    // Hidden overlays (toggled off / switched to quickview) must stay hidden:
-    // re-adding without `show` would resurrect them on top of the new overlay.
-    if (entity && entity.show) {
-      // Remove and re-add to bring to front
-      const savedProps = {
+    for (const prefix of ["QUICKVIEW_OVERLAY_", "HIGHRES_OVERLAY_", "MINERAL_OVERLAY_"]) {
+      const entity = viewer.entities.getById(`${prefix}${bringToFrontId}`);
+      // Hidden overlays (toggled off / switched type) must stay hidden:
+      // re-adding without `show` would resurrect them on top.
+      if (!entity || !entity.show) continue;
+      const saved = {
         id: entity.id,
         rectangle: entity.rectangle,
         polygon: entity.polygon,
         properties: entity.properties,
       };
-
       viewer.entities.remove(entity);
-      viewer.entities.add({
-        id: savedProps.id,
-        rectangle: savedProps.rectangle,
-        polygon: savedProps.polygon,
-        properties: savedProps.properties,
-      });
-
-      viewer.scene.requestRender();
+      viewer.entities.add(saved);
     }
+    viewer.scene.requestRender();
 
     onBringToFrontComplete?.();
   }, [bringToFrontId, onBringToFrontComplete, viewerRef]);

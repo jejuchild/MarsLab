@@ -95,6 +95,8 @@ export interface ProductsHubProps {
   activeOverlays: ActiveOverlays;
   onSetOverlay?: (productId: string, type: OverlayType | null) => void;
   onSetOpacity?: (productId: string, opacity: number) => void;
+  onToggleOverlayHidden?: (productId: string) => void;
+  onFlipOverlays?: (a: string, b: string) => void;
   onSelectProduct?: (product: VisibleProduct) => void;
   onFlyToProduct?: (productId: string) => void;
   onDeactivateAll?: () => void;
@@ -132,6 +134,8 @@ export interface LayerPanelProps {
   activeOverlays?: ActiveOverlays;
   onSetOverlay?: (productId: string, type: OverlayType | null) => void;
   onSetOpacity?: (productId: string, opacity: number) => void;
+  onToggleOverlayHidden?: (productId: string) => void;
+  onFlipOverlays?: (a: string, b: string) => void;
   onSelectProduct?: (product: VisibleProduct) => void;
   onFlyToProduct?: (productId: string) => void;
   onDeactivateAll?: () => void;
