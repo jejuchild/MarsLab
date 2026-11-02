@@ -40,7 +40,16 @@ interface Measurement {
 
 interface ProfileSample {
   distanceKm: number;
-  elevationM: number;
+  elevationM: number | null; // null = DEM nodata
+  lat: number;
+  lon: number;
+}
+
+interface ProfileData {
+  samples: ProfileSample[];
+  distanceKm: number;
+  start: LatLon;
+  end: LatLon;
 }
 
 export interface MeasurementToolsProps {
@@ -158,14 +167,38 @@ function uid(): string {
 }
 
 /* ==================================================
+ * Elevation profile CSV export
+ * ==================================================*/
+function downloadProfileCsv({ samples, start, end }: ProfileData) {
+  const rows = [
+    "index,distance_km,lat,lon,elevation_m",
+    ...samples.map((s, i) =>
+      [i, s.distanceKm, s.lat, s.lon, s.elevationM ?? ""].join(","),
+    ),
+  ];
+  const blob = new Blob([rows.join("\n") + "\n"], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const f = (v: number) => v.toFixed(4);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `elevation_profile_${f(start.lat)}_${f(start.lon)}_to_${f(end.lat)}_${f(end.lon)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ==================================================
  * Inline SVG elevation profile
  * ==================================================*/
 function ElevationProfileChart({
   samples,
   distanceKm,
+  onExportCsv,
 }: {
   samples: ProfileSample[];
   distanceKm: number;
+  onExportCsv?: () => void;
 }) {
   const W = 200;
   const H = 100;
@@ -178,7 +211,10 @@ function ElevationProfileChart({
 
   if (samples.length < 2) return null;
 
-  const elevs = samples.map((s) => s.elevationM);
+  const elevs = samples
+    .map((s) => s.elevationM)
+    .filter((e): e is number => e !== null);
+  if (elevs.length < 2) return null;
   const minElev = Math.min(...elevs);
   const maxElev = Math.max(...elevs);
   const elevRange = maxElev - minElev || 1;
@@ -186,16 +222,41 @@ function ElevationProfileChart({
   const toX = (i: number) => PAD_L + (i / (samples.length - 1)) * plotW;
   const toY = (e: number) => PAD_T + plotH - ((e - minElev) / elevRange) * plotH;
 
-  const linePath = samples
-    .map((s, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(s.elevationM).toFixed(1)}`)
-    .join(" ");
+  // Nodata samples break the line: the next valid sample starts a new subpath
+  const segs: string[] = [];
+  let penDown = false;
+  samples.forEach((s, i) => {
+    if (s.elevationM === null) {
+      penDown = false;
+      return;
+    }
+    segs.push(`${penDown ? "L" : "M"}${toX(i).toFixed(1)},${toY(s.elevationM).toFixed(1)}`);
+    penDown = true;
+  });
+  const linePath = segs.join(" ");
 
-  const fillPath = `${linePath} L${toX(samples.length - 1).toFixed(1)},${(PAD_T + plotH).toFixed(1)} L${PAD_L},${(PAD_T + plotH).toFixed(1)} Z`;
+  // Area fill only when the profile is gap-free
+  const fillPath =
+    elevs.length === samples.length
+      ? `${linePath} L${toX(samples.length - 1).toFixed(1)},${(PAD_T + plotH).toFixed(1)} L${PAD_L},${(PAD_T + plotH).toFixed(1)} Z`
+      : null;
 
   return (
     <div className="mt-2 rounded-md border border-border-dark bg-bg-dark/95 p-1">
-      <div className="text-[8px] text-slate-500 uppercase tracking-wider px-1 mb-0.5">
-        Elevation Profile &middot; {formatDistance(distanceKm)}
+      <div className="flex items-center gap-1.5 pr-5 px-1 mb-0.5">
+        <span className="text-[8px] text-slate-500 uppercase tracking-wider">
+          Elevation Profile &middot; {formatDistance(distanceKm)}
+        </span>
+        {onExportCsv && (
+          <button
+            onClick={onExportCsv}
+            title="Download profile as CSV"
+            className="ml-auto flex items-center gap-0.5 rounded px-1 text-[8px] font-medium uppercase tracking-wider text-slate-400 hover:bg-surface-elevated hover:text-white"
+          >
+            <span className="material-symbols-outlined text-[11px]">download</span>
+            CSV
+          </button>
+        )}
       </div>
       <svg width={W} height={H} className="block">
         {/* Grid lines */}
@@ -226,7 +287,7 @@ function ElevationProfileChart({
           {distanceKm < 1 ? `${(distanceKm * 1000).toFixed(0)}m` : `${distanceKm.toFixed(1)}km`}
         </text>
         {/* Fill */}
-        <path d={fillPath} fill="rgba(34,211,238,0.12)" />
+        {fillPath && <path d={fillPath} fill="rgba(34,211,238,0.12)" />}
         {/* Line */}
         <path d={linePath} fill="none" stroke="#22d3ee" strokeWidth={1.5} />
       </svg>
@@ -319,10 +380,8 @@ export default function MeasurementTools({
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [pendingPoints, setPendingPoints] = useState<LatLon[]>([]);
   const [pendingEntities, setPendingEntities] = useState<string[]>([]);
-  const [profileData, setProfileData] = useState<{
-    samples: ProfileSample[];
-    distanceKm: number;
-  } | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState<{
     lat: number;
     lon: number;
@@ -341,6 +400,9 @@ export default function MeasurementTools({
   // Timer ref to debounce area single-clicks so double-click doesn't add extra vertex
   const areaClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const areaClickPendingRef = useRef<{ lat: number; lon: number } | null>(null);
+  // Live preview line for the elevation profile: follows the cursor after the first click
+  const previewLineIdRef = useRef<string | null>(null);
+  const previewEndRef = useRef<Cesium.Cartesian3 | null>(null);
 
   // Keep refs in sync
   useEffect(() => {
@@ -406,6 +468,7 @@ export default function MeasurementTools({
     setPendingPoints([]);
     setPendingEntities([]);
     setProfileData(null);
+    setProfileError(null);
     setPinInput(null);
     viewer.scene.requestRender();
   }, [viewer]);
@@ -419,6 +482,8 @@ export default function MeasurementTools({
       areaClickTimerRef.current = null;
       areaClickPendingRef.current = null;
     }
+    previewLineIdRef.current = null;
+    previewEndRef.current = null;
     for (const eid of pendingEntitiesRef.current) {
       const ent = viewer.entities.getById(eid);
       if (ent) viewer.entities.remove(ent);
@@ -476,38 +541,30 @@ export default function MeasurementTools({
 
   /* ----- Fetch elevation profile from backend ----- */
   const fetchElevationProfile = useCallback(
-    async (start: LatLon, end: LatLon): Promise<ProfileSample[]> => {
-      try {
-        const url =
-          `/api/terrain/line_profile?start_lat=${start.lat}&start_lon=${start.lon}` +
-          `&end_lat=${end.lat}&end_lon=${end.lon}&num_samples=50`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.profile && Array.isArray(data.profile)) {
-            return data.profile.map((p: Record<string, number>) => ({
-              distanceKm: p.distance_km ?? 0,
-              elevationM: p.elevation_m ?? 0,
-            }));
-          }
-        }
-      } catch {
-        // Fall through to synthetic data
+    async (
+      start: LatLon,
+      end: LatLon,
+    ): Promise<ProfileSample[]> => {
+      // Throws on any failure; the caller shows the message instead of a chart
+      const url =
+        `/api/terrain/line_profile?start_lat=${start.lat}&start_lon=${start.lon}` +
+        `&end_lat=${end.lat}&end_lon=${end.lon}&num_samples=200`;
+      const res = await fetch(url);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error ?? `Elevation request failed (HTTP ${res.status})`);
       }
-
-      // Fallback: generate synthetic profile with random noise
-      const totalDist = marsGreatCircleDistanceKm(start, end);
-      const samples: ProfileSample[] = [];
-      for (let i = 0; i < 50; i++) {
-        const frac = i / 49;
-        const baseLat = start.lat + (end.lat - start.lat) * frac;
-        // Synthetic elevation: a sine-ish curve with noise
-        const base = -2000 + Math.sin(frac * Math.PI * 3) * 500;
-        const noise = (Math.random() - 0.5) * 200;
-        samples.push({
-          distanceKm: totalDist * frac,
-          elevationM: base + noise + baseLat * 10,
-        });
+      if (!data?.profile || !Array.isArray(data.profile)) {
+        throw new Error("Unexpected response from elevation service");
+      }
+      const samples: ProfileSample[] = data.profile.map((p: Record<string, number | null>) => ({
+        distanceKm: p.distance_km ?? 0,
+        elevationM: p.elevation_m ?? null,
+        lat: p.lat ?? 0,
+        lon: p.lon ?? 0,
+      }));
+      if (samples.filter((s) => s.elevationM !== null).length < 2) {
+        throw new Error("No DEM elevation data along this line");
       }
       return samples;
     },
@@ -535,6 +592,42 @@ export default function MeasurementTools({
 
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     handlerRef.current = handler;
+
+    /* ----- Rubber-band line from the start point to the cursor (updated on MOUSE_MOVE) ----- */
+    const startPreviewLine = (lon: number, lat: number): string => {
+      const startCart = Cesium.Cartesian3.fromDegrees(lon, lat, 0, MARS_ELLIPSOID);
+      const previewId = uid();
+      previewEndRef.current = null;
+      addEntity({
+        id: previewId,
+        polyline: {
+          positions: new Cesium.CallbackProperty(() => {
+            const endCart = previewEndRef.current;
+            return endCart ? [startCart, endCart] : [];
+          }, false),
+          width: 2,
+          arcType: Cesium.ArcType.GEODESIC,
+          material: new Cesium.PolylineDashMaterialProperty({
+            color: Cesium.Color.fromCssColorString("#22d3ee").withAlpha(0.9),
+            dashLength: 12,
+          }),
+        },
+      });
+      previewLineIdRef.current = previewId;
+      return previewId;
+    };
+
+    // Drop the rubber-band preview (the final line replaces it) and remove it from `ents`
+    const endPreviewLine = (ents: string[]) => {
+      const previewId = previewLineIdRef.current;
+      if (previewId) {
+        removeEntity(previewId);
+        const idx = ents.indexOf(previewId);
+        if (idx >= 0) ents.splice(idx, 1);
+      }
+      previewLineIdRef.current = null;
+      previewEndRef.current = null;
+    };
 
     /* ----- LEFT_CLICK ----- */
     handler.setInputAction(
@@ -564,14 +657,16 @@ export default function MeasurementTools({
                 disableDepthTestDistance: Number.POSITIVE_INFINITY,
               },
             });
+            const previewId = startPreviewLine(lon, lat);
             setPendingPoints([{ lat, lon }]);
-            setPendingEntities([dotId]);
+            setPendingEntities([dotId, previewId]);
           } else {
             // Second point - complete measurement
             const start = pts[0]!;
             const end: LatLon = { lat, lon };
             const dist = marsGreatCircleDistanceKm(start, end);
             const label = formatDistance(dist);
+            endPreviewLine(ents);
             const mid = midpoint(start, end);
 
             const dotId = uid();
@@ -706,13 +801,15 @@ export default function MeasurementTools({
                 disableDepthTestDistance: Number.POSITIVE_INFINITY,
               },
             });
+            const previewId = startPreviewLine(lon, lat);
             setPendingPoints([{ lat, lon }]);
-            setPendingEntities([dotId]);
+            setPendingEntities([dotId, previewId]);
           } else {
             // Second point - complete
             const start = pts[0]!;
             const end: LatLon = { lat, lon };
             const dist = marsGreatCircleDistanceKm(start, end);
+            endPreviewLine(ents);
 
             const dotId = uid();
             const lineId = uid();
@@ -773,9 +870,15 @@ export default function MeasurementTools({
             setPendingEntities([]);
 
             // Fetch elevation profile
-            fetchElevationProfile(start, end).then((samples) => {
-              setProfileData({ samples, distanceKm: dist });
-            });
+            setProfileData(null);
+            setProfileError(null);
+            fetchElevationProfile(start, end)
+              .then((samples) => {
+                setProfileData({ samples, distanceKm: dist, start, end });
+              })
+              .catch((err: unknown) => {
+                setProfileError(err instanceof Error ? err.message : "Elevation request failed");
+              });
 
             setActiveTool(null);
           }
@@ -901,13 +1004,26 @@ export default function MeasurementTools({
       Cesium.ScreenSpaceEventType.LEFT_DOUBLE_CLICK,
     );
 
+    /* ----- MOUSE_MOVE (distance / profile rubber-band line) ----- */
+    handler.setInputAction(
+      (move: Cesium.ScreenSpaceEventHandler.MotionEvent) => {
+        if (!previewLineIdRef.current) return;
+        const cart = viewer.camera.pickEllipsoid(move.endPosition, MARS_ELLIPSOID);
+        if (!cart) return;
+        previewEndRef.current = cart;
+        // requestRenderMode is on, so the frame must be requested explicitly
+        viewer.scene.requestRender();
+      },
+      Cesium.ScreenSpaceEventType.MOUSE_MOVE,
+    );
+
     return () => {
       handler.destroy();
       handlerRef.current = null;
     };
     // Re-create handler whenever the active tool changes, but NOT on every
     // pending point update (we use refs for that).
-  }, [viewer, activeTool, addEntity, fetchElevationProfile]);
+  }, [viewer, activeTool, addEntity, removeEntity, fetchElevationProfile]);
 
   /* ----- Pin submit handler ----- */
   const handlePinSubmit = useCallback(
@@ -1011,6 +1127,7 @@ export default function MeasurementTools({
       const target = measurementsRef.current.find((m) => m.id === measurementId);
       if (target?.type === "profile") {
         setProfileData(null);
+        setProfileError(null);
       }
     },
     [viewer],
@@ -1115,15 +1232,28 @@ export default function MeasurementTools({
       )}
 
       {/* Inline elevation profile chart */}
-      {profileData && (
+      {(profileData || profileError) && (
         <div className="absolute top-20 right-16 z-[498]" style={{ marginTop: measurements.length > 0 ? `${Math.min(measurements.length * 32 + 28, 220)}px` : "0px" }}>
           <div className="relative">
-            <ElevationProfileChart
-              samples={profileData.samples}
-              distanceKm={profileData.distanceKm}
-            />
+            {profileData ? (
+              <ElevationProfileChart
+                samples={profileData.samples}
+                distanceKm={profileData.distanceKm}
+                onExportCsv={() => downloadProfileCsv(profileData)}
+              />
+            ) : (
+              <div className="mt-2 w-[208px] rounded-md border border-red-900/60 bg-bg-dark/95 p-2 pr-5">
+                <div className="text-[8px] text-slate-500 uppercase tracking-wider mb-0.5">
+                  Elevation Profile
+                </div>
+                <div className="text-[10px] text-red-400">{profileError}</div>
+              </div>
+            )}
             <button
-              onClick={() => setProfileData(null)}
+              onClick={() => {
+                setProfileData(null);
+                setProfileError(null);
+              }}
               className="absolute top-1 right-1 text-slate-500 hover:text-white"
               title="Close profile"
             >
