@@ -48,3 +48,11 @@ def test_far_product_excluded():
 def test_0_360_longitudes_are_handled():
     res = _search_cache_at_point("crism", [_poly("E", 257.4, 18.4, 257.5, 18.5)], 18.45, -102.55, 10)
     assert len(res) == 1 and res[0].covers
+
+
+def test_covering_products_are_never_truncated():
+    many = [_poly(f"C{i}", 77.4, 18.4, 77.5, 18.5) for i in range(40)]
+    near = [_poly(f"N{i}", 77.55, 18.4, 77.6, 18.5) for i in range(40)]
+    res = _search_cache_at_point("hirise", many + near, 18.45, 77.45, 10, max_results=25)
+    assert sum(p.covers for p in res) == 40
+    assert sum(not p.covers for p in res) == 25

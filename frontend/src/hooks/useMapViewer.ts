@@ -1,4 +1,5 @@
 import { fetchTrr3Pixel } from "../api/inspector";
+import { crismPixelAt } from "../utils/pdsLabels";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
 import * as Cesium from "cesium";
@@ -639,37 +640,11 @@ export default function useMapViewer({
           let pixelSample: number | undefined;
 
           if (instrument === "CRISM") {
-            const lbl = await loadCRISMLBL(productId);
-            if (lbl) {
-              const minLat = parseLBLValue(lbl, "MINIMUM_LATITUDE");
-              const maxLat = parseLBLValue(lbl, "MAXIMUM_LATITUDE");
-              const westLon360 = parseLBLValue(lbl, "WESTERNMOST_LONGITUDE");
-              const eastLon360 = parseLBLValue(lbl, "EASTERNMOST_LONGITUDE");
-              const lines = parseLBLValue(lbl, "LINES");
-              const samples = parseLBLValue(lbl, "LINE_SAMPLES");
-
-              if (
-                minLat != null &&
-                maxLat != null &&
-                westLon360 != null &&
-                eastLon360 != null &&
-                lines &&
-                samples
-              ) {
-                const west = normalizeLonTo180(westLon360);
-                const east = normalizeLonTo180(eastLon360);
-                const south = Math.min(minLat, maxLat);
-                const north = Math.max(minLat, maxLat);
-
-                const latFrac = (north - clickLat) / (north - south);
-                const lonFrac = (clickLon - west) / (east - west);
-
-                pixelLine = Math.floor(latFrac * lines);
-                pixelSample = Math.floor(lonFrac * samples);
-
-                pixelLine = Math.max(0, Math.min(lines - 1, pixelLine));
-                pixelSample = Math.max(0, Math.min(samples - 1, pixelSample));
-              }
+            // Projection-aware (null for polar-stereographic labels / outside).
+            const px = await crismPixelAt(productId, clickLat, clickLon);
+            if (px) {
+              pixelLine = px.line;
+              pixelSample = px.sample;
             }
           }
 

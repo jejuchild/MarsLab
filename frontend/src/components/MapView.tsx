@@ -2,6 +2,7 @@ import type { AnalysisMode } from "./layerpanel/types";
 // src/MapView.tsx
 import { useRef, useState, useEffect, useCallback } from "react";
 import * as Cesium from "cesium";
+import { parseLBLValue, loadCRISMLBL } from "../utils/pdsLabels";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import { LRUMap } from "../utils/LRUMap";
 import { normalizeLonForMap } from "../utils/coordinates";
@@ -239,15 +240,6 @@ const BASE_LAYER_URLS: Record<BaseLayerType, string> = {
 /* ==================================================
  * Helpers
  * ==================================================*/
-function parseLBLValue(
-  block: string | null | undefined,
-  key: string
-): number | null {
-  if (!block) return null;
-  const m = block.match(new RegExp(`${key}\\s*=\\s*([-+0-9.eE]+)`, "i"));
-  return m ? Number(m[1]) : null;
-}
-
 // Using shared coordinate utility
 const normalizeLonTo180 = normalizeLonForMap;
 
@@ -268,7 +260,6 @@ function extractCrismObsId(productId: string): string {
  * LBL loaders with bounds caching
  * ==================================================*/
 const hiriseLBLCache = new Map<string, string>();
-const crismLBLCache = new Map<string, string>();
 const HIRISE_LBL_BASE = "/hirise_lbl";
 
 // PERFORMANCE: Cache parsed bounds to avoid re-parsing LBL files
@@ -309,36 +300,6 @@ async function loadHiRISELBL(id: string): Promise<string | null> {
   return null;
 }
 
-async function loadCRISMLBL(id: string): Promise<string | null> {
-  if (crismLBLCache.has(id)) return crismLBLCache.get(id)!;
-  const CRISM_LBL_BASE = "/crism_lbl";
-
-  // Extract base_key from product_id
-  const baseKey = id.replace(/_(?:if|br)[0-9a-z]+_mtr3$/i, "");
-
-  const patterns = [
-    `${CRISM_LBL_BASE}/${baseKey}_brcarj_mtr3.lbl`,
-    `${CRISM_LBL_BASE}/${baseKey}.lbl`,
-    `${CRISM_LBL_BASE}/${id}.lbl`,
-  ];
-
-  for (const url of patterns) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-
-      const text = await res.text();
-      if (!text.includes("IMAGE_MAP_PROJECTION")) continue;
-
-      crismLBLCache.set(id, text);
-      return text;
-    } catch {
-      continue;
-    }
-  }
-
-  return null;
-}
 
 type GeoJsonIndexFeature = {
   properties?: {

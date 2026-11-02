@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchHiRISEWindow } from "../../api/hirise";
 import { fetchTrr3Pixel } from "../../api/inspector";
+import { crismPixelAt } from "../../utils/pdsLabels";
 import type { OverlayType, ProductOverlay, CustomDataset } from "../../pages/MainPage";
 import type { FieldNote } from "../../api/fieldnotes";
 import type { InspectorContext, RGBWavelengths, WindowStats } from "./types";
@@ -106,17 +107,23 @@ export default function ProductDetail({
     return () => { cancelled = true; };
   }, [isHiRISE, productId, pixelLine, pixelSample, windowSize]);
 
-  // ── TRR3 pixel at the inspected point ──
+  // ── CRISM pixel at the inspected point ──
   // Products listed in a lane (not the one clicked) arrive without pixel
-  // coordinates; look the pixel up from the DDR so every TRR3 observation
-  // covering the point can show its spectrum there (same-location compare).
-  const [trr3Pixel, setTrr3Pixel] = useState<{ line: number; sample: number } | null>(null);
+  // coordinates; resolve them (TRR3: DDR lookup; MTRDR: projection-aware
+  // label mapping) so every CRISM product covering the point can show its
+  // spectrum there (same-location comparison).
+  const [resolvedPixel, setResolvedPixel] = useState<{ line: number; sample: number } | null>(null);
   useEffect(() => {
-    setTrr3Pixel(null);
-    if (instrument !== "CRISM_TRR3" || pixelLine !== undefined) return;
+    setResolvedPixel(null);
+    if (pixelLine !== undefined) return;
+    const lookup =
+      instrument === "CRISM_TRR3" ? fetchTrr3Pixel(productId, product.lat, product.lon)
+      : instrument === "CRISM" ? crismPixelAt(productId, product.lat, product.lon)
+      : null;
+    if (!lookup) return;
     let cancelled = false;
-    fetchTrr3Pixel(productId, product.lat, product.lon).then((px) => {
-      if (!cancelled) setTrr3Pixel(px);
+    lookup.then((px) => {
+      if (!cancelled) setResolvedPixel(px);
     });
     return () => { cancelled = true; };
   }, [instrument, productId, pixelLine, product.lat, product.lon]);
@@ -124,7 +131,7 @@ export default function ProductDetail({
   // ── CRISM spectrum + metadata ──
   const { spectrumData, dustAssessment, loading: spectrumLoading } = useSpectrumData(
     productId, instrument,
-    pixelLine ?? trr3Pixel?.line, pixelSample ?? trr3Pixel?.sample,
+    pixelLine ?? resolvedPixel?.line, pixelSample ?? resolvedPixel?.sample,
     product.lat, product.lon,
   );
   const { metadata, loading: metadataLoading } = useProductMetadata(productId, instrument);

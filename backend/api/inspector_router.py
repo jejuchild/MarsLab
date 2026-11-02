@@ -345,7 +345,11 @@ def _search_cache_at_point(
         )
 
     out.sort(key=lambda p: (not p.covers, p.distance_km if p.distance_km is not None else 1e9))
-    return out[:max_results]
+    # Never truncate products that cover the point (the whole point of the
+    # comparison); only the "nearby" tail is capped.
+    covering = [p for p in out if p.covers]
+    nearby = [p for p in out if not p.covers]
+    return covering + nearby[:max_results]
 
 
 # ======================================================
@@ -389,10 +393,12 @@ async def at_point(
     for lane, results in pairs:
         lanes[lane].extend(results)
 
-    # Re-sort each lane by distance after merging variants
+    # Re-sort each lane after merging variants: covering products first (never
+    # truncated), then the nearest non-covering ones (capped).
     for lane in lanes:
-        lanes[lane].sort(key=lambda p: p.distance_km if p.distance_km is not None else 1e9)
-        lanes[lane] = lanes[lane][:25]
+        merged = sorted(lanes[lane], key=lambda p: (not p.covers, p.distance_km if p.distance_km is not None else 1e9))
+        covering = [p for p in merged if p.covers]
+        lanes[lane] = covering + [p for p in merged if not p.covers][:25]
 
     return AtPointResponse(
         lat=lat,
