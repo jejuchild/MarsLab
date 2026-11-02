@@ -123,8 +123,9 @@ export default function LaneShell({
           >
             {products.map((p) => (
               <option key={p.product_id} value={p.product_id}>
+                {p.covers ? "● " : "○ "}
                 {p.product_id}
-                {p.distance_km != null ? ` — ${p.distance_km.toFixed(1)} km` : ""}
+                {p.covers ? " — covers point" : p.distance_km != null ? ` — ${p.distance_km.toFixed(1)} km away` : ""}
               </option>
             ))}
           </select>
@@ -142,11 +143,13 @@ export default function LaneShell({
               {activeProduct.lat.toFixed(3)}°, {activeProduct.lon.toFixed(3)}°
             </span>
           )}
-          {activeProduct.distance_km != null && (
-            <span className="ml-2 text-slate-600">
-              · {activeProduct.distance_km.toFixed(1)} km from cursor
+          {activeProduct.covers ? (
+            <span className="ml-2 text-emerald-500/80">· covers this point</span>
+          ) : activeProduct.distance_km != null ? (
+            <span className="ml-2 text-amber-500/80">
+              · {activeProduct.distance_km.toFixed(1)} km from this point
             </span>
-          )}
+          ) : null}
         </footer>
       )}
     </div>

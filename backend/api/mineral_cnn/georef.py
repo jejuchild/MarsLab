@@ -156,3 +156,30 @@ def warp_to_latlon(image: np.ndarray, valid: np.ndarray, grid: GeoGrid) -> tuple
     out = np.zeros((height * width, 4), dtype=np.uint8)
     out[covered] = src_rgba[idx[covered]]
     return out.reshape(height, width, 4), {"west": west, "south": south, "east": east, "north": north}
+
+
+class PixelLocator:
+    """Map lat/lon to the nearest sensor (line, sample) of an observation."""
+
+    def __init__(self, grid: GeoGrid):
+        ok = np.isfinite(grid.lat) & np.isfinite(grid.lon)
+        ok &= _regular_rows(grid)[:, None]
+        if ok.sum() < 4:
+            raise ValueError("not enough georeferenced pixels")
+        self._lines, self._samples = np.nonzero(ok)
+        lat, lon = grid.lat[ok], grid.lon[ok]
+        self._k = float(np.cos(np.radians(np.median(lat))))
+        self._tree = cKDTree(np.column_stack([lon * self._k, lat]))
+        sample_idx = slice(None, None, max(1, len(lat) // 2000))
+        self._spacing = float(np.median(self._tree.query(self._tree.data[sample_idx], k=2)[0][:, 1]))
+
+    def locate(self, lat: float, lon: float) -> dict:
+        lon = lon - 360.0 if lon > 180.0 else lon
+        dist, i = self._tree.query([lon * self._k, lat], k=1)
+        mars_km_per_deg = 3389.5 * np.pi / 180.0
+        return {
+            "line": int(self._lines[i]),
+            "sample": int(self._samples[i]),
+            "distance_m": round(float(dist) * mars_km_per_deg * 1000.0, 1),
+            "inside": bool(dist <= 1.5 * self._spacing),
+        }

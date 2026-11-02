@@ -22,7 +22,10 @@ export interface LaneProduct {
   lat: number | null;
   lon: number | null;
   variant: LaneVariant;
+  /** Distance from the point to the footprint (0 when inside). */
   distance_km: number | null;
+  /** Footprint contains the point (SHARAD tracks: passes within ~3 km). */
+  covers?: boolean;
 }
 
 export interface AtPointResponse {
@@ -68,4 +71,22 @@ export function pickDefaultLane(response: AtPointResponse): Lane {
     }
   }
   return best;
+}
+
+/** Nearest TRR3 sensor pixel for a lat/lon (DDR-based); null if outside or unavailable. */
+export async function fetchTrr3Pixel(
+  productId: string,
+  lat: number,
+  lon: number,
+): Promise<{ line: number; sample: number } | null> {
+  try {
+    const res = await fetch(
+      `/api/crism-trr3/${encodeURIComponent(productId)}/pixel?lat=${lat}&lon=${lon}`,
+    );
+    if (!res.ok) return null;
+    const px = (await res.json()) as { line: number; sample: number; inside: boolean };
+    return px.inside ? { line: px.line, sample: px.sample } : null;
+  } catch {
+    return null;
+  }
 }

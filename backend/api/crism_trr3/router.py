@@ -9,7 +9,9 @@ import re
 import io
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from functools import lru_cache
+
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -144,6 +146,35 @@ def wavelengths(obs_id: str):
         wl = IR_WL
 
     return {"wavelengths": wl.tolist(), "count": len(wl)}
+
+
+@lru_cache(maxsize=8)
+def _pixel_locator(obs_id: str):
+    from api.mineral_cnn.data_loader import resolve_trr_files
+    from api.mineral_cnn.georef import PixelLocator, load_ddr_latlon
+
+    files = resolve_trr_files(obs_id)
+    if not files.get("ddr_img") or not files.get("ddr_lbl"):
+        raise FileNotFoundError(f"DDR not found for {obs_id}")
+    return PixelLocator(load_ddr_latlon(files["ddr_img"], files["ddr_lbl"]))
+
+
+@router.get("/{obs_id}/pixel")
+def pixel_at(obs_id: str, lat: float = Query(..., ge=-90, le=90), lon: float = Query(..., ge=-360, le=360)):
+    """
+    Sensor (line, sample) of the pixel nearest to a lat/lon, from the DDR.
+
+    TRR3 cubes are in sensor geometry (rows/samples are not north-up), so a
+    linear lat/lon→pixel mapping over the bounding box picks the wrong pixel.
+    `inside` is false when the point is outside the observation's footprint.
+    """
+    _validate_obs_id(obs_id)
+    try:
+        return _pixel_locator(obs_id).locate(lat, lon)
+    except (FileNotFoundError, KeyError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.get("/{obs_id}/shape")

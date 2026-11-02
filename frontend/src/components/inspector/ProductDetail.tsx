@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchHiRISEWindow } from "../../api/hirise";
+import { fetchTrr3Pixel } from "../../api/inspector";
 import type { OverlayType, ProductOverlay, CustomDataset } from "../../pages/MainPage";
 import type { FieldNote } from "../../api/fieldnotes";
 import type { InspectorContext, RGBWavelengths, WindowStats } from "./types";
@@ -105,9 +106,26 @@ export default function ProductDetail({
     return () => { cancelled = true; };
   }, [isHiRISE, productId, pixelLine, pixelSample, windowSize]);
 
+  // ── TRR3 pixel at the inspected point ──
+  // Products listed in a lane (not the one clicked) arrive without pixel
+  // coordinates; look the pixel up from the DDR so every TRR3 observation
+  // covering the point can show its spectrum there (same-location compare).
+  const [trr3Pixel, setTrr3Pixel] = useState<{ line: number; sample: number } | null>(null);
+  useEffect(() => {
+    setTrr3Pixel(null);
+    if (instrument !== "CRISM_TRR3" || pixelLine !== undefined) return;
+    let cancelled = false;
+    fetchTrr3Pixel(productId, product.lat, product.lon).then((px) => {
+      if (!cancelled) setTrr3Pixel(px);
+    });
+    return () => { cancelled = true; };
+  }, [instrument, productId, pixelLine, product.lat, product.lon]);
+
   // ── CRISM spectrum + metadata ──
   const { spectrumData, dustAssessment, loading: spectrumLoading } = useSpectrumData(
-    productId, instrument, pixelLine, pixelSample, product.lat, product.lon,
+    productId, instrument,
+    pixelLine ?? trr3Pixel?.line, pixelSample ?? trr3Pixel?.sample,
+    product.lat, product.lon,
   );
   const { metadata, loading: metadataLoading } = useProductMetadata(productId, instrument);
 

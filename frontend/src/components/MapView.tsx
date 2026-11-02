@@ -791,7 +791,6 @@ export default function MapView({
     normalizeLonTo180,
     loadHiRISELBL,
     loadCRISMLBL,
-    getProductBounds,
     paddedRectangle,
     getEntityInstrument,
     getEntityProductId,

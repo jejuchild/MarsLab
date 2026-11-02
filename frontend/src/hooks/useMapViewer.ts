@@ -1,3 +1,4 @@
+import { fetchTrr3Pixel } from "../api/inspector";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
 import * as Cesium from "cesium";
@@ -44,14 +45,6 @@ type SHARADPopup = {
   stopLon: number;
 } | null;
 
-type ProductBounds = {
-  west: number;
-  south: number;
-  east: number;
-  north: number;
-  lines?: number;
-  samples?: number;
-};
 
 type HighlightState = {
   key: string | null;
@@ -96,7 +89,6 @@ type UseMapViewerParams = {
   normalizeLonTo180: (lon: number) => number;
   loadHiRISELBL: (id: string) => Promise<string | null>;
   loadCRISMLBL: (id: string) => Promise<string | null>;
-  getProductBounds: (productId: string) => Promise<ProductBounds | null>;
   paddedRectangle: (rect: Cesium.Rectangle, padRatio?: number) => Cesium.Rectangle;
   getEntityInstrument: (entity: Cesium.Entity) => InstrumentType | null;
   getEntityProductId: (entity: Cesium.Entity) => string | null;
@@ -141,7 +133,6 @@ export default function useMapViewer({
   normalizeLonTo180,
   loadHiRISELBL,
   loadCRISMLBL,
-  getProductBounds,
   paddedRectangle,
   getEntityInstrument,
   getEntityProductId,
@@ -682,27 +673,14 @@ export default function useMapViewer({
             }
           }
 
-          // For CRISM TRR3, get shape from backend and compute pixel coords
+          // For CRISM TRR3, look up the pixel from the DDR on the backend.
+          // TRR3 is in sensor geometry (not north-up), so the former linear
+          // bbox mapping returned a pixel on the opposite side of the scene.
           if (instrument === "CRISM_TRR3") {
-            try {
-              const obsId = productId.replace(/_\d{2}$/, "");
-              const shapeRes = await fetch(`/api/crism-trr3/${obsId}/shape`);
-              if (shapeRes.ok) {
-                const shape = await shapeRes.json();
-                const bounds = await getProductBounds(productId);
-                if (bounds && shape.rows && shape.cols) {
-                  const latFrac =
-                    (bounds.north - clickLat) / (bounds.north - bounds.south);
-                  const lonFrac =
-                    (clickLon - bounds.west) / (bounds.east - bounds.west);
-                  pixelLine = Math.floor(latFrac * shape.rows);
-                  pixelSample = Math.floor(lonFrac * shape.cols);
-                  pixelLine = Math.max(0, Math.min(shape.rows - 1, pixelLine));
-                  pixelSample = Math.max(0, Math.min(shape.cols - 1, pixelSample));
-                }
-              }
-            } catch {
-              // Ignore shape fetch failure
+            const px = await fetchTrr3Pixel(productId, clickLat, clickLon);
+            if (px) {
+              pixelLine = px.line;
+              pixelSample = px.sample;
             }
           }
 

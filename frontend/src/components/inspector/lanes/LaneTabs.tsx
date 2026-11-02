@@ -4,7 +4,10 @@ export interface LaneTabConfig {
   lane: Lane;
   label: string;
   accent: string;
+  /** Products whose footprint covers the point. */
   count: number;
+  /** Further products near (but not covering) the point. */
+  nearby?: number;
 }
 
 export interface LaneTabsProps {
@@ -16,7 +19,8 @@ export interface LaneTabsProps {
 /**
  * Horizontal tab switcher for the 4 instrument lanes.
  *
- * Lanes with zero products are dimmed but still clickable.
+ * The count is products covering the point; "+n" are nearby ones.
+ * Lanes with no products at all are dimmed but still clickable.
  */
 export default function LaneTabs({ tabs, active, onChange }: LaneTabsProps) {
   return (
@@ -27,7 +31,7 @@ export default function LaneTabs({ tabs, active, onChange }: LaneTabsProps) {
     >
       {tabs.map((tab) => {
         const isActive = tab.lane === active;
-        const isEmpty = tab.count === 0;
+        const isEmpty = tab.count === 0 && !tab.nearby;
         return (
           <button
             key={tab.lane}
@@ -53,6 +57,7 @@ export default function LaneTabs({ tabs, active, onChange }: LaneTabsProps) {
               }`}
             >
               {tab.count}
+              {tab.nearby ? <span className="text-slate-600"> +{tab.nearby}</span> : null}
             </span>
           </button>
         );

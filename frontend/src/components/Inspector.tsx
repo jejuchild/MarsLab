@@ -104,7 +104,7 @@ export default function Inspector({
     return {
       ...response.lanes,
       [clicked.lane]: [
-        { product_id: context.productId, title: context.title ?? null, lat: context.lat, lon: context.lon, variant: clicked.variant, distance_km: null },
+        { product_id: context.productId, title: context.title ?? null, lat: context.lat, lon: context.lon, variant: clicked.variant, distance_km: 0, covers: true },
         ...list,
       ],
     };
@@ -143,7 +143,8 @@ export default function Inspector({
     lane,
     label: LANE_CONFIG[lane].label,
     accent: LANE_CONFIG[lane].accent,
-    count: lanes?.[lane]?.length ?? 0,
+    count: lanes?.[lane]?.filter((p) => p.covers).length ?? 0,
+    nearby: lanes?.[lane]?.filter((p) => !p.covers).length ?? 0,
   }));
 
   return (
