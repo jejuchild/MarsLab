@@ -4,12 +4,12 @@ import useFootprintLayers from "../hooks/useFootprintLayers";
 import useInspectorContext from "../hooks/useInspectorContext";
 import useActiveOverlays from "../hooks/useActiveOverlays";
 import useCatalogSearch from "../hooks/useCatalogSearch";
-import Inspector2 from "../components/Inspector2";
+import Inspector from "../components/Inspector";
+import type { ProductDetailHandlers } from "../components/inspector/ProductDetail";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import MapViewRaw from "../components/MapView";
-import InspectorPanelRaw from "../components/inspector/InspectorPanel";
 import type { InspectorContext, RGBWavelengths } from "../components/inspector/types";
 import SlopeAnalysis from "../components/SlopeAnalysis";
 import type { HiRiseDTMPoint } from "../components/HiRiseDTM3DViewer";
@@ -47,7 +47,6 @@ import type { DetectedFeature } from "../components/CraterDetectPanel";
 
 // Memoize heavy child components to prevent unnecessary re-renders
 const MapView = memo(MapViewRaw);
-const Inspector = memo(InspectorPanelRaw);
 const LayerPanel = memo(LayerPanelRaw);
 
 // Lazy-loaded heavy components (Three.js / Recharts)
@@ -219,12 +218,6 @@ export default function MainPage() {
   void useActiveOverlays;
   void useCatalogSearch;
 
-  // Phase 3: 4-lane Inspector is now the default.
-  // Use ?v=legacy to opt back into the legacy Inspector temporarily.
-  const useNewInspector = useMemo(() => {
-    if (typeof window === "undefined") return true;
-    return new URLSearchParams(window.location.search).get("v") !== "legacy";
-  }, []);
 
   // Field notes hook (extracted from MainPage)
   const {
@@ -790,11 +783,6 @@ export default function MainPage() {
   }, [panelManager.ensurePanelVisible]);
 
 
-  // Handle download from Inspector quick actions
-  const handleDownloadProduct = useCallback((productId: string, instrument: string) => {
-    window.open(`/download?tab=product&product_id=${encodeURIComponent(productId)}&instrument=${encodeURIComponent(instrument)}&autoDownload=true`, "_self");
-  }, []);
-
   // Handle RGB wavelength changes from Inspector
   const handleRGBChange = useCallback((rgb: RGBWavelengths) => {
     setRGBWavelengths(rgb);
@@ -828,8 +816,8 @@ export default function MainPage() {
   }, []);
 
   // Handle opening Mineral Sequence analysis from Inspector CNN section
+  // Drill-in: the panel renders ahead of the Inspector; closing it returns there.
   const handleOpenMineralSequence = useCallback((obsId: string) => {
-    setSelected(null);
     setMineralSequenceObsId(obsId);
     setAnalysisMode("mineral_sequence");
   }, []);
@@ -1623,6 +1611,35 @@ export default function MainPage() {
     />
   );
 
+  // Map-side handlers used by every product shown in the Inspector lanes.
+  const inspectorHandlers = useMemo<ProductDetailHandlers>(() => ({
+    getActiveOverlay: (productId) => activeOverlays.get(productId) || null,
+    onSetOverlay: (productId, type) => handleSetOverlay(productId, type),
+    onSetOpacity: handleSetOpacity,
+    rgbWavelengths,
+    onRGBChange: handleRGBChange,
+    hasHighResData: (productId) => productsWithHighRes.has(productId),
+    getCustomDataset: (productId) => customDatasets.find((d) => d.id === productId) || null,
+    onCustomDatasetOpacity: handleCustomDatasetOpacity,
+    fieldNotes,
+    onOpenFieldNote: handleOpenFieldNote,
+    // 3D DTM opens as a drill-in; closing it returns to the Inspector.
+    onShow3DView: async (productId, lat, lon) => {
+      const center = await getDTMCenter(productId);
+      setHiRiseDTM3DPoint({ productId, lat: center?.lat ?? lat, lon: center?.lon ?? lon });
+    },
+    onPinSpectrum: handlePinSpectrum,
+    onOpenMineralSequence: handleOpenMineralSequence,
+  }), [activeOverlays, handleSetOverlay, handleSetOpacity, rgbWavelengths, handleRGBChange, productsWithHighRes,
+       customDatasets, handleCustomDatasetOpacity, fieldNotes, handleOpenFieldNote, handlePinSpectrum,
+       handleOpenMineralSequence, setHiRiseDTM3DPoint]);
+
+  const inspectorCrossActions = useMemo(() => ({
+    onOpenTemporal: (lat: number, lon: number, instrument: string) => setShowTemporalComparison({ lat, lon, instrument }),
+    onOpenMineralSequence: handleOpenMineralSequence,
+    onOpenCraterDetect: () => handleAnalysisModeChange("crater_detect"),
+  }), [handleOpenMineralSequence, handleAnalysisModeChange]);
+
   const rightPanelContent =
     // Explicit analysis modes take priority (user deliberately opened these)
     regolithProductId && analysisMode === "regolith" ? (
@@ -1670,76 +1687,6 @@ export default function MainPage() {
         onOpenRegolith={handleOpenRegolith}
         onOpenAttenuation={handleOpenAttenuation}
       />
-    ) : selected && useNewInspector ? (
-      <Inspector2
-        context={selected}
-        onClose={() => setSelected(null)}
-        onOpenLegacyProduct={(productId, instrument) => {
-          // Hand-off into legacy detail Inspector by setting ?v=legacy
-          // and selecting the product. Inspector.tsx is kept as a deep
-          // detail-view fallback for sub-panels not yet migrated.
-          setSelected({
-            instrument: instrument as InspectorContext["instrument"],
-            productId,
-            lat: selected.lat,
-            lon: selected.lon,
-            title: selected.title,
-          });
-          const url = new URL(window.location.href);
-          url.searchParams.set("v", "legacy");
-          window.history.replaceState({}, "", url.toString());
-          window.location.reload();
-        }}
-      />
-    ) : selected ? (
-      <Inspector
-        selected={selected}
-        onClose={() => setSelected(null)}
-        onCollapse={() => { setRightPanelCollapsed(true); panelManager.recordManualCollapse(); }}
-        activeOverlay={activeOverlays.get(selected.productId) || null}
-        onSetOverlay={(type) => handleSetOverlay(selected.productId, type)}
-        onSetOpacity={(opacity) => handleSetOpacity(selected.productId, opacity)}
-        rgbWavelengths={rgbWavelengths}
-        onRGBChange={handleRGBChange}
-        hasHighResData={productsWithHighRes.has(selected.productId)}
-        customDataset={customDatasets.find((d) => d.id === selected.productId) || null}
-        onCustomDatasetOpacity={handleCustomDatasetOpacity}
-        fieldNotes={fieldNotes}
-        onOpenFieldNote={handleOpenFieldNote}
-        recentProducts={recentProducts}
-        onSelectRecent={handleSelectRecent}
-        onRemoveRecent={removeRecentProduct}
-        onShow3DView={async (productId, lat, lon) => {
-          setSelected(null);
-          const center = await getDTMCenter(productId);
-          const safeLat = center?.lat ?? lat;
-          const safeLon = center?.lon ?? lon;
-          setHiRiseDTM3DPoint({ productId, lat: safeLat, lon: safeLon });
-        }}
-        onFindRelated={(productId, instrument) => {
-          window.open(`/download?tab=product&product_id=${encodeURIComponent(productId)}&instrument=${encodeURIComponent(instrument)}`, "_self");
-        }}
-        onDownloadProduct={handleDownloadProduct}
-        onPinSpectrum={handlePinSpectrum}
-        onFindTemporalPairs={(lat, lon, instrument) => setShowTemporalComparison({ lat, lon, instrument })}
-        onOpenMineralSequence={handleOpenMineralSequence}
-      />
-    ) : terrainPoint ? (
-      <SlopeAnalysis
-        point={terrainPoint}
-        onClose={() => setTerrainPoint(null)}
-      />
-    ) : hiRiseDTM3DPoint ? (
-      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
-        <HiRiseDTM3DViewer
-          point={hiRiseDTM3DPoint}
-          onClose={() => {
-            setHiRiseDTM3DPoint(null);
-            setAnalysisMode(null);
-            setActiveDTMProduct(null);
-          }}
-        />
-      </Suspense>
     ) : analysisMode === "crater_detect" ? (
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading landform detector...</div>}>
         <CraterDetectPanel
@@ -1757,6 +1704,35 @@ export default function MainPage() {
           onOpenStratColumn={handleOpenStratColumn}
         />
       </Suspense>
+    ) : hiRiseDTM3DPoint ? (
+      <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
+        <HiRiseDTM3DViewer
+          point={hiRiseDTM3DPoint}
+          onClose={() => {
+            setHiRiseDTM3DPoint(null);
+            setAnalysisMode(null);
+            setActiveDTMProduct(null);
+          }}
+        />
+      </Suspense>
+    ) : selected ? (
+      <Inspector
+        context={selected}
+        isMobile={isMobile}
+        onClose={() => setSelected(null)}
+        onCollapse={() => { setRightPanelCollapsed(true); panelManager.recordManualCollapse(); }}
+        handlers={inspectorHandlers}
+        recentProducts={recentProducts}
+        onSelectRecent={handleSelectRecent}
+        onRemoveRecent={removeRecentProduct}
+        onOpenRadargram={setSharadHiresProductId}
+        crossActions={inspectorCrossActions}
+      />
+    ) : terrainPoint ? (
+      <SlopeAnalysis
+        point={terrainPoint}
+        onClose={() => setTerrainPoint(null)}
+      />
     ) : (
       <div className="h-full flex items-center justify-center bg-[#101622]">
         <EmptyState

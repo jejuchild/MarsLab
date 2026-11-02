@@ -1,5 +1,4 @@
-import type { OverlayType, ProductOverlay, CustomDataset } from "../../pages/MainPage";
-import type { FieldNote } from "../../api/fieldnotes";
+import type { OverlayType } from "../../pages/MainPage";
 
 /* ── Instrument Types ── */
 export type InstrumentType = "CRISM" | "HIRISE" | "SHARAD" | "SHARAD_HIGHRES" | "CTX" | "CUSTOM" | "HIRISE_DTM" | "CRISM_TRR3";
@@ -21,10 +20,6 @@ export type RGBWavelengths = {
   g: number;
   b: number;
 };
-
-/* ── Tab Keys ── */
-export type HiRISETabKey = "Metadata" | "Pixel";
-export type CRISMTabKey = "Metadata" | "Spectrum" | "Bands";
 
 /* ── Spectrum Data ── */
 export type SpectrumData = {
@@ -146,32 +141,6 @@ export const DEFAULT_RGB: RGBWavelengths = {
   b: 1.08,
 };
 
-/* ── All Inspector Props ── */
-export type InspectorPanelProps = {
-  selected: InspectorContext | null;
-  onClose: () => void;
-  onCollapse?: () => void;
-  activeOverlay: ProductOverlay | null;
-  onSetOverlay: (type: OverlayType | null) => void;
-  onSetOpacity?: (opacity: number) => void;
-  rgbWavelengths?: RGBWavelengths;
-  onRGBChange?: (rgb: RGBWavelengths) => void;
-  hasHighResData?: boolean;
-  customDataset?: CustomDataset | null;
-  onCustomDatasetOpacity?: (id: string, opacity: number) => void;
-  fieldNotes?: FieldNote[];
-  onOpenFieldNote?: (productId: string, instrument: string, lat: number, lon: number) => void;
-  onShow3DView?: (productId: string, lat: number, lon: number) => void;
-  onFindRelated?: (productId: string, instrument: string) => void;
-  recentProducts?: RecentProduct[];
-  onSelectRecent?: (product: RecentProduct) => void;
-  onRemoveRecent?: (productId: string) => void;
-  onDownloadProduct?: (productId: string, instrument: string) => void;
-  onPinSpectrum?: (spectrum: { productId: string; lat: number; lon: number; wavelengths: number[]; reflectance: (number | null)[] }) => void;
-  onFindTemporalPairs?: (lat: number, lon: number, instrument: string) => void;
-  onOpenMineralSequence?: (obsId: string) => void;
-  isMobile?: boolean;
-};
 
 /* ── Helpers ── */
 export function formatBytes(bytes: number): string {
