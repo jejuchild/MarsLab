@@ -128,3 +128,6 @@ backend/analysis/mars_vqa/output/
 
 # Large ML output files
 scripts/mars_vqa/output/
+
+# background fetcher logs/state
+backend/logs/

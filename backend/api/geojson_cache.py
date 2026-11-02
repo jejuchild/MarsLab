@@ -17,11 +17,13 @@ logger = logging.getLogger("marslab")
 _geojson_cache: dict[str, dict] = {}  # key → parsed JSON
 _geojson_bytes_cache: dict[str, bytes] = {}  # key → serialized JSON bytes
 _geojson_gz_cache: dict[str, bytes] = {}  # key → pre-compressed gzip bytes
+_loaded_mtime: dict[str, float] = {}  # key → index file mtime when loaded
 
 
 def _preload_geojson(key: str, path: str):
     """Load a GeoJSON file into memory cache (incl. pre-compressed gzip)."""
     if os.path.exists(path):
+        mtime = os.path.getmtime(path)
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         _geojson_cache[key] = data
@@ -29,6 +31,7 @@ def _preload_geojson(key: str, path: str):
         _geojson_bytes_cache[key] = raw
         # Phase 2c: pre-compress gzip bytes at startup (avoid per-request gzip)
         _geojson_gz_cache[key] = gzip.compress(raw, compresslevel=6)
+        _loaded_mtime[key] = mtime
         logger.info(f"[CACHE] Preloaded {key}: {len(raw):,} bytes, gzip {len(_geojson_gz_cache[key]):,} bytes")
     else:
         logger.info(f"[CACHE] Skipped {key}: {path} not found")
@@ -79,3 +82,26 @@ def refresh_geojson_cache(instrument_key: str):
     except ImportError:
         pass
     logger.info(f"[CACHE] Refreshed {instrument_key} cache after download")
+
+
+def refresh_changed_indices() -> list[str]:
+    """
+    Reload indices whose file changed on disk since they were loaded.
+
+    The nightly background fetcher (scripts/background_fetch.py) writes the
+    index files directly; without this the running server only saw new
+    products after a restart. Returns the refreshed keys.
+    """
+    changed = []
+    for key, path in _INDEX_FILES.items():
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            continue
+        if _loaded_mtime.get(key) != mtime:
+            try:
+                refresh_geojson_cache(key)
+                changed.append(key)
+            except Exception as e:  # half-written file etc. — retry next tick
+                logger.warning(f"[CACHE] Reload of {key} failed, will retry: {e}")
+    return changed

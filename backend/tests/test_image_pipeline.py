@@ -198,3 +198,21 @@ def test_crism_image_to_rgba_variants():
 
 def test_blank_png_is_tile_sized():
     assert _decode(ip.blank_png()).shape == (ip.TILE_SIZE, ip.TILE_SIZE)
+
+
+def test_refresh_changed_indices_reloads_only_changed(tmp_path, monkeypatch):
+    import json, os, time
+    from api import geojson_cache as gc
+
+    f = tmp_path / "idx.geojson"
+    f.write_text(json.dumps({"type": "FeatureCollection", "features": []}))
+    monkeypatch.setattr(gc, "_INDEX_FILES", {"tmp": str(f)})
+    gc._preload_geojson("tmp", str(f))
+    assert gc.refresh_changed_indices() == []
+
+    f.write_text(json.dumps({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {}, "geometry": None}]}))
+    os.utime(f, (time.time() + 5, time.time() + 5))
+    assert gc.refresh_changed_indices() == ["tmp"]
+    assert len(gc._geojson_cache["tmp"]["features"]) == 1
+    for d in (gc._geojson_cache, gc._geojson_bytes_cache, gc._geojson_gz_cache, gc._loaded_mtime):
+        d.pop("tmp", None)

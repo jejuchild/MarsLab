@@ -94,9 +94,20 @@ async def lifespan(app: FastAPI):
     import asyncio
     repair_task = asyncio.create_task(_background_index_repair(app))
 
+    # Pick up index files rewritten by the nightly background fetcher.
+    async def _watch_indices():
+        from api.geojson_cache import refresh_changed_indices
+        while True:
+            await asyncio.sleep(120)
+            changed = await asyncio.to_thread(refresh_changed_indices)
+            if changed:
+                logger.info(f"[CACHE] Reloaded changed indices: {changed}")
+    watch_task = asyncio.create_task(_watch_indices())
+
     yield
 
     # --- Shutdown ---
+    watch_task.cancel()
     repair_task.cancel()
     await app.state.http_session.close()
 
