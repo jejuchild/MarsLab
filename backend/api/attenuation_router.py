@@ -147,8 +147,8 @@ def export_csv(
     writer.writerow([
         "trace_idx", "lat", "lon", "along_track_km", "surface_elev_m",
         "interface_detected", "surface_power_dB", "subsurface_power_dB",
-        "depth_m", "alpha_dBm", "transparency", "snr", "confidence",
-        "epsilon_r",
+        "depth_m", "alpha_dBm", "alpha_se_dBm", "alpha_r2", "alpha_ratio_dBm",
+        "transparency", "snr", "confidence", "epsilon_r", "lat_convention",
     ])
     for s in result.profile:
         writer.writerow([
@@ -158,10 +158,14 @@ def export_csv(
             s.subsurface_power_dB if s.subsurface_power_dB is not None else "",
             s.depth_m if s.depth_m is not None else "",
             s.alpha_dBm if s.alpha_dBm is not None else "",
+            s.alpha_se_dBm if s.alpha_se_dBm is not None else "",
+            s.alpha_r2 if s.alpha_r2 is not None else "",
+            s.alpha_ratio_dBm if s.alpha_ratio_dBm is not None else "",
             s.transparency if s.transparency is not None else "",
             s.snr if s.snr is not None else "",
             s.confidence if s.confidence is not None else "",
             epsilon_r,
+            "planetocentric",
         ])
 
     buf.seek(0)

@@ -205,6 +205,64 @@ def fit_attenuation(depth_m, rel_power_db, min_points: int = 5, min_span_m: floa
     )
 
 
+def windowed_attenuation(
+    depth_m,
+    rel_power_db,
+    valid,
+    half_window: int,
+    min_points: int = 10,
+    min_span_m: float = 5.0,
+) -> dict:
+    """Along-track sliding-window power-vs-depth regression (O(n) via prefix sums).
+
+    For each trace i, fits the valid traces in [i−half_window, i+half_window].
+    Returns arrays (NaN where unconstrained): ``alpha_dBm`` (one-way, = −slope/2),
+    ``alpha_se_dBm``, ``r2``, ``n``, ``depth_span_m``.
+    """
+    d = np.asarray(depth_m, dtype=np.float64)
+    y = np.asarray(rel_power_db, dtype=np.float64)
+    v = np.asarray(valid, dtype=bool) & np.isfinite(d) & np.isfinite(y)
+    dz = np.where(v, d, 0.0)
+    yz = np.where(v, y, 0.0)
+    n_tr = d.size
+
+    def cs(a):
+        return np.concatenate([[0.0], np.cumsum(a)])
+
+    C1, Cd, Cy = cs(v.astype(np.float64)), cs(dz), cs(yz)
+    Cdd, Cdy, Cyy = cs(dz * dz), cs(dz * yz), cs(yz * yz)
+    # running min/max depth for the span check
+    from scipy.ndimage import maximum_filter1d, minimum_filter1d
+    w = 2 * half_window + 1
+    dmax = maximum_filter1d(np.where(v, d, -np.inf), size=w, mode="nearest")
+    dmin = minimum_filter1d(np.where(v, d, np.inf), size=w, mode="nearest")
+
+    i = np.arange(n_tr)
+    a = np.clip(i - half_window, 0, n_tr)
+    b = np.clip(i + half_window + 1, 0, n_tr)
+    n = C1[b] - C1[a]
+    Sd, Sy = Cd[b] - Cd[a], Cy[b] - Cy[a]
+    Sdd, Sdy, Syy = Cdd[b] - Cdd[a], Cdy[b] - Cdy[a], Cyy[b] - Cyy[a]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        sxx = Sdd - Sd * Sd / n
+        sxy = Sdy - Sd * Sy / n
+        syy = Syy - Sy * Sy / n
+        slope = sxy / sxx
+        ss_res = np.maximum(syy - slope * sxy, 0.0)
+        r2 = np.where(syy > 0, 1.0 - ss_res / syy, 0.0)
+        se = np.sqrt(ss_res / np.maximum(n - 2, 1) / sxx)
+    span = dmax - dmin
+    ok = (n >= min_points) & (span >= min_span_m) & (sxx > 0)
+    nan = np.full(n_tr, np.nan)
+    return {
+        "alpha_dBm": np.where(ok, -slope / 2.0, nan),
+        "alpha_se_dBm": np.where(ok, se / 2.0, nan),
+        "r2": np.where(ok, r2, nan),
+        "n": n.astype(np.int64),
+        "depth_span_m": np.where(ok, span, nan),
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Hyperbola (diffraction) fitting
 # ─────────────────────────────────────────────────────────────────────

@@ -170,3 +170,23 @@ def test_predicted_surface_bins_and_calibration():
     assert mad < 2 and used > 400
     aligned = pred - np.polyval(coef, np.arange(n))
     assert np.median(np.abs(aligned - pick)) < 1.5
+
+
+def test_windowed_attenuation_matches_global_fit_and_localises():
+    from analysis.shared.sharad_math import windowed_attenuation
+    rng = np.random.default_rng(6)
+    n = 2000
+    depth = rng.uniform(10, 150, n)
+    alpha = np.where(np.arange(n) < 1000, 0.01, 0.05)      # two units along track
+    rel = -5 - 2 * alpha * depth + rng.normal(0, 0.3, n)
+    valid = rng.uniform(size=n) > 0.2
+    w = windowed_attenuation(depth, rel, valid, half_window=150)
+    assert np.nanmedian(w["alpha_dBm"][200:800]) == pytest.approx(0.01, abs=0.002)
+    assert np.nanmedian(w["alpha_dBm"][1200:1800]) == pytest.approx(0.05, abs=0.002)
+    # window at i equals a direct fit of the same points
+    i = 500
+    sl = slice(i - 150, i + 151)
+    f = fit_attenuation(depth[sl][valid[sl]], rel[sl][valid[sl]])
+    assert w["alpha_dBm"][i] == pytest.approx(f.alpha_dBm, rel=1e-6)
+    assert w["alpha_se_dBm"][i] == pytest.approx(f.alpha_se_dBm, rel=1e-6)
+    assert w["r2"][i] == pytest.approx(f.r2, rel=1e-6)

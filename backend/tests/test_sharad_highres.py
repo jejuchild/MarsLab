@@ -275,3 +275,35 @@ def test_surface_endpoint_leading_edge(data_dir, client):
     assert {p["y"] for p in j["surface"]} == {SURF_BIN}
     assert all(p["snr_db"] > 20 for p in j["surface"])
     assert j["method"].startswith("leading edge")
+
+
+# ── attenuation regression through the pipeline (C7) ─────────────────
+
+def test_attenuation_pipeline_regression(data_dir):
+    import math
+    from analysis.radar_attenuation.pipeline import RadarAttenuationMapper
+    from analysis.shared.constants import SPEED_OF_LIGHT as C
+    n, eps, alpha = 600, 2.5, 0.02
+    dt = R.SHARAD_SAMPLE_INTERVAL_US * 1e-6
+    v = C / math.sqrt(eps)
+
+    def sub(i):
+        k = int(round(20 + 100 * (0.5 - 0.5 * math.cos(2 * math.pi * i / n))))  # smooth 20→120→20 bins
+        depth = v * k * dt / 2
+        rel_db = -5.0 - 2 * alpha * depth                 # P_sub − P_surf
+        amp = 100.0 * 10 ** (rel_db / 20.0)
+        return {SURF_BIN + 40: 0.0, SURF_BIN + k: amp}
+
+    _write_product(str(data_dir), n_rows=n, lat_step=18.1 / 59152.0, extra=sub)
+    res = RadarAttenuationMapper().run(PID, epsilon_r=eps)
+    assert res.success, res.error
+    s = res.summary
+    assert s.alpha_fit_dBm == pytest.approx(alpha, abs=0.002)
+    assert s.alpha_fit_r2 > 0.9 and s.alpha_fit_n > 400
+    assert s.alpha_fit_se_dBm < 0.001
+    vals = [p.alpha_dBm for p in res.profile if p.alpha_dBm is not None]
+    assert len(vals) > 300
+    assert np.median(vals) == pytest.approx(alpha, abs=0.003)
+    # the legacy per-trace ratio is biased by the -5 dB reflectivity contrast
+    assert s.alpha_ratio_median_dBm > alpha + 0.002
+    assert res.profile[0].lat == pytest.approx(18.0)   # planetocentric
