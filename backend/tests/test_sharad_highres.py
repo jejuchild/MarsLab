@@ -263,3 +263,15 @@ def test_radargram_scale_header_and_distance(data_dir, client):
     assert rm["trace_spacing_m"] == pytest.approx(591.5, rel=0.01)
     assert rm["distance_km"][1] == pytest.approx(2 * 0.5915, rel=0.01)
     assert len(rm["distance_km"]) == rm["n_traces"] == N_ROWS // 2
+
+
+# ── leading-edge surface pick through the API (C6) ────────────────────
+
+def test_surface_endpoint_leading_edge(data_dir, client):
+    # strongest echo is a deeper "clutter" spike; the surface is the first return
+    _write_product(str(data_dir), extra=lambda i: {SURF_BIN + 80: 400.0})
+    j = client.get("/api/sharad_highres/surface", params={"product_id": PID, "downsample": 1}).json()
+    assert j["detected_traces"] == N_ROWS
+    assert {p["y"] for p in j["surface"]} == {SURF_BIN}
+    assert all(p["snr_db"] > 20 for p in j["surface"])
+    assert j["method"].startswith("leading edge")

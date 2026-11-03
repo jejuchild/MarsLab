@@ -41,6 +41,8 @@ from analysis.shared.sharad_math import (
     check_dat_complete,
     depth_from_twt,
     depth_resolution,
+    pick_surface_leading_edge,
+    reject_pick_outliers,
     label_file_records,
     read_rwot,
     source_signature,
@@ -360,23 +362,25 @@ def _lon_to_180(lon: np.ndarray) -> np.ndarray:
 
 
 # ── Surface picking ───────────────────────────────────
+SURFACE_PICK_METHOD = "leading edge (first echo >15 dB above noise and within 15 dB of trace peak, refined to local max ≤8 bins), lateral outlier rejection"
+
+
 def _pick_surface(
     product_id: str,
     power: np.ndarray,
-    min_offset: int = 15,
-    max_offset: int = 250,
-    snr_threshold: float = 3.0,
-    smooth_kernel: int = 31,
+    **_legacy_kwargs,
 ) -> np.ndarray:
     """
-    Pick the surface return per trace.
+    Pick the surface return per trace (leading edge / first strong return).
 
-    The surface is the strongest peak in a search band below a coarse
-    upper-window argmax.  Uses SNR gating and outlier rejection for
-    lateral continuity while allowing gaps where no clear surface exists.
+    See analysis.shared.sharad_math.pick_surface_leading_edge.  The previous
+    picker took the strongest peak below a noise-anchored window, which on
+    17–20 % of traces landed >10 bins below the first return (off-nadir
+    clutter or subsurface echoes), biasing every depth measured from it.
 
     Returns: 1-D int32 array [n_traces] with surface delay-bin index
-             (-1 where no valid surface detected).
+             (-1 where no valid surface detected).  SNR (dB) per trace is
+             available via _get_surface_snr().
     """
     cache = _get_product_data(product_id)
     if cache["surface"] is not None:
@@ -386,58 +390,41 @@ def _pick_surface(
 
 
 def _pick_surface_locked(cache: dict, power: np.ndarray) -> np.ndarray:
-    min_offset, max_offset, snr_threshold, smooth_kernel = 15, 250, 3.0, 31
     if cache["surface"] is not None:
         return cache["surface"]
 
-    cp = _cache_path(cache, "surface_v3.npy")
-    if os.path.exists(cp):
+    cp = _cache_path(cache, "surface_v4.npy")
+    cs = _cache_path(cache, "surface_snr_v4.npy")
+    if os.path.exists(cp) and os.path.exists(cs):
         cache["surface"] = np.load(cp)
+        cache["surface_snr"] = np.load(cs)
         return cache["surface"]
 
-    n_traces, n_bins = power.shape
-
-    # Step 1 — coarse anchor: argmax in upper 120 bins
-    coarse = np.argmax(power[:, :120], axis=1).astype(np.int32)
-
-    # Step 2 — refine: strongest peak in band [coarse+min_offset, coarse+max_offset]
+    n_traces = power.shape[0]
     surface = np.full(n_traces, -1, dtype=np.int32)
-    surface_snr = np.zeros(n_traces, dtype=np.float32)
-
-    for i in range(n_traces):
-        c = int(coarse[i])
-        lo = min(c + min_offset, n_bins - 1)
-        hi = min(c + max_offset, n_bins)
-        if hi <= lo:
-            continue
-
-        band = power[i, lo:hi].copy()
-        noise = np.median(band) + 1e-12
-        peak_idx = int(np.argmax(band))
-        peak_val = band[peak_idx]
-        snr = peak_val / noise
-
-        if snr >= snr_threshold:
-            surface[i] = lo + peak_idx
-            surface_snr[i] = snr
-
-    # Step 3 — outlier rejection (no smoothing of valid picks)
-    valid_mask = surface >= 0
-    if valid_mask.sum() >= 10:
-        from scipy.ndimage import median_filter as mf
-
-        valid_indices = np.where(valid_mask)[0]
-        if len(valid_indices) > smooth_kernel:
-            y_valid = surface[valid_mask].astype(np.float64)
-            y_filtered = mf(y_valid, size=smooth_kernel)
-            diff = np.abs(y_valid - y_filtered)
-            outlier = diff > 20
-            surface[valid_indices[outlier]] = -1
-            surface_snr[valid_indices[outlier]] = 0
+    snr = np.zeros(n_traces, dtype=np.float32)
+    chunk = 8192  # bounded memory (float64 copy of a chunk only)
+    for i0 in range(0, n_traces, chunk):
+        b, s_db = pick_surface_leading_edge(np.asarray(power[i0:i0 + chunk]))
+        surface[i0:i0 + len(b)] = b
+        snr[i0:i0 + len(b)] = s_db
+    surface = reject_pick_outliers(surface, kernel=31, max_dev=20)
+    snr = np.where(surface >= 0, snr, 0.0).astype(np.float32)
 
     np.save(cp, surface)
+    np.save(cs, snr)
     cache["surface"] = surface
+    cache["surface_snr"] = snr
     return surface
+
+
+def _get_surface_snr(product_id: str) -> np.ndarray:
+    """Surface-echo SNR (dB above the trace noise floor) per trace."""
+    cache = _get_product_data(product_id)
+    if cache.get("surface_snr") is None:
+        power, _ = _get_power(product_id)
+        _pick_surface(product_id, power)
+    return cache["surface_snr"]
 
 
 # ── Global percentile cache (for consistent tile brightness) ──
@@ -1204,23 +1191,25 @@ def get_surface(
     try:
         power, total_rows = _get_power(product_id)
         surface = _pick_surface(product_id, power)
+        snr = _get_surface_snr(product_id)
 
         n = total_rows // downsample
         indices = np.arange(0, total_rows, downsample)[:n]
         surface_ds = surface[indices]
+        snr_ds = snr[indices]
 
         # Only include traces where surface was detected
         points = []
         for i in range(n):
             if surface_ds[i] >= 0:
-                points.append({"x": int(i), "y": int(surface_ds[i])})
+                points.append({"x": int(i), "y": int(surface_ds[i]), "snr_db": round(float(snr_ds[i]), 1)})
 
         return JSONResponse(content={
             "surface": points,
             "downsample": downsample,
             "total_traces": n,
             "detected_traces": len(points),
-            "method": "peak detection + outlier rejection",
+            "method": SURFACE_PICK_METHOD,
         })
     except Exception as e:
         return _error_response(e)

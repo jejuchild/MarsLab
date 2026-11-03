@@ -20,7 +20,7 @@ type Metadata = {
   display: { recommended_downsample: number };
 };
 
-type SurfacePoint = { x: number; y: number };
+type SurfacePoint = { x: number; y: number; snr_db?: number };
 
 type RadargramMeta = {
   n_traces: number;
