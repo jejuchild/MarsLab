@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 class AttenuationSample(BaseModel):
     """One trace in the along-track attenuation profile."""
     trace_idx: int
-    lat: float                                # planetographic, degrees
+    lat: float                                # planetocentric, degrees
     lon: float                                # -180..180
     along_track_km: float
     surface_elev_m: float                     # DEM elevation

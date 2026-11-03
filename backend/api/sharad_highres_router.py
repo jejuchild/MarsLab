@@ -349,26 +349,12 @@ def _lon_to_180(lon: np.ndarray) -> np.ndarray:
     return np.where(lon > 180, lon - 360, lon)
 
 
-# Mars IAU 2000 ellipsoid radii (meters)
-_MARS_A = 3396190.0   # equatorial radius
-_MARS_B = 3376200.0   # polar radius
-_MARS_AB2 = (_MARS_A / _MARS_B) ** 2   # ≈ 1.01184
-
-
-def _centric_to_graphic(lat_centric: np.ndarray) -> np.ndarray:
-    """Convert planetocentric latitude (from SHARAD RDR) to planetographic
-    (geodetic) latitude expected by Cesium's oblate Mars ellipsoid.
-
-    tan(lat_graphic) = (a/b)^2 * tan(lat_centric)
-    """
-    rad = np.radians(lat_centric)
-    return np.degrees(np.arctan(_MARS_AB2 * np.tan(rad)))
-
-
-def _centric_to_graphic_scalar(lat_centric: float) -> float:
-    """Scalar version for single latitude values."""
-    rad = math.radians(lat_centric)
-    return math.degrees(math.atan(_MARS_AB2 * math.tan(rad)))
+# Latitude convention: every lat returned by this router is PLANETOCENTRIC,
+# exactly as stored in the RDR (SUB_SC_PLANETOCENTRIC_LATITUDE).  The footprint
+# index, /api/inspector/at-point and the map pins use the same convention, so a
+# trace located from the radargram lands on the drawn ground track.  (Earlier
+# versions converted to planetographic here, shifting pins ~0.2° = ~12 km
+# north of the track at 18° N.)
 
 
 # ── Surface picking ───────────────────────────────────
@@ -1017,7 +1003,7 @@ async def get_metadata(
     try:
         geom, total_rows = _get_geometry(product_id)
         lons180 = _lon_to_180(geom["lon"])
-        lats_graphic = _centric_to_graphic(geom["lat"])
+        lats_c = np.asarray(geom["lat"])
         return JSONResponse(content={
             "product_id": product_id.upper(),
             "instrument": "SHARAD_HIGHRES",
@@ -1025,11 +1011,11 @@ async def get_metadata(
             "range_bins": N_RANGE_BINS,
             "row_bytes": ROW_BYTES,
             "sample_interval_us": SHARAD_SAMPLE_INTERVAL_US,
-            "lat_range": [float(lats_graphic.min()), float(lats_graphic.max())],
+            "lat_range": [float(lats_c.min()), float(lats_c.max())],
             "lon_range": [float(lons180.min()), float(lons180.max())],
-            "start_lat": float(lats_graphic[0]),
+            "start_lat": float(lats_c[0]),
             "start_lon": float(lons180[0]),
-            "stop_lat": float(lats_graphic[-1]),
+            "stop_lat": float(lats_c[-1]),
             "stop_lon": float(lons180[-1]),
             "alt_range_km": [float(geom["alt"].min()), float(geom["alt"].max())],
             "display": {
@@ -1115,7 +1101,7 @@ async def get_radargram_meta(
         n_traces_out = total_rows // downsample
 
         indices = np.arange(0, total_rows, downsample)[:n_traces_out]
-        lats = _centric_to_graphic(geom["lat"][indices])
+        lats = np.asarray(geom["lat"][indices])  # planetocentric
         lons = _lon_to_180(geom["lon"][indices])
 
         return JSONResponse(content={
@@ -1192,7 +1178,7 @@ async def get_reflectors(
             })
 
         n_bins = int(power.shape[1])
-        lats_graphic = _centric_to_graphic(geom["lat"][:n_traces])
+        lats_c = np.asarray(geom["lat"][:n_traces])  # planetocentric
         lons180 = _lon_to_180(geom["lon"][:n_traces])
         depth_scale = (SHARAD_SAMPLE_INTERVAL_US * 1e-6 * SPEED_OF_LIGHT) / (2.0 * math.sqrt(epsilon_r))
 
@@ -1237,7 +1223,7 @@ async def get_reflectors(
             if delta_bins <= 0:
                 continue
 
-            lat = float(lats_graphic[trace_idx])
+            lat = float(lats_c[trace_idx])
             lon = float(lons180[trace_idx])
             if not np.isfinite(lat) or not np.isfinite(lon):
                 continue
@@ -1384,7 +1370,7 @@ async def depth_conversion(
             "epsilon_r2": epsilon_r2,
             "boundary_m": boundary_m,
             "depth_m": round(float(depth_m), 1),
-            "lat": round(_centric_to_graphic_scalar(float(geom["lat"][full_idx])), 4),
+            "lat": round(float(geom["lat"][full_idx]), 4),
             "lon": round(float(lons180[full_idx]), 4),
         })
     except Exception as e:
@@ -1479,7 +1465,7 @@ async def get_track(
         geom, total_rows = _get_geometry(product_id)
         n = total_rows // downsample
         indices = np.arange(0, total_rows, downsample)[:n]
-        lats = _centric_to_graphic(geom["lat"][indices])
+        lats = np.asarray(geom["lat"][indices])  # planetocentric
         lons = _lon_to_180(geom["lon"][indices])
 
         return JSONResponse(content={
@@ -1582,13 +1568,11 @@ async def get_mola_profile(
         # Cumulative along-track distance (vectorized, uses planetocentric for accuracy)
         distances_m = _haversine_vec(lats_centric, lons)
 
-        # Convert to planetographic for frontend/Cesium display
-        lats_graphic = _centric_to_graphic(lats_centric)
 
         result = {
             "distance_km": [round(d / 1000.0, 3) for d in distances_m],
             "elevation_m": [round(float(e), 1) if not np.isnan(e) else None for e in elevations],
-            "lats": [round(float(v), 4) for v in lats_graphic],
+            "lats": [round(float(v), 4) for v in lats_centric],
             "lons": [round(float(v), 4) for v in lons],
             "n_traces": n_traces,
             "downsample": downsample,

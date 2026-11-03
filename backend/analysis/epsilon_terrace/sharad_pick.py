@@ -118,9 +118,8 @@ def pick_subsurface_interface(
         return result
 
     lons180 = _lon_to_180(geom["lon"])
-    lats_graphic = np.array([
-        _centric_to_graphic(float(lat)) for lat in geom["lat"]
-    ])
+    # Planetocentric throughout (same convention as the map and crater DB)
+    lats_graphic = np.asarray(geom["lat"], dtype=np.float64)
 
     # Compute along-track cumulative distance
     cum_dist_km = np.zeros(n_traces)

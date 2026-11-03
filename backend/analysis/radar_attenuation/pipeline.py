@@ -26,7 +26,7 @@ from .models import (
 )
 
 from analysis.shared.constants import SPEED_OF_LIGHT, SHARAD_SAMPLE_INTERVAL_US
-from analysis.shared.coordinates import lon_to_180, centric_to_graphic, cumulative_distance_m
+from analysis.shared.coordinates import lon_to_180, cumulative_distance_m
 from analysis.shared.dem_sampling import sample_dem_along_track
 from analysis.shared.overlay import interpolate_colormap, CMAP_ATTENUATION
 
@@ -130,7 +130,7 @@ class RadarAttenuationMapper(AnalysisModule):
         lats_centric = geom["lat"][:total_rows]
         lons_360 = geom["lon"][:total_rows]
         lons_180 = lon_to_180(lons_360)
-        lats_graphic = centric_to_graphic(lats_centric)
+        lats_out = lats_centric  # planetocentric: same convention as map/at-point
 
         # ── Step 2: Sample DEM along track ──────────────────────────
         dem_source, surface_elevs = sample_dem_along_track(
@@ -234,7 +234,7 @@ class RadarAttenuationMapper(AnalysisModule):
             has_alpha = det and not np.isnan(alpha_dBm[i])
             sample = AttenuationSample(
                 trace_idx=i,
-                lat=round(float(lats_graphic[i]), 5),
+                lat=round(float(lats_out[i]), 5),
                 lon=round(float(lons_180[i]), 5),
                 along_track_km=round(float(distances_km[i]), 3),
                 surface_elev_m=round(float(surface_elevs[i]), 1)
@@ -256,7 +256,7 @@ class RadarAttenuationMapper(AnalysisModule):
         alpha_valid = np.where(~np.isnan(alpha_dBm), True, False)
         alpha_values = np.where(alpha_valid, alpha_dBm, 0.0)
         overlay = self._build_overlay(
-            lats_graphic, lons_180, alpha_valid, alpha_values, n_traces,
+            lats_out, lons_180, alpha_valid, alpha_values, n_traces,
         )
 
         # ── Step 9: Summary stats ──────────────────────────────────

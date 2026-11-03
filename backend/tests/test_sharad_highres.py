@@ -133,3 +133,15 @@ def test_read_rwot(tmp_path):
     rw = read_rwot(dat, N_ROWS, R.ROW_BYTES)
     assert rw.shape == (N_ROWS,)
     assert rw[0] == 9000.0 and rw[-1] == 9000.0 + N_ROWS - 1
+
+
+# ── latitude convention (C4) ──────────────────────────────────────────
+
+def test_latitudes_are_planetocentric(data_dir, client):
+    _write_product(str(data_dir))
+    m = client.get("/api/sharad_highres/metadata", params={"product_id": PID}).json()
+    assert m["start_lat"] == pytest.approx(18.0)
+    rm = client.get("/api/sharad_highres/radargram_meta", params={"product_id": PID, "downsample": 1}).json()
+    assert rm["lats"][10] == pytest.approx(18.1, abs=1e-4)
+    tr = client.get("/api/sharad_highres/track", params={"product_id": PID, "downsample": 1}).json()
+    assert tr["lats"][63] == pytest.approx(18.63, abs=1e-4)
