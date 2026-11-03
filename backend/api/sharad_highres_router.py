@@ -42,7 +42,9 @@ from analysis.shared.sharad_math import (
     depth_from_twt,
     depth_resolution,
     pick_surface_leading_edge,
+    predicted_surface_bins,
     reject_pick_outliers,
+    robust_linear_offset,
     label_file_records,
     read_rwot,
     source_signature,
@@ -1164,6 +1166,10 @@ def get_radargram_meta(
         dist_full = _haversine_vec(np.asarray(geom["lat"]), _lon_to_180(np.asarray(geom["lon"])))
         dist_km = dist_full[indices] / 1000.0
         spacing = float(np.median(np.diff(dist_full))) if total_rows > 1 else 0.0
+        try:
+            rwot = _get_rwot(product_id)[indices]
+        except Exception:  # pragma: no cover - unreadable .dat
+            rwot = None
 
         return JSONResponse(content={
             "n_traces": int(n_traces_out),
@@ -1175,6 +1181,10 @@ def get_radargram_meta(
             "lats": [round(float(v), 5) for v in lats],
             "lons": [round(float(v), 5) for v in lons],
             "distance_km": [round(float(v), 4) for v in dist_km],
+            # RECEIVE_WINDOW_OPENING_TIME per display trace, in 37.5 ns units:
+            # absolute two-way delay of bin b = (rwot + b)·37.5 ns + calibration
+            # offset (≈ 1 PRI; see /mola_profile "calibration").
+            "rwot": None if rwot is None else [float(v) for v in rwot],
         })
     except Exception as e:
         return _error_response(e)
@@ -1506,6 +1516,11 @@ def get_cluttergram_meta(
         "range_bins": aligned.shape[0] if aligned is not None else info["lines"],
         "total_traces": aligned.shape[1] if aligned is not None else info["samples"],
         "aligned": aligned is not None and aligned.shape[0] == N_RANGE_BINS,
+        # Known limitation: vertical alignment is empirical (clutter peak per
+        # trace shifted to the radargram's median surface bin), so off-nadir
+        # clutter timing relative to nadir is NOT preserved. Geometric
+        # alignment via RWOT + the sim's own time reference is pending.
+        "alignment": "empirical (median surface-bin match); geometric RWOT alignment pending",
     })
 
 
@@ -1626,6 +1641,41 @@ def get_mola_profile(
         # Cumulative along-track distance (vectorized, uses planetocentric for accuracy)
         distances_m = _haversine_vec(lats_centric, lons)
 
+        # Geometric (MOLA) nadir-surface prediction in radargram bins:
+        #   bin = 2(h − z)/c / 37.5 ns − RWOT − k(trace)
+        # k is a robust linear calibration against the leading-edge pick
+        # (constant ≈ one PRI of instrument delay + slow drift between the
+        # spacecraft-altitude datum and the DEM datum).  Deviations of the
+        # picked surface from this line are physical (off-nadir/sloped
+        # terrain returns earlier than nadir) — compare with a cluttergram.
+        predicted, calibration = None, None
+        try:
+            rwot = _get_rwot(product_id)[indices]
+            alt_m = np.asarray(geom["alt"][indices], dtype=np.float64) * 1e3
+            raw_pred = predicted_surface_bins(alt_m, elevations, rwot)
+            power, _ = _get_power(product_id)
+            picks = _pick_surface(product_id, power)[indices].astype(np.float64)
+            good = (picks >= 0) & np.isfinite(raw_pred) & (rwot > 0)
+            resid = np.where(good, raw_pred - picks, np.nan)
+            coef, mad, used = robust_linear_offset(resid)
+            if used >= 10:
+                pred_bins = raw_pred - np.polyval(coef, np.arange(len(raw_pred)))
+                pred_bins = np.where(np.isfinite(raw_pred) & (rwot > 0), pred_bins, np.nan)
+                predicted = [None if not np.isfinite(v) else round(float(v), 2) for v in pred_bins]
+                k_mid = float(np.polyval(coef, len(raw_pred) / 2))
+                calibration = {
+                    "offset_bins": round(k_mid, 2),
+                    "offset_us": round(k_mid * SHARAD_SAMPLE_INTERVAL_US, 4),
+                    "drift_bins_over_track": round(float(coef[0]) * len(raw_pred), 2),
+                    "residual_mad_bins": round(mad, 2),
+                    "n_used": used,
+                    "nominal_pri_us": 1428.0,
+                    "note": "absolute two-way delay = (rwot + bin)·0.0375 µs + offset_us; "
+                            "offset fitted to the leading-edge pick (≈1 PRI).",
+                }
+        except Exception as exc:  # DEM/RWOT unavailable → no prediction
+            logger.info("MOLA surface prediction unavailable for %s: %s", product_id, exc)
+
 
         result = {
             "distance_km": [round(d / 1000.0, 3) for d in distances_m],
@@ -1635,6 +1685,9 @@ def get_mola_profile(
             "n_traces": n_traces,
             "downsample": downsample,
             "total_distance_km": round(float(distances_m[-1] / 1000.0), 3) if n_traces > 0 else 0,
+            "predicted_surface_bin": predicted,
+            "calibration": calibration,
+            "lat_convention": "planetocentric",
         }
 
         # Cache result (bounded by LRUCache maxsize=30)

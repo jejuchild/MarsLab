@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import type { FieldNote } from "../api/fieldnotes";
-import { computeDownsample, describeHttpError, nearestTrace } from "../utils/sharad";
+import { BIN_DT_US, computeDownsample, describeHttpError, nearestTrace } from "../utils/sharad";
 import { drawRadargramAxes, type ValueScale } from "./sharad/radargramAxes";
 
 /* =========================================================
@@ -30,6 +30,8 @@ type RadargramMeta = {
   lons: number[];
   distance_km?: number[];
   trace_spacing_m?: number;
+  /** RECEIVE_WINDOW_OPENING_TIME per display trace (37.5 ns units) */
+  rwot?: number[] | null;
 };
 
 type DepthResult = {
@@ -49,11 +51,22 @@ type DepthResult = {
   message?: string;
 };
 
+type MolaCalibration = {
+  offset_bins: number;
+  offset_us: number;
+  drift_bins_over_track: number;
+  residual_mad_bins: number;
+  n_used: number;
+};
+
 type MolaProfile = {
   distance_km: number[];
   elevation_m: (number | null)[];
   n_traces: number;
   total_distance_km: number;
+  /** Geometric nadir-surface bin per display trace (same axis as the radargram) */
+  predicted_surface_bin?: (number | null)[] | null;
+  calibration?: MolaCalibration | null;
 };
 
 /* =========================================================
@@ -126,6 +139,7 @@ export default function SharadHiresInspector({
   const [retryNonce, setRetryNonce] = useState(0); // bump to re-run loadAll (Retry button)
   const [valueScale, setValueScale] = useState<ValueScale | null>(null); // colour-bar mapping
   const [showAxes, setShowAxes] = useState(true);
+  const [absoluteTimeAxis, setAbsoluteTimeAxis] = useState(false);
   // Nearest display trace to `initialPoint` (map point → trace linking)
   const [focusTrace, setFocusTrace] = useState<{ index: number; distanceM: number } | null>(null);
   const focusKeyRef = useRef<string>("");
@@ -206,9 +220,8 @@ export default function SharadHiresInspector({
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const [collapsed, setCollapsed] = useState(false);
 
-  // MOLA alignment offset (trace index shift)
-  const [molaAlignMode, setMolaAlignMode] = useState(false);
-  const [molaXOffset, setMolaXOffset] = useState(0);
+  // Geometric MOLA nadir-surface line on the radargram (from RWOT + altitude + DEM)
+  const [showMolaSurface, setShowMolaSurface] = useState(true);
 
   // ── Hyperbola εr Tool ──
   // Response of GET /api/epsilon/hyperbola_fit (trace indices are FULL resolution)
@@ -430,6 +443,16 @@ export default function SharadHiresInspector({
 
   // Computed downsample factor based on product size
   const downsample = metadata ? computeDownsample(metadata.rows) : 1;
+
+  // Absolute two-way delay (µs) of (display trace, bin): (RWOT + bin)·37.5 ns
+  // + MOLA-calibrated instrument offset; null when RWOT/calibration missing.
+  const absDelayUs = useCallback((trace: number, bin: number): number | null => {
+    const rw = radargramMeta?.rwot?.[trace];
+    const cal = molaProfile?.calibration;
+    if (rw == null || !(rw > 0) || !cal) return null;
+    return (rw + bin) * BIN_DT_US + cal.offset_us;
+  }, [radargramMeta, molaProfile]);
+
 
   // ── Cluttergram image loading ─────────────────────────
   useEffect(() => {
@@ -691,6 +714,27 @@ export default function SharadHiresInspector({
       ctx.stroke();
     }
 
+    // Geometric MOLA nadir surface (RWOT + altitude + DEM)
+    const pred = molaProfile?.predicted_surface_bin;
+    if (showMolaSurface && pred && pred.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.9)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      let mv = false;
+      const i0 = Math.max(0, Math.floor(viewX.start * nTraces) - 1);
+      const i1 = Math.min(pred.length - 1, Math.ceil(viewX.end * nTraces) + 1);
+      for (let i = i0; i <= i1; i++) {
+        const b = pred[i];
+        if (b == null) { mv = false; continue; }
+        const x = traceToX(i), y = binToY(b);
+        if (!mv) { ctx.moveTo(x, y); mv = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Inspected map point → nearest trace marker
     if (focusTrace) {
       const fx = traceToX(focusTrace.index + 0.5);
@@ -728,6 +772,7 @@ export default function SharadHiresInspector({
         surfaceBin: sBin,
         eps1: epsilonR1, eps2: epsilonR2, boundaryM,
         valueScale,
+        delayOffsetUs: absoluteTimeAxis ? absDelayUs(Math.round(centre), 0) : null,
       });
     }
 
@@ -754,7 +799,7 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit, showAxes, valueScale, epsilonR1, epsilonR2, focusTrace]);
+  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit, showAxes, valueScale, epsilonR1, epsilonR2, focusTrace, molaProfile, showMolaSurface, absoluteTimeAxis, absDelayUs]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -812,16 +857,13 @@ export default function SharadHiresInspector({
     const n = molaProfile.elevation_m.length;
     if (n === 0) return;
 
-    // molaXOffset shifts MOLA left/right relative to SHARAD x-axis
+    // MOLA samples are taken at the radargram's own trace positions → no offset
     const iStart = Math.floor(viewX.start * n);
     const iEnd = Math.ceil(viewX.end * n);
 
-    // For visible range calculation, account for offset
     const visibleElevs: number[] = [];
-    for (let i = iStart; i < iEnd && i < n; i++) {
-      const si = i + molaXOffset;
-      if (si < 0 || si >= n) continue;
-      const e = molaProfile.elevation_m[si]!;
+    for (let i = Math.max(0, iStart); i < iEnd && i < n; i++) {
+      const e = molaProfile.elevation_m[i]!;
       if (e !== null) visibleElevs.push(e);
     }
     if (visibleElevs.length === 0) return;
@@ -864,18 +906,13 @@ export default function SharadHiresInspector({
     ctx.textAlign = "center";
     const dStart = molaProfile.distance_km[iStart] ?? 0;
     const dEnd = molaProfile.distance_km[Math.min(iEnd, n - 1)] ?? molaProfile.total_distance_km;
-    const offsetLabel = molaXOffset !== 0 ? ` [offset: ${molaXOffset > 0 ? "+" : ""}${molaXOffset}]` : "";
-    ctx.fillText(`${dStart.toFixed(0)}\u2013${dEnd.toFixed(0)} km along track${offsetLabel}`, pad.left + plotW / 2, H - 3);
+    ctx.fillText(`${dStart.toFixed(0)}\u2013${dEnd.toFixed(0)} km along track`, pad.left + plotW / 2, H - 3);
 
     // Title
     ctx.fillStyle = "#94a3b8";
     ctx.font = "bold 9px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("MOLA Elevation (m)", pad.left, 12);
-    if (molaXOffset !== 0) {
-      ctx.fillStyle = "#fbbf24";
-      ctx.fillText(`  offset: ${molaXOffset > 0 ? "+" : ""}${molaXOffset}`, pad.left + 110, 12);
-    }
 
     // Clip to plot area
     ctx.save();
@@ -883,17 +920,15 @@ export default function SharadHiresInspector({
     ctx.rect(pad.left, pad.top, plotW, plotH);
     ctx.clip();
 
-    // Elevation line (shifted by molaXOffset)
+    // Elevation line
     ctx.beginPath();
     ctx.strokeStyle = "#38bdf8";
     ctx.lineWidth = 1.5;
     let started = false;
     for (let i = Math.max(0, iStart - 1); i <= Math.min(n - 1, iEnd + 1); i++) {
-      const si = i + molaXOffset;
-      if (si < 0 || si >= n) { started = false; continue; }
-      const e = molaProfile.elevation_m[si]!;
+      const e = molaProfile.elevation_m[i]!;
       if (e === null) { started = false; continue; }
-      const x = xOf(i); // x position is SHARAD-aligned (no offset)
+      const x = xOf(i);
       const y = yOf(e);
       if (!started) { ctx.moveTo(x, y); started = true; }
       else ctx.lineTo(x, y);
@@ -913,8 +948,7 @@ export default function SharadHiresInspector({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Show elevation at cursor, accounting for offset
-        const idx = Math.round(cursor.normX * (n - 1)) + molaXOffset;
+        const idx = Math.round(cursor.normX * (n - 1));
         if (idx >= 0 && idx < n) {
           const e = molaProfile.elevation_m[idx]!;
           if (e !== null) {
@@ -928,7 +962,7 @@ export default function SharadHiresInspector({
     }
 
     ctx.restore();
-  }, [molaProfile, viewX, cursor, molaXOffset]);
+  }, [molaProfile, viewX, cursor]);
 
   useEffect(() => { drawMola(); }, [drawMola]);
 
@@ -1121,42 +1155,6 @@ export default function SharadHiresInspector({
       }
     }
 
-    // MOLA offset drag (molaAlignMode ON, drag on MOLA panel)
-    if (molaAlignMode && !isOnRadargram && e.button === 0 && !e.shiftKey) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const startX = e.clientX;
-      const startOffset = molaXOffset;
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const nSamples = molaProfile?.elevation_m.length ?? 1;
-      const visibleSpan = viewX.end - viewX.start;
-
-      isDragging.current = true;
-
-      const onMove = (ev: MouseEvent) => {
-        ev.preventDefault();
-        const dxPx = ev.clientX - startX;
-        // Convert pixel movement to trace index offset
-        const dxTraces = Math.round(-(dxPx / rect.width) * visibleSpan * nSamples);
-        const maxOffset = Math.min(5000, Math.floor(nSamples / 2));
-        setMolaXOffset(Math.max(-maxOffset, Math.min(maxOffset, startOffset + dxTraces)));
-      };
-      const onUp = () => {
-        isDragging.current = false;
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
-
-      document.body.style.cursor = "ew-resize";
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-      return;
-    }
-
     // Pan drag — works in all modes (default left-click, move mode, middle click, shift+click)
     // In Query/default mode: drag to pan, click (no movement) for depth query
     if (e.button === 0 || e.button === 1) {
@@ -1205,7 +1203,7 @@ export default function SharadHiresInspector({
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     }
-  }, [viewX, viewY, adjustMode, molaAlignMode, molaXOffset, molaProfile, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
+  }, [viewX, viewY, adjustMode, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
@@ -1281,6 +1279,7 @@ export default function SharadHiresInspector({
       bin: binIdx,
       lat: radargramMeta.lats[traceIdx] ?? null,
       lon: radargramMeta.lons[traceIdx] ?? null,
+      absDelayUs: absDelayUs(traceIdx, binIdx),
     };
   })();
 
@@ -1419,6 +1418,15 @@ export default function SharadHiresInspector({
                 <MiniButton active={!showAxes} onClick={() => setShowAxes(false)}>Off</MiniButton>
               </div>
             </div>
+            {showAxes && (
+              <div className="flex items-center justify-between" title="Absolute = (RWOT + bin)·37.5 ns + MOLA-calibrated offset, labelled for the centre trace">
+                <span className="text-[10px] text-slate-400">Time axis</span>
+                <div className="flex gap-1">
+                  <MiniButton active={!absoluteTimeAxis} onClick={() => setAbsoluteTimeAxis(false)}>Window</MiniButton>
+                  <MiniButton active={absoluteTimeAxis} onClick={() => setAbsoluteTimeAxis(true)}>Absolute</MiniButton>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400">Normalize</span>
@@ -1526,6 +1534,10 @@ export default function SharadHiresInspector({
                     <div className="text-[8px] text-slate-600 italic">
                       Surface clutter simulation (US SHARAD team)
                     </div>
+                    <div className="text-[8px] text-amber-400/80 leading-snug">
+                      Vertical alignment is empirical (matched to the median surface bin); off-nadir
+                      clutter delays relative to nadir are approximate.
+                    </div>
                   </div>
                 )}
               </>
@@ -1579,65 +1591,25 @@ export default function SharadHiresInspector({
             </div>
           </Section>
 
-          {/* MOLA Alignment */}
+          {/* Geometric MOLA surface */}
           {molaProfile && (
-            <Section title="MOLA Align">
+            <Section title="MOLA surface (geometric)">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-slate-400">Adjust Offset</span>
-                <MiniButton
-                  active={molaAlignMode}
-                  onClick={() => setMolaAlignMode(!molaAlignMode)}
-                >
-                  {molaAlignMode ? "ON" : "OFF"}
+                <span className="text-[10px] text-slate-400">Predicted nadir line</span>
+                <MiniButton active={showMolaSurface} onClick={() => setShowMolaSurface(!showMolaSurface)}>
+                  {showMolaSurface ? "ON" : "OFF"}
                 </MiniButton>
               </div>
-              {molaAlignMode && (
-                <div className="text-[9px] text-slate-600">
-                  Drag left/right on MOLA panel to shift offset.
+              {molaProfile.calibration ? (
+                <div className="text-[9px] text-slate-500 leading-snug">
+                  2(h−z)/c − RWOT, calibrated to the picked surface: offset{" "}
+                  {molaProfile.calibration.offset_us.toFixed(1)} µs (≈1 PRI), drift{" "}
+                  {molaProfile.calibration.drift_bins_over_track.toFixed(0)} bins, residual MAD{" "}
+                  {molaProfile.calibration.residual_mad_bins.toFixed(1)} bins. Picks earlier than the
+                  line are off-nadir / sloped returns.
                 </div>
-              )}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">Offset</span>
-                  <span className={`text-[10px] font-mono ${molaXOffset !== 0 ? "text-amber-400" : "text-slate-500"}`}>
-                    {molaXOffset > 0 ? "+" : ""}{molaXOffset} traces
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setMolaXOffset(o => Math.max(-5000, o - 10))}
-                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
-                  >◀ 10</button>
-                  <button
-                    onClick={() => setMolaXOffset(o => Math.max(-5000, o - 1))}
-                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
-                  >◀</button>
-                  <input
-                    type="number"
-                    value={molaXOffset}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      if (!isNaN(v)) setMolaXOffset(Math.max(-5000, Math.min(5000, v)));
-                    }}
-                    className="flex-1 min-w-0 bg-[#0a0f18] border border-[#232f48] rounded px-1 py-0.5 text-[10px] text-center text-slate-300 font-mono focus:outline-none focus:border-primary/40"
-                  />
-                  <button
-                    onClick={() => setMolaXOffset(o => Math.min(5000, o + 1))}
-                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
-                  >▶</button>
-                  <button
-                    onClick={() => setMolaXOffset(o => Math.min(5000, o + 10))}
-                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
-                  >10 ▶</button>
-                </div>
-              </div>
-              {molaXOffset !== 0 && (
-                <button
-                  onClick={() => { setMolaXOffset(0); }}
-                  className="text-[9px] text-slate-500 hover:text-amber-400 transition-colors underline"
-                >
-                  Reset to zero
-                </button>
+              ) : (
+                <div className="text-[9px] text-slate-600">Geometric prediction unavailable (DEM or RWOT missing).</div>
               )}
             </Section>
           )}
@@ -2014,7 +1986,7 @@ export default function SharadHiresInspector({
               >
                 <canvas
                   ref={molaCanvasRef}
-                  className={`w-full h-full ${molaAlignMode ? "cursor-ew-resize" : "cursor-grab"}`}
+                  className="w-full h-full cursor-grab"
                   draggable={false}
                   onDragStart={(e) => e.preventDefault()}
                   onMouseMove={handleMouseMove}
@@ -2034,6 +2006,11 @@ export default function SharadHiresInspector({
                 <>
                   <span>Trace: <span className="text-slate-300">{cursorInfo.trace}</span></span>
                   <span>Bin: <span className="text-slate-300">{cursorInfo.bin}</span></span>
+                  {cursorInfo.absDelayUs != null && (
+                    <span title="Absolute two-way delay: (RWOT + bin)·37.5 ns + calibrated offset">
+                      Delay: <span className="text-slate-300">{cursorInfo.absDelayUs.toFixed(3)} µs</span>
+                    </span>
+                  )}
                   {cursorInfo.lat !== null && (
                     <span>
                       Lat: <span className="text-slate-300">{cursorInfo.lat?.toFixed(3)}°</span>
@@ -2047,8 +2024,6 @@ export default function SharadHiresInspector({
               <span>Zoom: <span className="text-slate-300">{zoomLevel}×</span></span>
               {moveMode && <span className="text-cyan-400">MOVE</span>}
               {adjustMode && <span className="text-green-400">ADJUST{editCount > 0 ? ` (${editCount})` : ""}</span>}
-              {molaAlignMode && <span className="text-amber-400">MOLA ALIGN</span>}
-              {molaXOffset !== 0 && <span className="text-amber-300">MOLA: {molaXOffset > 0 ? "+" : ""}{molaXOffset}</span>}
               {showClutter && <span className="text-orange-400">CLUTTER {Math.round(clutterOpacity * 100)}%</span>}
               {hyperbolaApex && <span className="text-red-400">HYPERBOLA T={hyperbolaApex.trace}</span>}
               {hyperbolaFit?.epsilon_r_est != null && <span className="text-red-300">εr≈{hyperbolaFit.epsilon_r_est.toFixed(2)} (exp.)</span>}

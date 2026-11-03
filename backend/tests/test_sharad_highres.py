@@ -307,3 +307,30 @@ def test_attenuation_pipeline_regression(data_dir):
     # the legacy per-trace ratio is biased by the -5 dB reflectivity contrast
     assert s.alpha_ratio_median_dBm > alpha + 0.002
     assert res.profile[0].lat == pytest.approx(18.0)   # planetocentric
+
+
+# ── receive-window / geometric MOLA prediction (C3) ──────────────────
+
+def test_mola_profile_geometric_surface_prediction(data_dir, client, tmp_path, monkeypatch):
+    import rasterio
+    from rasterio.transform import from_origin
+    dem = tmp_path / "dem.tif"
+    with rasterio.open(dem, "w", driver="GTiff", height=200, width=200, count=1, dtype="float32",
+                       crs=None, transform=from_origin(77.0, 19.0, 0.01, 0.01)) as ds:
+        ds.write(np.full((1, 200, 200), -1000.0, np.float32))
+    monkeypatch.setattr(R, "_dem_ds", rasterio.open(dem))
+    R._mola_cache.clear()
+    _write_product(str(data_dir))   # RWOT ramps +1/row, surface fixed at bin 150
+    j = client.get("/api/sharad_highres/mola_profile", params={"product_id": PID, "downsample": 1}).json()
+    pred = np.array(j["predicted_surface_bin"], dtype=float)
+    assert np.allclose(pred, SURF_BIN, atol=0.6)
+    cal = j["calibration"]
+    assert cal["residual_mad_bins"] < 0.6 and cal["n_used"] == N_ROWS
+    # offset consistent with 2(h − z)/c − (rwot + pick) at the middle trace
+    from analysis.shared.constants import SPEED_OF_LIGHT as C
+    mid = N_ROWS / 2
+    expect = 2 * (270e3 + 1000) / C / 37.5e-9 - (9000 + mid) - SURF_BIN
+    assert cal["offset_bins"] == pytest.approx(expect, abs=1.0)
+    rm = client.get("/api/sharad_highres/radargram_meta", params={"product_id": PID, "downsample": 1}).json()
+    assert rm["rwot"][0] == 9000.0 and rm["rwot"][5] == 9005.0
+    R._dem_ds = None

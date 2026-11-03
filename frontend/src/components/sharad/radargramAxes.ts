@@ -1,7 +1,8 @@
 /**
  * Axis / scale-bar / colour-bar overlay for the SHARAD radargram canvas.
  *
- *  - left:   two-way time inside the receive window (µs) — 37.5 ns per bin
+ *  - left:   two-way time inside the receive window (µs) — 37.5 ns per bin,
+ *            or absolute two-way delay at the centre trace (RWOT-referenced)
  *  - right:  depth below the surface pick at the view-centre trace (m) for
  *            the chosen (layered) εr
  *  - bottom: along-track distance (km) + horizontal scale bar
@@ -31,6 +32,8 @@ export type AxesParams = {
   eps2: number;
   boundaryM: number;
   valueScale?: ValueScale | null;
+  /** If set, the left axis shows absolute two-way delay = window time + this (µs, centre trace). */
+  delayOffsetUs?: number | null;
 };
 
 const AXIS_BG = "rgba(10, 15, 24, 0.72)";
@@ -47,9 +50,10 @@ export function drawRadargramAxes(ctx: CanvasRenderingContext2D, p: AxesParams):
   ctx.font = "9px monospace";
   ctx.lineWidth = 1;
 
-  // ── Left: two-way time in window (µs) ──
+  // ── Left: two-way time in window (µs), or absolute delay at centre trace ──
+  const off = p.delayOffsetUs ?? 0;
   const b0 = yToBin(0), b1 = yToBin(H);
-  const t0 = b0 * BIN_DT_US, t1 = b1 * BIN_DT_US;
+  const t0 = b0 * BIN_DT_US + off, t1 = b1 * BIN_DT_US + off;
   const tStep = niceStep(t1 - t0, Math.max(3, Math.floor(H / 60)));
   ctx.fillStyle = AXIS_BG;
   ctx.fillRect(0, 0, 34, H);
@@ -57,16 +61,19 @@ export function drawRadargramAxes(ctx: CanvasRenderingContext2D, p: AxesParams):
   ctx.strokeStyle = TICK_FG;
   ctx.textAlign = "left";
   for (let t = Math.ceil(t0 / tStep) * tStep; t <= t1; t += tStep) {
-    const y = binToY(t / BIN_DT_US);
+    const y = binToY((t - off) / BIN_DT_US);
     ctx.beginPath(); ctx.moveTo(28, y); ctx.lineTo(34, y); ctx.stroke();
-    ctx.fillText(formatNum(t, tStep), 2, y + 3);
+    const lbl = formatNum(t, tStep);
+    ctx.fillText(lbl.length > 6 ? lbl.slice(-6) : lbl, 2, y + 3);
   }
   ctx.save();
   ctx.translate(9, H / 2);
   ctx.rotate(-Math.PI / 2);
   ctx.textAlign = "center";
   ctx.fillStyle = AXIS_FG;
-  ctx.fillText("TWT in window (µs)", 0, 0);
+  ctx.fillText(p.delayOffsetUs != null
+    ? `Two-way delay (µs), centre trace${t0 >= 1e4 ? " (last 6 digits)" : ""}`
+    : "TWT in window (µs)", 0, 0);
   ctx.restore();
 
   // ── Right: depth below surface at centre trace ──
