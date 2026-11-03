@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import type { FieldNote } from "../api/fieldnotes";
-import { computeDownsample, describeHttpError } from "../utils/sharad";
+import { computeDownsample, describeHttpError, nearestTrace } from "../utils/sharad";
 import { drawRadargramAxes, type ValueScale } from "./sharad/radargramAxes";
 
 /* =========================================================
@@ -96,8 +96,11 @@ export default function SharadHiresInspector({
   onLocatePoint,
   onOpenRegolith,
   onOpenAttenuation,
+  initialPoint = null,
 }: {
   productId: string;
+  /** Map point (planetocentric) the viewer was opened from: centre on and mark the nearest trace. */
+  initialPoint?: { lat: number; lon: number } | null;
   onClose: () => void;
   fieldNotes?: FieldNote[];
   onOpenFieldNote?: (productId: string, lat: number, lon: number) => void;
@@ -123,6 +126,9 @@ export default function SharadHiresInspector({
   const [retryNonce, setRetryNonce] = useState(0); // bump to re-run loadAll (Retry button)
   const [valueScale, setValueScale] = useState<ValueScale | null>(null); // colour-bar mapping
   const [showAxes, setShowAxes] = useState(true);
+  // Nearest display trace to `initialPoint` (map point → trace linking)
+  const [focusTrace, setFocusTrace] = useState<{ index: number; distanceM: number } | null>(null);
+  const focusKeyRef = useRef<string>("");
 
   // Display controls
   const [useLog, setUseLog] = useState(true);
@@ -685,6 +691,27 @@ export default function SharadHiresInspector({
       ctx.stroke();
     }
 
+    // Inspected map point → nearest trace marker
+    if (focusTrace) {
+      const fx = traceToX(focusTrace.index + 0.5);
+      if (fx >= 0 && fx <= W) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(34, 211, 238, 0.85)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(fx, 0); ctx.lineTo(fx, H); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = "bold 9px monospace";
+        ctx.fillStyle = "#22d3ee";
+        ctx.textAlign = fx > W - 160 ? "right" : "left";
+        ctx.fillText(
+          `◆ inspected point · trace ${focusTrace.index} · ${(focusTrace.distanceM / 1000).toFixed(2)} km off-track`,
+          fx + (fx > W - 160 ? -4 : 4), 40,
+        );
+        ctx.restore();
+      }
+    }
+
     // Axes, scale bar and colour bar
     if (showAxes) {
       const centre = ((viewX.start + viewX.end) / 2) * nTraces;
@@ -727,9 +754,31 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit, showAxes, valueScale, epsilonR1, epsilonR2]);
+  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit, showAxes, valueScale, epsilonR1, epsilonR2, focusTrace]);
 
   useEffect(() => { draw(); }, [draw]);
+
+  // Map point → trace: once per (product, point), centre the view on the
+  // nearest trace, mark it and drop the map pin on the trace itself.
+  useEffect(() => {
+    if (!initialPoint || !radargramMeta || !radargram) { if (!initialPoint) setFocusTrace(null); return; }
+    const key = `${productId}|${initialPoint.lat}|${initialPoint.lon}|${radargramMeta.downsample}`;
+    if (focusKeyRef.current === key) return;
+    focusKeyRef.current = key;
+    const nt = nearestTrace(radargramMeta.lats, radargramMeta.lons, initialPoint.lat, initialPoint.lon);
+    setFocusTrace(nt);
+    if (!nt) return;
+    const n = radargramMeta.n_traces;
+    setViewX((v) => {
+      const span = Math.min(1, v.end - v.start);
+      let start = nt.index / n - span / 2;
+      start = Math.max(0, Math.min(1 - span, start));
+      return { start, end: start + span };
+    });
+    const la = radargramMeta.lats[nt.index];
+    const lo = radargramMeta.lons[nt.index];
+    if (onLocatePoint && la != null && lo != null) onLocatePoint(la, lo);
+  }, [initialPoint, radargramMeta, radargram, productId, onLocatePoint]);
 
   useEffect(() => {
     const container = containerRef.current;
