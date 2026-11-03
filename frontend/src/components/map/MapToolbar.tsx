@@ -16,6 +16,7 @@ type MapToolbarProps = {
   onDTMHoverModeChange: (mode: "hover" | "click") => void;
   viewer: Cesium.Viewer | null;
   showMeasurementTools: boolean;
+  onToggleMeasurementTools?: (v: boolean) => void;
   onMeasurementPinNote?: (lat: number, lon: number, text: string) => void;
 };
 
@@ -27,6 +28,7 @@ export default function MapToolbar({
   onDTMHoverModeChange,
   viewer,
   showMeasurementTools,
+  onToggleMeasurementTools,
   onMeasurementPinNote,
 }: MapToolbarProps) {
   const [copied, setCopied] = useState(false);
@@ -128,24 +130,37 @@ export default function MapToolbar({
 
       {/* ── Measurement tools (always-visible hint or full panel) ── */}
       {showMeasurementTools ? (
-        <MeasurementTools
-          viewer={viewer}
-          isVisible={showMeasurementTools}
-          onPinNote={onMeasurementPinNote}
-        />
+        <>
+          <MeasurementTools
+            viewer={viewer}
+            isVisible={showMeasurementTools}
+            onPinNote={onMeasurementPinNote}
+          />
+          {onToggleMeasurementTools && (
+            <button
+              type="button"
+              onClick={() => onToggleMeasurementTools(false)}
+              className="absolute top-6 right-4 z-[500] flex h-9 items-center gap-1 rounded-lg border border-primary/50 bg-primary/20 px-2 text-[11px] font-semibold text-primary shadow-lg backdrop-blur-md hover:bg-primary/30"
+              aria-label="Exit measurement mode"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+              Done
+            </button>
+          )}
+        </>
       ) : (
-        <div
-          className="absolute top-20 right-4 z-[500] flex flex-col items-center rounded-xl border border-border-dark bg-surface-dark/95 p-1.5 backdrop-blur-md shadow-lg"
-          style={{ pointerEvents: "auto" }}
-          title="Use Measurement Mode in the toolbar to enable"
+        <button
+          type="button"
+          onClick={() => onToggleMeasurementTools?.(true)}
+          disabled={!onToggleMeasurementTools}
+          className="group absolute top-20 right-4 z-[500] flex h-12 w-12 items-center justify-center rounded-xl border border-border-dark bg-surface-dark/95 text-slate-400 shadow-lg backdrop-blur-md transition-colors hover:text-white"
+          aria-label="Measure distance, area or profile"
         >
-          <div className="group relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 cursor-default">
-            <span className="material-symbols-outlined text-[20px]">straighten</span>
-            <span className="pointer-events-none absolute right-full mr-2 whitespace-nowrap rounded-md bg-bg-dark/95 px-2 py-1 text-[10px] text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 border border-border-dark">
-              Use Measurement Mode in the toolbar to enable
-            </span>
-          </div>
-        </div>
+          <span className="material-symbols-outlined text-[20px]">straighten</span>
+          <span className="pointer-events-none absolute right-full mr-2 whitespace-nowrap rounded-md border border-border-dark bg-bg-dark/95 px-2 py-1 text-[10px] text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+            Measure (distance · area · profile)
+          </span>
+        </button>
       )}
     </>
   );

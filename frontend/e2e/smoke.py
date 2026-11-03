@@ -63,11 +63,10 @@ async def main() -> None:
         check("?" not in page.url, "deep-link params are stripped after restore")
 
         # 2. Load HiRISE footprints and inspect a point.
-        await page.get_by_text("FOOTPRINTS", exact=False).first.click()
-        await page.wait_for_timeout(800)
-        row = page.locator("text=HiRISE JP2").first
-        await row.locator("xpath=ancestor::*[.//button][1]").get_by_role("button", name="Load").first.click()
+        bar = page.get_by_role("toolbar", name="Instrument footprints")
+        await bar.get_by_role("button", name="HiRISE footprints: not loaded").click()
         await page.wait_for_timeout(10000)
+        check(await bar.get_by_role("button", name="HiRISE footprints: shown").count() == 1, "instrument bar loads and shows HiRISE footprints")
         inspector = page.locator('aside[aria-label="Inspector"]')
         for x, y in [(800, 500), (760, 470), (840, 540), (700, 420)]:
             await page.mouse.click(x, y)
@@ -99,7 +98,20 @@ async def main() -> None:
             check(viewer_open == 1 and await page.locator("div.fixed.inset-0").count() == 0, "Escape closes the fullscreen viewer")
             check(await inspector.count() == 1, "Escape in the viewer keeps the Inspector open")
 
-        # 5. Removed routes fall back to the map.
+        # 5. Map controls never paint over a page-level modal.
+        on_top = await page.evaluate("""() => {
+          const btn = document.querySelector('[aria-label="Measure distance, area or profile"]');
+          if (!btn) return null;
+          const r = btn.getBoundingClientRect();
+          const m = document.createElement('div'); m.className = 'fixed inset-0 z-50'; m.id = 'probe-modal';
+          document.querySelector('main').appendChild(m);
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          m.remove();
+          return hit && hit.id === 'probe-modal';
+        }""")
+        check(on_top is True, "a z-50 modal covers the map's measure button")
+
+        # 6. Removed routes fall back to the map.
         await page.goto(f"{BASE}/news", wait_until="domcontentloaded")
         await page.wait_for_timeout(3000)
         check(page.url.rstrip("/") == BASE, "removed /news route redirects to the map")

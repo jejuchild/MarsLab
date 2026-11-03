@@ -15,6 +15,7 @@ import type { ProfilePoint } from "../components/LineProfile";
 import TopBar from "../components/TopBar";
 import LayerPanelRaw from "../components/layerpanel/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
+import InstrumentBar from "../components/map/InstrumentBar";
 import FieldNoteModal from "../components/FieldNoteModal";
 import CopilotFab from "../components/CopilotFab";
 import type { FieldNote } from "../api/fieldnotes";
@@ -1750,7 +1751,7 @@ export default function MainPage() {
         <EmptyState
           icon="explore"
           title="No product selected"
-          description="Click a footprint on the map or search for a product to inspect it. Load instrument layers from the Layers panel to get started."
+          description="Click a footprint on the map or search for a product to inspect it. Turn on an instrument (SHARAD, CRISM, HiRISE, CTX) in the bar at the top of the map to get started."
         />
       </div>
     );
@@ -1918,6 +1919,16 @@ export default function MainPage() {
         cameraViewportRef={cameraViewportRef}
         ctxMosaicOpacity={ctxMosaicOpacity}
         highResOnly={highResOnly}
+        onToggleMeasurementTools={setShowMeasurementTools}
+      />
+      <InstrumentBar
+        instrumentVisibility={instrumentVisibility}
+        onToggleInstrument={handleToggleInstrument}
+        onLoadFootprints={handleLoadFootprints}
+        footprintsLoading={footprintsLoading}
+        footprintCounts={footprintCounts}
+        highResOnly={highResOnly}
+        onHighResOnlyChange={setHighResOnly}
       />
       </div>
 

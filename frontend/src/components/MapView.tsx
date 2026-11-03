@@ -176,6 +176,7 @@ type MapViewProps = {
   sharadTracePin?: { lat: number; lon: number } | null;
   // Measurement & annotation tools
   showMeasurementTools?: boolean;
+  onToggleMeasurementTools?: (v: boolean) => void;
   onMeasurementPinNote?: (lat: number, lon: number, text: string) => void;
   // Crater/Landform Detection
   craterDetectFeatures?: Array<{
@@ -678,6 +679,7 @@ export default function MapView({
   inspectedProductId,
   sharadTracePin = null,
   showMeasurementTools = false,
+  onToggleMeasurementTools,
   onMeasurementPinNote,
   craterDetectFeatures,
   cameraViewportRef,
@@ -973,31 +975,12 @@ export default function MapView({
         onDTMHoverModeChange={handleDTMHoverModeChange}
         viewer={viewerRef.current}
         showMeasurementTools={showMeasurementTools}
+        onToggleMeasurementTools={onToggleMeasurementTools}
         onMeasurementPinNote={onMeasurementPinNote}
       />
 
-      {/* D4: Mini layer toggle indicators */}
+      {/* Map display toggles (instrument footprints live in InstrumentBar) */}
       <div className="absolute top-1/2 -translate-y-1/2 right-4 z-20 flex flex-col gap-1">
-        {[
-          { key: "crism", label: "CR", show: showCRISM, color: "#e879f9" },
-          { key: "hirise", label: "Hi", show: showHiRISE, color: "#4ade80" },
-          { key: "ctx", label: "CX", show: showCTX, color: "#facc15" },
-          { key: "sharad", label: "SH", show: showSHARAD, color: "#22d3ee" },
-        ].map(({ key, label, show, color }) => (
-          <div
-            key={key}
-            className={`flex h-7 w-7 items-center justify-center rounded-md border text-[9px] font-bold transition-all ${
-              show
-                ? "border-white/20 bg-surface-dark/90 text-white shadow-sm"
-                : "border-transparent bg-transparent text-slate-600"
-            }`}
-            style={show ? { borderLeftColor: color, borderLeftWidth: "2px" } : undefined}
-            title={`${key.toUpperCase()} footprints ${show ? "visible" : "hidden"}`}
-          >
-            {label}
-          </div>
-        ))}
-
         {/* D5: High contrast mode toggle */}
         <button
           onClick={toggleHighContrast}
