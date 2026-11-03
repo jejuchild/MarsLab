@@ -65,7 +65,7 @@ def _run_mapper(
 
 
 @router.get("/profile")
-async def attenuation_profile(
+def attenuation_profile(
     product_id: str = Query(..., description="SHARAD_HIGHRES product ID"),
     epsilon_r: float = Query(2.5, ge=1.5, le=8.0, description="Dielectric constant"),
     snr_threshold: float = Query(3.5, ge=1.0, le=20.0, description="Min SNR for detection"),
@@ -109,7 +109,7 @@ async def attenuation_profile(
 
 
 @router.get("/export_csv")
-async def export_csv(
+def export_csv(
     product_id: str = Query(..., description="SHARAD_HIGHRES product ID"),
     epsilon_r: float = Query(2.5, ge=1.5, le=8.0),
     snr_threshold: float = Query(3.5, ge=1.0, le=20.0),

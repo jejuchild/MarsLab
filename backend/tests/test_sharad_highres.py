@@ -182,3 +182,34 @@ def test_hyperbola_endpoint_on_synthetic_product(data_dir, client):
     assert "experimental" in j["flags"]
     assert j["diagnostics"]["trace_spacing_m"] == pytest.approx(18.1, rel=0.02)
     assert j["overlay"] and all("trace" in p and "bin" in p for p in j["overlay"])
+
+
+# ── concurrency (U2) ──────────────────────────────────────────────────
+
+def test_handlers_are_sync_and_parse_once_under_concurrency(data_dir, monkeypatch):
+    import inspect
+    import threading
+    for name in ("get_metadata", "get_radargram", "get_radargram_meta", "get_surface",
+                 "depth_conversion", "get_mola_profile", "get_reflectors"):
+        assert not inspect.iscoroutinefunction(getattr(R, name)), name
+    _write_product(str(data_dir))
+    calls = []
+    orig = R._parse_and_cache
+
+    def counting(cache):
+        calls.append(1)
+        return orig(cache)
+
+    monkeypatch.setattr(R, "_parse_and_cache", counting)
+    errs = []
+
+    def worker():
+        try:
+            R._get_power(PID)
+        except Exception as e:  # pragma: no cover
+            errs.append(e)
+
+    ts = [threading.Thread(target=worker) for _ in range(8)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert not errs and len(calls) == 1

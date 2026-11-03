@@ -379,6 +379,14 @@ def _pick_surface(
     cache = _get_product_data(product_id)
     if cache["surface"] is not None:
         return cache["surface"]
+    with _product_lock(product_id):
+        return _pick_surface_locked(cache, power)
+
+
+def _pick_surface_locked(cache: dict, power: np.ndarray) -> np.ndarray:
+    min_offset, max_offset, snr_threshold, smooth_kernel = 15, 250, 3.0, 31
+    if cache["surface"] is not None:
+        return cache["surface"]
 
     cp = _cache_path(cache, "surface_v3.npy")
     if os.path.exists(cp):
@@ -472,6 +480,19 @@ def _get_global_percentiles(
 
 # ── Radargram rendering ───────────────────────────────
 _png_cache: LRUCache = LRUCache(maxsize=20)  # key -> PNG bytes (bounded LRU)
+# Handlers are sync `def` (FastAPI thread pool) so heavy numpy work does not
+# block the event loop; cachetools caches are not thread-safe → guard them.
+_lru_lock = threading.Lock()
+
+
+def _lru_get(cache: LRUCache, key):
+    with _lru_lock:
+        return cache.get(key)
+
+
+def _lru_put(cache: LRUCache, key, value):
+    with _lru_lock:
+        cache[key] = value
 
 
 def _render_radargram_png(
@@ -493,8 +514,10 @@ def _render_radargram_png(
     global_vmin/global_vmax: if provided, use these for normalization instead of
       computing percentiles from the tile data (for consistent tile brightness).
     """
-    if cache_key and cache_key in _png_cache:
-        return _png_cache[cache_key]
+    if cache_key:
+        hit = _lru_get(_png_cache, cache_key)
+        if hit is not None:
+            return hit
 
     t0 = time.monotonic()
     power = np.asarray(power, dtype=np.float32)
@@ -554,7 +577,7 @@ def _render_radargram_png(
                 p.shape[0], p.shape[1] if p.ndim > 1 else 0, downsample, per_trace, elapsed)
 
     if cache_key:
-        _png_cache[cache_key] = png_bytes
+        _lru_put(_png_cache, cache_key, png_bytes)
 
     return png_bytes
 
@@ -799,6 +822,12 @@ def _project_clutter_to_rdr_axis(
 
 
 def _get_aligned_cluttergram(product_id: str) -> np.ndarray | None:
+    """Thread-safe wrapper (per-product lock) around the alignment build."""
+    with _product_lock(product_id):
+        return _build_aligned_cluttergram(product_id)
+
+
+def _build_aligned_cluttergram(product_id: str) -> np.ndarray | None:
     """Load cluttergram aligned to RDR bin space using coordinate-based trace
     mapping and robust median-anchored vertical alignment.
 
@@ -958,7 +987,7 @@ def _render_cluttergram_png(
 
 # ── List available products ───────────────────────────
 @router.get("/products")
-async def list_products():
+def list_products():
     """List available SHARAD High-Res RDR products."""
     products = []
     for lbl_file in sorted(globmod.glob(os.path.join(SHARAD_HR_DIR, "*.lbl"))):
@@ -994,7 +1023,7 @@ async def list_products():
 # ── API Endpoints ──────────────────────────────────────
 
 @router.get("/metadata")
-async def get_metadata(
+def get_metadata(
     product_id: str = Query(..., description="Product ID (e.g. R_5663601_001_SS19_700_A)"),
 ):
     """Return dataset metadata."""
@@ -1030,7 +1059,7 @@ async def get_metadata(
 
 
 @router.get("/radargram")
-async def get_radargram(
+def get_radargram(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(1, ge=1, le=500, description="Along-track downsample factor"),
     log: int = Query(1, ge=0, le=1, description="Log10 scale (1=yes, 0=no)"),
@@ -1089,7 +1118,7 @@ async def get_radargram(
 
 
 @router.get("/radargram_meta")
-async def get_radargram_meta(
+def get_radargram_meta(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(50, ge=1, le=500),
 ):
@@ -1117,7 +1146,7 @@ async def get_radargram_meta(
 
 
 @router.get("/surface")
-async def get_surface(
+def get_surface(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(50, ge=1, le=500),
 ):
@@ -1150,7 +1179,7 @@ async def get_surface(
 
 
 @router.get("/reflectors")
-async def get_reflectors(
+def get_reflectors(
     product_id: str = Query(..., description="SHARAD product ID"),
     epsilon_r: float = Query(3.1, gt=0, le=20, description="Dielectric constant for depth conversion"),
     min_snr: float = Query(3.0, ge=0, description="Minimum SNR for reflector detection"),
@@ -1282,7 +1311,7 @@ async def get_reflectors(
 
 
 @router.get("/depth_conversion")
-async def depth_conversion(
+def depth_conversion(
     product_id: str = Query(..., description="Product ID"),
     trace_idx: int = Query(..., ge=0, description="Trace index (downsampled)"),
     cursor_bin: int = Query(..., ge=0, description="Cursor range-bin position"),
@@ -1380,7 +1409,7 @@ async def depth_conversion(
 # ── Cluttergram endpoints ──────────────────────────────
 
 @router.get("/cluttergram")
-async def get_cluttergram(
+def get_cluttergram(
     product_id: str = Query(..., description="Product ID (e.g. R_0277201_001_SS19_700_A)"),
     downsample: int = Query(50, ge=1, le=500, description="Along-track downsample factor"),
     pmin: float = Query(1.0, ge=0, le=50, description="Lower percentile clip"),
@@ -1428,7 +1457,7 @@ async def get_cluttergram(
 
 
 @router.get("/cluttergram_meta")
-async def get_cluttergram_meta(
+def get_cluttergram_meta(
     product_id: str = Query(..., description="Product ID"),
 ):
     """Return cluttergram metadata (availability, dimensions)."""
@@ -1454,7 +1483,7 @@ async def get_cluttergram_meta(
 
 # ── Ground track coordinates ───────────────────────────
 @router.get("/track")
-async def get_track(
+def get_track(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(50, ge=1, le=500),
 ):
@@ -1514,7 +1543,7 @@ _mola_cache: LRUCache = LRUCache(maxsize=30)  # key: f"{product_id}_{downsample}
 
 
 @router.get("/mola_profile")
-async def get_mola_profile(
+def get_mola_profile(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(50, ge=1, le=500),
 ):
@@ -1529,8 +1558,9 @@ async def get_mola_profile(
     product_id = _validate_router_product_id(product_id)
 
     cache_key = f"{product_id.upper()}_{downsample}"
-    if cache_key in _mola_cache:
-        return JSONResponse(content=_mola_cache[cache_key])
+    hit = _lru_get(_mola_cache, cache_key)
+    if hit is not None:
+        return JSONResponse(content=hit)
 
     try:
         from rasterio.windows import Window
@@ -1580,7 +1610,7 @@ async def get_mola_profile(
         }
 
         # Cache result (bounded by LRUCache maxsize=30)
-        _mola_cache[cache_key] = result
+        _lru_put(_mola_cache, cache_key, result)
 
         return JSONResponse(content=result)
     except Exception as e:
