@@ -24,6 +24,8 @@ import math
 import glob as globmod
 import logging
 import time
+import json
+import threading
 
 import numpy as np
 from PIL import Image
@@ -34,6 +36,13 @@ from cachetools import LRUCache
 logger = logging.getLogger(__name__)
 
 from api.validation import validate_product_id
+from analysis.shared.sharad_math import (
+    IncompleteProductError,
+    check_dat_complete,
+    label_file_records,
+    read_rwot,
+    source_signature,
+)
 
 router = APIRouter(prefix="/api/sharad_highres", tags=["SHARAD High-Res"])
 
@@ -46,7 +55,10 @@ def _validate_router_product_id(product_id: str) -> str:
 
 # ── Paths ──────────────────────────────────────────────
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHARAD_HR_DIR = os.path.join(_BACKEND_DIR, "sharad_highres")
+# Both overridable so tests / offline checks can read live data read-only and
+# write derived caches elsewhere.
+SHARAD_HR_DIR = os.environ.get("MARSLAB_SHARAD_HR_DIR") or os.path.join(_BACKEND_DIR, "sharad_highres")
+SHARAD_CACHE_DIR = os.environ.get("MARSLAB_SHARAD_CACHE_DIR") or os.path.join(SHARAD_HR_DIR, ".cache")
 
 # ── RDR binary layout constants ────────────────────────
 ROW_BYTES = 5822
@@ -57,7 +69,7 @@ ECHO_REAL_OFFSET = 194      # start_byte 195
 ECHO_IMAG_OFFSET = 2862     # start_byte 2863
 ECHO_BYTES = N_RANGE_BINS * 4  # 2668
 
-RWOT_OFFSET = 186            # RECEIVE_WINDOW_OPENING_TIME, float32
+RWOT_OFFSET = 186            # RECEIVE_WINDOW_OPENING_TIME, float32 (units of 37.5 ns)
 LON_OFFSET = 5637            # SUB_SC_EAST_LONGITUDE, float64
 LAT_OFFSET = 5645            # SUB_SC_PLANETOCENTRIC_LATITUDE, float64
 ALT_OFFSET = 5629            # SPACECRAFT_ALTITUDE, float64
@@ -72,13 +84,80 @@ SPEED_OF_LIGHT = 299792458.0  # m/s
 # ── Per-product cache management ──────────────────────
 # Caches keyed by product_id (uppercase)
 _product_caches: dict[str, dict] = {}
+_locks_guard = threading.Lock()
+_product_locks: dict[str, threading.RLock] = {}
+
+
+def _product_lock(product_id: str) -> threading.RLock:
+    """Per-product lock: serialises the expensive parse/pick of one product
+    (concurrent first requests would otherwise parse 0.5 GB several times and
+    race on the .npy files) without blocking other products."""
+    pid = product_id.upper()
+    with _locks_guard:
+        lk = _product_locks.get(pid)
+        if lk is None:
+            lk = _product_locks[pid] = threading.RLock()
+        return lk
+
+
+def _error_response(e: Exception) -> JSONResponse:
+    """Map exceptions to HTTP errors with a useful ``detail``."""
+    if isinstance(e, IncompleteProductError):
+        return JSONResponse(content={"error": str(e), "detail": str(e), "code": "incomplete"}, status_code=409)
+    if isinstance(e, FileNotFoundError):
+        return JSONResponse(content={"error": str(e), "detail": str(e), "code": "not_found"}, status_code=404)
+    logger.exception("SHARAD hi-res request failed")
+    return JSONResponse(content={"error": str(e), "detail": f"{type(e).__name__}: {e}"}, status_code=500)
+
+
+_DERIVED_SUFFIXES = (".npy", ".npz")
+
+
+def _sync_cache_stamp(cache_dir: str, dat_path: str) -> dict:
+    """Key derived caches on the source .dat size + mtime.
+
+    If the stamp differs (file re-downloaded / completed) every derived array
+    in ``cache_dir`` is deleted.  Legacy cache dirs without a stamp are kept
+    only if none of their files is older than the .dat (a cache built from a
+    partial download predates the completed file).
+    """
+    sig = source_signature(dat_path)
+    stamp_path = os.path.join(cache_dir, "source.json")
+    stale = False
+    if os.path.exists(stamp_path):
+        try:
+            with open(stamp_path) as f:
+                stale = json.load(f) != sig
+        except Exception:
+            stale = True
+    else:
+        dat_mtime = os.path.getmtime(dat_path)
+        for name in os.listdir(cache_dir):
+            if name.endswith(_DERIVED_SUFFIXES) and os.path.getmtime(os.path.join(cache_dir, name)) < dat_mtime:
+                stale = True
+                break
+    if stale:
+        for name in os.listdir(cache_dir):
+            if name.endswith(_DERIVED_SUFFIXES):
+                try:
+                    os.remove(os.path.join(cache_dir, name))
+                except OSError:
+                    pass
+        logger.info("SHARAD cache for %s invalidated (source changed)", os.path.basename(dat_path))
+    if stale or not os.path.exists(stamp_path):
+        with open(stamp_path, "w") as f:
+            json.dump(sig, f)
+    return sig
 
 
 def _resolve_product(product_id: str) -> dict:
     """
     Resolve a product_id to file paths and metadata.
     Searches SHARAD_HR_DIR for matching .dat and .lbl files.
-    Returns dict with 'dat_path', 'lbl_path', 'total_rows', 'cache_dir'.
+    Returns dict with 'dat_path', 'lbl_path', 'total_rows', 'cache_dir', 'signature'.
+
+    Raises FileNotFoundError (→ 404) when the product is absent and
+    IncompleteProductError (→ 409) while it is still downloading or truncated.
     """
     pid_lower = product_id.lower()
 
@@ -99,54 +178,62 @@ def _resolve_product(product_id: str) -> dict:
     if not os.path.exists(dat_path):
         raise FileNotFoundError(f"SHARAD RDR .dat not found: {dat_path}")
 
-    # Parse total rows from .lbl or compute from file size
-    total_rows = _parse_total_rows(lbl_path, dat_path)
+    total_rows = check_dat_complete(dat_path, lbl_path if os.path.exists(lbl_path) else None, ROW_BYTES)
 
     # Per-product cache directory
-    cache_dir = os.path.join(SHARAD_HR_DIR, ".cache", product_id.upper())
+    cache_dir = os.path.join(SHARAD_CACHE_DIR, product_id.upper())
     os.makedirs(cache_dir, exist_ok=True)
+    sig = _sync_cache_stamp(cache_dir, dat_path)
 
     return {
         "dat_path": dat_path,
         "lbl_path": lbl_path,
         "total_rows": total_rows,
         "cache_dir": cache_dir,
+        "signature": sig,
     }
 
 
 def _parse_total_rows(lbl_path: str, dat_path: str) -> int:
     """Parse FILE_RECORDS from .lbl, or compute from file size."""
-    if os.path.exists(lbl_path):
-        with open(lbl_path, "r") as f:
-            for line in f:
-                m = re.match(r"\s*FILE_RECORDS\s*=\s*(\d+)", line)
-                if m:
-                    return int(m.group(1))
-
-    # Fallback: compute from file size
-    file_size = os.path.getsize(dat_path)
-    return file_size // ROW_BYTES
+    n = label_file_records(lbl_path)
+    if n is not None:
+        return n
+    return os.path.getsize(dat_path) // ROW_BYTES
 
 
 def _get_product_data(product_id: str) -> dict:
     """
     Get or create cached data for a product.
     Returns dict with 'power', 'geometry', 'surface', 'total_rows'.
+    The in-memory entry is dropped when the source .dat changes on disk.
     """
     pid = product_id.upper()
-    if pid in _product_caches:
-        return _product_caches[pid]
+    with _product_lock(pid):
+        cache = _product_caches.get(pid)
+        if cache is not None:
+            dat = cache["info"]["dat_path"]
+            try:
+                if os.path.exists(dat + ".aria2") or source_signature(dat) != cache["info"]["signature"]:
+                    cache = None
+            except OSError:
+                cache = None
+            if cache is not None:
+                return cache
+            _product_caches.pop(pid, None)
 
-    info = _resolve_product(product_id)
-    cache = {
-        "info": info,
-        "power": None,
-        "geometry": None,
-        "surface": None,
-        "total_rows": info["total_rows"],
-    }
-    _product_caches[pid] = cache
-    return cache
+        info = _resolve_product(product_id)
+        cache = {
+            "info": info,
+            "power": None,
+            "geometry": None,
+            "surface": None,
+            "surface_snr": None,
+            "rwot": None,
+            "total_rows": info["total_rows"],
+        }
+        _product_caches[pid] = cache
+        return cache
 
 
 def _cache_path(cache: dict, name: str) -> str:
@@ -184,38 +271,37 @@ def _parse_and_cache(cache: dict):
     if not os.path.exists(dat_path):
         raise FileNotFoundError(f"SHARAD RDR .dat not found: {dat_path}")
 
-    # Vectorized parsing: read entire file as raw bytes, then extract fields
-    raw = np.fromfile(dat_path, dtype=np.uint8)
-    actual_rows = len(raw) // ROW_BYTES
+    # Read only the needed columns through a memmap (bounded memory).
+    mm = np.memmap(dat_path, dtype=np.uint8, mode="r")
+    actual_rows = mm.size // ROW_BYTES
     if actual_rows < total_rows:
         total_rows = actual_rows
-    raw = raw[:total_rows * ROW_BYTES].reshape(total_rows, ROW_BYTES)
+    raw = mm[:total_rows * ROW_BYTES].reshape(total_rows, ROW_BYTES)
 
-    # Extract real/imag echo columns via view (zero-copy slice)
-    real = np.ndarray((total_rows, N_RANGE_BINS), dtype="<f4",
-                      buffer=raw, offset=0,
-                      strides=(ROW_BYTES, 4))
-    # offset within each row for real part
-    real = np.frombuffer(raw[:, ECHO_REAL_OFFSET:ECHO_REAL_OFFSET + ECHO_BYTES].tobytes(),
-                         dtype="<f4").reshape(total_rows, N_RANGE_BINS)
-    imag = np.frombuffer(raw[:, ECHO_IMAG_OFFSET:ECHO_IMAG_OFFSET + ECHO_BYTES].tobytes(),
-                         dtype="<f4").reshape(total_rows, N_RANGE_BINS)
-    power = (real ** 2 + imag ** 2).astype(np.float32)
+    def _col(off: int, nbytes: int, dtype: str, shape) -> np.ndarray:
+        return np.frombuffer(np.ascontiguousarray(raw[:, off:off + nbytes]).tobytes(), dtype=dtype).reshape(shape)
+
+    real = _col(ECHO_REAL_OFFSET, ECHO_BYTES, "<f4", (total_rows, N_RANGE_BINS))
+    imag = _col(ECHO_IMAG_OFFSET, ECHO_BYTES, "<f4", (total_rows, N_RANGE_BINS))
+    power = (real.astype(np.float32) ** 2 + imag.astype(np.float32) ** 2).astype(np.float32)
+    del real, imag
     # Some products can contain non-finite float payloads after squaring; keep
     # rendering/analysis stable by converting them to zero-energy samples.
     if not np.isfinite(power).all():
         power = np.nan_to_num(power, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
-    # Extract geometry columns
-    lons = np.frombuffer(raw[:, LON_OFFSET:LON_OFFSET + 8].tobytes(),
-                         dtype="<f8").copy()
-    lats = np.frombuffer(raw[:, LAT_OFFSET:LAT_OFFSET + 8].tobytes(),
-                         dtype="<f8").copy()
-    alts = np.frombuffer(raw[:, ALT_OFFSET:ALT_OFFSET + 8].tobytes(),
-                         dtype="<f8").copy()
+    lons = _col(LON_OFFSET, 8, "<f8", (total_rows,)).copy()
+    lats = _col(LAT_OFFSET, 8, "<f8", (total_rows,)).copy()
+    alts = _col(ALT_OFFSET, 8, "<f8", (total_rows,)).copy()
 
-    np.save(power_path, power)
-    np.savez_compressed(geom_path, lat=lats, lon=lons, alt=alts)
+    # Write to temp names then rename: a crash mid-write never leaves a
+    # truncated .npy that would be loaded as valid next time.
+    tmp_power = power_path + ".tmp.npy"
+    tmp_geom = geom_path + ".tmp.npz"
+    np.save(tmp_power, power)
+    np.savez_compressed(tmp_geom, lat=lats, lon=lons, alt=alts)
+    os.replace(tmp_power, power_path)
+    os.replace(tmp_geom, geom_path)
 
     cache["power"] = np.load(power_path, mmap_mode="r")
     cache["geometry"] = {"lat": lats, "lon": lons, "alt": alts}
@@ -226,16 +312,36 @@ def _get_power(product_id: str) -> tuple[np.ndarray, int]:
     """Return (power array, total_rows) for given product."""
     cache = _get_product_data(product_id)
     if cache["power"] is None:
-        _parse_and_cache(cache)
+        with _product_lock(product_id):
+            if cache["power"] is None:
+                _parse_and_cache(cache)
     return cache["power"], int(cache["power"].shape[0])
 
 
 def _get_geometry(product_id: str) -> tuple[dict, int]:
-    """Return (geometry dict, total_rows) for given product."""
+    """Return (geometry dict, total_rows) for given product.
+
+    Latitudes are planetocentric (as stored in the RDR) — the same convention
+    as the footprint index, at-point search and the map.
+    """
     cache = _get_product_data(product_id)
     if cache["geometry"] is None:
-        _parse_and_cache(cache)
+        with _product_lock(product_id):
+            if cache["geometry"] is None:
+                _parse_and_cache(cache)
     return cache["geometry"], int(cache["geometry"]["lat"].shape[0])
+
+
+def _get_rwot(product_id: str) -> np.ndarray:
+    """RECEIVE_WINDOW_OPENING_TIME per trace (units of 37.5 ns), read lazily
+    from the .dat (4 bytes/row) so legacy caches need no rebuild."""
+    cache = _get_product_data(product_id)
+    if cache["rwot"] is None:
+        with _product_lock(product_id):
+            if cache["rwot"] is None:
+                _, n = _get_geometry(product_id)
+                cache["rwot"] = read_rwot(cache["info"]["dat_path"], n, ROW_BYTES)
+    return cache["rwot"]
 
 
 def _lon_to_180(lon: np.ndarray) -> np.ndarray:
@@ -578,7 +684,7 @@ def _get_cluttergram(product_id: str) -> np.ndarray | None:
     if info is None:
         return None
 
-    cache_dir = os.path.join(SHARAD_HR_DIR, ".cache", pid)
+    cache_dir = os.path.join(SHARAD_CACHE_DIR, pid)
     os.makedirs(cache_dir, exist_ok=True)
     cache_path = os.path.join(cache_dir, "cluttergram.npy")
 
@@ -882,10 +988,19 @@ async def list_products():
                     orbit = int(m2.group(1))
         if pid:
             dat_path = lbl_file.rsplit(".", 1)[0] + ".dat"
+            has_dat = os.path.exists(dat_path)
+            incomplete = None
+            if has_dat:
+                try:
+                    check_dat_complete(dat_path, lbl_file, ROW_BYTES)
+                except IncompleteProductError as e:
+                    incomplete = str(e)
             products.append({
                 "product_id": pid,
                 "orbit_number": orbit,
-                "has_dat": os.path.exists(dat_path),
+                "has_dat": has_dat,
+                "complete": has_dat and incomplete is None,
+                "incomplete_reason": incomplete,
             })
     return JSONResponse(content={"products": products, "count": len(products)})
 
@@ -924,10 +1039,8 @@ async def get_metadata(
                 "y_axis": "range bin (delay)",
             },
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/radargram")
@@ -985,10 +1098,8 @@ async def get_radargram(
                 "Cache-Control": "public, max-age=3600",
             },
         )
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/radargram_meta")
@@ -1015,10 +1126,8 @@ async def get_radargram_meta(
             "lats": [round(float(v), 4) for v in lats],
             "lons": [round(float(v), 4) for v in lons],
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/surface")
@@ -1050,10 +1159,8 @@ async def get_surface(
             "detected_traces": len(points),
             "method": "peak detection + outlier rejection",
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/reflectors")
@@ -1184,10 +1291,8 @@ async def get_reflectors(
             "reflectors": segments,
             "total_reflectors": len(segments),
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/depth_conversion")
@@ -1282,10 +1387,8 @@ async def depth_conversion(
             "lat": round(_centric_to_graphic_scalar(float(geom["lat"][full_idx])), 4),
             "lon": round(float(lons180[full_idx]), 4),
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 # ── Cluttergram endpoints ──────────────────────────────
@@ -1335,7 +1438,7 @@ async def get_cluttergram(
             },
         )
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/cluttergram_meta")
@@ -1349,8 +1452,10 @@ async def get_cluttergram_meta(
     if info is None:
         return JSONResponse(content={"available": False})
 
-    aligned = _get_aligned_cluttergram(product_id)
-    raw = _get_cluttergram(product_id)
+    try:
+        aligned = _get_aligned_cluttergram(product_id)
+    except Exception as e:
+        return _error_response(e)
     return JSONResponse(content={
         "available": True,
         "raw_range_bins": info["lines"],
@@ -1383,10 +1488,8 @@ async def get_track(
             "n_traces": n,
             "downsample": downsample,
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 # ── MOLA elevation profile along SHARAD track ─────────
@@ -1496,7 +1599,5 @@ async def get_mola_profile(
         _mola_cache[cache_key] = result
 
         return JSONResponse(content=result)
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
