@@ -1853,6 +1853,10 @@ export default function MainPage() {
       ) : undefined}
     >
       {/* Map Canvas */}
+      {/* The map is its own stacking context: its floating controls (z-[500]
+          toolbar, measurement UI, popups) can never paint over a viewer or
+          modal opened from the page. */}
+      <div className="absolute inset-0 isolate">
       <MapView
         selectedProductId={selected?.productId ?? null}
         mapMode={mapMode}
@@ -1915,6 +1919,7 @@ export default function MainPage() {
         ctxMosaicOpacity={ctxMosaicOpacity}
         highResOnly={highResOnly}
       />
+      </div>
 
       {/* MARVIS FAB — floating chat widget with grounded tool calling */}
       {!isMobile && (
