@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import HiResImageViewer from "./HiResImageViewer";
 import QuickviewImage from "./widgets/QuickviewImage";
 import useSpectrumData from "./hooks/useSpectrumData";
 import usePixelAtPoint from "./hooks/usePixelAtPoint";
@@ -103,6 +104,7 @@ function CompareCard({
   const cfg = LANE_CONFIG[lane];
   const instrument = product ? instrumentFor(lane, product.variant) : null;
   const overlay = product ? handlers.getActiveOverlay(product.product_id) : null;
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   return (
     <section className="px-4 py-3 border-b border-border-dark/60" aria-label={`${cfg.label} at this point`}>
@@ -121,9 +123,24 @@ function CompareCard({
         </p>
       ) : (
         <div className="flex gap-3">
-          <div className="w-28 h-28 shrink-0 rounded overflow-hidden border border-border-dark bg-black">
-            <QuickviewImage productId={product.product_id} instrument={instrument} />
-          </div>
+          {instrument === "HIRISE" ? (
+            <button
+              type="button"
+              onClick={() => setViewerOpen(true)}
+              className="group relative w-28 h-28 shrink-0 rounded overflow-hidden border border-border-dark bg-black hover:border-primary focus-visible:border-primary"
+              aria-label={`Open ${product.product_id} full screen`}
+              title="Open full screen with the inspected point marked"
+            >
+              <QuickviewImage productId={product.product_id} instrument={instrument} />
+              <span className="material-symbols-outlined absolute bottom-1 right-1 rounded bg-black/70 p-0.5 text-[16px] text-white opacity-80 group-hover:opacity-100">
+                open_in_full
+              </span>
+            </button>
+          ) : (
+            <div className="w-28 h-28 shrink-0 rounded overflow-hidden border border-border-dark bg-black">
+              <QuickviewImage productId={product.product_id} instrument={instrument} />
+            </div>
+          )}
           <div className="min-w-0 flex-1 flex flex-col gap-1.5">
             <p className="text-[10px] font-mono text-slate-300 truncate" title={product.product_id}>
               {product.product_id}
@@ -179,6 +196,14 @@ function CompareCard({
             </div>
           </div>
         </div>
+      )}
+      {viewerOpen && product && (
+        <HiResImageViewer
+          productId={product.product_id}
+          lat={context.lat}
+          lon={context.lon}
+          onClose={() => setViewerOpen(false)}
+        />
       )}
     </section>
   );

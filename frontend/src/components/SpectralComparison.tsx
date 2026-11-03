@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useEscapeLayer } from "./viewer/escapeStack";
 
 /* =========================================================
  * Types
@@ -29,6 +30,7 @@ export default function SpectralComparison({
   onClear,
   onClose,
 }: SpectralComparisonProps) {
+  useEscapeLayer(onClose);
   // Chart dimensions
   const chartWidth = 460;
   const chartHeight = 240;
@@ -147,6 +149,8 @@ export default function SpectralComparison({
           </button>
           <button
             onClick={onClose}
+            aria-label="Close spectral comparison"
+            title="Close (Esc)"
             className="rounded p-1 text-slate-400 hover:text-white hover:bg-[#232f48] transition-colors"
           >
             <span className="material-symbols-outlined text-lg">close</span>
@@ -297,7 +301,8 @@ export default function SpectralComparison({
             {/* Remove button */}
             <button
               onClick={() => onRemove(s.id)}
-              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+              aria-label="Remove spectrum"
+              className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100 p-0.5 rounded text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
               title="Remove spectrum"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>

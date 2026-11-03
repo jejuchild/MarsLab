@@ -16,6 +16,8 @@ import TopBar from "../components/TopBar";
 import LayerPanelRaw from "../components/layerpanel/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
 import InstrumentBar from "../components/map/InstrumentBar";
+import ViewerShell, { ViewerAction } from "../components/viewer/ViewerShell";
+import PanZoomSurface from "../components/viewer/PanZoomSurface";
 import FieldNoteModal from "../components/FieldNoteModal";
 import CopilotFab from "../components/CopilotFab";
 import type { FieldNote } from "../api/fieldnotes";
@@ -2012,54 +2014,20 @@ export default function MainPage() {
 
       {/* SHARAD Quickview Popup */}
       {sharadPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="relative max-w-4xl max-h-[90vh] bg-[#101622] rounded-lg border border-[#232f48] shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#232f48] bg-[#0a0f18]">
-              <div>
-                <h3 className="text-white font-bold text-sm">{sharadPopup.productId}</h3>
-                <p className="text-[#92a4c9] text-[10px] mt-0.5">
-                  SHARAD Radargram: ({sharadPopup.startLat.toFixed(2)}°, {sharadPopup.startLon.toFixed(2)}°) → ({sharadPopup.stopLat.toFixed(2)}°, {sharadPopup.stopLon.toFixed(2)}°)
-                </p>
-              </div>
-              <button
-                onClick={() => setSharadPopup(null)}
-                className="p-1.5 rounded hover:bg-[#232f48] transition-colors text-[#92a4c9] hover:text-white"
-                aria-label="Close SHARAD popup"
-              >
-                <span className="material-symbols-outlined text-xl">close</span>
-              </button>
-            </div>
-
-            {/* Image */}
-            <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
-              <img
-                src={sharadPopup.quickviewUrl}
-                alt={`SHARAD ${sharadPopup.productId}`}
-                className="max-w-full h-auto"
-                style={{ imageRendering: "crisp-edges" }}
-              />
-            </div>
-
-            {/* Footer with Activate High-Res button placeholder */}
-            <div className="px-4 py-3 border-t border-[#232f48] bg-[#0a0f18] flex justify-end gap-2">
-              <button
-                disabled
-                className="px-3 py-1.5 text-[11px] font-medium bg-[#1a2333] border border-[#232f48] rounded text-[#6b7c9c] cursor-not-allowed"
-                title="High-resolution data not available yet"
-              >
-                Activate High-Res Image (Coming Soon)
-              </button>
-              <button
-                onClick={() => setSharadPopup(null)}
-                className="px-3 py-1.5 text-[11px] font-medium bg-primary/20 border border-primary/50 rounded text-primary hover:bg-primary/30 transition-colors"
-                aria-label="Close SHARAD popup"
-              >
-                Close
-              </button>
-            </div>
+        <ViewerShell
+          variant="modal"
+          maxWidthClass="max-w-6xl"
+          icon="radar"
+          title={`SHARAD ${sharadPopup.productId}`}
+          subtitle={`Track ${sharadPopup.startLat.toFixed(2)}°, ${sharadPopup.startLon.toFixed(2)}°E → ${sharadPopup.stopLat.toFixed(2)}°, ${sharadPopup.stopLon.toFixed(2)}°E`}
+          actions={<ViewerAction icon="download" label="Download" href={sharadPopup.quickviewUrl} download={`${sharadPopup.productId}.png`} />}
+          footer={<p className="text-[11px] text-slate-400">Browse radargram (uncalibrated). Wheel to zoom, drag to pan, 0 to fit.</p>}
+          onClose={() => setSharadPopup(null)}
+        >
+          <div className="relative h-[70vh]">
+            <PanZoomSurface src={sharadPopup.quickviewUrl} alt={`SHARAD radargram ${sharadPopup.productId}`} />
           </div>
-        </div>
+        </ViewerShell>
       )}
 
       {/* Temporal Comparison Modal */}

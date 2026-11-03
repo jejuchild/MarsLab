@@ -93,6 +93,14 @@ async def main() -> None:
             await inspector.get_by_role("button", name="View High-Res Image").first.click()
             await page.wait_for_timeout(3000)
             viewer_open = await page.locator("div.fixed.inset-0").count()
+            await page.wait_for_timeout(5000)
+            fits = await page.evaluate("""() => {
+              const i = document.querySelector('[role=dialog] img');
+              if (!i || !i.naturalWidth) return null;
+              const b = i.getBoundingClientRect();
+              return b.left >= 0 && b.top >= 0 && b.right <= innerWidth && b.bottom <= innerHeight;
+            }""")
+            check(fits is True, "viewer opens with the whole image fitted on screen")
             await page.keyboard.press("Escape")
             await page.wait_for_timeout(1500)
             check(viewer_open == 1 and await page.locator("div.fixed.inset-0").count() == 0, "Escape closes the fullscreen viewer")

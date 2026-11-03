@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import ViewerShell from "./viewer/ViewerShell";
+import QuickviewImage from "./inspector/widgets/QuickviewImage";
 
 /* =========================================================
  * Types
@@ -130,30 +132,15 @@ export default function TemporalComparison({
   }, [lat, lon, instrument]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="relative max-w-3xl w-full mx-4 max-h-[90vh] bg-[#101622] rounded-lg border border-[#232f48] shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#232f48] bg-[#0a0f18]">
-          <div>
-            <h3 className="text-white font-bold text-sm flex items-center gap-2">
-              <span className="material-symbols-outlined text-lg text-amber-400">
-                compare
-              </span>
-              Temporal Change Detection
-            </h3>
-            <p className="text-[#92a4c9] text-[10px] mt-1">
-              {lat.toFixed(4)}{"\u00b0"}, {lon.toFixed(4)}{"\u00b0"} | Searching
-              for repeat observations
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded hover:bg-[#232f48] transition-colors text-[#92a4c9] hover:text-white"
-          >
-            <span className="material-symbols-outlined text-xl">close</span>
-          </button>
-        </div>
-
+    <ViewerShell
+      variant="modal"
+      maxWidthClass="max-w-5xl"
+      icon="compare"
+      title="Temporal change"
+      subtitle={`${lat.toFixed(4)}°, ${lon.toFixed(4)}°E · repeat observations within 50 km`}
+      onClose={onClose}
+    >
+      <div className="flex h-full max-h-[calc(90vh-3.5rem)] flex-col">
         {/* Instrument selector */}
         <div className="px-5 py-3 border-b border-[#232f48] flex items-center gap-3 flex-wrap">
           <span className="text-[10px] text-[#6b7c9c] uppercase font-bold">Instrument</span>
@@ -311,17 +298,8 @@ export default function TemporalComparison({
                       {selectedPair.product_a.date}
                     </span>
                   </div>
-                  <div className="rounded-lg border border-[#232f48] overflow-hidden bg-black">
-                    <img
-                      src={`/hirise/quickview/${selectedPair.product_a.product_id}.png`}
-                      alt={`${selectedPair.product_a.product_id}`}
-                      className="w-full h-auto"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                        (e.target as HTMLImageElement).parentElement!.innerHTML =
-                          '<div class="flex items-center justify-center h-48 text-slate-600 text-[10px]">Quickview not available</div>';
-                      }}
-                    />
+                  <div className="rounded-lg border border-[#232f48] overflow-hidden bg-black h-80">
+                    <QuickviewImage productId={selectedPair.product_a.product_id} instrument={instrument} />
                   </div>
                   <p className="text-[9px] font-mono text-[#6b7c9c] truncate">
                     {selectedPair.product_a.product_id}
@@ -338,17 +316,8 @@ export default function TemporalComparison({
                       {selectedPair.product_b.date}
                     </span>
                   </div>
-                  <div className="rounded-lg border border-[#232f48] overflow-hidden bg-black">
-                    <img
-                      src={`/hirise/quickview/${selectedPair.product_b.product_id}.png`}
-                      alt={`${selectedPair.product_b.product_id}`}
-                      className="w-full h-auto"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                        (e.target as HTMLImageElement).parentElement!.innerHTML =
-                          '<div class="flex items-center justify-center h-48 text-slate-600 text-[10px]">Quickview not available</div>';
-                      }}
-                    />
+                  <div className="rounded-lg border border-[#232f48] overflow-hidden bg-black h-80">
+                    <QuickviewImage productId={selectedPair.product_b.product_id} instrument={instrument} />
                   </div>
                   <p className="text-[9px] font-mono text-[#6b7c9c] truncate">
                     {selectedPair.product_b.product_id}
@@ -378,16 +347,7 @@ export default function TemporalComparison({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-[#232f48] bg-[#0a0f18] flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-[11px] font-medium bg-primary/20 border border-primary/50 rounded text-primary hover:bg-primary/30 transition-colors"
-          >
-            Close
-          </button>
-        </div>
       </div>
-    </div>
+    </ViewerShell>
   );
 }

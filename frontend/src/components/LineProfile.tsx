@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useEscapeLayer } from "./viewer/escapeStack";
 import {
   ComposedChart,
   Line,
@@ -91,6 +92,7 @@ export default function LineProfile({
   endPoint: ProfilePoint;
   onClose: () => void;
 }) {
+  useEscapeLayer(onClose);
   const [data, setData] = useState<TransectResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -205,7 +207,8 @@ export default function LineProfile({
           <button
             onClick={onClose}
             className="p-1 text-slate-500 hover:text-red-400 transition-colors"
-            title="Close profile"
+            title="Close profile (Esc)"
+            aria-label="Close profile"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>

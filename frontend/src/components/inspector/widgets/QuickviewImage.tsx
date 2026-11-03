@@ -97,7 +97,7 @@ export default function QuickviewImage({ productId, instrument }: QuickviewImage
         <span className="material-symbols-outlined text-2xl text-slate-500">
           satellite_alt
         </span>
-        <span className="text-xs text-slate-500">No quickview available</span>
+        <span className="text-xs text-slate-500">No preview image for this product</span>
       </div>
     );
   }
@@ -105,8 +105,8 @@ export default function QuickviewImage({ productId, instrument }: QuickviewImage
   return (
     <img
       src={currentUrl}
-      alt={`Quickview for ${productId}`}
-      className="w-full rounded-lg border border-border-dark object-cover"
+      alt={`${instrument} quickview of ${productId}`}
+      className="h-full w-full rounded-lg border border-border-dark object-contain"
     />
   );
 }

@@ -692,6 +692,8 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
         </div>
         <button
           onClick={onClose}
+          aria-label="Close 3D terrain view"
+          title="Close (Esc)"
           className="p-1.5 rounded hover:bg-[#232f48] transition-colors text-[#92a4c9] hover:text-white"
         >
           <span className="material-symbols-outlined">close</span>
@@ -753,11 +755,11 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
           </span>
         </div>
 
-        {/* Debug Controls */}
-        <div className="flex items-center gap-2">
+        {/* View toggles (Debug is a developer aid, dev builds only) */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowWireframe(!showWireframe)}
-            className={`px-2 py-1 text-[9px] font-bold rounded transition-colors ${
+            className={`min-h-8 px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
               showWireframe
                 ? "bg-green-500/20 text-green-400 border border-green-500/50"
                 : "bg-[#1a2333] text-[#6b7c9c] border border-[#232f48]"
@@ -767,7 +769,7 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
           </button>
           <button
             onClick={() => setShowBoundingBox(!showBoundingBox)}
-            className={`px-2 py-1 text-[9px] font-bold rounded transition-colors ${
+            className={`min-h-8 px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
               showBoundingBox
                 ? "bg-green-500/20 text-green-400 border border-green-500/50"
                 : "bg-[#1a2333] text-[#6b7c9c] border border-[#232f48]"
@@ -775,9 +777,10 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
           >
             Bounds
           </button>
+          {import.meta.env.DEV && (
           <button
             onClick={() => setShowDebug(!showDebug)}
-            className={`px-2 py-1 text-[9px] font-bold rounded transition-colors ${
+            className={`min-h-8 px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
               showDebug
                 ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
                 : "bg-[#1a2333] text-[#6b7c9c] border border-[#232f48]"
@@ -785,9 +788,10 @@ export default function HiRiseDTM3DViewer({ point, onClose }: HiRiseDTM3DViewerP
           >
             Debug
           </button>
+          )}
           <button
             onClick={() => setShowFootprints(!showFootprints)}
-            className={`px-2 py-1 text-[9px] font-bold rounded transition-colors ${
+            className={`min-h-8 px-2.5 py-1 text-[11px] font-semibold rounded transition-colors ${
               showFootprints
                 ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/50"
                 : "bg-[#1a2333] text-[#6b7c9c] border border-[#232f48]"

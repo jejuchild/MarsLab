@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useEscapeLayer } from "../viewer/escapeStack";
 import { INSTRUMENTS, INSTRUMENT_GROUPS } from "../../config/instrumentRegistry";
 import type { InstrumentGroup, InstrumentId } from "../../config/instrumentRegistry";
 import type { FootprintCount, InstrumentVisibility } from "../layerpanel/types";
@@ -42,19 +43,10 @@ export default function InstrumentBar(props: InstrumentBarProps) {
     const onDown = (e: PointerEvent) => {
       if (!barRef.current?.contains(e.target as Node)) setOpenGroup(null);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopImmediatePropagation();
-        setOpenGroup(null);
-      }
-    };
     document.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      document.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey, true);
-    };
+    return () => document.removeEventListener("pointerdown", onDown);
   }, [openGroup]);
+  useEscapeLayer(() => setOpenGroup(null), openGroup !== null);
 
   const loadedIds = (Object.keys(footprintCounts) as InstrumentId[]).filter((id) => footprintCounts[id]);
   const anyLoaded = loadedIds.length > 0;

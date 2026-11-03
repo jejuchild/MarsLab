@@ -210,7 +210,7 @@ export default function ProductDetail({
           />
         </div>
 
-        {(isHiRISE || isDTM) && (
+        {isHiRISE && (
           <button
             onClick={() => setShowHiResViewer(true)}
             className="flex w-full items-center justify-center gap-2 mt-4 py-3 rounded-lg bg-purple-500/20 border border-purple-500/50 text-purple-300 text-[11px] font-bold uppercase tracking-widest hover:bg-purple-500/30 active:scale-[0.98] transition-all"
@@ -233,7 +233,12 @@ export default function ProductDetail({
       </div>
 
       {showHiResViewer && (
-        <HiResImageViewer productId={productId} onClose={() => setShowHiResViewer(false)} />
+        <HiResImageViewer
+          productId={productId}
+          lat={product.lat}
+          lon={product.lon}
+          onClose={() => setShowHiResViewer(false)}
+        />
       )}
     </div>
   );

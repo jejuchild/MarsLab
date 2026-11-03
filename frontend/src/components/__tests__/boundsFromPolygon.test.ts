@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { boundsFromPolygon } from "../MapView";
+import { boundsFromPolygon } from "../../utils/productBounds";
 
 describe("boundsFromPolygon", () => {
   it("returns a plain box for an ordinary footprint", () => {
