@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import type { FieldNote } from "../api/fieldnotes";
 import { computeDownsample, describeHttpError } from "../utils/sharad";
+import { drawRadargramAxes, type ValueScale } from "./sharad/radargramAxes";
 
 /* =========================================================
  * Types
@@ -27,6 +28,8 @@ type RadargramMeta = {
   downsample: number;
   lats: number[];
   lons: number[];
+  distance_km?: number[];
+  trace_spacing_m?: number;
 };
 
 type DepthResult = {
@@ -75,6 +78,7 @@ type CachedProductData = {
   surface: SurfacePoint[];
   molaProfile: MolaProfile | null;
   clutterAvailable: boolean;
+  valueScale: ValueScale | null;
   /** Cache key includes display params that affect the radargram image */
   paramKey: string;
 };
@@ -117,6 +121,8 @@ export default function SharadHiresInspector({
   const [, setAuxLoading] = useState(false); // surface/mola still loading
   const [auxWarning, setAuxWarning] = useState<string | null>(null); // non-fatal surface/MOLA failure
   const [retryNonce, setRetryNonce] = useState(0); // bump to re-run loadAll (Retry button)
+  const [valueScale, setValueScale] = useState<ValueScale | null>(null); // colour-bar mapping
+  const [showAxes, setShowAxes] = useState(true);
 
   // Display controls
   const [useLog, setUseLog] = useState(true);
@@ -262,6 +268,7 @@ export default function SharadHiresInspector({
           surfData = cached.surface;
           molaData = cached.molaProfile;
           clutterOk = cached.clutterAvailable;
+          setValueScale(cached.valueScale);
         } else {
           // Helper: fetch with 30s timeout via AbortController
           const fetchWithTimeout = (url: string, timeoutMs = 60000): Promise<globalThis.Response> => {
@@ -286,6 +293,12 @@ export default function SharadHiresInspector({
           if (!imgRes.ok) throw new Error(await describeHttpError(imgRes, "Radargram image"));
           if (!rmRes.ok) throw new Error(await describeHttpError(rmRes, "Radargram axis metadata"));
 
+          let vScale: ValueScale | null = null;
+          try {
+            const hdr = imgRes.headers.get("X-Value-Scale");
+            vScale = hdr ? (JSON.parse(hdr) as ValueScale) : null;
+          } catch { vScale = null; }
+          if (!cancelled) setValueScale(vScale);
           blob = await imgRes.blob();
           rmData = await rmRes.json();
 
@@ -367,7 +380,7 @@ export default function SharadHiresInspector({
           _productCache.set(productId, {
             metadata: metaData, radargramBlob: blob, radargramMeta: rmData,
             surface: surfData, molaProfile: molaData, clutterAvailable: clutterOk,
-            paramKey,
+            valueScale: vScale, paramKey,
           });
           return; // skip the generic state-setting below (already done)
         }
@@ -672,6 +685,25 @@ export default function SharadHiresInspector({
       ctx.stroke();
     }
 
+    // Axes, scale bar and colour bar
+    if (showAxes) {
+      const centre = ((viewX.start + viewX.end) / 2) * nTraces;
+      let sBin: number | null = null;
+      let bestDx = Infinity;
+      for (const pt of effectiveSurface) {
+        const dx = Math.abs(pt.x - centre);
+        if (dx < bestDx) { bestDx = dx; sBin = pt.y; }
+      }
+      if (bestDx > Math.max(20, nTraces * 0.02)) sBin = null;
+      drawRadargramAxes(ctx, {
+        W, H, viewX, viewY, nTraces, nBins,
+        distanceKm: radargramMeta.distance_km,
+        surfaceBin: sBin,
+        eps1: epsilonR1, eps2: epsilonR2, boundaryM,
+        valueScale,
+      });
+    }
+
     // Cursor crosshair
     if (cursor && !adjustDragRef.current && !isDragging.current) {
       const cx = cursor.normX;
@@ -695,7 +727,7 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit]);
+  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit, showAxes, valueScale, epsilonR1, epsilonR2]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -1330,6 +1362,14 @@ export default function SharadHiresInspector({
                 </div>
               </div>
             )}
+
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-slate-400">Axes</span>
+              <div className="flex gap-1">
+                <MiniButton active={showAxes} onClick={() => setShowAxes(true)}>On</MiniButton>
+                <MiniButton active={!showAxes} onClick={() => setShowAxes(false)}>Off</MiniButton>
+              </div>
+            </div>
 
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400">Normalize</span>

@@ -239,3 +239,27 @@ def test_depth_conversion_endpoint(data_dir, client):
     q.update(surface_bin_override=SURF_BIN + 50, boundary_m=0, epsilon_r2=4.0)
     j3 = client.get("/api/sharad_highres/depth_conversion", params=q).json()
     assert j3["delta_bins"] == 50 and j3["surface_pick"] == "manual"
+
+
+# ── axes metadata (R2) ────────────────────────────────────────────────
+
+def test_radargram_scale_header_and_distance(data_dir, client):
+    _write_product(str(data_dir))
+    r = client.get("/api/sharad_highres/radargram", params={
+        "product_id": PID, "downsample": 1, "log": 1, "amplitude": 0, "per_trace": 0})
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    sc = json.loads(r.headers["X-Value-Scale"])
+    assert sc["unit"].startswith("dB") and "uncalibrated" in sc["unit"]
+    assert sc["vmin"] < sc["vmax"]
+    r2 = client.get("/api/sharad_highres/radargram", params={
+        "product_id": PID, "downsample": 1, "log": 1, "amplitude": 1, "per_trace": 0})
+    sc2 = json.loads(r2.headers["X-Value-Scale"])
+    assert sc2["vmax"] == pytest.approx(sc["vmax"], abs=0.5)   # amp vs power: same dB
+    pt = json.loads(client.get("/api/sharad_highres/radargram", params={
+        "product_id": PID, "downsample": 1, "per_trace": 1}).headers["X-Value-Scale"])
+    assert pt["vmin"] is None and pt["per_trace"]
+    rm = client.get("/api/sharad_highres/radargram_meta", params={"product_id": PID, "downsample": 2}).json()
+    # 0.01 deg latitude per row ≈ 591.5 m
+    assert rm["trace_spacing_m"] == pytest.approx(591.5, rel=0.01)
+    assert rm["distance_km"][1] == pytest.approx(2 * 0.5915, rel=0.01)
+    assert len(rm["distance_km"]) == rm["n_traces"] == N_ROWS // 2

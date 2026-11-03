@@ -509,7 +509,42 @@ def _render_radargram_png(
     global_vmin: float | None = None,
     global_vmax: float | None = None,
 ) -> bytes:
-    """Render the radargram as a grayscale PNG (cached by params).
+    """PNG bytes only (backwards-compatible wrapper)."""
+    return _render_radargram(power, downsample, use_log, pmin, pmax, amplitude,
+                             per_trace, cache_key, global_vmin, global_vmax)[0]
+
+
+def _scale_info(use_log: bool, amplitude: bool, per_trace: bool, vmin: float | None, vmax: float | None) -> dict:
+    """Describe how grey 0..255 maps to data values (for the colour bar).
+
+    Values are UNCALIBRATED relative power: the RDR is not corrected for
+    antenna gain, receiver gain or spreading, so dB are relative only.
+    """
+    info = {"per_trace": per_trace, "log": use_log, "amplitude": amplitude}
+    if per_trace or vmin is None or vmax is None:
+        info.update(unit="relative (per-trace stretch)", vmin=None, vmax=None)
+    elif use_log:
+        k = 20.0 if amplitude else 10.0   # log10(amp)·20 = log10(power)·10 = dB
+        info.update(unit="dB (uncalibrated relative power)", vmin=round(k * vmin, 2), vmax=round(k * vmax, 2))
+    else:
+        info.update(unit=("amplitude" if amplitude else "power") + " (uncalibrated, linear)",
+                    vmin=float(f"{vmin:.4g}"), vmax=float(f"{vmax:.4g}"))
+    return info
+
+
+def _render_radargram(
+    power: np.ndarray,
+    downsample: int = 1,
+    use_log: bool = True,
+    pmin: float = 1.0,
+    pmax: float = 99.0,
+    amplitude: bool = False,
+    per_trace: bool = False,
+    cache_key: str = "",
+    global_vmin: float | None = None,
+    global_vmax: float | None = None,
+) -> tuple[bytes, dict]:
+    """Render the radargram as a grayscale PNG (cached by params) → (png, scale_info).
 
     amplitude: if True, use sqrt(power) instead of raw power.
     per_trace: if True, normalize each trace independently (like PDS browse images).
@@ -556,6 +591,7 @@ def _render_radargram_png(
         vmaxs = p_sorted_hi[:, k_hi : k_hi + 1]
         vmaxs = np.where(vmaxs <= vmins, vmins + 1, vmaxs)
         img = ((p - vmins) / (vmaxs - vmins) * 255).clip(0, 255).astype(np.uint8)
+        vmin = vmax = None
     else:
         p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
         if global_vmin is not None and global_vmax is not None:
@@ -578,10 +614,13 @@ def _render_radargram_png(
     logger.info("_render_radargram_png: %d traces x %d bins, ds=%d, per_trace=%s => %.2fs",
                 p.shape[0], p.shape[1] if p.ndim > 1 else 0, downsample, per_trace, elapsed)
 
+    result = (png_bytes, _scale_info(use_log, amplitude, per_trace,
+                                     None if vmin is None else float(vmin),
+                                     None if vmax is None else float(vmax)))
     if cache_key:
-        _lru_put(_png_cache, cache_key, png_bytes)
+        _lru_put(_png_cache, cache_key, result)
 
-    return png_bytes
+    return result
 
 
 # ── Cluttergram (surface clutter simulation) ─────────
@@ -1094,7 +1133,7 @@ def get_radargram(
             )
 
         ckey = f"{product_id}_{downsample}_{log}_{pmin}_{pmax}_{amplitude}_{per_trace}_{st}_{et}"
-        png = _render_radargram_png(
+        png, scale = _render_radargram(
             tile_power, downsample=downsample, use_log=bool(log),
             pmin=pmin, pmax=pmax,
             amplitude=bool(amplitude), per_trace=bool(per_trace),
@@ -1112,6 +1151,7 @@ def get_radargram(
                 "X-Start-Trace": str(st),
                 "X-End-Trace": str(et),
                 "X-Total-Traces": str(total_rows),
+                "X-Value-Scale": json.dumps(scale),
                 "Cache-Control": "public, max-age=3600",
             },
         )
@@ -1134,14 +1174,20 @@ def get_radargram_meta(
         indices = np.arange(0, total_rows, downsample)[:n_traces_out]
         lats = np.asarray(geom["lat"][indices])  # planetocentric
         lons = _lon_to_180(geom["lon"][indices])
+        dist_full = _haversine_vec(np.asarray(geom["lat"]), _lon_to_180(np.asarray(geom["lon"])))
+        dist_km = dist_full[indices] / 1000.0
+        spacing = float(np.median(np.diff(dist_full))) if total_rows > 1 else 0.0
 
         return JSONResponse(content={
             "n_traces": int(n_traces_out),
             "n_bins": N_RANGE_BINS,
             "downsample": downsample,
             "sample_interval_us": SHARAD_SAMPLE_INTERVAL_US,
-            "lats": [round(float(v), 4) for v in lats],
-            "lons": [round(float(v), 4) for v in lons],
+            "lat_convention": "planetocentric",
+            "trace_spacing_m": round(spacing, 2),
+            "lats": [round(float(v), 5) for v in lats],
+            "lons": [round(float(v), 5) for v in lons],
+            "distance_km": [round(float(v), 4) for v in dist_km],
         })
     except Exception as e:
         return _error_response(e)
