@@ -26,7 +26,7 @@ from .models import (
 )
 
 from analysis.shared.constants import SPEED_OF_LIGHT, SHARAD_SAMPLE_INTERVAL_US
-from analysis.shared.coordinates import lon_to_180, centric_to_graphic, cumulative_distance_m
+from analysis.shared.coordinates import lon_to_180, cumulative_distance_m
 from analysis.shared.dem_sampling import sample_dem_along_track
 from analysis.shared.overlay import interpolate_colormap, CMAP_THICKNESS
 from analysis.shared.clutter_mask import compute_clutter_mask
@@ -164,7 +164,7 @@ class RegolithThicknessEstimator(AnalysisModule):
         lats_centric = geom["lat"][:total_rows]
         lons_360 = geom["lon"][:total_rows]
         lons_180 = lon_to_180(lons_360)
-        lats_graphic = centric_to_graphic(lats_centric)
+        lats_out = lats_centric  # planetocentric: same convention as map/at-point
 
         logger.debug("RTE: loaded %d traces, %d bins", total_rows, power.shape[1])
 
@@ -179,7 +179,7 @@ class RegolithThicknessEstimator(AnalysisModule):
             )
             lats_centric = lats_centric[:n_traces_min]
             lons_180 = lons_180[:n_traces_min]
-            lats_graphic = centric_to_graphic(lats_centric)
+            lats_out = lats_centric  # planetocentric: same convention as map/at-point
             surface = surface[:n_traces_min]
             power = power[:n_traces_min]
             total_rows = n_traces_min
@@ -336,7 +336,7 @@ class RegolithThicknessEstimator(AnalysisModule):
         for i in range(n_traces):
             sample = RegolithSample(
                 trace_idx=i,
-                lat=round(float(lats_graphic[i]), 5),
+                lat=round(float(lats_out[i]), 5),
                 lon=round(float(lons_180[i]), 5),
                 along_track_km=round(float(distances_km[i]), 3),
                 surface_elev_m=round(float(surface_elevs[i]), 1)
@@ -363,7 +363,7 @@ class RegolithThicknessEstimator(AnalysisModule):
 
         # ── Step 9: Overlay segments (downsampled to ≤500) ─────────
         overlay = self._build_overlay(
-            lats_graphic, lons_180, detected, thickness_m, n_traces,
+            lats_out, lons_180, detected, thickness_m, n_traces,
         )
 
         # ── Step 10: Summary stats ──────────────────────────────────

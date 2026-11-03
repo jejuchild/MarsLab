@@ -5,7 +5,12 @@ Algorithm:
   1. Load SHARAD power array + surface picks (cached)
   2. For each trace, detect near-surface reflector (reuses RTE pattern)
   3. Apply coherence filtering (median + outlier rejection)
-  4. Compute two-way attenuation: α = (P_surf_dB - P_sub_dB) / (2 * depth_m)
+  4. Attenuation from a power-vs-depth REGRESSION of (P_sub − P_surf) dB on
+     depth: α = −slope/2 (one-way dB/m), fitted in an along-track sliding
+     window (and once for the whole track), with standard error and R².
+     The per-trace ratio (P_surf − P_sub)/(2d) is kept as ``alpha_ratio_dBm``
+     for reference only: it attributes the whole interface-reflectivity
+     contrast to loss.
   5. Classify material transparency per trace
   6. Sample DEM elevation along track
   7. Generate colored overlay segments for map rendering
@@ -26,7 +31,14 @@ from .models import (
 )
 
 from analysis.shared.constants import SPEED_OF_LIGHT, SHARAD_SAMPLE_INTERVAL_US
-from analysis.shared.coordinates import lon_to_180, centric_to_graphic, cumulative_distance_m
+from analysis.shared.sharad_math import fit_attenuation, windowed_attenuation
+
+# Sliding regression window (full-resolution traces each side). ~250 traces
+# ≈ 4.5 km (SS19) / 9 km (SS4) half-width.
+ATTEN_HALF_WINDOW = 250
+ATTEN_MIN_POINTS = 20
+ATTEN_MIN_SPAN_M = 10.0
+from analysis.shared.coordinates import lon_to_180, cumulative_distance_m
 from analysis.shared.dem_sampling import sample_dem_along_track
 from analysis.shared.overlay import interpolate_colormap, CMAP_ATTENUATION
 
@@ -130,7 +142,7 @@ class RadarAttenuationMapper(AnalysisModule):
         lats_centric = geom["lat"][:total_rows]
         lons_360 = geom["lon"][:total_rows]
         lons_180 = lon_to_180(lons_360)
-        lats_graphic = centric_to_graphic(lats_centric)
+        lats_out = lats_centric  # planetocentric: same convention as map/at-point
 
         # ── Step 2: Sample DEM along track ──────────────────────────
         dem_source, surface_elevs = sample_dem_along_track(
@@ -201,8 +213,7 @@ class RadarAttenuationMapper(AnalysisModule):
         # Power in dB (surface and subsurface)
         surface_power_dB = np.full(n_traces, np.nan, dtype=np.float64)
         subsurface_power_dB = np.full(n_traces, np.nan, dtype=np.float64)
-        alpha_dBm = np.full(n_traces, np.nan, dtype=np.float64)
-        transparency = [None] * n_traces
+        alpha_ratio = np.full(n_traces, np.nan, dtype=np.float64)
 
         for i in valid_indices:
             if not detected[i]:
@@ -210,31 +221,42 @@ class RadarAttenuationMapper(AnalysisModule):
             sb = int(surface[i])
             sub_bin = sb + delta_bins_arr[i]
             if sub_bin >= n_bins:
+                detected[i] = False
                 continue
-
             p_surf = max(float(power[i, sb]), 1e-12)
             p_sub = max(float(power[i, sub_bin]), 1e-12)
-            p_surf_dB = 10.0 * math.log10(p_surf)
-            p_sub_dB = 10.0 * math.log10(p_sub)
-
-            surface_power_dB[i] = p_surf_dB
-            subsurface_power_dB[i] = p_sub_dB
-
+            surface_power_dB[i] = 10.0 * math.log10(p_surf)
+            subsurface_power_dB[i] = 10.0 * math.log10(p_sub)
             d = depth_m[i]
-            if d > 5.0:  # Need sufficient depth for reliable α
-                a = (p_surf_dB - p_sub_dB) / (2.0 * d)
-                if a >= 0:  # Physically valid (surface stronger than subsurface)
-                    alpha_dBm[i] = a
-                    transparency[i] = _classify_transparency(a)
+            if d > 5.0:
+                alpha_ratio[i] = (surface_power_dB[i] - subsurface_power_dB[i]) / (2.0 * d)
+
+        rel_db = subsurface_power_dB - surface_power_dB
+        fit_ok = detected & np.isfinite(rel_db) & (depth_m > 0)
+        win = windowed_attenuation(
+            depth_m, rel_db, fit_ok, ATTEN_HALF_WINDOW,
+            min_points=ATTEN_MIN_POINTS, min_span_m=ATTEN_MIN_SPAN_M,
+        )
+        # Physically α ≥ 0; a negative slope-fit means "no measurable loss
+        # gradient" (or reflectivity varies with depth) → leave unclassified.
+        alpha_dBm = np.where(win["alpha_dBm"] >= 0, win["alpha_dBm"], np.nan)
+        alpha_se = np.where(np.isfinite(alpha_dBm), win["alpha_se_dBm"], np.nan)
+        alpha_r2 = np.where(np.isfinite(alpha_dBm), win["r2"], np.nan)
+        transparency = [
+            _classify_transparency(float(alpha_dBm[i])) if fit_ok[i] and np.isfinite(alpha_dBm[i]) else None
+            for i in range(n_traces)
+        ]
+        track_fit = fit_attenuation(depth_m[fit_ok], rel_db[fit_ok],
+                                    min_points=ATTEN_MIN_POINTS, min_span_m=ATTEN_MIN_SPAN_M)
 
         # ── Step 7: Build profile ───────────────────────────────────
         profile: List[AttenuationSample] = []
         for i in range(n_traces):
             det = bool(detected[i])
-            has_alpha = det and not np.isnan(alpha_dBm[i])
+            has_alpha = bool(fit_ok[i]) and not np.isnan(alpha_dBm[i])
             sample = AttenuationSample(
                 trace_idx=i,
-                lat=round(float(lats_graphic[i]), 5),
+                lat=round(float(lats_out[i]), 5),
                 lon=round(float(lons_180[i]), 5),
                 along_track_km=round(float(distances_km[i]), 3),
                 surface_elev_m=round(float(surface_elevs[i]), 1)
@@ -246,6 +268,10 @@ class RadarAttenuationMapper(AnalysisModule):
                     if det and not np.isnan(subsurface_power_dB[i]) else None,
                 depth_m=round(float(depth_m[i]), 1) if det else None,
                 alpha_dBm=round(float(alpha_dBm[i]), 4) if has_alpha else None,
+                alpha_se_dBm=round(float(alpha_se[i]), 4) if has_alpha else None,
+                alpha_r2=round(float(alpha_r2[i]), 3) if has_alpha else None,
+                alpha_ratio_dBm=round(float(alpha_ratio[i]), 4)
+                    if det and not np.isnan(alpha_ratio[i]) else None,
                 transparency=transparency[i],
                 snr=round(float(snr_arr[i]), 2) if det else None,
                 confidence=round(float(coherence[i]), 3) if det else None,
@@ -253,14 +279,14 @@ class RadarAttenuationMapper(AnalysisModule):
             profile.append(sample)
 
         # ── Step 8: Overlay segments ────────────────────────────────
-        alpha_valid = np.where(~np.isnan(alpha_dBm), True, False)
+        alpha_valid = fit_ok & ~np.isnan(alpha_dBm)
         alpha_values = np.where(alpha_valid, alpha_dBm, 0.0)
         overlay = self._build_overlay(
-            lats_graphic, lons_180, alpha_valid, alpha_values, n_traces,
+            lats_out, lons_180, alpha_valid, alpha_values, n_traces,
         )
 
         # ── Step 9: Summary stats ──────────────────────────────────
-        valid_alpha = alpha_dBm[~np.isnan(alpha_dBm)]
+        valid_alpha = alpha_dBm[alpha_valid]
         n_alpha = len(valid_alpha)
 
         # Count transparency classes
@@ -284,6 +310,14 @@ class RadarAttenuationMapper(AnalysisModule):
             transparency_counts=trans_counts,
             dem_source=dem_source,
             total_distance_km=round(float(distances_km[-1]), 2) if n_traces else 0.0,
+            method="power-vs-depth regression, sliding window ±%d traces" % ATTEN_HALF_WINDOW,
+            alpha_fit_dBm=None if track_fit.alpha_dBm is None else round(track_fit.alpha_dBm, 5),
+            alpha_fit_se_dBm=None if track_fit.alpha_se_dBm is None else round(track_fit.alpha_se_dBm, 5),
+            alpha_fit_r2=None if track_fit.r2 is None else round(track_fit.r2, 3),
+            alpha_fit_n=track_fit.n,
+            alpha_fit_depth_span_m=round(track_fit.depth_span_m, 1),
+            alpha_ratio_median_dBm=round(float(np.nanmedian(alpha_ratio)), 4)
+                if np.isfinite(alpha_ratio).any() else None,
         )
 
         params = AttenuationParameters(

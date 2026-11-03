@@ -398,6 +398,8 @@ export default function MainPage() {
 
   // SHARAD High-Res Inspector — opens when a product is selected
   const [sharadHiresProductId, setSharadHiresProductId] = useState<string | null>(null);
+  // Map point the radargram was opened from (Inspector) → viewer centres on the nearest trace
+  const [sharadHiresFocus, setSharadHiresFocus] = useState<{ lat: number; lon: number } | null>(null);
   // Pin showing clicked radargram location on the map track
   const [sharadTracePin, setSharadTracePin] = useState<{ lat: number; lon: number } | null>(null);
 
@@ -755,6 +757,7 @@ export default function MainPage() {
 
   // Handle SHARAD High-Res footprint click - open radargram inspector
   const handleSharadHiresClick = useCallback((productId: string) => {
+    setSharadHiresFocus(null);
     setSharadHiresProductId(productId);
     setSelected(null); // Close regular Inspector
   }, []);
@@ -951,6 +954,7 @@ export default function MainPage() {
 
     // SHARAD_HIGHRES: open the dedicated SharadHiresInspector and fly to track
     if (note.instrument === "SHARAD_HIGHRES") {
+      setSharadHiresFocus(null); // legacy notes may hold planetographic coords
       setSharadHiresProductId(note.product_id);
       setSelected(null); // Close regular Inspector
 
@@ -1478,6 +1482,7 @@ export default function MainPage() {
 
     // Open appropriate panel based on instrument
     if (instrument === "SHARAD_HIGHRES") {
+      setSharadHiresFocus(null);
       setSharadHiresProductId(productId);
       panelManager.ensurePanelVisible("search_result");
     } else if (instrument && instrument !== "CTX") {
@@ -1671,7 +1676,8 @@ export default function MainPage() {
     ) : sharadHiresProductId ? (
       <SharadHiresInspector
         productId={sharadHiresProductId}
-        onClose={() => { setSharadHiresProductId(null); setSharadTracePin(null); }}
+        initialPoint={sharadHiresFocus}
+        onClose={() => { setSharadHiresProductId(null); setSharadTracePin(null); setSharadHiresFocus(null); }}
         fieldNotes={fieldNotes}
         onOpenFieldNote={(pid, lat, lon) => setShowFieldNoteModal({ productId: pid, instrument: "SHARAD_HIGHRES", lat, lon })}
         onLocatePoint={(lat, lon) => setSharadTracePin({ lat, lon })}
@@ -1716,7 +1722,7 @@ export default function MainPage() {
         recentProducts={recentProducts}
         onSelectRecent={handleSelectRecent}
         onRemoveRecent={removeRecentProduct}
-        onOpenRadargram={setSharadHiresProductId}
+        onOpenRadargram={(pid, point) => { setSharadHiresFocus(point ?? null); setSharadHiresProductId(pid); }}
         crossActions={inspectorCrossActions}
       />
     ) : terrainPoint ? (

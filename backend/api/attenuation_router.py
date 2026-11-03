@@ -65,7 +65,7 @@ def _run_mapper(
 
 
 @router.get("/profile")
-async def attenuation_profile(
+def attenuation_profile(
     product_id: str = Query(..., description="SHARAD_HIGHRES product ID"),
     epsilon_r: float = Query(2.5, ge=1.5, le=8.0, description="Dielectric constant"),
     snr_threshold: float = Query(3.5, ge=1.0, le=20.0, description="Min SNR for detection"),
@@ -109,7 +109,7 @@ async def attenuation_profile(
 
 
 @router.get("/export_csv")
-async def export_csv(
+def export_csv(
     product_id: str = Query(..., description="SHARAD_HIGHRES product ID"),
     epsilon_r: float = Query(2.5, ge=1.5, le=8.0),
     snr_threshold: float = Query(3.5, ge=1.0, le=20.0),
@@ -147,8 +147,8 @@ async def export_csv(
     writer.writerow([
         "trace_idx", "lat", "lon", "along_track_km", "surface_elev_m",
         "interface_detected", "surface_power_dB", "subsurface_power_dB",
-        "depth_m", "alpha_dBm", "transparency", "snr", "confidence",
-        "epsilon_r",
+        "depth_m", "alpha_dBm", "alpha_se_dBm", "alpha_r2", "alpha_ratio_dBm",
+        "transparency", "snr", "confidence", "epsilon_r", "lat_convention",
     ])
     for s in result.profile:
         writer.writerow([
@@ -158,10 +158,14 @@ async def export_csv(
             s.subsurface_power_dB if s.subsurface_power_dB is not None else "",
             s.depth_m if s.depth_m is not None else "",
             s.alpha_dBm if s.alpha_dBm is not None else "",
+            s.alpha_se_dBm if s.alpha_se_dBm is not None else "",
+            s.alpha_r2 if s.alpha_r2 is not None else "",
+            s.alpha_ratio_dBm if s.alpha_ratio_dBm is not None else "",
             s.transparency if s.transparency is not None else "",
             s.snr if s.snr is not None else "",
             s.confidence if s.confidence is not None else "",
             epsilon_r,
+            "planetocentric",
         ])
 
     buf.seek(0)

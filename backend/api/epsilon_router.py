@@ -84,33 +84,19 @@ async def near_crater_inversion(
 
 
 @router.get("/hyperbola_fit")
-async def hyperbola_fit(
+def hyperbola_fit(
     product_id: str = Query(..., description="SHARAD product ID"),
-    trace_idx0: int = Query(..., ge=0, description="Center trace index"),
-    bin_idx0: int = Query(..., ge=0, description="Center bin index"),
-    window_traces: int = Query(150, ge=20, le=500, description="Window width in traces"),
-    window_bins: int = Query(120, ge=20, le=300, description="Window height in bins"),
+    trace_idx0: int = Query(..., ge=0, description="Apex trace index (FULL resolution)"),
+    bin_idx0: int = Query(..., ge=0, description="Apex range bin"),
+    window_traces: int = Query(300, ge=20, le=6000, description="Window width in full-res traces"),
+    window_bins: int = Query(120, ge=20, le=600, description="Window height in bins"),
 ) -> dict:
-    """Estimate εr from hyperbolic reflector curvature (NMO analysis).
+    """EXPERIMENTAL: estimate εr from a diffraction hyperbola.
 
-    Fits a hyperbolic travel-time curve to reflector arrivals around a point
-    reflector to estimate velocity → εr.
-
-    Args:
-        product_id: SHARAD product ID containing reflector
-        trace_idx0: Center trace of point reflector
-        bin_idx0: Center bin of point reflector
-        window_traces: Traces to include in fitting window
-        window_bins: Bins to include in fitting window
-
-    Returns:
-        epsilon_r_est: Estimated εr from NMO fit
-        epsilon_r_std: Uncertainty in estimate
-        rmse_bins: RMS error of fit (in bins)
-        inlier_ratio: Fraction of picks used (vs outliers rejected)
-        n_inliers: Number of inlier reflections
-        quality_note: Fit quality assessment
-        diagnostics: Advanced metrics (curve params, residuals, etc.)
+    Fits t(x) = √(t0² + (2(x−x0)/v)²) with t measured below the surface echo
+    and x from the RDR geometry; εr = (c/v)².  Poorly constrained for focused
+    orbital RDRs (see ``flags`` / ``quality_note``).  Trace indices are full
+    resolution (display trace × downsample).
     """
     try:
         logger.info(
@@ -127,14 +113,22 @@ async def hyperbola_fit(
             window_bins=window_bins,
         )
 
+        import math as _m
         return {
-            "success": True,
+            "success": result.epsilon_r_est is not None,
+            "experimental": True,
             "epsilon_r_est": result.epsilon_r_est,
             "epsilon_r_std": result.epsilon_r_std,
-            "rmse_bins": round(result.rmse_bins, 2),
+            "epsilon_r_ci95": list(result.epsilon_r_ci95) if result.epsilon_r_ci95 else None,
+            "depth_m": result.depth_m,
+            "v_ms": result.v_ms,
+            "rmse_bins": None if _m.isnan(result.rmse_bins) else round(result.rmse_bins, 3),
             "inlier_ratio": round(result.inlier_ratio, 3),
-            "n_inliers": result.n_inliers,
+            "n_inliers": int(result.n_inliers),
             "quality_note": result.quality_note,
+            "flags": result.flags,
+            "picks": result.picks,
+            "overlay": result.overlay,
             "diagnostics": result.diagnostics,
         }
 

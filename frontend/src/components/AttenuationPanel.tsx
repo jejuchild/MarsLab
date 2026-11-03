@@ -212,6 +212,31 @@ export default function AttenuationPanel({
               </div>
             )}
 
+            {/* ── Track regression (power vs depth) ───── */}
+            {summary.alpha_fit_dBm != null && (
+              <div className="rounded-lg border border-border-dark bg-black/20 p-2 text-[10px] text-slate-300 space-y-0.5"
+                title={summary.method || "power-vs-depth regression"}>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Track fit α (one-way)</span>
+                  <span className="font-mono text-white">
+                    {summary.alpha_fit_dBm.toFixed(4)} ± {(summary.alpha_fit_se_dBm ?? 0).toFixed(4)} dB/m
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">R² / points / depth span</span>
+                  <span className="font-mono">
+                    {(summary.alpha_fit_r2 ?? 0).toFixed(2)} / {summary.alpha_fit_n ?? 0} / {(summary.alpha_fit_depth_span_m ?? 0).toFixed(0)} m
+                  </span>
+                </div>
+                {summary.alpha_ratio_median_dBm != null && (
+                  <div className="flex justify-between text-slate-500">
+                    <span>Per-trace ratio (legacy, biased)</span>
+                    <span className="font-mono">{summary.alpha_ratio_median_dBm.toFixed(4)} dB/m</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── Summary Stats ───────────────────────── */}
             <div className="grid grid-cols-2 gap-2">
               <StatCard

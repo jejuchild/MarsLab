@@ -18,8 +18,10 @@ export interface InspectorProps {
   recentProducts?: RecentProduct[];
   onSelectRecent?: (product: RecentProduct) => void;
   onRemoveRecent?: (productId: string) => void;
-  /** Open the full SHARAD hi-res radargram viewer (drill-in; closing returns here). */
-  onOpenRadargram?: (productId: string) => void;
+  /** Open the full SHARAD hi-res radargram viewer (drill-in; closing returns here).
+   *  `point` is the inspected map point (planetocentric) so the viewer can
+   *  centre on and mark the nearest trace. */
+  onOpenRadargram?: (productId: string, point?: { lat: number; lon: number }) => void;
   /** Launchers for the Cross-Analysis tools at the bottom of the panel. */
   crossActions?: CrossActions;
 }
@@ -61,6 +63,10 @@ export default function Inspector({
   onOpenRadargram,
   crossActions,
 }: InspectorProps) {
+  // Pass the inspected point along so the radargram opens on the nearest trace.
+  const openRadargramAtPoint = onOpenRadargram
+    ? (productId: string) => onOpenRadargram(productId, context ? { lat: context.lat, lon: context.lon } : undefined)
+    : undefined;
   const [response, setResponse] = useState<AtPointResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -276,7 +282,7 @@ export default function Inspector({
                 context={context}
                 handlers={handlers}
                 onOpenLane={openLane}
-                onOpenRadargram={onOpenRadargram}
+                onOpenRadargram={openRadargramAtPoint}
               />
             )}
             {!loading && !error && lanes && view === "lanes" && (
@@ -293,7 +299,7 @@ export default function Inspector({
                 }}
                 context={context}
                 handlers={handlers}
-                onOpenRadargram={onOpenRadargram}
+                onOpenRadargram={openRadargramAtPoint}
               />
             )}
           </div>

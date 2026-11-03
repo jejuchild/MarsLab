@@ -24,6 +24,8 @@ import math
 import glob as globmod
 import logging
 import time
+import json
+import threading
 
 import numpy as np
 from PIL import Image
@@ -34,6 +36,19 @@ from cachetools import LRUCache
 logger = logging.getLogger(__name__)
 
 from api.validation import validate_product_id
+from analysis.shared.sharad_math import (
+    IncompleteProductError,
+    check_dat_complete,
+    depth_from_twt,
+    depth_resolution,
+    pick_surface_leading_edge,
+    predicted_surface_bins,
+    reject_pick_outliers,
+    robust_linear_offset,
+    label_file_records,
+    read_rwot,
+    source_signature,
+)
 
 router = APIRouter(prefix="/api/sharad_highres", tags=["SHARAD High-Res"])
 
@@ -46,7 +61,10 @@ def _validate_router_product_id(product_id: str) -> str:
 
 # ── Paths ──────────────────────────────────────────────
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHARAD_HR_DIR = os.path.join(_BACKEND_DIR, "sharad_highres")
+# Both overridable so tests / offline checks can read live data read-only and
+# write derived caches elsewhere.
+SHARAD_HR_DIR = os.environ.get("MARSLAB_SHARAD_HR_DIR") or os.path.join(_BACKEND_DIR, "sharad_highres")
+SHARAD_CACHE_DIR = os.environ.get("MARSLAB_SHARAD_CACHE_DIR") or os.path.join(SHARAD_HR_DIR, ".cache")
 
 # ── RDR binary layout constants ────────────────────────
 ROW_BYTES = 5822
@@ -57,7 +75,7 @@ ECHO_REAL_OFFSET = 194      # start_byte 195
 ECHO_IMAG_OFFSET = 2862     # start_byte 2863
 ECHO_BYTES = N_RANGE_BINS * 4  # 2668
 
-RWOT_OFFSET = 186            # RECEIVE_WINDOW_OPENING_TIME, float32
+RWOT_OFFSET = 186            # RECEIVE_WINDOW_OPENING_TIME, float32 (units of 37.5 ns)
 LON_OFFSET = 5637            # SUB_SC_EAST_LONGITUDE, float64
 LAT_OFFSET = 5645            # SUB_SC_PLANETOCENTRIC_LATITUDE, float64
 ALT_OFFSET = 5629            # SPACECRAFT_ALTITUDE, float64
@@ -72,13 +90,80 @@ SPEED_OF_LIGHT = 299792458.0  # m/s
 # ── Per-product cache management ──────────────────────
 # Caches keyed by product_id (uppercase)
 _product_caches: dict[str, dict] = {}
+_locks_guard = threading.Lock()
+_product_locks: dict[str, threading.RLock] = {}
+
+
+def _product_lock(product_id: str) -> threading.RLock:
+    """Per-product lock: serialises the expensive parse/pick of one product
+    (concurrent first requests would otherwise parse 0.5 GB several times and
+    race on the .npy files) without blocking other products."""
+    pid = product_id.upper()
+    with _locks_guard:
+        lk = _product_locks.get(pid)
+        if lk is None:
+            lk = _product_locks[pid] = threading.RLock()
+        return lk
+
+
+def _error_response(e: Exception) -> JSONResponse:
+    """Map exceptions to HTTP errors with a useful ``detail``."""
+    if isinstance(e, IncompleteProductError):
+        return JSONResponse(content={"error": str(e), "detail": str(e), "code": "incomplete"}, status_code=409)
+    if isinstance(e, FileNotFoundError):
+        return JSONResponse(content={"error": str(e), "detail": str(e), "code": "not_found"}, status_code=404)
+    logger.exception("SHARAD hi-res request failed")
+    return JSONResponse(content={"error": str(e), "detail": f"{type(e).__name__}: {e}"}, status_code=500)
+
+
+_DERIVED_SUFFIXES = (".npy", ".npz")
+
+
+def _sync_cache_stamp(cache_dir: str, dat_path: str) -> dict:
+    """Key derived caches on the source .dat size + mtime.
+
+    If the stamp differs (file re-downloaded / completed) every derived array
+    in ``cache_dir`` is deleted.  Legacy cache dirs without a stamp are kept
+    only if none of their files is older than the .dat (a cache built from a
+    partial download predates the completed file).
+    """
+    sig = source_signature(dat_path)
+    stamp_path = os.path.join(cache_dir, "source.json")
+    stale = False
+    if os.path.exists(stamp_path):
+        try:
+            with open(stamp_path) as f:
+                stale = json.load(f) != sig
+        except Exception:
+            stale = True
+    else:
+        dat_mtime = os.path.getmtime(dat_path)
+        for name in os.listdir(cache_dir):
+            if name.endswith(_DERIVED_SUFFIXES) and os.path.getmtime(os.path.join(cache_dir, name)) < dat_mtime:
+                stale = True
+                break
+    if stale:
+        for name in os.listdir(cache_dir):
+            if name.endswith(_DERIVED_SUFFIXES):
+                try:
+                    os.remove(os.path.join(cache_dir, name))
+                except OSError:
+                    pass
+        logger.info("SHARAD cache for %s invalidated (source changed)", os.path.basename(dat_path))
+    if stale or not os.path.exists(stamp_path):
+        with open(stamp_path, "w") as f:
+            json.dump(sig, f)
+    return sig
 
 
 def _resolve_product(product_id: str) -> dict:
     """
     Resolve a product_id to file paths and metadata.
     Searches SHARAD_HR_DIR for matching .dat and .lbl files.
-    Returns dict with 'dat_path', 'lbl_path', 'total_rows', 'cache_dir'.
+    Returns dict with 'dat_path', 'lbl_path', 'total_rows', 'cache_dir', 'signature'.
+
+    Raises FileNotFoundError (→ 404) when the product is absent and
+    IncompleteProductError (→ 409) while it is still downloading or truncated.
     """
     pid_lower = product_id.lower()
 
@@ -99,54 +184,62 @@ def _resolve_product(product_id: str) -> dict:
     if not os.path.exists(dat_path):
         raise FileNotFoundError(f"SHARAD RDR .dat not found: {dat_path}")
 
-    # Parse total rows from .lbl or compute from file size
-    total_rows = _parse_total_rows(lbl_path, dat_path)
+    total_rows = check_dat_complete(dat_path, lbl_path if os.path.exists(lbl_path) else None, ROW_BYTES)
 
     # Per-product cache directory
-    cache_dir = os.path.join(SHARAD_HR_DIR, ".cache", product_id.upper())
+    cache_dir = os.path.join(SHARAD_CACHE_DIR, product_id.upper())
     os.makedirs(cache_dir, exist_ok=True)
+    sig = _sync_cache_stamp(cache_dir, dat_path)
 
     return {
         "dat_path": dat_path,
         "lbl_path": lbl_path,
         "total_rows": total_rows,
         "cache_dir": cache_dir,
+        "signature": sig,
     }
 
 
 def _parse_total_rows(lbl_path: str, dat_path: str) -> int:
     """Parse FILE_RECORDS from .lbl, or compute from file size."""
-    if os.path.exists(lbl_path):
-        with open(lbl_path, "r") as f:
-            for line in f:
-                m = re.match(r"\s*FILE_RECORDS\s*=\s*(\d+)", line)
-                if m:
-                    return int(m.group(1))
-
-    # Fallback: compute from file size
-    file_size = os.path.getsize(dat_path)
-    return file_size // ROW_BYTES
+    n = label_file_records(lbl_path)
+    if n is not None:
+        return n
+    return os.path.getsize(dat_path) // ROW_BYTES
 
 
 def _get_product_data(product_id: str) -> dict:
     """
     Get or create cached data for a product.
     Returns dict with 'power', 'geometry', 'surface', 'total_rows'.
+    The in-memory entry is dropped when the source .dat changes on disk.
     """
     pid = product_id.upper()
-    if pid in _product_caches:
-        return _product_caches[pid]
+    with _product_lock(pid):
+        cache = _product_caches.get(pid)
+        if cache is not None:
+            dat = cache["info"]["dat_path"]
+            try:
+                if os.path.exists(dat + ".aria2") or source_signature(dat) != cache["info"]["signature"]:
+                    cache = None
+            except OSError:
+                cache = None
+            if cache is not None:
+                return cache
+            _product_caches.pop(pid, None)
 
-    info = _resolve_product(product_id)
-    cache = {
-        "info": info,
-        "power": None,
-        "geometry": None,
-        "surface": None,
-        "total_rows": info["total_rows"],
-    }
-    _product_caches[pid] = cache
-    return cache
+        info = _resolve_product(product_id)
+        cache = {
+            "info": info,
+            "power": None,
+            "geometry": None,
+            "surface": None,
+            "surface_snr": None,
+            "rwot": None,
+            "total_rows": info["total_rows"],
+        }
+        _product_caches[pid] = cache
+        return cache
 
 
 def _cache_path(cache: dict, name: str) -> str:
@@ -184,38 +277,37 @@ def _parse_and_cache(cache: dict):
     if not os.path.exists(dat_path):
         raise FileNotFoundError(f"SHARAD RDR .dat not found: {dat_path}")
 
-    # Vectorized parsing: read entire file as raw bytes, then extract fields
-    raw = np.fromfile(dat_path, dtype=np.uint8)
-    actual_rows = len(raw) // ROW_BYTES
+    # Read only the needed columns through a memmap (bounded memory).
+    mm = np.memmap(dat_path, dtype=np.uint8, mode="r")
+    actual_rows = mm.size // ROW_BYTES
     if actual_rows < total_rows:
         total_rows = actual_rows
-    raw = raw[:total_rows * ROW_BYTES].reshape(total_rows, ROW_BYTES)
+    raw = mm[:total_rows * ROW_BYTES].reshape(total_rows, ROW_BYTES)
 
-    # Extract real/imag echo columns via view (zero-copy slice)
-    real = np.ndarray((total_rows, N_RANGE_BINS), dtype="<f4",
-                      buffer=raw, offset=0,
-                      strides=(ROW_BYTES, 4))
-    # offset within each row for real part
-    real = np.frombuffer(raw[:, ECHO_REAL_OFFSET:ECHO_REAL_OFFSET + ECHO_BYTES].tobytes(),
-                         dtype="<f4").reshape(total_rows, N_RANGE_BINS)
-    imag = np.frombuffer(raw[:, ECHO_IMAG_OFFSET:ECHO_IMAG_OFFSET + ECHO_BYTES].tobytes(),
-                         dtype="<f4").reshape(total_rows, N_RANGE_BINS)
-    power = (real ** 2 + imag ** 2).astype(np.float32)
+    def _col(off: int, nbytes: int, dtype: str, shape) -> np.ndarray:
+        return np.frombuffer(np.ascontiguousarray(raw[:, off:off + nbytes]).tobytes(), dtype=dtype).reshape(shape)
+
+    real = _col(ECHO_REAL_OFFSET, ECHO_BYTES, "<f4", (total_rows, N_RANGE_BINS))
+    imag = _col(ECHO_IMAG_OFFSET, ECHO_BYTES, "<f4", (total_rows, N_RANGE_BINS))
+    power = (real.astype(np.float32) ** 2 + imag.astype(np.float32) ** 2).astype(np.float32)
+    del real, imag
     # Some products can contain non-finite float payloads after squaring; keep
     # rendering/analysis stable by converting them to zero-energy samples.
     if not np.isfinite(power).all():
         power = np.nan_to_num(power, nan=0.0, posinf=0.0, neginf=0.0).astype(np.float32)
 
-    # Extract geometry columns
-    lons = np.frombuffer(raw[:, LON_OFFSET:LON_OFFSET + 8].tobytes(),
-                         dtype="<f8").copy()
-    lats = np.frombuffer(raw[:, LAT_OFFSET:LAT_OFFSET + 8].tobytes(),
-                         dtype="<f8").copy()
-    alts = np.frombuffer(raw[:, ALT_OFFSET:ALT_OFFSET + 8].tobytes(),
-                         dtype="<f8").copy()
+    lons = _col(LON_OFFSET, 8, "<f8", (total_rows,)).copy()
+    lats = _col(LAT_OFFSET, 8, "<f8", (total_rows,)).copy()
+    alts = _col(ALT_OFFSET, 8, "<f8", (total_rows,)).copy()
 
-    np.save(power_path, power)
-    np.savez_compressed(geom_path, lat=lats, lon=lons, alt=alts)
+    # Write to temp names then rename: a crash mid-write never leaves a
+    # truncated .npy that would be loaded as valid next time.
+    tmp_power = power_path + ".tmp.npy"
+    tmp_geom = geom_path + ".tmp.npz"
+    np.save(tmp_power, power)
+    np.savez_compressed(tmp_geom, lat=lats, lon=lons, alt=alts)
+    os.replace(tmp_power, power_path)
+    os.replace(tmp_geom, geom_path)
 
     cache["power"] = np.load(power_path, mmap_mode="r")
     cache["geometry"] = {"lat": lats, "lon": lons, "alt": alts}
@@ -226,16 +318,36 @@ def _get_power(product_id: str) -> tuple[np.ndarray, int]:
     """Return (power array, total_rows) for given product."""
     cache = _get_product_data(product_id)
     if cache["power"] is None:
-        _parse_and_cache(cache)
+        with _product_lock(product_id):
+            if cache["power"] is None:
+                _parse_and_cache(cache)
     return cache["power"], int(cache["power"].shape[0])
 
 
 def _get_geometry(product_id: str) -> tuple[dict, int]:
-    """Return (geometry dict, total_rows) for given product."""
+    """Return (geometry dict, total_rows) for given product.
+
+    Latitudes are planetocentric (as stored in the RDR) — the same convention
+    as the footprint index, at-point search and the map.
+    """
     cache = _get_product_data(product_id)
     if cache["geometry"] is None:
-        _parse_and_cache(cache)
+        with _product_lock(product_id):
+            if cache["geometry"] is None:
+                _parse_and_cache(cache)
     return cache["geometry"], int(cache["geometry"]["lat"].shape[0])
+
+
+def _get_rwot(product_id: str) -> np.ndarray:
+    """RECEIVE_WINDOW_OPENING_TIME per trace (units of 37.5 ns), read lazily
+    from the .dat (4 bytes/row) so legacy caches need no rebuild."""
+    cache = _get_product_data(product_id)
+    if cache["rwot"] is None:
+        with _product_lock(product_id):
+            if cache["rwot"] is None:
+                _, n = _get_geometry(product_id)
+                cache["rwot"] = read_rwot(cache["info"]["dat_path"], n, ROW_BYTES)
+    return cache["rwot"]
 
 
 def _lon_to_180(lon: np.ndarray) -> np.ndarray:
@@ -243,99 +355,78 @@ def _lon_to_180(lon: np.ndarray) -> np.ndarray:
     return np.where(lon > 180, lon - 360, lon)
 
 
-# Mars IAU 2000 ellipsoid radii (meters)
-_MARS_A = 3396190.0   # equatorial radius
-_MARS_B = 3376200.0   # polar radius
-_MARS_AB2 = (_MARS_A / _MARS_B) ** 2   # ≈ 1.01184
-
-
-def _centric_to_graphic(lat_centric: np.ndarray) -> np.ndarray:
-    """Convert planetocentric latitude (from SHARAD RDR) to planetographic
-    (geodetic) latitude expected by Cesium's oblate Mars ellipsoid.
-
-    tan(lat_graphic) = (a/b)^2 * tan(lat_centric)
-    """
-    rad = np.radians(lat_centric)
-    return np.degrees(np.arctan(_MARS_AB2 * np.tan(rad)))
-
-
-def _centric_to_graphic_scalar(lat_centric: float) -> float:
-    """Scalar version for single latitude values."""
-    rad = math.radians(lat_centric)
-    return math.degrees(math.atan(_MARS_AB2 * math.tan(rad)))
+# Latitude convention: every lat returned by this router is PLANETOCENTRIC,
+# exactly as stored in the RDR (SUB_SC_PLANETOCENTRIC_LATITUDE).  The footprint
+# index, /api/inspector/at-point and the map pins use the same convention, so a
+# trace located from the radargram lands on the drawn ground track.  (Earlier
+# versions converted to planetographic here, shifting pins ~0.2° = ~12 km
+# north of the track at 18° N.)
 
 
 # ── Surface picking ───────────────────────────────────
+SURFACE_PICK_METHOD = "leading edge (first echo >15 dB above noise and within 15 dB of trace peak, refined to local max ≤8 bins), lateral outlier rejection"
+
+
 def _pick_surface(
     product_id: str,
     power: np.ndarray,
-    min_offset: int = 15,
-    max_offset: int = 250,
-    snr_threshold: float = 3.0,
-    smooth_kernel: int = 31,
+    **_legacy_kwargs,
 ) -> np.ndarray:
     """
-    Pick the surface return per trace.
+    Pick the surface return per trace (leading edge / first strong return).
 
-    The surface is the strongest peak in a search band below a coarse
-    upper-window argmax.  Uses SNR gating and outlier rejection for
-    lateral continuity while allowing gaps where no clear surface exists.
+    See analysis.shared.sharad_math.pick_surface_leading_edge.  The previous
+    picker took the strongest peak below a noise-anchored window, which on
+    17–20 % of traces landed >10 bins below the first return (off-nadir
+    clutter or subsurface echoes), biasing every depth measured from it.
 
     Returns: 1-D int32 array [n_traces] with surface delay-bin index
-             (-1 where no valid surface detected).
+             (-1 where no valid surface detected).  SNR (dB) per trace is
+             available via _get_surface_snr().
     """
     cache = _get_product_data(product_id)
     if cache["surface"] is not None:
         return cache["surface"]
+    with _product_lock(product_id):
+        return _pick_surface_locked(cache, power)
 
-    cp = _cache_path(cache, "surface_v3.npy")
-    if os.path.exists(cp):
-        cache["surface"] = np.load(cp)
+
+def _pick_surface_locked(cache: dict, power: np.ndarray) -> np.ndarray:
+    if cache["surface"] is not None:
         return cache["surface"]
 
-    n_traces, n_bins = power.shape
+    cp = _cache_path(cache, "surface_v4.npy")
+    cs = _cache_path(cache, "surface_snr_v4.npy")
+    if os.path.exists(cp) and os.path.exists(cs):
+        cache["surface"] = np.load(cp)
+        cache["surface_snr"] = np.load(cs)
+        return cache["surface"]
 
-    # Step 1 — coarse anchor: argmax in upper 120 bins
-    coarse = np.argmax(power[:, :120], axis=1).astype(np.int32)
-
-    # Step 2 — refine: strongest peak in band [coarse+min_offset, coarse+max_offset]
+    n_traces = power.shape[0]
     surface = np.full(n_traces, -1, dtype=np.int32)
-    surface_snr = np.zeros(n_traces, dtype=np.float32)
-
-    for i in range(n_traces):
-        c = int(coarse[i])
-        lo = min(c + min_offset, n_bins - 1)
-        hi = min(c + max_offset, n_bins)
-        if hi <= lo:
-            continue
-
-        band = power[i, lo:hi].copy()
-        noise = np.median(band) + 1e-12
-        peak_idx = int(np.argmax(band))
-        peak_val = band[peak_idx]
-        snr = peak_val / noise
-
-        if snr >= snr_threshold:
-            surface[i] = lo + peak_idx
-            surface_snr[i] = snr
-
-    # Step 3 — outlier rejection (no smoothing of valid picks)
-    valid_mask = surface >= 0
-    if valid_mask.sum() >= 10:
-        from scipy.ndimage import median_filter as mf
-
-        valid_indices = np.where(valid_mask)[0]
-        if len(valid_indices) > smooth_kernel:
-            y_valid = surface[valid_mask].astype(np.float64)
-            y_filtered = mf(y_valid, size=smooth_kernel)
-            diff = np.abs(y_valid - y_filtered)
-            outlier = diff > 20
-            surface[valid_indices[outlier]] = -1
-            surface_snr[valid_indices[outlier]] = 0
+    snr = np.zeros(n_traces, dtype=np.float32)
+    chunk = 8192  # bounded memory (float64 copy of a chunk only)
+    for i0 in range(0, n_traces, chunk):
+        b, s_db = pick_surface_leading_edge(np.asarray(power[i0:i0 + chunk]))
+        surface[i0:i0 + len(b)] = b
+        snr[i0:i0 + len(b)] = s_db
+    surface = reject_pick_outliers(surface, kernel=31, max_dev=20)
+    snr = np.where(surface >= 0, snr, 0.0).astype(np.float32)
 
     np.save(cp, surface)
+    np.save(cs, snr)
     cache["surface"] = surface
+    cache["surface_snr"] = snr
     return surface
+
+
+def _get_surface_snr(product_id: str) -> np.ndarray:
+    """Surface-echo SNR (dB above the trace noise floor) per trace."""
+    cache = _get_product_data(product_id)
+    if cache.get("surface_snr") is None:
+        power, _ = _get_power(product_id)
+        _pick_surface(product_id, power)
+    return cache["surface_snr"]
 
 
 # ── Global percentile cache (for consistent tile brightness) ──
@@ -380,6 +471,19 @@ def _get_global_percentiles(
 
 # ── Radargram rendering ───────────────────────────────
 _png_cache: LRUCache = LRUCache(maxsize=20)  # key -> PNG bytes (bounded LRU)
+# Handlers are sync `def` (FastAPI thread pool) so heavy numpy work does not
+# block the event loop; cachetools caches are not thread-safe → guard them.
+_lru_lock = threading.Lock()
+
+
+def _lru_get(cache: LRUCache, key):
+    with _lru_lock:
+        return cache.get(key)
+
+
+def _lru_put(cache: LRUCache, key, value):
+    with _lru_lock:
+        cache[key] = value
 
 
 def _render_radargram_png(
@@ -394,28 +498,72 @@ def _render_radargram_png(
     global_vmin: float | None = None,
     global_vmax: float | None = None,
 ) -> bytes:
-    """Render the radargram as a grayscale PNG (cached by params).
+    """PNG bytes only (backwards-compatible wrapper)."""
+    return _render_radargram(power, downsample, use_log, pmin, pmax, amplitude,
+                             per_trace, cache_key, global_vmin, global_vmax)[0]
+
+
+def _scale_info(use_log: bool, amplitude: bool, per_trace: bool, vmin: float | None, vmax: float | None) -> dict:
+    """Describe how grey 0..255 maps to data values (for the colour bar).
+
+    Values are UNCALIBRATED relative power: the RDR is not corrected for
+    antenna gain, receiver gain or spreading, so dB are relative only.
+    """
+    info = {"per_trace": per_trace, "log": use_log, "amplitude": amplitude}
+    if per_trace or vmin is None or vmax is None:
+        info.update(unit="relative (per-trace stretch)", vmin=None, vmax=None)
+    elif use_log:
+        k = 20.0 if amplitude else 10.0   # log10(amp)·20 = log10(power)·10 = dB
+        info.update(unit="dB (uncalibrated relative power)", vmin=round(k * vmin, 2), vmax=round(k * vmax, 2))
+    else:
+        info.update(unit=("amplitude" if amplitude else "power") + " (uncalibrated, linear)",
+                    vmin=float(f"{vmin:.4g}"), vmax=float(f"{vmax:.4g}"))
+    return info
+
+
+def _render_radargram(
+    power: np.ndarray,
+    downsample: int = 1,
+    use_log: bool = True,
+    pmin: float = 1.0,
+    pmax: float = 99.0,
+    amplitude: bool = False,
+    per_trace: bool = False,
+    cache_key: str = "",
+    global_vmin: float | None = None,
+    global_vmax: float | None = None,
+) -> tuple[bytes, dict]:
+    """Render the radargram as a grayscale PNG (cached by params) → (png, scale_info).
 
     amplitude: if True, use sqrt(power) instead of raw power.
     per_trace: if True, normalize each trace independently (like PDS browse images).
     global_vmin/global_vmax: if provided, use these for normalization instead of
       computing percentiles from the tile data (for consistent tile brightness).
     """
-    if cache_key and cache_key in _png_cache:
-        return _png_cache[cache_key]
+    if cache_key:
+        hit = _lru_get(_png_cache, cache_key)
+        if hit is not None:
+            return hit
 
     t0 = time.monotonic()
-    power = np.asarray(power, dtype=np.float32)
-    power = np.nan_to_num(power, nan=0.0, posinf=0.0, neginf=0.0)
+    n_bins_in = power.shape[1]
 
     if downsample > 1:
         n = power.shape[0] // downsample * downsample
         if n == 0:
-            p = np.zeros((1, power.shape[1]), dtype=np.float32)
+            p = np.zeros((1, n_bins_in), dtype=np.float32)
         else:
-            p = power[:n].reshape(-1, downsample, power.shape[1]).mean(axis=1)
+            # Chunked mean over the (memory-mapped) array: avoids materialising
+            # full-resolution float copies (~0.26 GB per SS19 product).
+            p = np.empty((n // downsample, n_bins_in), dtype=np.float32)
+            step = max(downsample, (8192 // downsample) * downsample)
+            for i0 in range(0, n, step):
+                i1 = min(n, i0 + step)
+                blk = np.asarray(power[i0:i1], dtype=np.float32)
+                p[i0 // downsample:i1 // downsample] = blk.reshape(-1, downsample, n_bins_in).mean(axis=1)
     else:
         p = np.array(power, dtype=np.float32)
+    np.nan_to_num(p, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
     if amplitude:
         np.maximum(p, 0, out=p)
@@ -427,7 +575,6 @@ def _render_radargram_png(
     if per_trace:
         # Per-trace normalization (vectorized) — matches PDS browse image style
         # Uses np.partition (O(n) partial sort) instead of np.percentile (O(n log n))
-        p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
         n_bins = p.shape[1]
         k_lo = max(0, int(pmin / 100.0 * n_bins))
         k_hi = min(n_bins - 1, int(pmax / 100.0 * n_bins))
@@ -439,13 +586,16 @@ def _render_radargram_png(
         vmaxs = p_sorted_hi[:, k_hi : k_hi + 1]
         vmaxs = np.where(vmaxs <= vmins, vmins + 1, vmaxs)
         img = ((p - vmins) / (vmaxs - vmins) * 255).clip(0, 255).astype(np.uint8)
+        vmin = vmax = None
     else:
-        p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
         if global_vmin is not None and global_vmax is not None:
             vmin, vmax = global_vmin, global_vmax
         else:
-            vmin = np.percentile(p, pmin)
-            vmax = np.percentile(p, pmax)
+            # one partition pass over a strided sample (stable to <0.1 dB,
+            # ~5x faster than two full percentile calls on 10 M values)
+            flat = p.ravel()
+            sample = flat[:: max(1, flat.size // 2_000_000)]
+            vmin, vmax = (float(v) for v in np.percentile(sample, [pmin, pmax]))
         if vmax <= vmin:
             vmax = vmin + 1
         img = ((p - vmin) / (vmax - vmin) * 255).clip(0, 255).astype(np.uint8)
@@ -461,10 +611,13 @@ def _render_radargram_png(
     logger.info("_render_radargram_png: %d traces x %d bins, ds=%d, per_trace=%s => %.2fs",
                 p.shape[0], p.shape[1] if p.ndim > 1 else 0, downsample, per_trace, elapsed)
 
+    result = (png_bytes, _scale_info(use_log, amplitude, per_trace,
+                                     None if vmin is None else float(vmin),
+                                     None if vmax is None else float(vmax)))
     if cache_key:
-        _png_cache[cache_key] = png_bytes
+        _lru_put(_png_cache, cache_key, result)
 
-    return png_bytes
+    return result
 
 
 # ── Cluttergram (surface clutter simulation) ─────────
@@ -578,7 +731,7 @@ def _get_cluttergram(product_id: str) -> np.ndarray | None:
     if info is None:
         return None
 
-    cache_dir = os.path.join(SHARAD_HR_DIR, ".cache", pid)
+    cache_dir = os.path.join(SHARAD_CACHE_DIR, pid)
     os.makedirs(cache_dir, exist_ok=True)
     cache_path = os.path.join(cache_dir, "cluttergram.npy")
 
@@ -707,6 +860,12 @@ def _project_clutter_to_rdr_axis(
 
 
 def _get_aligned_cluttergram(product_id: str) -> np.ndarray | None:
+    """Thread-safe wrapper (per-product lock) around the alignment build."""
+    with _product_lock(product_id):
+        return _build_aligned_cluttergram(product_id)
+
+
+def _build_aligned_cluttergram(product_id: str) -> np.ndarray | None:
     """Load cluttergram aligned to RDR bin space using coordinate-based trace
     mapping and robust median-anchored vertical alignment.
 
@@ -866,7 +1025,7 @@ def _render_cluttergram_png(
 
 # ── List available products ───────────────────────────
 @router.get("/products")
-async def list_products():
+def list_products():
     """List available SHARAD High-Res RDR products."""
     products = []
     for lbl_file in sorted(globmod.glob(os.path.join(SHARAD_HR_DIR, "*.lbl"))):
@@ -882,10 +1041,19 @@ async def list_products():
                     orbit = int(m2.group(1))
         if pid:
             dat_path = lbl_file.rsplit(".", 1)[0] + ".dat"
+            has_dat = os.path.exists(dat_path)
+            incomplete = None
+            if has_dat:
+                try:
+                    check_dat_complete(dat_path, lbl_file, ROW_BYTES)
+                except IncompleteProductError as e:
+                    incomplete = str(e)
             products.append({
                 "product_id": pid,
                 "orbit_number": orbit,
-                "has_dat": os.path.exists(dat_path),
+                "has_dat": has_dat,
+                "complete": has_dat and incomplete is None,
+                "incomplete_reason": incomplete,
             })
     return JSONResponse(content={"products": products, "count": len(products)})
 
@@ -893,7 +1061,7 @@ async def list_products():
 # ── API Endpoints ──────────────────────────────────────
 
 @router.get("/metadata")
-async def get_metadata(
+def get_metadata(
     product_id: str = Query(..., description="Product ID (e.g. R_5663601_001_SS19_700_A)"),
 ):
     """Return dataset metadata."""
@@ -902,7 +1070,7 @@ async def get_metadata(
     try:
         geom, total_rows = _get_geometry(product_id)
         lons180 = _lon_to_180(geom["lon"])
-        lats_graphic = _centric_to_graphic(geom["lat"])
+        lats_c = np.asarray(geom["lat"])
         return JSONResponse(content={
             "product_id": product_id.upper(),
             "instrument": "SHARAD_HIGHRES",
@@ -910,11 +1078,11 @@ async def get_metadata(
             "range_bins": N_RANGE_BINS,
             "row_bytes": ROW_BYTES,
             "sample_interval_us": SHARAD_SAMPLE_INTERVAL_US,
-            "lat_range": [float(lats_graphic.min()), float(lats_graphic.max())],
+            "lat_range": [float(lats_c.min()), float(lats_c.max())],
             "lon_range": [float(lons180.min()), float(lons180.max())],
-            "start_lat": float(lats_graphic[0]),
+            "start_lat": float(lats_c[0]),
             "start_lon": float(lons180[0]),
-            "stop_lat": float(lats_graphic[-1]),
+            "stop_lat": float(lats_c[-1]),
             "stop_lon": float(lons180[-1]),
             "alt_range_km": [float(geom["alt"].min()), float(geom["alt"].max())],
             "display": {
@@ -924,14 +1092,12 @@ async def get_metadata(
                 "y_axis": "range bin (delay)",
             },
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/radargram")
-async def get_radargram(
+def get_radargram(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(1, ge=1, le=500, description="Along-track downsample factor"),
     log: int = Query(1, ge=0, le=1, description="Log10 scale (1=yes, 0=no)"),
@@ -964,7 +1130,7 @@ async def get_radargram(
             )
 
         ckey = f"{product_id}_{downsample}_{log}_{pmin}_{pmax}_{amplitude}_{per_trace}_{st}_{et}"
-        png = _render_radargram_png(
+        png, scale = _render_radargram(
             tile_power, downsample=downsample, use_log=bool(log),
             pmin=pmin, pmax=pmax,
             amplitude=bool(amplitude), per_trace=bool(per_trace),
@@ -982,17 +1148,16 @@ async def get_radargram(
                 "X-Start-Trace": str(st),
                 "X-End-Trace": str(et),
                 "X-Total-Traces": str(total_rows),
+                "X-Value-Scale": json.dumps(scale),
                 "Cache-Control": "public, max-age=3600",
             },
         )
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/radargram_meta")
-async def get_radargram_meta(
+def get_radargram_meta(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(50, ge=1, le=500),
 ):
@@ -1004,25 +1169,37 @@ async def get_radargram_meta(
         n_traces_out = total_rows // downsample
 
         indices = np.arange(0, total_rows, downsample)[:n_traces_out]
-        lats = _centric_to_graphic(geom["lat"][indices])
+        lats = np.asarray(geom["lat"][indices])  # planetocentric
         lons = _lon_to_180(geom["lon"][indices])
+        dist_full = _haversine_vec(np.asarray(geom["lat"]), _lon_to_180(np.asarray(geom["lon"])))
+        dist_km = dist_full[indices] / 1000.0
+        spacing = float(np.median(np.diff(dist_full))) if total_rows > 1 else 0.0
+        try:
+            rwot = _get_rwot(product_id)[indices]
+        except Exception:  # pragma: no cover - unreadable .dat
+            rwot = None
 
         return JSONResponse(content={
             "n_traces": int(n_traces_out),
             "n_bins": N_RANGE_BINS,
             "downsample": downsample,
             "sample_interval_us": SHARAD_SAMPLE_INTERVAL_US,
-            "lats": [round(float(v), 4) for v in lats],
-            "lons": [round(float(v), 4) for v in lons],
+            "lat_convention": "planetocentric",
+            "trace_spacing_m": round(spacing, 2),
+            "lats": [round(float(v), 5) for v in lats],
+            "lons": [round(float(v), 5) for v in lons],
+            "distance_km": [round(float(v), 4) for v in dist_km],
+            # RECEIVE_WINDOW_OPENING_TIME per display trace, in 37.5 ns units:
+            # absolute two-way delay of bin b = (rwot + b)·37.5 ns + calibration
+            # offset (≈ 1 PRI; see /mola_profile "calibration").
+            "rwot": None if rwot is None else [float(v) for v in rwot],
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/surface")
-async def get_surface(
+def get_surface(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(50, ge=1, le=500),
 ):
@@ -1032,32 +1209,32 @@ async def get_surface(
     try:
         power, total_rows = _get_power(product_id)
         surface = _pick_surface(product_id, power)
+        snr = _get_surface_snr(product_id)
 
         n = total_rows // downsample
         indices = np.arange(0, total_rows, downsample)[:n]
         surface_ds = surface[indices]
+        snr_ds = snr[indices]
 
         # Only include traces where surface was detected
         points = []
         for i in range(n):
             if surface_ds[i] >= 0:
-                points.append({"x": int(i), "y": int(surface_ds[i])})
+                points.append({"x": int(i), "y": int(surface_ds[i]), "snr_db": round(float(snr_ds[i]), 1)})
 
         return JSONResponse(content={
             "surface": points,
             "downsample": downsample,
             "total_traces": n,
             "detected_traces": len(points),
-            "method": "peak detection + outlier rejection",
+            "method": SURFACE_PICK_METHOD,
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/reflectors")
-async def get_reflectors(
+def get_reflectors(
     product_id: str = Query(..., description="SHARAD product ID"),
     epsilon_r: float = Query(3.1, gt=0, le=20, description="Dielectric constant for depth conversion"),
     min_snr: float = Query(3.0, ge=0, description="Minimum SNR for reflector detection"),
@@ -1085,7 +1262,7 @@ async def get_reflectors(
             })
 
         n_bins = int(power.shape[1])
-        lats_graphic = _centric_to_graphic(geom["lat"][:n_traces])
+        lats_c = np.asarray(geom["lat"][:n_traces])  # planetocentric
         lons180 = _lon_to_180(geom["lon"][:n_traces])
         depth_scale = (SHARAD_SAMPLE_INTERVAL_US * 1e-6 * SPEED_OF_LIGHT) / (2.0 * math.sqrt(epsilon_r))
 
@@ -1130,7 +1307,7 @@ async def get_reflectors(
             if delta_bins <= 0:
                 continue
 
-            lat = float(lats_graphic[trace_idx])
+            lat = float(lats_c[trace_idx])
             lon = float(lons180[trace_idx])
             if not np.isfinite(lat) or not np.isfinite(lon):
                 continue
@@ -1184,14 +1361,12 @@ async def get_reflectors(
             "reflectors": segments,
             "total_reflectors": len(segments),
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/depth_conversion")
-async def depth_conversion(
+def depth_conversion(
     product_id: str = Query(..., description="Product ID"),
     trace_idx: int = Query(..., ge=0, description="Trace index (downsampled)"),
     cursor_bin: int = Query(..., ge=0, description="Cursor range-bin position"),
@@ -1249,22 +1424,8 @@ async def depth_conversion(
 
         delta_bins = cursor_bin - s_bin
         total_dt_s = delta_bins * SHARAD_SAMPLE_INTERVAL_US * 1e-6  # two-way travel time
-
-        # Piecewise depth computation
-        if boundary_m <= 0 or epsilon_r1 == epsilon_r2:
-            v = SPEED_OF_LIGHT / np.sqrt(epsilon_r1)
-            depth_m = v * total_dt_s / 2.0
-        else:
-            v1 = SPEED_OF_LIGHT / np.sqrt(epsilon_r1)
-            v2 = SPEED_OF_LIGHT / np.sqrt(epsilon_r2)
-            twt_layer1 = 2.0 * boundary_m / v1
-
-            if total_dt_s <= twt_layer1:
-                depth_m = v1 * total_dt_s / 2.0
-            else:
-                remaining_dt = total_dt_s - twt_layer1
-                depth_in_layer2 = v2 * remaining_dt / 2.0
-                depth_m = boundary_m + depth_in_layer2
+        depth_m = depth_from_twt(total_dt_s, epsilon_r1, epsilon_r2, boundary_m)
+        res = depth_resolution(total_dt_s, epsilon_r1, epsilon_r2, boundary_m)
 
         geom, _ = _get_geometry(product_id)
         lons180 = _lon_to_180(geom["lon"])
@@ -1279,19 +1440,22 @@ async def depth_conversion(
             "epsilon_r2": epsilon_r2,
             "boundary_m": boundary_m,
             "depth_m": round(float(depth_m), 1),
-            "lat": round(_centric_to_graphic_scalar(float(geom["lat"][full_idx])), 4),
+            # ±1 range bin (37.5 ns) quantisation at this depth, and the
+            # c/(2B√εr) vertical resolution (B = 10 MHz → 15 m in vacuum)
+            "depth_uncertainty_m": round(res["bin_uncertainty_m"], 2),
+            "vertical_resolution_m": round(res["vertical_resolution_m"], 2),
+            "surface_pick": "manual" if surface_bin_override is not None else "auto",
+            "lat": round(float(geom["lat"][full_idx]), 4),
             "lon": round(float(lons180[full_idx]), 4),
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 # ── Cluttergram endpoints ──────────────────────────────
 
 @router.get("/cluttergram")
-async def get_cluttergram(
+def get_cluttergram(
     product_id: str = Query(..., description="Product ID (e.g. R_0277201_001_SS19_700_A)"),
     downsample: int = Query(50, ge=1, le=500, description="Along-track downsample factor"),
     pmin: float = Query(1.0, ge=0, le=50, description="Lower percentile clip"),
@@ -1335,11 +1499,11 @@ async def get_cluttergram(
             },
         )
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 @router.get("/cluttergram_meta")
-async def get_cluttergram_meta(
+def get_cluttergram_meta(
     product_id: str = Query(..., description="Product ID"),
 ):
     """Return cluttergram metadata (availability, dimensions)."""
@@ -1349,8 +1513,10 @@ async def get_cluttergram_meta(
     if info is None:
         return JSONResponse(content={"available": False})
 
-    aligned = _get_aligned_cluttergram(product_id)
-    raw = _get_cluttergram(product_id)
+    try:
+        aligned = _get_aligned_cluttergram(product_id)
+    except Exception as e:
+        return _error_response(e)
     return JSONResponse(content={
         "available": True,
         "raw_range_bins": info["lines"],
@@ -1358,12 +1524,17 @@ async def get_cluttergram_meta(
         "range_bins": aligned.shape[0] if aligned is not None else info["lines"],
         "total_traces": aligned.shape[1] if aligned is not None else info["samples"],
         "aligned": aligned is not None and aligned.shape[0] == N_RANGE_BINS,
+        # Known limitation: vertical alignment is empirical (clutter peak per
+        # trace shifted to the radargram's median surface bin), so off-nadir
+        # clutter timing relative to nadir is NOT preserved. Geometric
+        # alignment via RWOT + the sim's own time reference is pending.
+        "alignment": "empirical (median surface-bin match); geometric RWOT alignment pending",
     })
 
 
 # ── Ground track coordinates ───────────────────────────
 @router.get("/track")
-async def get_track(
+def get_track(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(50, ge=1, le=500),
 ):
@@ -1374,7 +1545,7 @@ async def get_track(
         geom, total_rows = _get_geometry(product_id)
         n = total_rows // downsample
         indices = np.arange(0, total_rows, downsample)[:n]
-        lats = _centric_to_graphic(geom["lat"][indices])
+        lats = np.asarray(geom["lat"][indices])  # planetocentric
         lons = _lon_to_180(geom["lon"][indices])
 
         return JSONResponse(content={
@@ -1383,16 +1554,14 @@ async def get_track(
             "n_traces": n,
             "downsample": downsample,
         })
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)
 
 
 # ── MOLA elevation profile along SHARAD track ─────────
 MARS_MEAN_RADIUS = (2 * 3_396_190.0 + 3_376_200.0) / 3  # metres
 
-_DEM_PATH = os.path.join(
+_DEM_PATH = os.environ.get("MARSLAB_MOLA_DEM") or os.path.join(
     os.path.dirname(_BACKEND_DIR),  # project root
     "Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.tif",
 )
@@ -1425,7 +1594,7 @@ _mola_cache: LRUCache = LRUCache(maxsize=30)  # key: f"{product_id}_{downsample}
 
 
 @router.get("/mola_profile")
-async def get_mola_profile(
+def get_mola_profile(
     product_id: str = Query(..., description="Product ID"),
     downsample: int = Query(50, ge=1, le=500),
 ):
@@ -1440,8 +1609,9 @@ async def get_mola_profile(
     product_id = _validate_router_product_id(product_id)
 
     cache_key = f"{product_id.upper()}_{downsample}"
-    if cache_key in _mola_cache:
-        return JSONResponse(content=_mola_cache[cache_key])
+    hit = _lru_get(_mola_cache, cache_key)
+    if hit is not None:
+        return JSONResponse(content=hit)
 
     try:
         from rasterio.windows import Window
@@ -1479,24 +1649,58 @@ async def get_mola_profile(
         # Cumulative along-track distance (vectorized, uses planetocentric for accuracy)
         distances_m = _haversine_vec(lats_centric, lons)
 
-        # Convert to planetographic for frontend/Cesium display
-        lats_graphic = _centric_to_graphic(lats_centric)
+        # Geometric (MOLA) nadir-surface prediction in radargram bins:
+        #   bin = 2(h − z)/c / 37.5 ns − RWOT − k(trace)
+        # k is a robust linear calibration against the leading-edge pick
+        # (constant ≈ one PRI of instrument delay + slow drift between the
+        # spacecraft-altitude datum and the DEM datum).  Deviations of the
+        # picked surface from this line are physical (off-nadir/sloped
+        # terrain returns earlier than nadir) — compare with a cluttergram.
+        predicted, calibration = None, None
+        try:
+            rwot = _get_rwot(product_id)[indices]
+            alt_m = np.asarray(geom["alt"][indices], dtype=np.float64) * 1e3
+            raw_pred = predicted_surface_bins(alt_m, elevations, rwot)
+            power, _ = _get_power(product_id)
+            picks = _pick_surface(product_id, power)[indices].astype(np.float64)
+            good = (picks >= 0) & np.isfinite(raw_pred) & (rwot > 0)
+            resid = np.where(good, raw_pred - picks, np.nan)
+            coef, mad, used = robust_linear_offset(resid)
+            if used >= 10:
+                pred_bins = raw_pred - np.polyval(coef, np.arange(len(raw_pred)))
+                pred_bins = np.where(np.isfinite(raw_pred) & (rwot > 0), pred_bins, np.nan)
+                predicted = [None if not np.isfinite(v) else round(float(v), 2) for v in pred_bins]
+                k_mid = float(np.polyval(coef, len(raw_pred) / 2))
+                calibration = {
+                    "offset_bins": round(k_mid, 2),
+                    "offset_us": round(k_mid * SHARAD_SAMPLE_INTERVAL_US, 4),
+                    "drift_bins_over_track": round(float(coef[0]) * len(raw_pred), 2),
+                    "residual_mad_bins": round(mad, 2),
+                    "n_used": used,
+                    "nominal_pri_us": 1428.0,
+                    "note": "absolute two-way delay = (rwot + bin)·0.0375 µs + offset_us; "
+                            "offset fitted to the leading-edge pick (≈1 PRI).",
+                }
+        except Exception as exc:  # DEM/RWOT unavailable → no prediction
+            logger.info("MOLA surface prediction unavailable for %s: %s", product_id, exc)
+
 
         result = {
             "distance_km": [round(d / 1000.0, 3) for d in distances_m],
             "elevation_m": [round(float(e), 1) if not np.isnan(e) else None for e in elevations],
-            "lats": [round(float(v), 4) for v in lats_graphic],
+            "lats": [round(float(v), 4) for v in lats_centric],
             "lons": [round(float(v), 4) for v in lons],
             "n_traces": n_traces,
             "downsample": downsample,
             "total_distance_km": round(float(distances_m[-1] / 1000.0), 3) if n_traces > 0 else 0,
+            "predicted_surface_bin": predicted,
+            "calibration": calibration,
+            "lat_convention": "planetocentric",
         }
 
         # Cache result (bounded by LRUCache maxsize=30)
-        _mola_cache[cache_key] = result
+        _lru_put(_mola_cache, cache_key, result)
 
         return JSONResponse(content=result)
-    except FileNotFoundError as e:
-        return JSONResponse(content={"error": str(e)}, status_code=404)
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return _error_response(e)

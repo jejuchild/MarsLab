@@ -1,5 +1,10 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import type { FieldNote } from "../api/fieldnotes";
+import {
+  BIN_DT_US, computeDownsample, completePick, describeHttpError, downloadBlob, nearestTrace,
+  picksToCsv, picksToGeoJSON, type Pick,
+} from "../utils/sharad";
+import { drawRadargramAxes, type ValueScale } from "./sharad/radargramAxes";
 
 /* =========================================================
  * Types
@@ -18,7 +23,7 @@ type Metadata = {
   display: { recommended_downsample: number };
 };
 
-type SurfacePoint = { x: number; y: number };
+type SurfacePoint = { x: number; y: number; snr_db?: number };
 
 type RadargramMeta = {
   n_traces: number;
@@ -26,6 +31,10 @@ type RadargramMeta = {
   downsample: number;
   lats: number[];
   lons: number[];
+  distance_km?: number[];
+  trace_spacing_m?: number;
+  /** RECEIVE_WINDOW_OPENING_TIME per display trace (37.5 ns units) */
+  rwot?: number[] | null;
 };
 
 type DepthResult = {
@@ -40,7 +49,17 @@ type DepthResult = {
   boundary_m: number;
   lat: number;
   lon: number;
+  depth_uncertainty_m?: number;
+  vertical_resolution_m?: number;
   message?: string;
+};
+
+type MolaCalibration = {
+  offset_bins: number;
+  offset_us: number;
+  drift_bins_over_track: number;
+  residual_mad_bins: number;
+  n_used: number;
 };
 
 type MolaProfile = {
@@ -48,12 +67,14 @@ type MolaProfile = {
   elevation_m: (number | null)[];
   n_traces: number;
   total_distance_km: number;
+  /** Geometric nadir-surface bin per display trace (same axis as the radargram) */
+  predicted_surface_bin?: (number | null)[] | null;
+  calibration?: MolaCalibration | null;
 };
 
 /* =========================================================
  * Constants
  * =======================================================*/
-const MAX_IMAGE_WIDTH = 16384; // Safe browser canvas/image limit
 const MOLA_PANEL_HEIGHT = 120;
 const ADJUST_RADIUS = 8;
 const HANDLE_HIT_PX = 10;
@@ -73,6 +94,7 @@ type CachedProductData = {
   surface: SurfacePoint[];
   molaProfile: MolaProfile | null;
   clutterAvailable: boolean;
+  valueScale: ValueScale | null;
   /** Cache key includes display params that affect the radargram image */
   paramKey: string;
 };
@@ -90,8 +112,11 @@ export default function SharadHiresInspector({
   onLocatePoint,
   onOpenRegolith,
   onOpenAttenuation,
+  initialPoint = null,
 }: {
   productId: string;
+  /** Map point (planetocentric) the viewer was opened from: centre on and mark the nearest trace. */
+  initialPoint?: { lat: number; lon: number } | null;
   onClose: () => void;
   fieldNotes?: FieldNote[];
   onOpenFieldNote?: (productId: string, lat: number, lon: number) => void;
@@ -113,13 +138,21 @@ export default function SharadHiresInspector({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [, setAuxLoading] = useState(false); // surface/mola still loading
+  const [auxWarning, setAuxWarning] = useState<string | null>(null); // non-fatal surface/MOLA failure
+  const [retryNonce, setRetryNonce] = useState(0); // bump to re-run loadAll (Retry button)
+  const [valueScale, setValueScale] = useState<ValueScale | null>(null); // colour-bar mapping
+  const [showAxes, setShowAxes] = useState(true);
+  const [absoluteTimeAxis, setAbsoluteTimeAxis] = useState(false);
+  // Nearest display trace to `initialPoint` (map point → trace linking)
+  const [focusTrace, setFocusTrace] = useState<{ index: number; distanceM: number } | null>(null);
+  const focusKeyRef = useRef<string>("");
 
   // Display controls
   const [useLog, setUseLog] = useState(true);
   const [pmin, setPmin] = useState(1);
   const [pmax, setPmax] = useState(99);
   const [useAmplitude, setUseAmplitude] = useState(true);
-  const [usePerTrace, setUsePerTrace] = useState(true);
+  const [usePerTrace, setUsePerTrace] = useState(false); // global stretch preserves relative amplitude
   const [showSurface, setShowSurface] = useState(true);
 
   // Cluttergram overlay
@@ -135,6 +168,13 @@ export default function SharadHiresInspector({
   const [boundaryM, setBoundaryM] = useState(0);
   const [showBoundaryLine, setShowBoundaryLine] = useState(true);
   const [depthResult, setDepthResult] = useState<DepthResult | null>(null);
+  const [depthError, setDepthError] = useState<string | null>(null);
+  // Clicked depth picks (kept for export), and the current radargram PNG blob
+  const [clickPicks, setClickPicks] = useState<Pick[]>([]);
+  const [exportBusy, setExportBusy] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const radargramBlobRef = useRef<Blob | null>(null);
+  useEffect(() => { setClickPicks([]); }, [productId]);
 
   // Surface line adjustment
   const [adjustMode, setAdjustMode] = useState(false);
@@ -145,10 +185,10 @@ export default function SharadHiresInspector({
     baseOffsets: Map<number, number>;
   } | null>(null);
 
-  const effectiveSurface = useMemo(() => {
+  const effectiveSurface = useMemo((): SurfacePoint[] => {
     if (surfaceOffsets.size === 0) return surface;
     return surface.map(pt => ({
-      x: pt.x,
+      ...pt,
       y: pt.y + Math.round(surfaceOffsets.get(pt.x) ?? 0),
     }));
   }, [surface, surfaceOffsets]);
@@ -189,19 +229,25 @@ export default function SharadHiresInspector({
   const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
   const [collapsed, setCollapsed] = useState(false);
 
-  // MOLA alignment offset (trace index shift)
-  const [molaAlignMode, setMolaAlignMode] = useState(false);
-  const [molaXOffset, setMolaXOffset] = useState(0);
+  // Geometric MOLA nadir-surface line on the radargram (from RWOT + altitude + DEM)
+  const [showMolaSurface, setShowMolaSurface] = useState(true);
 
   // ── Hyperbola εr Tool ──
+  // Response of GET /api/epsilon/hyperbola_fit (trace indices are FULL resolution)
   type HyperbolaFitResult = {
-    v_mps: number; epsr: number; epsr_ci95: [number, number];
-    dt_surface_s: number; depth_m: number; depth_ci95: [number, number];
-    quality: { snr: number; residual: number; support_traces: number };
+    success: boolean;
+    epsilon_r_est: number | null;
+    epsilon_r_std: number | null;
+    epsilon_r_ci95: [number, number] | null;
+    depth_m: number | null;
+    v_ms: number | null;
+    rmse_bins: number | null;
+    n_inliers: number;
+    quality_note: string;
     flags: string[];
-    overlay_polyline: { trace: number; bin: number }[];
-    overlay_ci_band?: { trace: number; bin_lo: number; bin_hi: number }[] | null;
-    preset_curves?: Record<string, { trace: number; bin: number }[]> | null;
+    picks: { trace: number; bin: number }[];
+    overlay: { trace: number; bin: number }[];
+    diagnostics: { trace_spacing_m?: number; orbital_model_rmse_bins?: number };
   };
   const [hyperbolaApex, setHyperbolaApex] = useState<{ trace: number; bin: number } | null>(null);
   const [hyperbolaRoiTraces, setHyperbolaRoiTraces] = useState(60);
@@ -209,8 +255,6 @@ export default function SharadHiresInspector({
   const [hyperbolaFit, setHyperbolaFit] = useState<HyperbolaFitResult | null>(null);
   const [hyperbolaLoading, setHyperbolaLoading] = useState(false);
   const [hyperbolaError, setHyperbolaError] = useState<string | null>(null);
-  const [showPresetCurves, setShowPresetCurves] = useState(false);
-  const [showHyperbolaCi, setShowHyperbolaCi] = useState(true);
 
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -230,6 +274,7 @@ export default function SharadHiresInspector({
     async function loadAll() {
       setLoading(true);
       setError(null);
+      setAuxWarning(null);
 
       try {
         const pid = encodeURIComponent(productId);
@@ -251,29 +296,37 @@ export default function SharadHiresInspector({
           surfData = cached.surface;
           molaData = cached.molaProfile;
           clutterOk = cached.clutterAvailable;
+          setValueScale(cached.valueScale);
         } else {
           // Helper: fetch with 30s timeout via AbortController
-          const fetchWithTimeout = (url: string, timeoutMs = 30000): Promise<globalThis.Response> => {
+          const fetchWithTimeout = (url: string, timeoutMs = 60000): Promise<globalThis.Response> => {
             const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), timeoutMs);
             return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
           };
 
-          // Fetch metadata + radargram in parallel (use conservative downsample guess first)
-          const guessDs = 4; // Safe initial guess — most tracks are ~5000-15000 traces
-          const metaPromise = fetchWithTimeout(`/api/sharad_highres/metadata?product_id=${pid}`);
-          const imgPromise = fetchWithTimeout(`/api/sharad_highres/radargram?product_id=${pid}&downsample=${guessDs}&log=${useLog ? 1 : 0}&pmin=${pmin}&pmax=${pmax}&amplitude=${useAmplitude ? 1 : 0}&per_trace=${usePerTrace ? 1 : 0}`);
-          const rmPromise = fetchWithTimeout(`/api/sharad_highres/radargram_meta?product_id=${pid}&downsample=${guessDs}`);
-
-          const [metaRes, imgRes, rmRes] = await Promise.all([metaPromise, imgPromise, rmPromise]);
-
-          if (!metaRes.ok) throw new Error("Failed to load metadata");
+          // Metadata first: the downsample factor derives from the row count,
+          // and EVERY request for this view (image, axis meta, surface, MOLA,
+          // clutter, depth, hyperbola) must use the same factor so that a
+          // display trace index means the same thing everywhere.
+          const metaRes = await fetchWithTimeout(`/api/sharad_highres/metadata?product_id=${pid}`, 90000);
+          if (!metaRes.ok) throw new Error(await describeHttpError(metaRes, "Metadata"));
           metaData = await metaRes.json();
-          const ds = Math.max(1, Math.ceil(metaData.rows / MAX_IMAGE_WIDTH));
+          const ds = computeDownsample(metaData.rows);
 
-          if (!imgRes.ok) throw new Error("Failed to load radargram");
-          if (!rmRes.ok) throw new Error("Failed to load radargram meta");
+          const [imgRes, rmRes] = await Promise.all([
+            fetchWithTimeout(`/api/sharad_highres/radargram?product_id=${pid}&downsample=${ds}&log=${useLog ? 1 : 0}&pmin=${pmin}&pmax=${pmax}&amplitude=${useAmplitude ? 1 : 0}&per_trace=${usePerTrace ? 1 : 0}`),
+            fetchWithTimeout(`/api/sharad_highres/radargram_meta?product_id=${pid}&downsample=${ds}`),
+          ]);
+          if (!imgRes.ok) throw new Error(await describeHttpError(imgRes, "Radargram image"));
+          if (!rmRes.ok) throw new Error(await describeHttpError(rmRes, "Radargram axis metadata"));
 
+          let vScale: ValueScale | null = null;
+          try {
+            const hdr = imgRes.headers.get("X-Value-Scale");
+            vScale = hdr ? (JSON.parse(hdr) as ValueScale) : null;
+          } catch { vScale = null; }
+          if (!cancelled) setValueScale(vScale);
           blob = await imgRes.blob();
           rmData = await rmRes.json();
 
@@ -286,14 +339,24 @@ export default function SharadHiresInspector({
             fetchWithTimeout(`/api/sharad_highres/surface?product_id=${pid}&downsample=${ds}`),
             fetchWithTimeout(`/api/sharad_highres/mola_profile?product_id=${pid}&downsample=${ds}`),
           ]).then(async ([surfResult, molaResult]) => {
+            const warnings: string[] = [];
             if (surfResult.status === "fulfilled" && surfResult.value.ok) {
               const sj = await surfResult.value.json();
               surfData = sj.surface || [];
+            } else {
+              warnings.push(surfResult.status === "fulfilled"
+                ? await describeHttpError(surfResult.value, "Surface pick")
+                : `Surface pick failed (${String(surfResult.reason)})`);
             }
             if (molaResult.status === "fulfilled" && molaResult.value.ok) {
               molaData = await molaResult.value.json();
+            } else {
+              warnings.push(molaResult.status === "fulfilled"
+                ? await describeHttpError(molaResult.value, "MOLA profile")
+                : `MOLA profile failed (${String(molaResult.reason)})`);
             }
             if (!cancelled) {
+              setAuxWarning(warnings.length ? warnings.join(" · ") : null);
               setSurface(surfData);
               setMolaProfile(molaData);
               setAuxLoading(false);
@@ -316,6 +379,7 @@ export default function SharadHiresInspector({
 
           // Decode radargram image immediately — show UI before aux data arrives
           const img = new globalThis.Image();
+          radargramBlobRef.current = blob;
           img.src = URL.createObjectURL(blob);
           await new Promise<void>((resolve, reject) => {
             img.onload = () => resolve();
@@ -345,13 +409,14 @@ export default function SharadHiresInspector({
           _productCache.set(productId, {
             metadata: metaData, radargramBlob: blob, radargramMeta: rmData,
             surface: surfData, molaProfile: molaData, clutterAvailable: clutterOk,
-            paramKey,
+            valueScale: vScale, paramKey,
           });
           return; // skip the generic state-setting below (already done)
         }
 
         // Cache-hit path: decode blob → HTMLImageElement
         const img = new globalThis.Image();
+        radargramBlobRef.current = blob;
         img.src = URL.createObjectURL(blob);
         await new Promise<void>((resolve, reject) => {
           img.onload = () => resolve();
@@ -375,7 +440,7 @@ export default function SharadHiresInspector({
       } catch (e: unknown) {
         let msg = e instanceof Error ? e.message : "Unknown error";
         if (e instanceof DOMException && e.name === "AbortError") {
-          msg = "Request timed out — the server took too long to respond";
+          msg = "Request timed out — the server took too long to respond (first open of a product parses ~0.5 GB; try Retry)";
         }
         if (!cancelled) setError(msg);
       } finally {
@@ -385,10 +450,20 @@ export default function SharadHiresInspector({
 
     loadAll();
     return () => { cancelled = true; };
-  }, [productId, useLog, pmin, pmax, useAmplitude, usePerTrace]);
+  }, [productId, useLog, pmin, pmax, useAmplitude, usePerTrace, retryNonce]);
 
   // Computed downsample factor based on product size
-  const downsample = metadata ? Math.max(1, Math.ceil(metadata.rows / MAX_IMAGE_WIDTH)) : 1;
+  const downsample = metadata ? computeDownsample(metadata.rows) : 1;
+
+  // Absolute two-way delay (µs) of (display trace, bin): (RWOT + bin)·37.5 ns
+  // + MOLA-calibrated instrument offset; null when RWOT/calibration missing.
+  const absDelayUs = useCallback((trace: number, bin: number): number | null => {
+    const rw = radargramMeta?.rwot?.[trace];
+    const cal = molaProfile?.calibration;
+    if (rw == null || !(rw > 0) || !cal) return null;
+    return (rw + bin) * BIN_DT_US + cal.offset_us;
+  }, [radargramMeta, molaProfile]);
+
 
   // ── Cluttergram image loading ─────────────────────────
   useEffect(() => {
@@ -625,72 +700,91 @@ export default function SharadHiresInspector({
       ctx.setLineDash([]);
     }
 
-    if (hyperbolaFit && hyperbolaFit.overlay_polyline.length > 0) {
-      // Draw fitted curve (red)
+    if (hyperbolaFit && hyperbolaFit.success) {
+      const ds = radargramMeta.downsample || 1;
+      // Picks used by the fit
+      ctx.fillStyle = "rgba(251, 191, 36, 0.8)";
+      for (const pt of hyperbolaFit.picks) {
+        const x = traceToX(pt.trace / ds);
+        const y = binToY(pt.bin);
+        if (x < 0 || x > W || y < 0 || y > H) continue;
+        ctx.fillRect(x - 1, y - 1, 2, 2);
+      }
+      // Fitted curve (red)
       ctx.beginPath();
       ctx.strokeStyle = "#ef4444";
       ctx.lineWidth = 2;
       let fMoved = false;
-      for (const pt of hyperbolaFit.overlay_polyline) {
-        const x = traceToX(pt.trace);
+      for (const pt of hyperbolaFit.overlay) {
+        const x = traceToX(pt.trace / ds);
         const y = binToY(pt.bin);
         if (x < -10 || x > W + 10) continue;
         if (!fMoved) { ctx.moveTo(x, y); fMoved = true; }
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
+    }
 
-      // CI band
-      if (showHyperbolaCi && hyperbolaFit.overlay_ci_band) {
-        ctx.fillStyle = "rgba(239, 68, 68, 0.12)";
-        ctx.beginPath();
-        // Upper edge
-        let ciMoved = false;
-        for (const pt of hyperbolaFit.overlay_ci_band) {
-          const x = traceToX(pt.trace);
-          const y = binToY(pt.bin_lo);
-          if (!ciMoved) { ctx.moveTo(x, y); ciMoved = true; } else ctx.lineTo(x, y);
-        }
-        // Lower edge (reverse)
-        for (let i = hyperbolaFit.overlay_ci_band.length - 1; i >= 0; i--) {
-          const pt = hyperbolaFit.overlay_ci_band[i]!;
-          ctx.lineTo(traceToX(pt.trace), binToY(pt.bin_hi));
-        }
-        ctx.closePath();
-        ctx.fill();
+    // Geometric MOLA nadir surface (RWOT + altitude + DEM)
+    const pred = molaProfile?.predicted_surface_bin;
+    if (showMolaSurface && pred && pred.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.9)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      let mv = false;
+      const i0 = Math.max(0, Math.floor(viewX.start * nTraces) - 1);
+      const i1 = Math.min(pred.length - 1, Math.ceil(viewX.end * nTraces) + 1);
+      for (let i = i0; i <= i1; i++) {
+        const b = pred[i];
+        if (b == null) { mv = false; continue; }
+        const x = traceToX(i), y = binToY(b);
+        if (!mv) { ctx.moveTo(x, y); mv = true; } else ctx.lineTo(x, y);
       }
+      ctx.stroke();
+      ctx.restore();
+    }
 
-      // Preset curves
-      if (showPresetCurves && hyperbolaFit.preset_curves) {
-        const presetColors: Record<string, string> = {
-          "2.8": "#67e8f9", "3.15": "#4ade80", "4.0": "#facc15",
-        };
-        for (const [key, curve] of Object.entries(hyperbolaFit.preset_curves)) {
-          ctx.beginPath();
-          ctx.strokeStyle = presetColors[key] || "#94a3b8";
-          ctx.lineWidth = 1;
-          ctx.setLineDash([5, 3]);
-          let pMoved = false;
-          for (const pt of curve) {
-            const x = traceToX(pt.trace);
-            const y = binToY(pt.bin);
-            if (x < -10 || x > W + 10) continue;
-            if (!pMoved) { ctx.moveTo(x, y); pMoved = true; } else ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-          ctx.setLineDash([]);
-          // Label
-          const first = curve[0];
-          if (first) {
-            const lx = traceToX(first.trace);
-            const ly = binToY(first.bin);
-            ctx.font = "bold 8px monospace";
-            ctx.fillStyle = presetColors[key] || "#94a3b8";
-            ctx.textAlign = "right";
-            ctx.fillText(`εr=${key}`, lx - 4, ly - 2);
-          }
-        }
+    // Inspected map point → nearest trace marker
+    if (focusTrace) {
+      const fx = traceToX(focusTrace.index + 0.5);
+      if (fx >= 0 && fx <= W) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(34, 211, 238, 0.85)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(fx, 0); ctx.lineTo(fx, H); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = "bold 9px monospace";
+        ctx.fillStyle = "#22d3ee";
+        ctx.textAlign = fx > W - 160 ? "right" : "left";
+        ctx.fillText(
+          `◆ inspected point · trace ${focusTrace.index} · ${(focusTrace.distanceM / 1000).toFixed(2)} km off-track`,
+          fx + (fx > W - 160 ? -4 : 4), 40,
+        );
+        ctx.restore();
       }
+    }
+
+    // Axes, scale bar and colour bar
+    if (showAxes) {
+      const centre = ((viewX.start + viewX.end) / 2) * nTraces;
+      let sBin: number | null = null;
+      let bestDx = Infinity;
+      for (const pt of effectiveSurface) {
+        const dx = Math.abs(pt.x - centre);
+        if (dx < bestDx) { bestDx = dx; sBin = pt.y; }
+      }
+      if (bestDx > Math.max(20, nTraces * 0.02)) sBin = null;
+      drawRadargramAxes(ctx, {
+        W, H, viewX, viewY, nTraces, nBins,
+        distanceKm: radargramMeta.distance_km,
+        surfaceBin: sBin,
+        eps1: epsilonR1, eps2: epsilonR2, boundaryM,
+        valueScale,
+        delayOffsetUs: absoluteTimeAxis ? absDelayUs(Math.round(centre), 0) : null,
+      });
     }
 
     // Cursor crosshair
@@ -716,9 +810,31 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit, showPresetCurves, showHyperbolaCi]);
+  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit, showAxes, valueScale, epsilonR1, epsilonR2, focusTrace, molaProfile, showMolaSurface, absoluteTimeAxis, absDelayUs]);
 
   useEffect(() => { draw(); }, [draw]);
+
+  // Map point → trace: once per (product, point), centre the view on the
+  // nearest trace, mark it and drop the map pin on the trace itself.
+  useEffect(() => {
+    if (!initialPoint || !radargramMeta || !radargram) { if (!initialPoint) setFocusTrace(null); return; }
+    const key = `${productId}|${initialPoint.lat}|${initialPoint.lon}|${radargramMeta.downsample}`;
+    if (focusKeyRef.current === key) return;
+    focusKeyRef.current = key;
+    const nt = nearestTrace(radargramMeta.lats, radargramMeta.lons, initialPoint.lat, initialPoint.lon);
+    setFocusTrace(nt);
+    if (!nt) return;
+    const n = radargramMeta.n_traces;
+    setViewX((v) => {
+      const span = Math.min(1, v.end - v.start);
+      let start = nt.index / n - span / 2;
+      start = Math.max(0, Math.min(1 - span, start));
+      return { start, end: start + span };
+    });
+    const la = radargramMeta.lats[nt.index];
+    const lo = radargramMeta.lons[nt.index];
+    if (onLocatePoint && la != null && lo != null) onLocatePoint(la, lo);
+  }, [initialPoint, radargramMeta, radargram, productId, onLocatePoint]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -752,16 +868,13 @@ export default function SharadHiresInspector({
     const n = molaProfile.elevation_m.length;
     if (n === 0) return;
 
-    // molaXOffset shifts MOLA left/right relative to SHARAD x-axis
+    // MOLA samples are taken at the radargram's own trace positions → no offset
     const iStart = Math.floor(viewX.start * n);
     const iEnd = Math.ceil(viewX.end * n);
 
-    // For visible range calculation, account for offset
     const visibleElevs: number[] = [];
-    for (let i = iStart; i < iEnd && i < n; i++) {
-      const si = i + molaXOffset;
-      if (si < 0 || si >= n) continue;
-      const e = molaProfile.elevation_m[si]!;
+    for (let i = Math.max(0, iStart); i < iEnd && i < n; i++) {
+      const e = molaProfile.elevation_m[i]!;
       if (e !== null) visibleElevs.push(e);
     }
     if (visibleElevs.length === 0) return;
@@ -804,18 +917,13 @@ export default function SharadHiresInspector({
     ctx.textAlign = "center";
     const dStart = molaProfile.distance_km[iStart] ?? 0;
     const dEnd = molaProfile.distance_km[Math.min(iEnd, n - 1)] ?? molaProfile.total_distance_km;
-    const offsetLabel = molaXOffset !== 0 ? ` [offset: ${molaXOffset > 0 ? "+" : ""}${molaXOffset}]` : "";
-    ctx.fillText(`${dStart.toFixed(0)}\u2013${dEnd.toFixed(0)} km along track${offsetLabel}`, pad.left + plotW / 2, H - 3);
+    ctx.fillText(`${dStart.toFixed(0)}\u2013${dEnd.toFixed(0)} km along track`, pad.left + plotW / 2, H - 3);
 
     // Title
     ctx.fillStyle = "#94a3b8";
     ctx.font = "bold 9px sans-serif";
     ctx.textAlign = "left";
     ctx.fillText("MOLA Elevation (m)", pad.left, 12);
-    if (molaXOffset !== 0) {
-      ctx.fillStyle = "#fbbf24";
-      ctx.fillText(`  offset: ${molaXOffset > 0 ? "+" : ""}${molaXOffset}`, pad.left + 110, 12);
-    }
 
     // Clip to plot area
     ctx.save();
@@ -823,17 +931,15 @@ export default function SharadHiresInspector({
     ctx.rect(pad.left, pad.top, plotW, plotH);
     ctx.clip();
 
-    // Elevation line (shifted by molaXOffset)
+    // Elevation line
     ctx.beginPath();
     ctx.strokeStyle = "#38bdf8";
     ctx.lineWidth = 1.5;
     let started = false;
     for (let i = Math.max(0, iStart - 1); i <= Math.min(n - 1, iEnd + 1); i++) {
-      const si = i + molaXOffset;
-      if (si < 0 || si >= n) { started = false; continue; }
-      const e = molaProfile.elevation_m[si]!;
+      const e = molaProfile.elevation_m[i]!;
       if (e === null) { started = false; continue; }
-      const x = xOf(i); // x position is SHARAD-aligned (no offset)
+      const x = xOf(i);
       const y = yOf(e);
       if (!started) { ctx.moveTo(x, y); started = true; }
       else ctx.lineTo(x, y);
@@ -853,8 +959,7 @@ export default function SharadHiresInspector({
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Show elevation at cursor, accounting for offset
-        const idx = Math.round(cursor.normX * (n - 1)) + molaXOffset;
+        const idx = Math.round(cursor.normX * (n - 1));
         if (idx >= 0 && idx < n) {
           const e = molaProfile.elevation_m[idx]!;
           if (e !== null) {
@@ -868,7 +973,7 @@ export default function SharadHiresInspector({
     }
 
     ctx.restore();
-  }, [molaProfile, viewX, cursor, molaXOffset]);
+  }, [molaProfile, viewX, cursor]);
 
   useEffect(() => { drawMola(); }, [drawMola]);
 
@@ -1061,42 +1166,6 @@ export default function SharadHiresInspector({
       }
     }
 
-    // MOLA offset drag (molaAlignMode ON, drag on MOLA panel)
-    if (molaAlignMode && !isOnRadargram && e.button === 0 && !e.shiftKey) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const startX = e.clientX;
-      const startOffset = molaXOffset;
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const nSamples = molaProfile?.elevation_m.length ?? 1;
-      const visibleSpan = viewX.end - viewX.start;
-
-      isDragging.current = true;
-
-      const onMove = (ev: MouseEvent) => {
-        ev.preventDefault();
-        const dxPx = ev.clientX - startX;
-        // Convert pixel movement to trace index offset
-        const dxTraces = Math.round(-(dxPx / rect.width) * visibleSpan * nSamples);
-        const maxOffset = Math.min(5000, Math.floor(nSamples / 2));
-        setMolaXOffset(Math.max(-maxOffset, Math.min(maxOffset, startOffset + dxTraces)));
-      };
-      const onUp = () => {
-        isDragging.current = false;
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
-
-      document.body.style.cursor = "ew-resize";
-      document.body.style.userSelect = "none";
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-      return;
-    }
-
     // Pan drag — works in all modes (default left-click, move mode, middle click, shift+click)
     // In Query/default mode: drag to pan, click (no movement) for depth query
     if (e.button === 0 || e.button === 1) {
@@ -1145,7 +1214,7 @@ export default function SharadHiresInspector({
       document.addEventListener("mousemove", onMove);
       document.addEventListener("mouseup", onUp);
     }
-  }, [viewX, viewY, adjustMode, molaAlignMode, molaXOffset, molaProfile, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
+  }, [viewX, viewY, adjustMode, findNearestSurfaceVertex, effectiveSurface, surfaceOffsets, radargramMeta, applyAdjustDrag, clampRange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = e.currentTarget;
@@ -1201,10 +1270,114 @@ export default function SharadHiresInspector({
       url += `&surface_bin_override=${surfOverride}`;
     }
     fetch(url)
-      .then((r) => r.json())
-      .then((data) => setDepthResult(data))
-      .catch(() => setDepthResult(null));
-  }, [radargramMeta, viewX, viewY, epsilonR1, epsilonR2, boundaryM, productId, moveMode, adjustMode, effectiveSurface, surfaceOffsets, onLocatePoint, downsample]);
+      .then(async (r) => {
+        if (!r.ok) throw new Error(await describeHttpError(r, "Depth conversion"));
+        return r.json();
+      })
+      .then((data: DepthResult) => {
+        setDepthResult(data);
+        setDepthError(null);
+        if (data.surface_bin != null && data.depth_m != null) {
+          setClickPicks((prev) => [...prev, completePick({
+            kind: "click", product_id: productId, display_trace: traceIdx,
+            full_trace: traceIdx * downsample, lat: data.lat ?? null, lon: data.lon ?? null,
+            bin: cursorBin, surface_bin: data.surface_bin,
+            abs_delay_us: absDelayUs(traceIdx, cursorBin),
+            depth_m: data.depth_m, depth_uncertainty_m: data.depth_uncertainty_m ?? null,
+            vertical_resolution_m: data.vertical_resolution_m ?? null,
+            epsilon_r1: epsilonR1, epsilon_r2: epsilonR2, boundary_m: boundaryM, snr_db: null,
+          })]);
+        }
+      })
+      .catch((err) => { setDepthResult(null); setDepthError(err instanceof Error ? err.message : String(err)); });
+  }, [radargramMeta, viewX, viewY, epsilonR1, epsilonR2, boundaryM, productId, moveMode, adjustMode, effectiveSurface, surfaceOffsets, onLocatePoint, downsample, absDelayUs]);
+
+  // ── Export ─────────────────────────────────────────────
+  const buildPicks = useCallback(async (withReflectors: boolean): Promise<Pick[]> => {
+    if (!radargramMeta) return [];
+    const ds = radargramMeta.downsample;
+    const common = { product_id: productId, epsilon_r1: epsilonR1, epsilon_r2: epsilonR2, boundary_m: boundaryM };
+    const out: Pick[] = effectiveSurface.map((pt) => completePick({
+      ...common, kind: "surface", display_trace: pt.x, full_trace: pt.x * ds,
+      lat: radargramMeta.lats[pt.x] ?? null, lon: radargramMeta.lons[pt.x] ?? null,
+      bin: pt.y, surface_bin: pt.y, abs_delay_us: absDelayUs(pt.x, pt.y), snr_db: pt.snr_db ?? null,
+    }));
+    out.push(...clickPicks);
+    if (withReflectors) {
+      const r = await fetch(`/api/sharad_highres/reflectors?product_id=${encodeURIComponent(productId)}&epsilon_r=${epsilonR1}`);
+      if (!r.ok) throw new Error(await describeHttpError(r, "Reflector detection"));
+      const j = await r.json() as { reflectors: { traces: { trace_idx: number; lat: number; lon: number; bin_idx: number; snr: number }[] }[] };
+      const surfAt = new Map(effectiveSurface.map((pt) => [pt.x, pt.y]));
+      for (const seg of j.reflectors) {
+        for (const t of seg.traces) {
+          if (t.trace_idx % ds !== 0) continue; // one per display trace
+          const dt = t.trace_idx / ds;
+          out.push(completePick({
+            ...common, epsilon_r2: epsilonR1, boundary_m: 0, // reflector depths use uniform εr1
+            kind: "reflector", display_trace: dt, full_trace: t.trace_idx, lat: t.lat, lon: t.lon,
+            bin: t.bin_idx, surface_bin: surfAt.get(dt) ?? null, abs_delay_us: absDelayUs(dt, t.bin_idx),
+            snr_db: t.snr > 0 ? 10 * Math.log10(t.snr) : null,
+          }));
+        }
+      }
+    }
+    return out;
+  }, [radargramMeta, productId, epsilonR1, epsilonR2, boundaryM, effectiveSurface, clickPicks, absDelayUs]);
+
+  const exportPicks = useCallback(async (fmt: "csv" | "geojson", withReflectors: boolean) => {
+    setExportBusy(fmt);
+    setExportError(null);
+    try {
+      const picks = await buildPicks(withReflectors);
+      const base = `${productId}_picks${withReflectors ? "_with_reflectors" : ""}`;
+      if (fmt === "csv") downloadBlob(`${base}.csv`, picksToCsv(picks), "text/csv");
+      else downloadBlob(`${base}.geojson`, picksToGeoJSON(picks, {
+        product_id: productId, downsample: radargramMeta?.downsample,
+        surface_pick: surfaceOffsets.size > 0 ? "auto + manual edits" : "auto (leading edge)",
+      }), "application/geo+json");
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExportBusy(null);
+    }
+  }, [buildPicks, productId, radargramMeta, surfaceOffsets]);
+
+  const exportRadargram = useCallback(() => {
+    const blob = radargramBlobRef.current;
+    if (!blob || !radargramMeta) return;
+    const tag = `${productId}_ds${radargramMeta.downsample}_${useLog ? "log" : "lin"}_${usePerTrace ? "pertrace" : "global"}`;
+    downloadBlob(`${tag}.png`, blob);
+    const sidecar = {
+      product_id: productId,
+      image: `${tag}.png`,
+      description: "SHARAD RDR radargram rendered by MarsLab. Columns = display traces (full-res trace = column × downsample), rows = range bins of the receive window.",
+      columns: radargramMeta.n_traces,
+      rows: radargramMeta.n_bins,
+      downsample: radargramMeta.downsample,
+      along_track_aggregation: "mean of power over `downsample` consecutive traces",
+      sample_interval_us: BIN_DT_US,
+      trace_spacing_m: radargramMeta.trace_spacing_m ?? null,
+      lat_convention: "planetocentric",
+      lon_convention: "east, -180..180",
+      display: { log: useLog, amplitude: useAmplitude, per_trace: usePerTrace, pmin, pmax },
+      value_scale: valueScale,
+      absolute_delay: molaProfile?.calibration
+        ? { formula: "(rwot + row) * 0.0375 + offset_us", offset_us: molaProfile.calibration.offset_us, calibration: molaProfile.calibration }
+        : null,
+      per_column: {
+        lat: radargramMeta.lats,
+        lon: radargramMeta.lons,
+        distance_km: radargramMeta.distance_km ?? null,
+        rwot: radargramMeta.rwot ?? null,
+        surface_bin: (() => {
+          const m = new Map(effectiveSurface.map((pt) => [pt.x, pt.y]));
+          return Array.from({ length: radargramMeta.n_traces }, (_, i) => m.get(i) ?? null);
+        })(),
+        mola_predicted_surface_bin: molaProfile?.predicted_surface_bin ?? null,
+      },
+    };
+    downloadBlob(`${tag}.axes.json`, JSON.stringify(sidecar), "application/json");
+  }, [productId, radargramMeta, useLog, useAmplitude, usePerTrace, pmin, pmax, valueScale, molaProfile, effectiveSurface]);
 
   // ── Cursor info ────────────────────────────────────────
   const cursorInfo = (() => {
@@ -1218,6 +1391,7 @@ export default function SharadHiresInspector({
       bin: binIdx,
       lat: radargramMeta.lats[traceIdx] ?? null,
       lon: radargramMeta.lons[traceIdx] ?? null,
+      absDelayUs: absDelayUs(traceIdx, binIdx),
     };
   })();
 
@@ -1337,13 +1511,34 @@ export default function SharadHiresInspector({
               </div>
             </div>
 
+            {/* Amp vs Power is a no-op on a log scale (log√P = ½·logP, identical
+                after percentile stretching), so it is only offered for Linear. */}
+            {!useLog && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-400">Value</span>
+                <div className="flex gap-1">
+                  <MiniButton active={useAmplitude} onClick={() => setUseAmplitude(true)}>Amp</MiniButton>
+                  <MiniButton active={!useAmplitude} onClick={() => setUseAmplitude(false)}>Power</MiniButton>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-400">Value</span>
+              <span className="text-[10px] text-slate-400">Axes</span>
               <div className="flex gap-1">
-                <MiniButton active={useAmplitude} onClick={() => setUseAmplitude(true)}>Amp</MiniButton>
-                <MiniButton active={!useAmplitude} onClick={() => setUseAmplitude(false)}>Power</MiniButton>
+                <MiniButton active={showAxes} onClick={() => setShowAxes(true)}>On</MiniButton>
+                <MiniButton active={!showAxes} onClick={() => setShowAxes(false)}>Off</MiniButton>
               </div>
             </div>
+            {showAxes && (
+              <div className="flex items-center justify-between" title="Absolute = (RWOT + bin)·37.5 ns + MOLA-calibrated offset, labelled for the centre trace">
+                <span className="text-[10px] text-slate-400">Time axis</span>
+                <div className="flex gap-1">
+                  <MiniButton active={!absoluteTimeAxis} onClick={() => setAbsoluteTimeAxis(false)}>Window</MiniButton>
+                  <MiniButton active={absoluteTimeAxis} onClick={() => setAbsoluteTimeAxis(true)}>Absolute</MiniButton>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400">Normalize</span>
@@ -1352,6 +1547,12 @@ export default function SharadHiresInspector({
                 <MiniButton active={!usePerTrace} onClick={() => setUsePerTrace(false)}>Global</MiniButton>
               </div>
             </div>
+            {usePerTrace && (
+              <div className="text-[9px] text-amber-400/80 leading-snug">
+                Per-trace stretch hides along-track amplitude changes — use Global for
+                attenuation / reflectivity work.
+              </div>
+            )}
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -1445,6 +1646,10 @@ export default function SharadHiresInspector({
                     <div className="text-[8px] text-slate-600 italic">
                       Surface clutter simulation (US SHARAD team)
                     </div>
+                    <div className="text-[8px] text-amber-400/80 leading-snug">
+                      Vertical alignment is empirical (matched to the median surface bin); off-nadir
+                      clutter delays relative to nadir are approximate.
+                    </div>
                   </div>
                 )}
               </>
@@ -1498,65 +1703,25 @@ export default function SharadHiresInspector({
             </div>
           </Section>
 
-          {/* MOLA Alignment */}
+          {/* Geometric MOLA surface */}
           {molaProfile && (
-            <Section title="MOLA Align">
+            <Section title="MOLA surface (geometric)">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-slate-400">Adjust Offset</span>
-                <MiniButton
-                  active={molaAlignMode}
-                  onClick={() => setMolaAlignMode(!molaAlignMode)}
-                >
-                  {molaAlignMode ? "ON" : "OFF"}
+                <span className="text-[10px] text-slate-400">Predicted nadir line</span>
+                <MiniButton active={showMolaSurface} onClick={() => setShowMolaSurface(!showMolaSurface)}>
+                  {showMolaSurface ? "ON" : "OFF"}
                 </MiniButton>
               </div>
-              {molaAlignMode && (
-                <div className="text-[9px] text-slate-600">
-                  Drag left/right on MOLA panel to shift offset.
+              {molaProfile.calibration ? (
+                <div className="text-[9px] text-slate-500 leading-snug">
+                  2(h−z)/c − RWOT, calibrated to the picked surface: offset{" "}
+                  {molaProfile.calibration.offset_us.toFixed(1)} µs (≈1 PRI), drift{" "}
+                  {molaProfile.calibration.drift_bins_over_track.toFixed(0)} bins, residual MAD{" "}
+                  {molaProfile.calibration.residual_mad_bins.toFixed(1)} bins. Picks earlier than the
+                  line are off-nadir / sloped returns.
                 </div>
-              )}
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">Offset</span>
-                  <span className={`text-[10px] font-mono ${molaXOffset !== 0 ? "text-amber-400" : "text-slate-500"}`}>
-                    {molaXOffset > 0 ? "+" : ""}{molaXOffset} traces
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setMolaXOffset(o => Math.max(-5000, o - 10))}
-                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
-                  >◀ 10</button>
-                  <button
-                    onClick={() => setMolaXOffset(o => Math.max(-5000, o - 1))}
-                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
-                  >◀</button>
-                  <input
-                    type="number"
-                    value={molaXOffset}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      if (!isNaN(v)) setMolaXOffset(Math.max(-5000, Math.min(5000, v)));
-                    }}
-                    className="flex-1 min-w-0 bg-[#0a0f18] border border-[#232f48] rounded px-1 py-0.5 text-[10px] text-center text-slate-300 font-mono focus:outline-none focus:border-primary/40"
-                  />
-                  <button
-                    onClick={() => setMolaXOffset(o => Math.min(5000, o + 1))}
-                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
-                  >▶</button>
-                  <button
-                    onClick={() => setMolaXOffset(o => Math.min(5000, o + 10))}
-                    className="px-1 py-0.5 text-[9px] text-slate-400 hover:text-white border border-[#232f48] rounded transition-colors"
-                  >10 ▶</button>
-                </div>
-              </div>
-              {molaXOffset !== 0 && (
-                <button
-                  onClick={() => { setMolaXOffset(0); }}
-                  className="text-[9px] text-slate-500 hover:text-amber-400 transition-colors underline"
-                >
-                  Reset to zero
-                </button>
+              ) : (
+                <div className="text-[9px] text-slate-600">Geometric prediction unavailable (DEM or RWOT missing).</div>
               )}
             </Section>
           )}
@@ -1614,6 +1779,9 @@ export default function SharadHiresInspector({
               Click below surface line to compute depth
             </div>
 
+            {depthError && (
+              <div className="text-[10px] text-red-400 mb-1" role="alert">{depthError}</div>
+            )}
             {depthResult && (
               <div className="space-y-1.5 p-2 rounded border border-amber-500/30 bg-amber-500/5 mt-2">
                 <div className="flex justify-between text-[10px]">
@@ -1638,8 +1806,19 @@ export default function SharadHiresInspector({
                     </div>
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-amber-400">Depth</span>
-                      <span className="text-amber-300 font-mono">{depthResult.depth_m?.toFixed(1)} m</span>
+                      <span className="text-amber-300 font-mono">
+                        {depthResult.depth_m?.toFixed(1)}
+                        {depthResult.depth_uncertainty_m != null && ` ± ${depthResult.depth_uncertainty_m.toFixed(1)}`} m
+                      </span>
                     </div>
+                    {depthResult.vertical_resolution_m != null && (
+                      <div className="flex justify-between text-[10px]" title="±1 range bin (37.5 ns) quantisation; vertical resolution c/(2B√εr), B = 10 MHz. Excludes εr and surface-pick uncertainty.">
+                        <span className="text-slate-400">Resolution</span>
+                        <span className="text-slate-300 font-mono text-[9px]">
+                          {depthResult.vertical_resolution_m.toFixed(1)} m (±1 bin = {depthResult.depth_uncertainty_m?.toFixed(1)} m)
+                        </span>
+                      </div>
+                    )}
                     {depthResult.boundary_m > 0 && (
                       <div className="flex justify-between text-[10px]">
                         <span className="text-slate-400">Model</span>
@@ -1665,7 +1844,12 @@ export default function SharadHiresInspector({
           </Section>
 
           {/* Hyperbola εr Tool */}
-          <Section title="Hyperbola εr">
+          <Section title="Hyperbola εr (experimental)">
+            <div className="text-[9px] text-amber-400/90 mb-1.5 leading-snug" role="note">
+              Experimental — poorly constrained for focused orbital RDR: the data are
+              Doppler-focused and, from ~270 km altitude, free-space moveout dominates
+              hyperbola shape regardless of εr. Treat results as indicative only.
+            </div>
             <div className="text-[9px] text-slate-500 italic mb-2">
               Shift+Click on radargram to set apex
             </div>
@@ -1704,37 +1888,30 @@ export default function SharadHiresInspector({
                       if (!hyperbolaApex) return;
                       setHyperbolaLoading(true);
                       setHyperbolaError(null);
-                      fetch("/api/ice/hyperbola/fit", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          product_id: productId,
-                          apex_trace: hyperbolaApex.trace,
-                          apex_bin: hyperbolaApex.bin,
-                          roi_traces: hyperbolaRoiTraces,
-                          roi_bins: hyperbolaRoiBins,
-                        }),
-                      })
-                        .then((r) => {
-                          if (!r.ok) throw new Error(`${r.status}`);
-                          return r.json();
+                      // Apex/ROI are in display traces; the endpoint wants full resolution.
+                      const ds = radargramMeta?.downsample || downsample;
+                      const params = new URLSearchParams({
+                        product_id: productId,
+                        trace_idx0: String(hyperbolaApex.trace * ds),
+                        bin_idx0: String(hyperbolaApex.bin),
+                        window_traces: String(Math.min(6000, Math.max(20, 2 * hyperbolaRoiTraces * ds))),
+                        window_bins: String(Math.min(600, Math.max(20, 2 * hyperbolaRoiBins))),
+                      });
+                      fetch(`/api/epsilon/hyperbola_fit?${params}`)
+                        .then(async (r) => {
+                          if (!r.ok) throw new Error(await describeHttpError(r, "Hyperbola fit"));
+                          return r.json() as Promise<HyperbolaFitResult>;
                         })
-                        .then((data) => { setHyperbolaFit(data); setHyperbolaLoading(false); })
-                        .catch((err) => { setHyperbolaError(String(err)); setHyperbolaLoading(false); });
+                        .then((data) => {
+                          setHyperbolaFit(data);
+                          if (!data.success) setHyperbolaError(data.quality_note || "Fit failed");
+                          setHyperbolaLoading(false);
+                        })
+                        .catch((err) => { setHyperbolaError(err instanceof Error ? err.message : String(err)); setHyperbolaLoading(false); });
                     }}
                     className="px-2 py-0.5 text-[9px] font-bold rounded bg-red-900/40 text-red-300 border border-red-500/30 hover:bg-red-800/50 disabled:opacity-50"
                   >
                     {hyperbolaLoading ? "Fitting..." : "Fit Hyperbola"}
-                  </button>
-                  <button
-                    onClick={() => setShowPresetCurves((p) => !p)}
-                    className={`px-2 py-0.5 text-[9px] font-bold rounded border ${
-                      showPresetCurves
-                        ? "bg-cyan-900/30 text-cyan-300 border-cyan-500/40"
-                        : "bg-[#0a0f18] text-slate-500 border-[#232f48] hover:text-slate-300"
-                    }`}
-                  >
-                    Presets
                   </button>
                   <button
                     onClick={() => {
@@ -1752,61 +1929,52 @@ export default function SharadHiresInspector({
                   <div className="text-[9px] text-red-400 mt-1">{hyperbolaError}</div>
                 )}
 
-                {hyperbolaFit && (
+                {hyperbolaFit && hyperbolaFit.success && hyperbolaFit.epsilon_r_est != null && (
                   <div className="space-y-1.5 p-2 rounded border border-red-500/30 bg-red-500/5 mt-2">
                     <div className="flex justify-between text-[10px]">
                       <span className="text-slate-400">Velocity</span>
-                      <span className="text-white font-mono">{(hyperbolaFit.v_mps / 1e6).toFixed(2)} Mm/s</span>
+                      <span className="text-white font-mono">{((hyperbolaFit.v_ms ?? 0) / 1e6).toFixed(1)} Mm/s</span>
                     </div>
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-red-400">εr</span>
-                      <span className="text-red-300 font-mono">{hyperbolaFit.epsr.toFixed(3)}</span>
-                    </div>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">CI95</span>
-                      <span className="text-slate-300 font-mono text-[9px]">
-                        [{hyperbolaFit.epsr_ci95[0].toFixed(2)}, {hyperbolaFit.epsr_ci95[1].toFixed(2)}]
+                      <span className="text-red-300 font-mono">
+                        {hyperbolaFit.epsilon_r_est.toFixed(2)}
+                        {hyperbolaFit.epsilon_r_std != null && ` ± ${hyperbolaFit.epsilon_r_std.toFixed(2)}`}
                       </span>
                     </div>
+                    {hyperbolaFit.epsilon_r_ci95 && (
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-400">CI95</span>
+                        <span className="text-slate-300 font-mono text-[9px]">
+                          [{hyperbolaFit.epsilon_r_ci95[0].toFixed(2)}, {hyperbolaFit.epsilon_r_ci95[1].toFixed(2)}]
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">Depth</span>
-                      <span className="text-amber-300 font-mono">{hyperbolaFit.depth_m.toFixed(1)} m</span>
+                      <span className="text-slate-400">Apex depth</span>
+                      <span className="text-amber-300 font-mono">{(hyperbolaFit.depth_m ?? 0).toFixed(1)} m</span>
                     </div>
                     <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">SNR</span>
-                      <span className="text-white font-mono">{hyperbolaFit.quality.snr.toFixed(1)}</span>
+                      <span className="text-slate-400">Fit RMSE</span>
+                      <span className="text-white font-mono">{hyperbolaFit.rmse_bins?.toFixed(2)} bins ({hyperbolaFit.n_inliers} picks)</span>
                     </div>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">Support</span>
-                      <span className="text-white font-mono">{hyperbolaFit.quality.support_traces} traces</span>
-                    </div>
-
-                    {/* Flags */}
+                    {hyperbolaFit.diagnostics.orbital_model_rmse_bins != null && (
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-400">Orbital-moveout RMSE</span>
+                        <span className="text-white font-mono">{hyperbolaFit.diagnostics.orbital_model_rmse_bins.toFixed(2)} bins</span>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {hyperbolaFit.flags.map((flag) => (
                         <span
                           key={flag}
                           className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${
-                            flag === "ICE_CONSISTENT" ? "bg-green-900/40 text-green-300" :
-                            flag.startsWith("CLUTTER_RISK_HIGH") ? "bg-red-900/40 text-red-300" :
-                            flag.startsWith("CLUTTER_RISK_MED") ? "bg-amber-900/40 text-amber-300" :
-                            flag === "LOW_SNR" ? "bg-orange-900/40 text-orange-300" :
-                            "bg-slate-700/40 text-slate-300"
+                            flag === "experimental" ? "bg-amber-900/40 text-amber-300" : "bg-red-900/40 text-red-300"
                           }`}
                         >
                           {flag}
                         </span>
                       ))}
-                    </div>
-
-                    {/* Overlay controls */}
-                    <div className="flex gap-2 mt-1">
-                      <label className="flex items-center gap-1 text-[9px] text-slate-400">
-                        <input type="checkbox" checked={showHyperbolaCi}
-                          onChange={(e) => setShowHyperbolaCi(e.target.checked)}
-                          className="w-3 h-3" />
-                        CI band
-                      </label>
                     </div>
                   </div>
                 )}
@@ -1816,6 +1984,25 @@ export default function SharadHiresInspector({
                 No apex set. Shift+Click on a diffraction hyperbola to begin.
               </div>
             )}
+          </Section>
+
+          {/* Export */}
+          <Section title="Export">
+            <div className="text-[9px] text-slate-500 mb-1.5 leading-snug">
+              Picks: surface (every display trace) + {clickPicks.length} clicked point{clickPicks.length === 1 ? "" : "s"}
+              {" "}with trace, lat/lon (planetocentric), delay, depth @ εr and ±1-bin uncertainty.
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <MiniButton active={false} onClick={() => exportPicks("csv", false)}>Picks CSV</MiniButton>
+              <MiniButton active={false} onClick={() => exportPicks("geojson", false)}>Picks GeoJSON</MiniButton>
+              <MiniButton active={false} onClick={() => exportPicks("csv", true)}>+ Reflectors CSV</MiniButton>
+              <MiniButton active={false} onClick={exportRadargram}>PNG + axes JSON</MiniButton>
+              {clickPicks.length > 0 && (
+                <MiniButton active={false} onClick={() => setClickPicks([])}>Clear clicks</MiniButton>
+              )}
+            </div>
+            {exportBusy && <div className="text-[9px] text-slate-400 mt-1">Preparing {exportBusy}…</div>}
+            {exportError && <div className="text-[9px] text-red-400 mt-1" role="alert">{exportError}</div>}
           </Section>
 
           {/* Analysis buttons */}
@@ -1885,9 +2072,24 @@ export default function SharadHiresInspector({
               )}
 
               {error && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10 px-6 text-center" role="alert">
                   <span className="material-symbols-outlined text-3xl text-red-400 mb-3">error</span>
-                  <p className="text-xs text-red-400">{error}</p>
+                  <p className="text-xs text-red-400 break-words max-w-full">{error}</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Product {productId}</p>
+                  <button
+                    onClick={() => { _productCache.delete(productId); setRetryNonce((n) => n + 1); }}
+                    className="mt-3 px-3 py-1 text-[11px] font-bold rounded bg-red-900/40 text-red-200 border border-red-500/40 hover:bg-red-800/50"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!error && auxWarning && !loading && (
+                <div className="absolute top-1 left-1 right-1 z-10 text-[10px] text-amber-300 bg-amber-900/40 border border-amber-500/30 rounded px-2 py-1 flex items-center gap-2" role="status">
+                  <span className="flex-1 truncate" title={auxWarning}>{auxWarning}</span>
+                  <button onClick={() => { _productCache.delete(productId); setRetryNonce((n) => n + 1); }}
+                    className="underline hover:text-amber-100">Retry</button>
                 </div>
               )}
 
@@ -1915,7 +2117,7 @@ export default function SharadHiresInspector({
               >
                 <canvas
                   ref={molaCanvasRef}
-                  className={`w-full h-full ${molaAlignMode ? "cursor-ew-resize" : "cursor-grab"}`}
+                  className="w-full h-full cursor-grab"
                   draggable={false}
                   onDragStart={(e) => e.preventDefault()}
                   onMouseMove={handleMouseMove}
@@ -1935,6 +2137,11 @@ export default function SharadHiresInspector({
                 <>
                   <span>Trace: <span className="text-slate-300">{cursorInfo.trace}</span></span>
                   <span>Bin: <span className="text-slate-300">{cursorInfo.bin}</span></span>
+                  {cursorInfo.absDelayUs != null && (
+                    <span title="Absolute two-way delay: (RWOT + bin)·37.5 ns + calibrated offset">
+                      Delay: <span className="text-slate-300">{cursorInfo.absDelayUs.toFixed(3)} µs</span>
+                    </span>
+                  )}
                   {cursorInfo.lat !== null && (
                     <span>
                       Lat: <span className="text-slate-300">{cursorInfo.lat?.toFixed(3)}°</span>
@@ -1948,11 +2155,9 @@ export default function SharadHiresInspector({
               <span>Zoom: <span className="text-slate-300">{zoomLevel}×</span></span>
               {moveMode && <span className="text-cyan-400">MOVE</span>}
               {adjustMode && <span className="text-green-400">ADJUST{editCount > 0 ? ` (${editCount})` : ""}</span>}
-              {molaAlignMode && <span className="text-amber-400">MOLA ALIGN</span>}
-              {molaXOffset !== 0 && <span className="text-amber-300">MOLA: {molaXOffset > 0 ? "+" : ""}{molaXOffset}</span>}
               {showClutter && <span className="text-orange-400">CLUTTER {Math.round(clutterOpacity * 100)}%</span>}
               {hyperbolaApex && <span className="text-red-400">HYPERBOLA T={hyperbolaApex.trace}</span>}
-              {hyperbolaFit && <span className="text-red-300">εr={hyperbolaFit.epsr.toFixed(2)}</span>}
+              {hyperbolaFit?.epsilon_r_est != null && <span className="text-red-300">εr≈{hyperbolaFit.epsilon_r_est.toFixed(2)} (exp.)</span>}
             </div>
           </div>
         </div>

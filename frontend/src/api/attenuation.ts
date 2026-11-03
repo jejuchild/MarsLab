@@ -13,6 +13,9 @@ export interface AttenuationSample {
   subsurface_power_dB?: number | null;
   depth_m?: number | null;
   alpha_dBm?: number | null;
+  alpha_se_dBm?: number | null;
+  alpha_r2?: number | null;
+  alpha_ratio_dBm?: number | null;
   transparency?: string | null;
   snr?: number | null;
   confidence?: number | null;
@@ -40,6 +43,14 @@ export interface AttenuationSummary {
   transparency_counts: Record<string, number>;
   dem_source: string;
   total_distance_km: number;
+  method?: string;
+  /** Whole-track power-vs-depth regression (one-way dB/m) */
+  alpha_fit_dBm?: number | null;
+  alpha_fit_se_dBm?: number | null;
+  alpha_fit_r2?: number | null;
+  alpha_fit_n?: number;
+  alpha_fit_depth_span_m?: number;
+  alpha_ratio_median_dBm?: number | null;
 }
 
 export interface AttenuationParameters {
