@@ -213,3 +213,29 @@ def test_handlers_are_sync_and_parse_once_under_concurrency(data_dir, monkeypatc
     [t.start() for t in ts]
     [t.join() for t in ts]
     assert not errs and len(calls) == 1
+
+
+# ── depth conversion endpoint (incl. two-layer + uncertainty) ─────────
+
+def test_depth_conversion_endpoint(data_dir, client):
+    from analysis.shared.constants import SPEED_OF_LIGHT as C
+    _write_product(str(data_dir))
+    q = {"product_id": PID, "trace_idx": 5, "cursor_bin": SURF_BIN + 100, "downsample": 2,
+         "epsilon_r1": 4.0, "epsilon_r2": 4.0, "boundary_m": 0}
+    j = client.get("/api/sharad_highres/depth_conversion", params=q).json()
+    assert j["surface_bin"] == SURF_BIN and j["full_trace_idx"] == 10
+    dt = 100 * 37.5e-9
+    assert j["depth_m"] == pytest.approx(C * dt / 4, abs=0.1)
+    assert j["depth_uncertainty_m"] == pytest.approx(C * 37.5e-9 / 4, abs=0.01)
+    assert j["vertical_resolution_m"] == pytest.approx(7.49, abs=0.01)
+    assert j["lat"] == pytest.approx(18.1, abs=1e-4)
+    # two-layer: 50 m of εr=4 then εr=9
+    q.update(epsilon_r2=9.0, boundary_m=50)
+    j2 = client.get("/api/sharad_highres/depth_conversion", params=q).json()
+    t1 = 2 * 50 * 2 / C
+    assert j2["depth_m"] == pytest.approx(50 + C * (dt - t1) / 6, abs=0.1)
+    assert j2["depth_uncertainty_m"] == pytest.approx(C * 37.5e-9 / 6, abs=0.01)
+    # manual surface override
+    q.update(surface_bin_override=SURF_BIN + 50, boundary_m=0, epsilon_r2=4.0)
+    j3 = client.get("/api/sharad_highres/depth_conversion", params=q).json()
+    assert j3["delta_bins"] == 50 and j3["surface_pick"] == "manual"

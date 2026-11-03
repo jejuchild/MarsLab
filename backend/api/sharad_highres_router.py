@@ -39,6 +39,8 @@ from api.validation import validate_product_id
 from analysis.shared.sharad_math import (
     IncompleteProductError,
     check_dat_complete,
+    depth_from_twt,
+    depth_resolution,
     label_file_records,
     read_rwot,
     source_signature,
@@ -1369,22 +1371,8 @@ def depth_conversion(
 
         delta_bins = cursor_bin - s_bin
         total_dt_s = delta_bins * SHARAD_SAMPLE_INTERVAL_US * 1e-6  # two-way travel time
-
-        # Piecewise depth computation
-        if boundary_m <= 0 or epsilon_r1 == epsilon_r2:
-            v = SPEED_OF_LIGHT / np.sqrt(epsilon_r1)
-            depth_m = v * total_dt_s / 2.0
-        else:
-            v1 = SPEED_OF_LIGHT / np.sqrt(epsilon_r1)
-            v2 = SPEED_OF_LIGHT / np.sqrt(epsilon_r2)
-            twt_layer1 = 2.0 * boundary_m / v1
-
-            if total_dt_s <= twt_layer1:
-                depth_m = v1 * total_dt_s / 2.0
-            else:
-                remaining_dt = total_dt_s - twt_layer1
-                depth_in_layer2 = v2 * remaining_dt / 2.0
-                depth_m = boundary_m + depth_in_layer2
+        depth_m = depth_from_twt(total_dt_s, epsilon_r1, epsilon_r2, boundary_m)
+        res = depth_resolution(total_dt_s, epsilon_r1, epsilon_r2, boundary_m)
 
         geom, _ = _get_geometry(product_id)
         lons180 = _lon_to_180(geom["lon"])
@@ -1399,6 +1387,11 @@ def depth_conversion(
             "epsilon_r2": epsilon_r2,
             "boundary_m": boundary_m,
             "depth_m": round(float(depth_m), 1),
+            # ±1 range bin (37.5 ns) quantisation at this depth, and the
+            # c/(2B√εr) vertical resolution (B = 10 MHz → 15 m in vacuum)
+            "depth_uncertainty_m": round(res["bin_uncertainty_m"], 2),
+            "vertical_resolution_m": round(res["vertical_resolution_m"], 2),
+            "surface_pick": "manual" if surface_bin_override is not None else "auto",
             "lat": round(float(geom["lat"][full_idx]), 4),
             "lon": round(float(lons180[full_idx]), 4),
         })

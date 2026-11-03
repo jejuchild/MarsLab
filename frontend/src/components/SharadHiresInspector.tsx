@@ -41,6 +41,8 @@ type DepthResult = {
   boundary_m: number;
   lat: number;
   lon: number;
+  depth_uncertainty_m?: number;
+  vertical_resolution_m?: number;
   message?: string;
 };
 
@@ -121,7 +123,7 @@ export default function SharadHiresInspector({
   const [pmin, setPmin] = useState(1);
   const [pmax, setPmax] = useState(99);
   const [useAmplitude, setUseAmplitude] = useState(true);
-  const [usePerTrace, setUsePerTrace] = useState(true);
+  const [usePerTrace, setUsePerTrace] = useState(false); // global stretch preserves relative amplitude
   const [showSurface, setShowSurface] = useState(true);
 
   // Cluttergram overlay
@@ -1317,13 +1319,17 @@ export default function SharadHiresInspector({
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-400">Value</span>
-              <div className="flex gap-1">
-                <MiniButton active={useAmplitude} onClick={() => setUseAmplitude(true)}>Amp</MiniButton>
-                <MiniButton active={!useAmplitude} onClick={() => setUseAmplitude(false)}>Power</MiniButton>
+            {/* Amp vs Power is a no-op on a log scale (log√P = ½·logP, identical
+                after percentile stretching), so it is only offered for Linear. */}
+            {!useLog && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-slate-400">Value</span>
+                <div className="flex gap-1">
+                  <MiniButton active={useAmplitude} onClick={() => setUseAmplitude(true)}>Amp</MiniButton>
+                  <MiniButton active={!useAmplitude} onClick={() => setUseAmplitude(false)}>Power</MiniButton>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400">Normalize</span>
@@ -1332,6 +1338,12 @@ export default function SharadHiresInspector({
                 <MiniButton active={!usePerTrace} onClick={() => setUsePerTrace(false)}>Global</MiniButton>
               </div>
             </div>
+            {usePerTrace && (
+              <div className="text-[9px] text-amber-400/80 leading-snug">
+                Per-trace stretch hides along-track amplitude changes — use Global for
+                attenuation / reflectivity work.
+              </div>
+            )}
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -1621,8 +1633,19 @@ export default function SharadHiresInspector({
                     </div>
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-amber-400">Depth</span>
-                      <span className="text-amber-300 font-mono">{depthResult.depth_m?.toFixed(1)} m</span>
+                      <span className="text-amber-300 font-mono">
+                        {depthResult.depth_m?.toFixed(1)}
+                        {depthResult.depth_uncertainty_m != null && ` ± ${depthResult.depth_uncertainty_m.toFixed(1)}`} m
+                      </span>
                     </div>
+                    {depthResult.vertical_resolution_m != null && (
+                      <div className="flex justify-between text-[10px]" title="±1 range bin (37.5 ns) quantisation; vertical resolution c/(2B√εr), B = 10 MHz. Excludes εr and surface-pick uncertainty.">
+                        <span className="text-slate-400">Resolution</span>
+                        <span className="text-slate-300 font-mono text-[9px]">
+                          {depthResult.vertical_resolution_m.toFixed(1)} m (±1 bin = {depthResult.depth_uncertainty_m?.toFixed(1)} m)
+                        </span>
+                      </div>
+                    )}
                     {depthResult.boundary_m > 0 && (
                       <div className="flex justify-between text-[10px]">
                         <span className="text-slate-400">Model</span>
