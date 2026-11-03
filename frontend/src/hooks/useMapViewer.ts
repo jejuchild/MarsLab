@@ -1188,14 +1188,36 @@ export default function useMapViewer({
     const targetMode = mode === "3D" ? Cesium.SceneMode.SCENE3D : Cesium.SceneMode.SCENE2D;
 
     if (viewer.scene.mode !== targetMode) {
-      // Morph to new mode with animation
+      // Remember what the user was looking at: morphing reset the camera to
+      // the whole planet at 0°E, losing the site being compared.
+      const canvas = viewer.scene.canvas;
+      const centre = viewer.camera.pickEllipsoid(
+        new Cesium.Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2),
+        marsEllipsoid,
+      );
+      const target = centre ? Cesium.Cartographic.fromCartesian(centre, marsEllipsoid) : null;
+      const height = Math.min(Math.max(viewer.camera.positionCartographic.height, 20_000), 12_000_000);
+
+      // 3D: depth-test against the globe so footprints on the far side are
+      // hidden (they showed through as a halo around the limb).
+      viewer.scene.globe.depthTestAgainstTerrain = targetMode === Cesium.SceneMode.SCENE3D;
+
+      const remove = viewer.scene.morphComplete.addEventListener(() => {
+        remove();
+        if (target) {
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromRadians(target.longitude, target.latitude, height, marsEllipsoid),
+          });
+        }
+        viewer.scene.requestRender();
+      });
       if (targetMode === Cesium.SceneMode.SCENE3D) {
         viewer.scene.morphTo3D(1.0);
       } else {
         viewer.scene.morphTo2D(1.0);
       }
     }
-  }, []);
+  }, [marsEllipsoid]);
 
   const switchBaseLayer = useCallback(
     (layer: BaseLayerType) => {

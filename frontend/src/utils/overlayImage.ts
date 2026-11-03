@@ -30,3 +30,9 @@ export function renderUntilSettled(viewer: Cesium.Viewer): void {
     }, ms);
   }
 }
+
+/**
+ * Image overlays sit a little above the ellipsoid (and below footprint
+ * outlines at 150 m) so they don't z-fight with the globe in 3D.
+ */
+export const OVERLAY_HEIGHT_M = 60;

@@ -1050,6 +1050,57 @@ async def check_exists(request: Request, instrument: str, product_id: str):
     }
 
 
+class ExistsBatchItem(BaseModel):
+    instrument: str
+    product_id: str
+
+
+class ExistsBatchRequest(BaseModel):
+    items: List[ExistsBatchItem]
+
+
+def _has_core_sync(instrument: str, product_id: str) -> bool:
+    """Core data present locally (same rule as GET /exists/...; errors -> False)."""
+    try:
+        product_id = validate_product_id(product_id)
+    except ValueError:
+        return False
+    inst_l = instrument.lower()
+    if inst_l == "crism_trr3":
+        from .mineral_cnn.constants import TRR_DATA_DIR
+        for d in (product_id, f"{product_id}_07"):
+            obs_dir = os.path.join(TRR_DATA_DIR, d)
+            if os.path.isdir(obs_dir):
+                return any(f.upper().endswith("_TRR3.IMG") for f in os.listdir(obs_dir))
+        return False
+    try:
+        inst = Instrument(inst_l)
+    except ValueError:
+        return False
+    try:
+        return bool(check_local_existence_detailed(product_id, inst).has_core)
+    except Exception:
+        return False
+
+
+@router.post("/exists/batch")
+@limiter.limit("60/minute")
+async def check_exists_batch(request: Request, body: ExistsBatchRequest):
+    """
+    Which of these products have core data locally (one request for a whole
+    viewport). The map used to call GET /exists/... once per visible product,
+    sequentially and without cancellation, on every pan/zoom — thousands of
+    requests (rate-limited at 30/min) that froze the page with several
+    footprint layers loaded.
+    """
+    items = body.items[:3000]
+
+    def run() -> List[str]:
+        return [it.product_id for it in items if _has_core_sync(it.instrument, it.product_id)]
+
+    return {"has_core": await asyncio.to_thread(run), "checked": len(items)}
+
+
 # =============================================================================
 # Download Endpoints
 # =============================================================================

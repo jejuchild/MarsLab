@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import * as Cesium from "cesium";
-import { decodeImage, renderUntilSettled } from "../utils/overlayImage";
+import { decodeImage, renderUntilSettled, OVERLAY_HEIGHT_M } from "../utils/overlayImage";
 
 type UseCustomDatasetsParams = {
   viewerRef: React.MutableRefObject<Cesium.Viewer | null>;
@@ -70,7 +70,7 @@ export default function useCustomDatasets({
                 outline: true,
                 outlineColor: Cesium.Color.FUCHSIA,
                 outlineWidth: 2,
-                height: 0,
+                height: OVERLAY_HEIGHT_M,
               },
               properties: {
                 product_id: dataset.id,
@@ -99,7 +99,7 @@ export default function useCustomDatasets({
                 rectangle: {
                   coordinates: rect,
                   material: new Cesium.ImageMaterialProperty({ image, transparent: true, color }),
-                  height: 0,
+                  height: OVERLAY_HEIGHT_M,
                 },
                 properties: { product_id: dataset.id, instrument: "CUSTOM", kind: "OVERLAY" },
               });

@@ -62,6 +62,8 @@ export interface FeatureMetadata {
   properties: Record<string, unknown>;
   bounds: ProductBounds;
   outlineIndex: number;
+  /** All polylines drawn for this feature (lines split at the antimeridian). */
+  outlineIndices?: number[];
 }
 
 // Using shared normalizeLonForMap from coordinates.ts
@@ -76,6 +78,57 @@ const normalizeLon = normalizeLonForMap;
  * detection relies on picking these fills.
  */
 const FILL_ALPHA = { idle: 1 / 255, hover: 0.15 } as const;
+
+/** Footprints sit slightly above the ellipsoid so, in 3D with depth testing,
+ * they don't z-fight with the globe surface (image overlays sit lower). */
+const FOOTPRINT_HEIGHT_M = 150;
+/** Max spacing between line vertices (deg) so long tracks follow the surface
+ * in 3D instead of cutting through the planet as straight chords. */
+const MAX_SEGMENT_DEG = 0.5;
+
+/**
+ * Normalize to ±180°, split where a line crosses the antimeridian, and
+ * densify long segments.
+ *
+ * Standard SHARAD tracks are stored as just start/end points, often across
+ * ±180° (vertex gaps up to ~358°): drawn as-is they wrapped around the whole
+ * planet in 2D and cut through it in 3D.
+ */
+export function splitAndDensify(coords: [number, number][]): [number, number][][] {
+  const parts: [number, number][][] = [];
+  let cur: [number, number][] = [];
+  let prev: [number, number] | null = null;
+  for (const [rawLon, lat] of coords) {
+    const lon = normalizeLon(rawLon);
+    if (prev) {
+      let dLon = lon - prev[0];
+      const crosses = Math.abs(dLon) > 180;
+      if (crosses) dLon += dLon > 0 ? -360 : 360;
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dLon), Math.abs(lat - prev[1])) / MAX_SEGMENT_DEG));
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        let x = prev[0] + dLon * t;
+        const y = prev[1] + (lat - prev[1]) * t;
+        if (x > 180) x -= 360;
+        else if (x < -180) x += 360;
+        const last = cur[cur.length - 1];
+        if (last && Math.abs(x - last[0]) > 180) {
+          // Crossed the antimeridian between the last sample and this one.
+          const edge = last[0] > 0 ? 180 : -180;
+          cur.push([edge, y]);
+          if (cur.length >= 2) parts.push(cur);
+          cur = [[-edge, y]];
+        }
+        cur.push([x, y]);
+      }
+    } else {
+      cur.push([lon, lat]);
+    }
+    prev = [lon, lat];
+  }
+  if (cur.length >= 2) parts.push(cur);
+  return parts;
+}
 /** The selected footprint is marked by a thicker outline, not a fill, so it
  * never tints an image overlay lying underneath it. */
 const SELECTED_OUTLINE_WIDTH = 3.5;
@@ -493,6 +546,7 @@ export class FootprintManager {
         if (!bounds) continue;
 
         let outlineIndex = -1;
+        let outlineIndices: number[] = [];
 
         if (geom.type === "Polygon") {
           // Use actual polygon coordinates (content-fitted, not bbox)
@@ -512,6 +566,8 @@ export class FootprintManager {
             new Cesium.GeometryInstance({
               geometry: new Cesium.PolygonGeometry({
                 polygonHierarchy: new Cesium.PolygonHierarchy(positions),
+                height: FOOTPRINT_HEIGHT_M,
+                ellipsoid: this.ellipsoid,
               }),
               id: entityId,
               attributes: {
@@ -521,25 +577,13 @@ export class FootprintManager {
             }),
           );
 
-          outlineIndex = outlineCollection.length;
-          // Outline follows actual polygon shape
-          const outlinePositions = ring && ring.length >= 3
-            ? Cesium.Cartesian3.fromDegreesArray(
-                [...ring.flatMap(([lon, lat]) => [normalizeLon(lon), lat])],
-                this.ellipsoid,
-              )
-            : Cesium.Cartesian3.fromDegreesArray(
-                [bounds.west, bounds.south, bounds.west, bounds.north,
-                 bounds.east, bounds.north, bounds.east, bounds.south,
-                 bounds.west, bounds.south],
-                this.ellipsoid,
-              );
-          outlineCollection.add({
-            positions: outlinePositions,
-            width: 1.0,
-            material: Cesium.Material.fromType("Color", { color }),
-            id: entityId,
-          });
+          // Outline follows the actual polygon shape (split/densified).
+          const ringPts: [number, number][] = ring && ring.length >= 3
+            ? ring
+            : [[bounds.west, bounds.south], [bounds.west, bounds.north],
+               [bounds.east, bounds.north], [bounds.east, bounds.south], [bounds.west, bounds.south]];
+          outlineIndices = this.addOutline(outlineCollection, ringPts, 1.0, color, entityId);
+          outlineIndex = outlineIndices[0] ?? -1;
         } else if (geom.type !== "LineString") {
           // Point or other types: use bbox rectangle
           geometryInstances.push(
@@ -548,6 +592,8 @@ export class FootprintManager {
                 rectangle: Cesium.Rectangle.fromDegrees(
                   bounds.west, bounds.south, bounds.east, bounds.north,
                 ),
+                height: FOOTPRINT_HEIGHT_M,
+                ellipsoid: this.ellipsoid,
               }),
               id: entityId,
               attributes: {
@@ -557,31 +603,17 @@ export class FootprintManager {
             }),
           );
 
-          outlineIndex = outlineCollection.length;
-          outlineCollection.add({
-            positions: Cesium.Cartesian3.fromDegreesArray(
-              [bounds.west, bounds.south, bounds.west, bounds.north,
-               bounds.east, bounds.north, bounds.east, bounds.south,
-               bounds.west, bounds.south],
-              this.ellipsoid,
-            ),
-            width: 1.0,
-            material: Cesium.Material.fromType("Color", { color }),
-            id: entityId,
-          });
+          outlineIndices = this.addOutline(
+            outlineCollection,
+            [[bounds.west, bounds.south], [bounds.west, bounds.north],
+             [bounds.east, bounds.north], [bounds.east, bounds.south], [bounds.west, bounds.south]],
+            1.0, color, entityId,
+          );
+          outlineIndex = outlineIndices[0] ?? -1;
         } else {
           const coords = geom.coordinates as [number, number][];
-          const positions: number[] = [];
-          for (const [lon, lat] of coords) {
-            positions.push(normalizeLon(lon), lat);
-          }
-          outlineIndex = outlineCollection.length;
-          outlineCollection.add({
-            positions: Cesium.Cartesian3.fromDegreesArray(positions, this.ellipsoid),
-            width: 3.0,
-            material: Cesium.Material.fromType("Color", { color }),
-            id: entityId,
-          });
+          outlineIndices = this.addOutline(outlineCollection, coords, 2.0, color, entityId);
+          outlineIndex = outlineIndices[0] ?? -1;
         }
 
         const metadata: FeatureMetadata = {
@@ -590,6 +622,7 @@ export class FootprintManager {
           properties: { ...feature.properties, instrument } as Record<string, unknown>,
           bounds,
           outlineIndex,
+          outlineIndices,
         };
         this.featureMetadata.set(entityId, metadata);
         this.featureVisibility.set(entityId, true);
@@ -715,8 +748,10 @@ export class FootprintManager {
     if (metadata) {
       const outlines = this.outlineCollections.get(instrument);
       if (outlines) {
-        const polyline = outlines.get(metadata.outlineIndex);
-        if (polyline) polyline.show = visible;
+        for (const idx of metadata.outlineIndices ?? [metadata.outlineIndex]) {
+          const polyline = idx >= 0 ? outlines.get(idx) : undefined;
+          if (polyline) polyline.show = visible;
+        }
       }
     }
 
@@ -751,6 +786,30 @@ export class FootprintManager {
     }
 
     this.viewer.scene.requestRender();
+  }
+
+  /** Add a (split + densified) outline; returns the polyline indices. */
+  private addOutline(
+    collection: Cesium.PolylineCollection,
+    coords: [number, number][],
+    width: number,
+    color: Cesium.Color,
+    id: string,
+  ): number[] {
+    const indices: number[] = [];
+    for (const part of splitAndDensify(coords)) {
+      indices.push(collection.length);
+      collection.add({
+        positions: Cesium.Cartesian3.fromDegreesArrayHeights(
+          part.flatMap(([lon, lat]) => [lon, lat, FOOTPRINT_HEIGHT_M]),
+          this.ellipsoid,
+        ),
+        width,
+        material: Cesium.Material.fromType("Color", { color }),
+        id,
+      });
+    }
+    return indices;
   }
 
   /** Highlight the footprint under the cursor (entity id `INSTR_FP_pid`), or clear it. */
@@ -791,8 +850,10 @@ export class FootprintManager {
       const alpha = entityId === this.hoveredId ? FILL_ALPHA.hover : FILL_ALPHA.idle;
       attrs.color = Cesium.ColorGeometryInstanceAttribute.toValue(this.getColor(meta.instrument).withAlpha(alpha));
     }
-    const polyline = this.outlineCollections.get(meta.instrument)?.get(meta.outlineIndex);
-    if (polyline) {
+    const outlines = this.outlineCollections.get(meta.instrument);
+    for (const idx of meta.outlineIndices ?? [meta.outlineIndex]) {
+      const polyline = idx >= 0 ? outlines?.get(idx) : undefined;
+      if (!polyline) continue;
       if (!this.baseOutlineWidth.has(entityId)) this.baseOutlineWidth.set(entityId, polyline.width);
       polyline.width = isSelected ? SELECTED_OUTLINE_WIDTH : this.baseOutlineWidth.get(entityId)!;
     }

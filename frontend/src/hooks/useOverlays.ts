@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import type React from "react";
 import * as Cesium from "cesium";
-import { decodeImage, renderUntilSettled } from "../utils/overlayImage";
+import { decodeImage, renderUntilSettled, OVERLAY_HEIGHT_M } from "../utils/overlayImage";
 import type FootprintManager from "../utils/FootprintManager";
 import type { InstrumentType as FPInstrumentType } from "../utils/FootprintManager";
 import {
@@ -579,7 +579,7 @@ export default function useOverlays({
                   transparent: true,
                   color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
                 }),
-                height: 0,
+                height: OVERLAY_HEIGHT_M,
                 stRotation: 0,
               },
               properties: {
@@ -605,7 +605,7 @@ export default function useOverlays({
                   transparent: true,
                   color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
                 }),
-                height: 0,
+                height: OVERLAY_HEIGHT_M,
               },
               properties: {
                 product_id: productId,
@@ -808,7 +808,7 @@ export default function useOverlays({
                 transparent: true,
                 color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
               }),
-              height: 0,
+              height: OVERLAY_HEIGHT_M,
             },
             properties: {
               product_id: productId,
@@ -995,7 +995,7 @@ export default function useOverlays({
                 transparent: true,
                 color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
               }),
-              height: 0,
+              height: OVERLAY_HEIGHT_M,
             },
             properties: {
               product_id: productId,
@@ -1142,7 +1142,7 @@ export default function useOverlays({
                 transparent: true,
                 color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
               }),
-              height: 0,
+              height: OVERLAY_HEIGHT_M,
             },
             properties: {
               product_id: productId,
@@ -1270,7 +1270,7 @@ export default function useOverlays({
                 transparent: true,
                 color: Cesium.Color.WHITE.withAlpha(getProductOpacity(productId)),
               }),
-              height: 0,
+              height: OVERLAY_HEIGHT_M,
             },
             properties: {
               product_id: productId,

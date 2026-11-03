@@ -1052,33 +1052,48 @@ export default function MainPage() {
     toast("All overlays cleared", { icon: "🗑" });
   }, [clearOverlays]);
 
-  // Check high-res availability for visible products
+  // High-res (local core data) availability for visible products.
+  // One batched request per settled view, cached per product, cancelled when
+  // the view changes again. (It used to fire one GET per visible product,
+  // sequentially, on every pan/zoom — thousands of overlapping requests that
+  // froze the page once several footprint layers were loaded.)
+  const highResKnownRef = useRef<Map<string, boolean>>(new Map());
   useEffect(() => {
-    const checkHighResAvailability = async () => {
-      const newHighResSet = new Set<string>();
-
-      for (const product of visibleProducts) {
-        try {
-          const instrument = product.instrument.toLowerCase();
-          const response = await fetch(`/api/exists/${instrument}/${encodeURIComponent(product.productId)}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.has_core) {
-              newHighResSet.add(product.productId);
-            }
-          }
-        } catch (e) {
-          // If check fails, assume high-res is available (fail open)
-          newHighResSet.add(product.productId);
-        }
-      }
-
-      setProductsWithHighRes(newHighResSet);
-    };
-
-    if (visibleProducts.length > 0) {
-      checkHighResAvailability();
+    const known = highResKnownRef.current;
+    const unknown = visibleProducts.filter((p) => !known.has(p.productId));
+    const publish = () =>
+      setProductsWithHighRes(new Set([...known].filter(([, v]) => v).map(([k]) => k)));
+    if (unknown.length === 0) {
+      publish();
+      return;
     }
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        for (let i = 0; i < unknown.length; i += 1000) {
+          const chunk = unknown.slice(i, i + 1000);
+          const res = await fetch("/api/exists/batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: chunk.map((p) => ({ instrument: p.instrument.toLowerCase(), product_id: p.productId })),
+            }),
+            signal: ctrl.signal,
+          });
+          if (!res.ok) return;
+          const { has_core } = (await res.json()) as { has_core: string[] };
+          const yes = new Set(has_core);
+          for (const p of chunk) known.set(p.productId, yes.has(p.productId));
+        }
+        publish();
+      } catch {
+        /* aborted or offline — retried on the next view change */
+      }
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
   }, [visibleProducts]);
 
 
