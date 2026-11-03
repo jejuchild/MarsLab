@@ -113,6 +113,8 @@ export default function SharadHiresInspector({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [, setAuxLoading] = useState(false); // surface/mola still loading
+  const [auxWarning, setAuxWarning] = useState<string | null>(null); // non-fatal surface/MOLA failure
+  const [retryNonce, setRetryNonce] = useState(0); // bump to re-run loadAll (Retry button)
 
   // Display controls
   const [useLog, setUseLog] = useState(true);
@@ -135,6 +137,7 @@ export default function SharadHiresInspector({
   const [boundaryM, setBoundaryM] = useState(0);
   const [showBoundaryLine, setShowBoundaryLine] = useState(true);
   const [depthResult, setDepthResult] = useState<DepthResult | null>(null);
+  const [depthError, setDepthError] = useState<string | null>(null);
 
   // Surface line adjustment
   const [adjustMode, setAdjustMode] = useState(false);
@@ -235,6 +238,7 @@ export default function SharadHiresInspector({
     async function loadAll() {
       setLoading(true);
       setError(null);
+      setAuxWarning(null);
 
       try {
         const pid = encodeURIComponent(productId);
@@ -258,7 +262,7 @@ export default function SharadHiresInspector({
           clutterOk = cached.clutterAvailable;
         } else {
           // Helper: fetch with 30s timeout via AbortController
-          const fetchWithTimeout = (url: string, timeoutMs = 30000): Promise<globalThis.Response> => {
+          const fetchWithTimeout = (url: string, timeoutMs = 60000): Promise<globalThis.Response> => {
             const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), timeoutMs);
             return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
@@ -292,14 +296,24 @@ export default function SharadHiresInspector({
             fetchWithTimeout(`/api/sharad_highres/surface?product_id=${pid}&downsample=${ds}`),
             fetchWithTimeout(`/api/sharad_highres/mola_profile?product_id=${pid}&downsample=${ds}`),
           ]).then(async ([surfResult, molaResult]) => {
+            const warnings: string[] = [];
             if (surfResult.status === "fulfilled" && surfResult.value.ok) {
               const sj = await surfResult.value.json();
               surfData = sj.surface || [];
+            } else {
+              warnings.push(surfResult.status === "fulfilled"
+                ? await describeHttpError(surfResult.value, "Surface pick")
+                : `Surface pick failed (${String(surfResult.reason)})`);
             }
             if (molaResult.status === "fulfilled" && molaResult.value.ok) {
               molaData = await molaResult.value.json();
+            } else {
+              warnings.push(molaResult.status === "fulfilled"
+                ? await describeHttpError(molaResult.value, "MOLA profile")
+                : `MOLA profile failed (${String(molaResult.reason)})`);
             }
             if (!cancelled) {
+              setAuxWarning(warnings.length ? warnings.join(" · ") : null);
               setSurface(surfData);
               setMolaProfile(molaData);
               setAuxLoading(false);
@@ -381,7 +395,7 @@ export default function SharadHiresInspector({
       } catch (e: unknown) {
         let msg = e instanceof Error ? e.message : "Unknown error";
         if (e instanceof DOMException && e.name === "AbortError") {
-          msg = "Request timed out — the server took too long to respond";
+          msg = "Request timed out — the server took too long to respond (first open of a product parses ~0.5 GB; try Retry)";
         }
         if (!cancelled) setError(msg);
       } finally {
@@ -391,7 +405,7 @@ export default function SharadHiresInspector({
 
     loadAll();
     return () => { cancelled = true; };
-  }, [productId, useLog, pmin, pmax, useAmplitude, usePerTrace]);
+  }, [productId, useLog, pmin, pmax, useAmplitude, usePerTrace, retryNonce]);
 
   // Computed downsample factor based on product size
   const downsample = metadata ? computeDownsample(metadata.rows) : 1;
@@ -1164,9 +1178,12 @@ export default function SharadHiresInspector({
       url += `&surface_bin_override=${surfOverride}`;
     }
     fetch(url)
-      .then((r) => r.json())
-      .then((data) => setDepthResult(data))
-      .catch(() => setDepthResult(null));
+      .then(async (r) => {
+        if (!r.ok) throw new Error(await describeHttpError(r, "Depth conversion"));
+        return r.json();
+      })
+      .then((data) => { setDepthResult(data); setDepthError(null); })
+      .catch((err) => { setDepthResult(null); setDepthError(err instanceof Error ? err.message : String(err)); });
   }, [radargramMeta, viewX, viewY, epsilonR1, epsilonR2, boundaryM, productId, moveMode, adjustMode, effectiveSurface, surfaceOffsets, onLocatePoint, downsample]);
 
   // ── Cursor info ────────────────────────────────────────
@@ -1577,6 +1594,9 @@ export default function SharadHiresInspector({
               Click below surface line to compute depth
             </div>
 
+            {depthError && (
+              <div className="text-[10px] text-red-400 mb-1" role="alert">{depthError}</div>
+            )}
             {depthResult && (
               <div className="space-y-1.5 p-2 rounded border border-amber-500/30 bg-amber-500/5 mt-2">
                 <div className="flex justify-between text-[10px]">
@@ -1837,9 +1857,24 @@ export default function SharadHiresInspector({
               )}
 
               {error && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-10 px-6 text-center" role="alert">
                   <span className="material-symbols-outlined text-3xl text-red-400 mb-3">error</span>
-                  <p className="text-xs text-red-400">{error}</p>
+                  <p className="text-xs text-red-400 break-words max-w-full">{error}</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Product {productId}</p>
+                  <button
+                    onClick={() => { _productCache.delete(productId); setRetryNonce((n) => n + 1); }}
+                    className="mt-3 px-3 py-1 text-[11px] font-bold rounded bg-red-900/40 text-red-200 border border-red-500/40 hover:bg-red-800/50"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!error && auxWarning && !loading && (
+                <div className="absolute top-1 left-1 right-1 z-10 text-[10px] text-amber-300 bg-amber-900/40 border border-amber-500/30 rounded px-2 py-1 flex items-center gap-2" role="status">
+                  <span className="flex-1 truncate" title={auxWarning}>{auxWarning}</span>
+                  <button onClick={() => { _productCache.delete(productId); setRetryNonce((n) => n + 1); }}
+                    className="underline hover:text-amber-100">Retry</button>
                 </div>
               )}
 
