@@ -194,14 +194,21 @@ export default function SharadHiresInspector({
   const [molaXOffset, setMolaXOffset] = useState(0);
 
   // ── Hyperbola εr Tool ──
+  // Response of GET /api/epsilon/hyperbola_fit (trace indices are FULL resolution)
   type HyperbolaFitResult = {
-    v_mps: number; epsr: number; epsr_ci95: [number, number];
-    dt_surface_s: number; depth_m: number; depth_ci95: [number, number];
-    quality: { snr: number; residual: number; support_traces: number };
+    success: boolean;
+    epsilon_r_est: number | null;
+    epsilon_r_std: number | null;
+    epsilon_r_ci95: [number, number] | null;
+    depth_m: number | null;
+    v_ms: number | null;
+    rmse_bins: number | null;
+    n_inliers: number;
+    quality_note: string;
     flags: string[];
-    overlay_polyline: { trace: number; bin: number }[];
-    overlay_ci_band?: { trace: number; bin_lo: number; bin_hi: number }[] | null;
-    preset_curves?: Record<string, { trace: number; bin: number }[]> | null;
+    picks: { trace: number; bin: number }[];
+    overlay: { trace: number; bin: number }[];
+    diagnostics: { trace_spacing_m?: number; orbital_model_rmse_bins?: number };
   };
   const [hyperbolaApex, setHyperbolaApex] = useState<{ trace: number; bin: number } | null>(null);
   const [hyperbolaRoiTraces, setHyperbolaRoiTraces] = useState(60);
@@ -209,8 +216,6 @@ export default function SharadHiresInspector({
   const [hyperbolaFit, setHyperbolaFit] = useState<HyperbolaFitResult | null>(null);
   const [hyperbolaLoading, setHyperbolaLoading] = useState(false);
   const [hyperbolaError, setHyperbolaError] = useState<string | null>(null);
-  const [showPresetCurves, setShowPresetCurves] = useState(false);
-  const [showHyperbolaCi, setShowHyperbolaCi] = useState(true);
 
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -626,72 +631,29 @@ export default function SharadHiresInspector({
       ctx.setLineDash([]);
     }
 
-    if (hyperbolaFit && hyperbolaFit.overlay_polyline.length > 0) {
-      // Draw fitted curve (red)
+    if (hyperbolaFit && hyperbolaFit.success) {
+      const ds = radargramMeta.downsample || 1;
+      // Picks used by the fit
+      ctx.fillStyle = "rgba(251, 191, 36, 0.8)";
+      for (const pt of hyperbolaFit.picks) {
+        const x = traceToX(pt.trace / ds);
+        const y = binToY(pt.bin);
+        if (x < 0 || x > W || y < 0 || y > H) continue;
+        ctx.fillRect(x - 1, y - 1, 2, 2);
+      }
+      // Fitted curve (red)
       ctx.beginPath();
       ctx.strokeStyle = "#ef4444";
       ctx.lineWidth = 2;
       let fMoved = false;
-      for (const pt of hyperbolaFit.overlay_polyline) {
-        const x = traceToX(pt.trace);
+      for (const pt of hyperbolaFit.overlay) {
+        const x = traceToX(pt.trace / ds);
         const y = binToY(pt.bin);
         if (x < -10 || x > W + 10) continue;
         if (!fMoved) { ctx.moveTo(x, y); fMoved = true; }
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
-
-      // CI band
-      if (showHyperbolaCi && hyperbolaFit.overlay_ci_band) {
-        ctx.fillStyle = "rgba(239, 68, 68, 0.12)";
-        ctx.beginPath();
-        // Upper edge
-        let ciMoved = false;
-        for (const pt of hyperbolaFit.overlay_ci_band) {
-          const x = traceToX(pt.trace);
-          const y = binToY(pt.bin_lo);
-          if (!ciMoved) { ctx.moveTo(x, y); ciMoved = true; } else ctx.lineTo(x, y);
-        }
-        // Lower edge (reverse)
-        for (let i = hyperbolaFit.overlay_ci_band.length - 1; i >= 0; i--) {
-          const pt = hyperbolaFit.overlay_ci_band[i]!;
-          ctx.lineTo(traceToX(pt.trace), binToY(pt.bin_hi));
-        }
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Preset curves
-      if (showPresetCurves && hyperbolaFit.preset_curves) {
-        const presetColors: Record<string, string> = {
-          "2.8": "#67e8f9", "3.15": "#4ade80", "4.0": "#facc15",
-        };
-        for (const [key, curve] of Object.entries(hyperbolaFit.preset_curves)) {
-          ctx.beginPath();
-          ctx.strokeStyle = presetColors[key] || "#94a3b8";
-          ctx.lineWidth = 1;
-          ctx.setLineDash([5, 3]);
-          let pMoved = false;
-          for (const pt of curve) {
-            const x = traceToX(pt.trace);
-            const y = binToY(pt.bin);
-            if (x < -10 || x > W + 10) continue;
-            if (!pMoved) { ctx.moveTo(x, y); pMoved = true; } else ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-          ctx.setLineDash([]);
-          // Label
-          const first = curve[0];
-          if (first) {
-            const lx = traceToX(first.trace);
-            const ly = binToY(first.bin);
-            ctx.font = "bold 8px monospace";
-            ctx.fillStyle = presetColors[key] || "#94a3b8";
-            ctx.textAlign = "right";
-            ctx.fillText(`εr=${key}`, lx - 4, ly - 2);
-          }
-        }
-      }
     }
 
     // Cursor crosshair
@@ -717,7 +679,7 @@ export default function SharadHiresInspector({
 
       ctx.setLineDash([]);
     }
-  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit, showPresetCurves, showHyperbolaCi]);
+  }, [radargram, radargramMeta, effectiveSurface, smoothedSurface, showSurface, viewX, viewY, cursor, adjustMode, surfaceOffsets, boundaryBinOffset, boundaryM, showBoundaryLine, showClutter, clutterImage, clutterOpacity, hyperbolaApex, hyperbolaRoiTraces, hyperbolaRoiBins, hyperbolaFit]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -1666,7 +1628,12 @@ export default function SharadHiresInspector({
           </Section>
 
           {/* Hyperbola εr Tool */}
-          <Section title="Hyperbola εr">
+          <Section title="Hyperbola εr (experimental)">
+            <div className="text-[9px] text-amber-400/90 mb-1.5 leading-snug" role="note">
+              Experimental — poorly constrained for focused orbital RDR: the data are
+              Doppler-focused and, from ~270 km altitude, free-space moveout dominates
+              hyperbola shape regardless of εr. Treat results as indicative only.
+            </div>
             <div className="text-[9px] text-slate-500 italic mb-2">
               Shift+Click on radargram to set apex
             </div>
@@ -1705,37 +1672,30 @@ export default function SharadHiresInspector({
                       if (!hyperbolaApex) return;
                       setHyperbolaLoading(true);
                       setHyperbolaError(null);
-                      fetch("/api/ice/hyperbola/fit", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          product_id: productId,
-                          apex_trace: hyperbolaApex.trace,
-                          apex_bin: hyperbolaApex.bin,
-                          roi_traces: hyperbolaRoiTraces,
-                          roi_bins: hyperbolaRoiBins,
-                        }),
-                      })
-                        .then((r) => {
-                          if (!r.ok) throw new Error(`${r.status}`);
-                          return r.json();
+                      // Apex/ROI are in display traces; the endpoint wants full resolution.
+                      const ds = radargramMeta?.downsample || downsample;
+                      const params = new URLSearchParams({
+                        product_id: productId,
+                        trace_idx0: String(hyperbolaApex.trace * ds),
+                        bin_idx0: String(hyperbolaApex.bin),
+                        window_traces: String(Math.min(6000, Math.max(20, 2 * hyperbolaRoiTraces * ds))),
+                        window_bins: String(Math.min(600, Math.max(20, 2 * hyperbolaRoiBins))),
+                      });
+                      fetch(`/api/epsilon/hyperbola_fit?${params}`)
+                        .then(async (r) => {
+                          if (!r.ok) throw new Error(await describeHttpError(r, "Hyperbola fit"));
+                          return r.json() as Promise<HyperbolaFitResult>;
                         })
-                        .then((data) => { setHyperbolaFit(data); setHyperbolaLoading(false); })
-                        .catch((err) => { setHyperbolaError(String(err)); setHyperbolaLoading(false); });
+                        .then((data) => {
+                          setHyperbolaFit(data);
+                          if (!data.success) setHyperbolaError(data.quality_note || "Fit failed");
+                          setHyperbolaLoading(false);
+                        })
+                        .catch((err) => { setHyperbolaError(err instanceof Error ? err.message : String(err)); setHyperbolaLoading(false); });
                     }}
                     className="px-2 py-0.5 text-[9px] font-bold rounded bg-red-900/40 text-red-300 border border-red-500/30 hover:bg-red-800/50 disabled:opacity-50"
                   >
                     {hyperbolaLoading ? "Fitting..." : "Fit Hyperbola"}
-                  </button>
-                  <button
-                    onClick={() => setShowPresetCurves((p) => !p)}
-                    className={`px-2 py-0.5 text-[9px] font-bold rounded border ${
-                      showPresetCurves
-                        ? "bg-cyan-900/30 text-cyan-300 border-cyan-500/40"
-                        : "bg-[#0a0f18] text-slate-500 border-[#232f48] hover:text-slate-300"
-                    }`}
-                  >
-                    Presets
                   </button>
                   <button
                     onClick={() => {
@@ -1753,61 +1713,52 @@ export default function SharadHiresInspector({
                   <div className="text-[9px] text-red-400 mt-1">{hyperbolaError}</div>
                 )}
 
-                {hyperbolaFit && (
+                {hyperbolaFit && hyperbolaFit.success && hyperbolaFit.epsilon_r_est != null && (
                   <div className="space-y-1.5 p-2 rounded border border-red-500/30 bg-red-500/5 mt-2">
                     <div className="flex justify-between text-[10px]">
                       <span className="text-slate-400">Velocity</span>
-                      <span className="text-white font-mono">{(hyperbolaFit.v_mps / 1e6).toFixed(2)} Mm/s</span>
+                      <span className="text-white font-mono">{((hyperbolaFit.v_ms ?? 0) / 1e6).toFixed(1)} Mm/s</span>
                     </div>
                     <div className="flex justify-between text-[10px] font-bold">
                       <span className="text-red-400">εr</span>
-                      <span className="text-red-300 font-mono">{hyperbolaFit.epsr.toFixed(3)}</span>
-                    </div>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">CI95</span>
-                      <span className="text-slate-300 font-mono text-[9px]">
-                        [{hyperbolaFit.epsr_ci95[0].toFixed(2)}, {hyperbolaFit.epsr_ci95[1].toFixed(2)}]
+                      <span className="text-red-300 font-mono">
+                        {hyperbolaFit.epsilon_r_est.toFixed(2)}
+                        {hyperbolaFit.epsilon_r_std != null && ` ± ${hyperbolaFit.epsilon_r_std.toFixed(2)}`}
                       </span>
                     </div>
+                    {hyperbolaFit.epsilon_r_ci95 && (
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-400">CI95</span>
+                        <span className="text-slate-300 font-mono text-[9px]">
+                          [{hyperbolaFit.epsilon_r_ci95[0].toFixed(2)}, {hyperbolaFit.epsilon_r_ci95[1].toFixed(2)}]
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">Depth</span>
-                      <span className="text-amber-300 font-mono">{hyperbolaFit.depth_m.toFixed(1)} m</span>
+                      <span className="text-slate-400">Apex depth</span>
+                      <span className="text-amber-300 font-mono">{(hyperbolaFit.depth_m ?? 0).toFixed(1)} m</span>
                     </div>
                     <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">SNR</span>
-                      <span className="text-white font-mono">{hyperbolaFit.quality.snr.toFixed(1)}</span>
+                      <span className="text-slate-400">Fit RMSE</span>
+                      <span className="text-white font-mono">{hyperbolaFit.rmse_bins?.toFixed(2)} bins ({hyperbolaFit.n_inliers} picks)</span>
                     </div>
-                    <div className="flex justify-between text-[10px]">
-                      <span className="text-slate-400">Support</span>
-                      <span className="text-white font-mono">{hyperbolaFit.quality.support_traces} traces</span>
-                    </div>
-
-                    {/* Flags */}
+                    {hyperbolaFit.diagnostics.orbital_model_rmse_bins != null && (
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-400">Orbital-moveout RMSE</span>
+                        <span className="text-white font-mono">{hyperbolaFit.diagnostics.orbital_model_rmse_bins.toFixed(2)} bins</span>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-1 mt-1">
                       {hyperbolaFit.flags.map((flag) => (
                         <span
                           key={flag}
                           className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${
-                            flag === "ICE_CONSISTENT" ? "bg-green-900/40 text-green-300" :
-                            flag.startsWith("CLUTTER_RISK_HIGH") ? "bg-red-900/40 text-red-300" :
-                            flag.startsWith("CLUTTER_RISK_MED") ? "bg-amber-900/40 text-amber-300" :
-                            flag === "LOW_SNR" ? "bg-orange-900/40 text-orange-300" :
-                            "bg-slate-700/40 text-slate-300"
+                            flag === "experimental" ? "bg-amber-900/40 text-amber-300" : "bg-red-900/40 text-red-300"
                           }`}
                         >
                           {flag}
                         </span>
                       ))}
-                    </div>
-
-                    {/* Overlay controls */}
-                    <div className="flex gap-2 mt-1">
-                      <label className="flex items-center gap-1 text-[9px] text-slate-400">
-                        <input type="checkbox" checked={showHyperbolaCi}
-                          onChange={(e) => setShowHyperbolaCi(e.target.checked)}
-                          className="w-3 h-3" />
-                        CI band
-                      </label>
                     </div>
                   </div>
                 )}
@@ -1953,7 +1904,7 @@ export default function SharadHiresInspector({
               {molaXOffset !== 0 && <span className="text-amber-300">MOLA: {molaXOffset > 0 ? "+" : ""}{molaXOffset}</span>}
               {showClutter && <span className="text-orange-400">CLUTTER {Math.round(clutterOpacity * 100)}%</span>}
               {hyperbolaApex && <span className="text-red-400">HYPERBOLA T={hyperbolaApex.trace}</span>}
-              {hyperbolaFit && <span className="text-red-300">εr={hyperbolaFit.epsr.toFixed(2)}</span>}
+              {hyperbolaFit?.epsilon_r_est != null && <span className="text-red-300">εr≈{hyperbolaFit.epsilon_r_est.toFixed(2)} (exp.)</span>}
             </div>
           </div>
         </div>
