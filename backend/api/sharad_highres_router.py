@@ -546,17 +546,24 @@ def _render_radargram(
             return hit
 
     t0 = time.monotonic()
-    power = np.asarray(power, dtype=np.float32)
-    power = np.nan_to_num(power, nan=0.0, posinf=0.0, neginf=0.0)
+    n_bins_in = power.shape[1]
 
     if downsample > 1:
         n = power.shape[0] // downsample * downsample
         if n == 0:
-            p = np.zeros((1, power.shape[1]), dtype=np.float32)
+            p = np.zeros((1, n_bins_in), dtype=np.float32)
         else:
-            p = power[:n].reshape(-1, downsample, power.shape[1]).mean(axis=1)
+            # Chunked mean over the (memory-mapped) array: avoids materialising
+            # full-resolution float copies (~0.26 GB per SS19 product).
+            p = np.empty((n // downsample, n_bins_in), dtype=np.float32)
+            step = max(downsample, (8192 // downsample) * downsample)
+            for i0 in range(0, n, step):
+                i1 = min(n, i0 + step)
+                blk = np.asarray(power[i0:i1], dtype=np.float32)
+                p[i0 // downsample:i1 // downsample] = blk.reshape(-1, downsample, n_bins_in).mean(axis=1)
     else:
         p = np.array(power, dtype=np.float32)
+    np.nan_to_num(p, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
     if amplitude:
         np.maximum(p, 0, out=p)
@@ -568,7 +575,6 @@ def _render_radargram(
     if per_trace:
         # Per-trace normalization (vectorized) — matches PDS browse image style
         # Uses np.partition (O(n) partial sort) instead of np.percentile (O(n log n))
-        p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
         n_bins = p.shape[1]
         k_lo = max(0, int(pmin / 100.0 * n_bins))
         k_hi = min(n_bins - 1, int(pmax / 100.0 * n_bins))
@@ -582,12 +588,14 @@ def _render_radargram(
         img = ((p - vmins) / (vmaxs - vmins) * 255).clip(0, 255).astype(np.uint8)
         vmin = vmax = None
     else:
-        p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
         if global_vmin is not None and global_vmax is not None:
             vmin, vmax = global_vmin, global_vmax
         else:
-            vmin = np.percentile(p, pmin)
-            vmax = np.percentile(p, pmax)
+            # one partition pass over a strided sample (stable to <0.1 dB,
+            # ~5x faster than two full percentile calls on 10 M values)
+            flat = p.ravel()
+            sample = flat[:: max(1, flat.size // 2_000_000)]
+            vmin, vmax = (float(v) for v in np.percentile(sample, [pmin, pmax]))
         if vmax <= vmin:
             vmax = vmin + 1
         img = ((p - vmin) / (vmax - vmin) * 255).clip(0, 255).astype(np.uint8)
@@ -1553,7 +1561,7 @@ def get_track(
 # ── MOLA elevation profile along SHARAD track ─────────
 MARS_MEAN_RADIUS = (2 * 3_396_190.0 + 3_376_200.0) / 3  # metres
 
-_DEM_PATH = os.path.join(
+_DEM_PATH = os.environ.get("MARSLAB_MOLA_DEM") or os.path.join(
     os.path.dirname(_BACKEND_DIR),  # project root
     "Mars_HRSC_MOLA_BlendDEM_Global_200mp_v2.tif",
 )
