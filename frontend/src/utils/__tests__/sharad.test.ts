@@ -51,3 +51,23 @@ describe("misc", () => {
     expect(toCsv(["a", "b"], [[1, 'x,"y"'], [null, 2]])).toBe('a,b\n1,"x,""y"""\n,2\n');
   });
 });
+
+describe("pick export", () => {
+  it("computes depth/uncertainty and serialises CSV + GeoJSON", async () => {
+    const { completePick, picksToCsv, picksToGeoJSON, PICK_COLUMNS } = await import("../sharad");
+    const p = completePick({
+      kind: "click", product_id: "R_X", display_trace: 10, full_trace: 60, lat: 18.4, lon: 77.45,
+      bin: 250, surface_bin: 150, abs_delay_us: null, epsilon_r1: 4, epsilon_r2: 4, boundary_m: 0, snr_db: null,
+    });
+    expect(p.depth_m).toBeCloseTo((299792458 * 100 * 37.5e-9) / 4, 3);
+    expect(p.depth_uncertainty_m).toBeCloseTo((299792458 * 37.5e-9) / 4, 3);
+    expect(p.vertical_resolution_m).toBeCloseTo(7.5, 3);
+    const csv = picksToCsv([p]).trim().split("\n");
+    expect(csv[0]!.split(",")).toEqual([...PICK_COLUMNS]);
+    expect(csv[1]!.startsWith("click,R_X,10,60,18.4,77.45,250,150,100,3.75,")).toBe(true);
+    const gj = JSON.parse(picksToGeoJSON([p], { product_id: "R_X" }));
+    expect(gj.features[0].geometry.coordinates).toEqual([77.45, 18.4]);
+    expect(gj.features[0].properties.depth_m).toBeCloseTo(281.05, 1);
+    expect(gj.metadata.lat_convention).toBe("planetocentric");
+  });
+});

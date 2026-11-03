@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import type { FieldNote } from "../api/fieldnotes";
-import { BIN_DT_US, computeDownsample, describeHttpError, nearestTrace } from "../utils/sharad";
+import {
+  BIN_DT_US, computeDownsample, completePick, describeHttpError, downloadBlob, nearestTrace,
+  picksToCsv, picksToGeoJSON, type Pick,
+} from "../utils/sharad";
 import { drawRadargramAxes, type ValueScale } from "./sharad/radargramAxes";
 
 /* =========================================================
@@ -166,6 +169,12 @@ export default function SharadHiresInspector({
   const [showBoundaryLine, setShowBoundaryLine] = useState(true);
   const [depthResult, setDepthResult] = useState<DepthResult | null>(null);
   const [depthError, setDepthError] = useState<string | null>(null);
+  // Clicked depth picks (kept for export), and the current radargram PNG blob
+  const [clickPicks, setClickPicks] = useState<Pick[]>([]);
+  const [exportBusy, setExportBusy] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const radargramBlobRef = useRef<Blob | null>(null);
+  useEffect(() => { setClickPicks([]); }, [productId]);
 
   // Surface line adjustment
   const [adjustMode, setAdjustMode] = useState(false);
@@ -176,10 +185,10 @@ export default function SharadHiresInspector({
     baseOffsets: Map<number, number>;
   } | null>(null);
 
-  const effectiveSurface = useMemo(() => {
+  const effectiveSurface = useMemo((): SurfacePoint[] => {
     if (surfaceOffsets.size === 0) return surface;
     return surface.map(pt => ({
-      x: pt.x,
+      ...pt,
       y: pt.y + Math.round(surfaceOffsets.get(pt.x) ?? 0),
     }));
   }, [surface, surfaceOffsets]);
@@ -370,6 +379,7 @@ export default function SharadHiresInspector({
 
           // Decode radargram image immediately — show UI before aux data arrives
           const img = new globalThis.Image();
+          radargramBlobRef.current = blob;
           img.src = URL.createObjectURL(blob);
           await new Promise<void>((resolve, reject) => {
             img.onload = () => resolve();
@@ -406,6 +416,7 @@ export default function SharadHiresInspector({
 
         // Cache-hit path: decode blob → HTMLImageElement
         const img = new globalThis.Image();
+        radargramBlobRef.current = blob;
         img.src = URL.createObjectURL(blob);
         await new Promise<void>((resolve, reject) => {
           img.onload = () => resolve();
@@ -1263,9 +1274,110 @@ export default function SharadHiresInspector({
         if (!r.ok) throw new Error(await describeHttpError(r, "Depth conversion"));
         return r.json();
       })
-      .then((data) => { setDepthResult(data); setDepthError(null); })
+      .then((data: DepthResult) => {
+        setDepthResult(data);
+        setDepthError(null);
+        if (data.surface_bin != null && data.depth_m != null) {
+          setClickPicks((prev) => [...prev, completePick({
+            kind: "click", product_id: productId, display_trace: traceIdx,
+            full_trace: traceIdx * downsample, lat: data.lat ?? null, lon: data.lon ?? null,
+            bin: cursorBin, surface_bin: data.surface_bin,
+            abs_delay_us: absDelayUs(traceIdx, cursorBin),
+            depth_m: data.depth_m, depth_uncertainty_m: data.depth_uncertainty_m ?? null,
+            vertical_resolution_m: data.vertical_resolution_m ?? null,
+            epsilon_r1: epsilonR1, epsilon_r2: epsilonR2, boundary_m: boundaryM, snr_db: null,
+          })]);
+        }
+      })
       .catch((err) => { setDepthResult(null); setDepthError(err instanceof Error ? err.message : String(err)); });
-  }, [radargramMeta, viewX, viewY, epsilonR1, epsilonR2, boundaryM, productId, moveMode, adjustMode, effectiveSurface, surfaceOffsets, onLocatePoint, downsample]);
+  }, [radargramMeta, viewX, viewY, epsilonR1, epsilonR2, boundaryM, productId, moveMode, adjustMode, effectiveSurface, surfaceOffsets, onLocatePoint, downsample, absDelayUs]);
+
+  // ── Export ─────────────────────────────────────────────
+  const buildPicks = useCallback(async (withReflectors: boolean): Promise<Pick[]> => {
+    if (!radargramMeta) return [];
+    const ds = radargramMeta.downsample;
+    const common = { product_id: productId, epsilon_r1: epsilonR1, epsilon_r2: epsilonR2, boundary_m: boundaryM };
+    const out: Pick[] = effectiveSurface.map((pt) => completePick({
+      ...common, kind: "surface", display_trace: pt.x, full_trace: pt.x * ds,
+      lat: radargramMeta.lats[pt.x] ?? null, lon: radargramMeta.lons[pt.x] ?? null,
+      bin: pt.y, surface_bin: pt.y, abs_delay_us: absDelayUs(pt.x, pt.y), snr_db: pt.snr_db ?? null,
+    }));
+    out.push(...clickPicks);
+    if (withReflectors) {
+      const r = await fetch(`/api/sharad_highres/reflectors?product_id=${encodeURIComponent(productId)}&epsilon_r=${epsilonR1}`);
+      if (!r.ok) throw new Error(await describeHttpError(r, "Reflector detection"));
+      const j = await r.json() as { reflectors: { traces: { trace_idx: number; lat: number; lon: number; bin_idx: number; snr: number }[] }[] };
+      const surfAt = new Map(effectiveSurface.map((pt) => [pt.x, pt.y]));
+      for (const seg of j.reflectors) {
+        for (const t of seg.traces) {
+          if (t.trace_idx % ds !== 0) continue; // one per display trace
+          const dt = t.trace_idx / ds;
+          out.push(completePick({
+            ...common, epsilon_r2: epsilonR1, boundary_m: 0, // reflector depths use uniform εr1
+            kind: "reflector", display_trace: dt, full_trace: t.trace_idx, lat: t.lat, lon: t.lon,
+            bin: t.bin_idx, surface_bin: surfAt.get(dt) ?? null, abs_delay_us: absDelayUs(dt, t.bin_idx),
+            snr_db: t.snr > 0 ? 10 * Math.log10(t.snr) : null,
+          }));
+        }
+      }
+    }
+    return out;
+  }, [radargramMeta, productId, epsilonR1, epsilonR2, boundaryM, effectiveSurface, clickPicks, absDelayUs]);
+
+  const exportPicks = useCallback(async (fmt: "csv" | "geojson", withReflectors: boolean) => {
+    setExportBusy(fmt);
+    setExportError(null);
+    try {
+      const picks = await buildPicks(withReflectors);
+      const base = `${productId}_picks${withReflectors ? "_with_reflectors" : ""}`;
+      if (fmt === "csv") downloadBlob(`${base}.csv`, picksToCsv(picks), "text/csv");
+      else downloadBlob(`${base}.geojson`, picksToGeoJSON(picks, {
+        product_id: productId, downsample: radargramMeta?.downsample,
+        surface_pick: surfaceOffsets.size > 0 ? "auto + manual edits" : "auto (leading edge)",
+      }), "application/geo+json");
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExportBusy(null);
+    }
+  }, [buildPicks, productId, radargramMeta, surfaceOffsets]);
+
+  const exportRadargram = useCallback(() => {
+    const blob = radargramBlobRef.current;
+    if (!blob || !radargramMeta) return;
+    const tag = `${productId}_ds${radargramMeta.downsample}_${useLog ? "log" : "lin"}_${usePerTrace ? "pertrace" : "global"}`;
+    downloadBlob(`${tag}.png`, blob);
+    const sidecar = {
+      product_id: productId,
+      image: `${tag}.png`,
+      description: "SHARAD RDR radargram rendered by MarsLab. Columns = display traces (full-res trace = column × downsample), rows = range bins of the receive window.",
+      columns: radargramMeta.n_traces,
+      rows: radargramMeta.n_bins,
+      downsample: radargramMeta.downsample,
+      along_track_aggregation: "mean of power over `downsample` consecutive traces",
+      sample_interval_us: BIN_DT_US,
+      trace_spacing_m: radargramMeta.trace_spacing_m ?? null,
+      lat_convention: "planetocentric",
+      lon_convention: "east, -180..180",
+      display: { log: useLog, amplitude: useAmplitude, per_trace: usePerTrace, pmin, pmax },
+      value_scale: valueScale,
+      absolute_delay: molaProfile?.calibration
+        ? { formula: "(rwot + row) * 0.0375 + offset_us", offset_us: molaProfile.calibration.offset_us, calibration: molaProfile.calibration }
+        : null,
+      per_column: {
+        lat: radargramMeta.lats,
+        lon: radargramMeta.lons,
+        distance_km: radargramMeta.distance_km ?? null,
+        rwot: radargramMeta.rwot ?? null,
+        surface_bin: (() => {
+          const m = new Map(effectiveSurface.map((pt) => [pt.x, pt.y]));
+          return Array.from({ length: radargramMeta.n_traces }, (_, i) => m.get(i) ?? null);
+        })(),
+        mola_predicted_surface_bin: molaProfile?.predicted_surface_bin ?? null,
+      },
+    };
+    downloadBlob(`${tag}.axes.json`, JSON.stringify(sidecar), "application/json");
+  }, [productId, radargramMeta, useLog, useAmplitude, usePerTrace, pmin, pmax, valueScale, molaProfile, effectiveSurface]);
 
   // ── Cursor info ────────────────────────────────────────
   const cursorInfo = (() => {
@@ -1872,6 +1984,25 @@ export default function SharadHiresInspector({
                 No apex set. Shift+Click on a diffraction hyperbola to begin.
               </div>
             )}
+          </Section>
+
+          {/* Export */}
+          <Section title="Export">
+            <div className="text-[9px] text-slate-500 mb-1.5 leading-snug">
+              Picks: surface (every display trace) + {clickPicks.length} clicked point{clickPicks.length === 1 ? "" : "s"}
+              {" "}with trace, lat/lon (planetocentric), delay, depth @ εr and ±1-bin uncertainty.
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <MiniButton active={false} onClick={() => exportPicks("csv", false)}>Picks CSV</MiniButton>
+              <MiniButton active={false} onClick={() => exportPicks("geojson", false)}>Picks GeoJSON</MiniButton>
+              <MiniButton active={false} onClick={() => exportPicks("csv", true)}>+ Reflectors CSV</MiniButton>
+              <MiniButton active={false} onClick={exportRadargram}>PNG + axes JSON</MiniButton>
+              {clickPicks.length > 0 && (
+                <MiniButton active={false} onClick={() => setClickPicks([])}>Clear clicks</MiniButton>
+              )}
+            </div>
+            {exportBusy && <div className="text-[9px] text-slate-400 mt-1">Preparing {exportBusy}…</div>}
+            {exportError && <div className="text-[9px] text-red-400 mt-1" role="alert">{exportError}</div>}
           </Section>
 
           {/* Analysis buttons */}
