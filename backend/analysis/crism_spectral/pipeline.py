@@ -43,7 +43,7 @@ def run_spectral_analysis(
         import sys
         import os
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'api'))
-        from crism_trr3.loader import get_cube_memmap, get_wavelengths
+        from crism_trr3.loader import get_cube_memmap, get_cube_wavelengths, SUPPORTED_BANDS
     except ImportError as e:
         return CrismSpectralResult(
             obs_id=obs_id,
@@ -53,19 +53,23 @@ def run_spectral_analysis(
     # Load data
     try:
         memmap, rows, cols, n_bands = get_cube_memmap(obs_id)
-        wavelengths = get_wavelengths()
+        band_wl = get_cube_wavelengths(obs_id)
     except Exception as e:
         return CrismSpectralResult(
             obs_id=obs_id,
             error=f"Failed to load TRR3 cube: {e}",
         )
 
-    if n_bands != len(wavelengths):
+    if n_bands != SUPPORTED_BANDS:
         # Endmembers are IR mineral spectra; VNIR/survey cubes don't match.
         return CrismSpectralResult(
             obs_id=obs_id,
-            error=f"Mineral unmixing needs a {len(wavelengths)}-band IR cube; this one has {n_bands} bands.",
+            error=f"Mineral unmixing needs a {SUPPORTED_BANDS}-band IR cube; this one has {n_bands} bands.",
         )
+    # Bands with a wavelength, in ascending wavelength order (L cubes are stored long→short).
+    keep = np.flatnonzero(np.isfinite(band_wl))
+    band_idx = keep[np.argsort(band_wl[keep])]
+    wavelengths = band_wl[band_idx]
 
     logger.info(f"[CRISM Spectral] Loaded {obs_id}: {rows}x{cols}, {n_bands} bands")
 
@@ -103,7 +107,7 @@ def run_spectral_analysis(
     for r in row_indices:
         for c in col_indices:
             # memmap shape is (rows, bands, cols) — Line-Interleaved Layout
-            spectrum = np.array(memmap[r, :, c], dtype=np.float64)
+            spectrum = np.array(memmap[r, :, c], dtype=np.float64)[band_idx]
 
             # Check for fill values
             n_valid_bands = np.sum(

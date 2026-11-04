@@ -67,3 +67,16 @@ def test_truncated_wavelength_table_is_unsupported(monkeypatch, tmp_path):
     (tmp_path / "cdr1_wa_short.img").write_bytes(np.zeros(10, "<f4").tobytes())
     with pytest.raises(L.UnsupportedCubeError, match="does not match"):
         L._wa_table.__wrapped__("CDR1_WA_SHORT.IMG", 107)
+
+
+def test_l_detector_table_runs_long_to_short():
+    """438-band TRR3 cubes are stored long→short wavelength; the CO2 2.0 µm
+    band of real spectra lands at band ~284, not where an ascending table puts it."""
+    name = "CDR410803692813_WA0000000L_3.IMG"
+    if not (L.WA_DIR / name.lower()).exists():
+        pytest.skip("WA CDR not present")
+    with np.errstate(all="ignore"):
+        wl = np.nanmedian(L._wa_table(name, 438), axis=1)
+    assert 3.9 < wl[1] < 3.95 and 1.0 < wl[437] < 1.01
+    assert np.all(np.diff(wl[1:]) < 0)
+    assert abs(wl[284] - 2.01) < 0.01

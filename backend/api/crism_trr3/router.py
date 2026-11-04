@@ -90,12 +90,13 @@ def rgb(obs_id: str, req: RGBRequest):
         raise HTTPException(status_code=422, detail=str(e))
 
     targets = (req.r_um, req.g_um, req.b_um)
-    lo, hi = float(np.min(wavelengths)), float(np.max(wavelengths))
+    lo, hi = float(np.nanmin(wavelengths)), float(np.nanmax(wavelengths))
     if not all(lo - 0.05 <= t <= hi + 0.05 for t in targets):
         # Requested bands outside this detector's range (e.g. IR defaults on
         # a VNIR cube): use the visible true-colour bands instead.
         targets = (0.60, 0.53, 0.44) if lo < 0.5 else (2.53, 1.51, 1.08)
-    r_idx, g_idx, b_idx = (nearest_band(wavelengths, t) for t in targets)
+    finite = np.where(np.isfinite(wavelengths), wavelengths, np.inf)
+    r_idx, g_idx, b_idx = (nearest_band(finite, t) for t in targets)
 
     # memmap shape: (rows, bands, cols) — extract 3 bands as (rows, cols) each
     def extract_band(band_idx):
@@ -147,7 +148,8 @@ def wavelengths(obs_id: str):
     except UnsupportedCubeError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    return {"wavelengths": wl.tolist(), "count": len(wl)}
+    # Band order (L-detector cubes run long→short); null for unusable bands.
+    return {"wavelengths": [None if not np.isfinite(w) else float(w) for w in wl], "count": len(wl)}
 
 
 @lru_cache(maxsize=8)

@@ -66,7 +66,8 @@ def require_supported_bands(bands: int) -> None:
 
 def get_wavelengths() -> np.ndarray:
     """
-    Build full 438-band wavelength array.
+    Wavelength labels of the mineral-CNN convention (NOT the physical band
+    wavelengths of a TRR3 cube; use get_cube_wavelengths for those).
     Bands 0-87: VNIR (linearly spaced 0.362 – 1.014 µm)
     Bands 88-437: IR from mineral_cnn constants (1.021 – 3.477 µm)
     """
@@ -118,13 +119,15 @@ def _wa_table(name: str, bands: int) -> np.ndarray:
 
 def get_cube_wavelengths(obs_id: str, sample: int | None = None) -> np.ndarray:
     """
-    Wavelengths (µm) of every band of this cube. 438-band IR cubes use the
-    project's fixed table; other cubes use the CDR named in their label, at
-    the given detector column (spectral smile) or the median over columns.
+    Wavelengths (µm) of every band of this cube, in the cube's band order,
+    from the CRISM WA CDR named in its label: at the given detector column
+    (spectral smile) or the median over columns. NaN marks bands the CDR has
+    no wavelength for (unusable detector rows).
+
+    Note: L-detector (438-band) cubes are stored long→short wavelength
+    (band 0 ≈ 3.94 µm, band 437 ≈ 1.00 µm).
     """
     _, _, cols, bands = get_cube_memmap(obs_id)
-    if bands == SUPPORTED_BANDS:
-        return get_wavelengths()
     meta = parse_pds3_label(resolve_trr_files(obs_id)["trr_lbl"])
     name = meta.get("MRO:WAVELENGTH_FILE_NAME")
     if not name or bands < 10:
@@ -132,14 +135,16 @@ def get_cube_wavelengths(obs_id: str, sample: int | None = None) -> np.ndarray:
             f"This observation has {bands} bands and no wavelength table; it is not a spectral cube."
         )
     table = _wa_table(name, bands)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN rows → NaN
+        wl = np.nanmedian(table, axis=1)
+    if np.isfinite(wl).sum() < bands // 2:
+        raise UnsupportedCubeError(f"Wavelength table {name} has too few valid values.")
     if sample is not None and table.shape[1] == cols:
         col = table[:, max(0, min(cols - 1, sample))]
-        if np.isfinite(col).all():
-            return col
-    with np.errstate(all="ignore"):
-        wl = np.nanmedian(table, axis=1)
-    if not np.isfinite(wl).all():
-        raise UnsupportedCubeError(f"Wavelength table {name} has no valid values for some bands.")
+        # Per-column values where valid, the column median elsewhere.
+        wl = np.where(np.isfinite(col), col, wl)
     return wl
 
 
@@ -157,8 +162,10 @@ def get_pixel_spectrum(obs_id: str, line: int, sample: int):
     # memmap shape: (rows, bands, cols) — LIL layout
     values = np.array(mm[line, :, sample], dtype=np.float32)
 
-    # Ascending wavelength order for plotting and band lookups.
-    order = np.argsort(wavelengths, kind="stable")
+    # Ascending wavelength order for plotting and band lookups; drop bands
+    # without a wavelength.
+    keep = np.flatnonzero(np.isfinite(wavelengths))
+    order = keep[np.argsort(wavelengths[keep], kind="stable")]
     return wavelengths[order], values[order]
 
 
