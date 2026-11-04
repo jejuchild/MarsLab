@@ -73,7 +73,7 @@ type UseMapViewerParams = {
   footprintManagerRef: React.MutableRefObject<FootprintManager | null>;
   onSelect: (ctx: InspectorContext | null) => void;
   onSharadClick?: (popup: SHARADPopup) => void;
-  onSharadHiresClick?: (productId: string) => void;
+  onSharadHiresClick?: (productId: string, lat?: number, lon?: number) => void;
   onHiRiseDTMClick?: (productId: string, lat: number, lon: number, title?: string) => void;
   onToggleOverlay?: (productId: string, type: "quickview" | null) => void;
   onTerrainClick?: (lat: number, lon: number) => void;
@@ -600,6 +600,16 @@ export default function useMapViewer({
           }
         }
 
+        // PRIORITY 0: a click within a few pixels of a SHARAD ground track
+        // selects that track. Lines are thin, deliberate targets; before, a
+        // draped HiRISE image (or any polygon) under them always won, so a
+        // track crossing a HiRISE image could not be clicked at all.
+        const sharadLineId = viewer.scene
+          .drillPick(m.position, 8, 9, 9)
+          .map((p: { id?: unknown }) => p.id)
+          .find((id: unknown): id is string => typeof id === "string" && /^SHARAD(_HIGHRES)?_FP_/.test(id));
+        const sharadLineHit = sharadLineId ? footprintManagerRef.current?.getFeatureMetadata(sharadLineId) ?? null : null;
+
         // PRIORITY 1: Check if click is within any active overlay bounds
         // Skip if cycling through overlapping footprints (let PRIORITY 2 handle)
         let overlayProduct: { productId: string; instrument: InstrumentType } | null = null;
@@ -609,8 +619,8 @@ export default function useMapViewer({
         const quickviewIds = quickviewOverlaysRef.current;
         const allOverlayIds = [...highResIds, ...quickviewIds];
 
-        if (isCycleClick) {
-          // Skip overlay detection — fall through to PRIORITY 2 cycle logic
+        if (isCycleClick || sharadLineHit) {
+          // Skip overlay detection — fall through to PRIORITY 2 (cycle / track)
         } else for (const productId of allOverlayIds) {
           const highResEnt = viewer.entities.getById(`HIGHRES_OVERLAY_${productId}`);
           const quickviewEnt = viewer.entities.getById(
@@ -819,7 +829,7 @@ export default function useMapViewer({
           cycleClickRef.current = null;
         }
 
-        const pickedFootprint = allFootprintsHere[cycleIndex] ?? allFootprintsHere[0] ?? null;
+        const pickedFootprint = sharadLineHit ?? allFootprintsHere[cycleIndex] ?? allFootprintsHere[0] ?? null;
         const pickedPrimitiveMetadata = pickedFootprint;
 
         if ((!picked || !(picked.id instanceof Cesium.Entity)) && !pickedPrimitiveMetadata) {
@@ -882,7 +892,7 @@ export default function useMapViewer({
 
         // Handle SHARAD_HIGHRES - open radargram inspector + Inspector panel
         if (instrument === "SHARAD_HIGHRES") {
-          onSharadHiresClickRef.current?.(productId);
+          onSharadHiresClickRef.current?.(productId, clickLat, clickLon);
           onSelect({
             instrument,
             productId,

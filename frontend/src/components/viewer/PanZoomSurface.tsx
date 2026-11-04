@@ -9,6 +9,10 @@ export interface PanZoomSurfaceProps {
   onHover?: (pos: { fx: number; fy: number } | null) => void;
   /** Zoom range relative to native pixels. */
   maxZoom?: number;
+  /** Polylines drawn on the image (image fractions), e.g. radar ground tracks. */
+  lines?: { id: string; label: string; points: { fx: number; fy: number }[] }[];
+  /** Click on a line, with the clicked position in image fractions. */
+  onLineClick?: (id: string, pos: { fx: number; fy: number }) => void;
 }
 
 type View = { zoom: number; x: number; y: number };
@@ -20,7 +24,16 @@ const WHEEL_FACTOR = 1.0015;
  * around the cursor, drag (mouse/touch/pen) to pan, keyboard + − 0 1 and
  * arrows, and a marker that keeps its size at any zoom.
  */
-export default function PanZoomSurface({ src, alt, marker, onHover, maxZoom = 16 }: PanZoomSurfaceProps) {
+export default function PanZoomSurface({
+  src,
+  alt,
+  marker,
+  onHover,
+  maxZoom = 16,
+  lines,
+  onLineClick,
+}: PanZoomSurfaceProps) {
+  const [hoverLine, setHoverLine] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
@@ -183,6 +196,48 @@ export default function PanZoomSurface({ src, alt, marker, onHover, maxZoom = 16
             className="block max-w-none"
             style={{ imageRendering: view.zoom > 2 ? "pixelated" : "auto", visibility: status === "ok" ? "visible" : "hidden" }}
           />
+          {lines && lines.length > 0 && natural && status === "ok" && (
+            <svg
+              className="absolute left-0 top-0 overflow-visible"
+              width={natural.w}
+              height={natural.h}
+              viewBox={`0 0 ${natural.w} ${natural.h}`}
+              aria-label="Tracks on this image"
+            >
+              {/* The zoom is a CSS transform outside the SVG, so stroke widths
+                  are divided by it to stay constant on screen. */}
+              {lines.map((l) => {
+                const pts = l.points.map((p) => `${p.fx * natural.w},${p.fy * natural.h}`).join(" ");
+                const hot = hoverLine === l.id;
+                return (
+                  <g key={l.id}>
+                    <polyline points={pts} fill="none" stroke="black" strokeOpacity={0.7} strokeWidth={(hot ? 7 : 5) / view.zoom} />
+                    <polyline points={pts} fill="none" stroke={hot ? "#fde68a" : "#fbbf24"} strokeWidth={(hot ? 4 : 2.5) / view.zoom} />
+                    {onLineClick && (
+                      <polyline
+                        points={pts}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={16 / view.zoom}
+                        style={{ pointerEvents: "stroke", cursor: "pointer" }}
+                        role="button"
+                        aria-label={l.label}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerEnter={() => setHoverLine(l.id)}
+                        onPointerLeave={() => setHoverLine(null)}
+                        onClick={(e) => {
+                          const pos = toImageFraction(e.clientX, e.clientY);
+                          if (pos) onLineClick(l.id, pos);
+                        }}
+                      >
+                        <title>{l.label}</title>
+                      </polyline>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+          )}
           {marker && natural && status === "ok" && (
             <div
               className="pointer-events-none absolute"

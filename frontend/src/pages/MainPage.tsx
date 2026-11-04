@@ -18,8 +18,7 @@ import LayerPanelRaw from "../components/layerpanel/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
 import InstrumentBar from "../components/map/InstrumentBar";
 import DockedViewerRow from "../components/layout/DockedViewerRow";
-import ViewerShell, { ViewerAction } from "../components/viewer/ViewerShell";
-import PanZoomSurface from "../components/viewer/PanZoomSurface";
+import SharadBrowsePanel from "../components/sharad/SharadBrowsePanel";
 import FieldNoteModal from "../components/FieldNoteModal";
 import CopilotFab from "../components/CopilotFab";
 import type { FieldNote } from "../api/fieldnotes";
@@ -756,15 +755,19 @@ export default function MainPage() {
   }, []);
 
   // Handle SHARAD track click - open popup with quickview
+  // Standard SHARAD track click: browse radargram docked beside the Inspector.
   const handleSharadClick = useCallback((popup: SHARADPopup) => {
+    setSharadHiresProductId(null);
     setSharadPopup(popup);
   }, []);
 
   // Handle SHARAD High-Res footprint click - open radargram inspector
-  const handleSharadHiresClick = useCallback((productId: string) => {
-    setSharadHiresFocus(null);
+  // Clicking a hi-res track opens its radargram docked beside the Inspector,
+  // centred on the clicked point (the map's onSelect keeps the Inspector).
+  const handleSharadHiresClick = useCallback((productId: string, lat?: number, lon?: number) => {
+    setSharadPopup(null);
+    setSharadHiresFocus(lat != null && lon != null ? { lat, lon } : null);
     setSharadHiresProductId(productId);
-    setSelected(null); // Close regular Inspector
   }, []);
 
   // Handle opening Regolith Thickness analysis from SharadHiresInspector
@@ -1646,6 +1649,12 @@ export default function MainPage() {
     },
     onPinSpectrum: handlePinSpectrum,
     onOpenMineralSequence: handleOpenMineralSequence,
+    // From a SHARAD line on a HiRISE image: radargram docked at that point.
+    onOpenRadargram: (productId, point) => {
+      setSharadPopup(null);
+      setSharadHiresFocus(point ?? null);
+      setSharadHiresProductId(productId);
+    },
   }), [activeOverlays, handleSetOverlay, handleSetOpacity, rgbWavelengths, handleRGBChange, productsWithHighRes,
        customDatasets, handleCustomDatasetOpacity, fieldNotes, handleOpenFieldNote, handlePinSpectrum,
        handleOpenMineralSequence, setHiRiseDTM3DPoint]);
@@ -1723,7 +1732,21 @@ export default function MainPage() {
         onLocatePoint={(lat, lon) => setSharadTracePin({ lat, lon })}
         onOpenRegolith={handleOpenRegolith}
         onOpenAttenuation={handleOpenAttenuation}
+        onShowHirise={(c) => {
+          handleSetOverlay(c.product_id, "quickview");
+          setFlyToCoords({ lat: c.lat, lon: c.lon });
+        }}
       />
+      )
+    ) : sharadPopup ? (
+      withInspector(
+        <SharadBrowsePanel
+          productId={sharadPopup.productId}
+          quickviewUrl={sharadPopup.quickviewUrl}
+          start={{ lat: sharadPopup.startLat, lon: sharadPopup.startLon }}
+          stop={{ lat: sharadPopup.stopLat, lon: sharadPopup.stopLon }}
+          onClose={() => setSharadPopup(null)}
+        />
       )
     ) : analysisMode === "crater_detect" ? (
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading landform detector...</div>}>
@@ -1926,6 +1949,7 @@ export default function MainPage() {
         onHighlightComplete={handleHighlightComplete}
         inspectedProductId={inspectedProductId}
         sharadTracePin={sharadTracePin}
+        sharadActiveProductId={sharadHiresProductId}
         showMeasurementTools={showMeasurementTools}
         onMeasurementPinNote={handleMeasurementPinNote}
         terraformMode={showTerraform}
@@ -2024,24 +2048,6 @@ export default function MainPage() {
             />
           </Suspense>
         </ErrorBoundary>
-      )}
-
-      {/* SHARAD Quickview Popup */}
-      {sharadPopup && (
-        <ViewerShell
-          variant="modal"
-          maxWidthClass="max-w-6xl"
-          icon="radar"
-          title={`SHARAD ${sharadPopup.productId}`}
-          subtitle={`Track ${sharadPopup.startLat.toFixed(2)}°, ${sharadPopup.startLon.toFixed(2)}°E → ${sharadPopup.stopLat.toFixed(2)}°, ${sharadPopup.stopLon.toFixed(2)}°E`}
-          actions={<ViewerAction icon="download" label="Download" href={sharadPopup.quickviewUrl} download={`${sharadPopup.productId}.png`} />}
-          footer={<p className="text-[11px] text-slate-400">Browse radargram (uncalibrated). Wheel to zoom, drag to pan, 0 to fit.</p>}
-          onClose={() => setSharadPopup(null)}
-        >
-          <div className="relative h-[70vh]">
-            <PanZoomSurface src={sharadPopup.quickviewUrl} alt={`SHARAD radargram ${sharadPopup.productId}`} />
-          </div>
-        </ViewerShell>
       )}
 
       {/* Temporal Comparison Modal */}

@@ -8,8 +8,12 @@ type HiResImageViewerProps = {
   /** Inspected point, marked on the image when it falls inside it. */
   lat?: number;
   lon?: number;
+  /** Open a SHARAD radargram that crosses this image, centred on the clicked point. */
+  onOpenRadargram?: (productId: string, point: { lat: number; lon: number }) => void;
   onClose: () => void;
 };
+
+type SharadCrossing = { product_id: string; start_trace: number; coords: [number, number][] };
 
 const fmt = (lat: number, lon: number) => `${lat.toFixed(4)}°, ${lon.toFixed(4)}°E`;
 
@@ -18,12 +22,24 @@ const fmt = (lat: number, lon: number) => `${lat.toFixed(4)}°, ${lon.toFixed(4)
  * draped on the map (on its product bounds), so the inspected point and the
  * cursor position map to lat/lon with the same geometry as the map.
  */
-export default function HiResImageViewer({ productId, lat, lon, onClose }: HiResImageViewerProps) {
+export default function HiResImageViewer({ productId, lat, lon, onOpenRadargram, onClose }: HiResImageViewerProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [isJP2, setIsJP2] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bounds, setBounds] = useState<{ west: number; east: number; south: number; north: number } | null>(null);
   const [hover, setHover] = useState<{ fx: number; fy: number } | null>(null);
+  const [sharad, setSharad] = useState<SharadCrossing[]>([]);
+
+  // SHARAD hi-res ground tracks that cross this image.
+  useEffect(() => {
+    let cancelled = false;
+    setSharad([]);
+    fetch(`/api/crossings/hirise/${encodeURIComponent(productId)}/sharad`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d?.tracks) setSharad(d.tracks); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [productId]);
 
   // JP2-backed high-res when downloaded, else a smaller browse image.
   useEffect(() => {
@@ -61,6 +77,18 @@ export default function HiResImageViewer({ productId, lat, lon, onClose }: HiRes
       ? { fx: (lon - bounds.west) / span.lon, fy: (bounds.north - lat) / span.lat }
       : null;
   const markerInside = marker && marker.fx >= 0 && marker.fx <= 1 && marker.fy >= 0 && marker.fy <= 1;
+  const toFrac = (lo: number, la: number) =>
+    bounds && span ? { fx: (lo - bounds.west) / span.lon, fy: (bounds.north - la) / span.lat } : null;
+  const lines =
+    bounds && span
+      ? sharad.map((t) => ({
+          id: `${t.product_id}#${t.start_trace}`,
+          label: `SHARAD ${t.product_id} — click to open the radargram here`,
+          points: t.coords.map(([lo, la]) => toFrac(lo, la)!),
+        }))
+      : [];
+  const nTracks = new Set(sharad.map((t) => t.product_id)).size;
+
   const cursor =
     hover && bounds && span
       ? { lat: bounds.north - hover.fy * span.lat, lon: bounds.west + hover.fx * span.lon }
@@ -89,6 +117,11 @@ export default function HiResImageViewer({ productId, lat, lon, onClose }: HiRes
         <div className="flex items-center gap-4 font-mono text-[11px] text-slate-400">
           <span>{cursor ? `Cursor ${fmt(cursor.lat, cursor.lon)}` : "Move over the image for coordinates"}</span>
           {marker && !markerInside && <span className="text-amber-300">Inspected point is outside this image</span>}
+          {nTracks > 0 && (
+            <span className="text-amber-300">
+              {nTracks} SHARAD track{nTracks > 1 ? "s" : ""} cross this image{onOpenRadargram ? " — click a line to open its radargram there" : ""}
+            </span>
+          )}
           <span className="ml-auto hidden md:inline">Wheel / double-click zoom · drag pan · 0 fit · 1 actual · Esc close</span>
         </div>
       }
@@ -105,6 +138,18 @@ export default function HiResImageViewer({ productId, lat, lon, onClose }: HiRes
           alt={`HiRISE ${productId}`}
           marker={markerInside ? { fx: marker.fx, fy: marker.fy, label: "Inspected point" } : null}
           onHover={bounds ? setHover : undefined}
+          lines={lines}
+          onLineClick={
+            onOpenRadargram && bounds && span
+              ? (id, pos) => {
+                  onOpenRadargram(id.split("#")[0]!, {
+                    lat: bounds.north - pos.fy * span.lat,
+                    lon: bounds.west + pos.fx * span.lon,
+                  });
+                  onClose();
+                }
+              : undefined
+          }
         />
       ) : (
         <div className="flex h-full items-center justify-center gap-3 text-sm text-slate-300">

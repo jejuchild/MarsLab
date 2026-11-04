@@ -202,6 +202,7 @@ function CompareCard({
           productId={product.product_id}
           lat={context.lat}
           lon={context.lon}
+          onOpenRadargram={handlers.onOpenRadargram}
           onClose={() => setViewerOpen(false)}
         />
       )}

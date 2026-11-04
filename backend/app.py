@@ -333,3 +333,6 @@ async def health_check():
         "timestamp": datetime.utcnow().isoformat(),
         "indices_loaded": len(_geojson_cache),
     })
+
+from api.crossings_router import router as crossings_router  # noqa: E402
+app.include_router(crossings_router)  # /api/crossings — SHARAD x HiRISE

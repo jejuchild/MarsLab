@@ -18,6 +18,7 @@ import useMapLayers from "../hooks/useMapLayers";
 import useFlyTo from "../hooks/useFlyTo";
 import useViewBoundSelection from "../hooks/useViewBoundSelection";
 import useAnnotations from "../hooks/useAnnotations";
+import useSharadTrackLink from "../hooks/useSharadTrackLink";
 import useHoverHighlight from "../hooks/useHoverHighlight";
 import useGridOverlay from "../hooks/useGridOverlay";
 import useCustomDatasets from "../hooks/useCustomDatasets";
@@ -111,7 +112,7 @@ type MapViewProps = {
   showHiRISEDTM?: boolean;
   showCRISM_TRR3?: boolean;
   onSharadClick?: (popup: SHARADPopup) => void;
-  onSharadHiresClick?: (productId: string) => void;
+  onSharadHiresClick?: (productId: string, lat?: number, lon?: number) => void;
   onHiRiseDTMClick?: (productId: string, lat: number, lon: number, title?: string) => void;
   onToggleOverlay?: (productId: string, type: "quickview" | null) => void;
   quickviewOverlays?: string[];
@@ -175,6 +176,8 @@ type MapViewProps = {
   inspectedProductId?: string | null;
   // SHARAD radargram trace pin — show clicked radargram location on map
   sharadTracePin?: { lat: number; lon: number } | null;
+  /** Radargram open in the side panel: its track is drawn and cursor-linked. */
+  sharadActiveProductId?: string | null;
   // Measurement & annotation tools
   showMeasurementTools?: boolean;
   onToggleMeasurementTools?: (v: boolean) => void;
@@ -413,6 +416,7 @@ export default function MapView({
   onHighlightComplete,
   inspectedProductId,
   sharadTracePin = null,
+  sharadActiveProductId = null,
   showMeasurementTools = false,
   onToggleMeasurementTools,
   onMeasurementPinNote,
@@ -643,6 +647,8 @@ export default function MapView({
     terraformMode,
     craterDetectFeatures,
   });
+
+  useSharadTrackLink({ viewerRef, marsEllipsoid: MARS_ELLIPSOID, productId: sharadActiveProductId });
 
   useHoverHighlight({
     viewerRef,

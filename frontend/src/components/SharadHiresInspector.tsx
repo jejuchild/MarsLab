@@ -5,6 +5,8 @@ import {
   picksToCsv, picksToGeoJSON, type Pick,
 } from "../utils/sharad";
 import { drawRadargramAxes, type ValueScale } from "./sharad/radargramAxes";
+import CrossingBands, { type HiriseCrossing } from "./sharad/CrossingBands";
+import { emitSharadHover } from "../utils/sharadLinkBus";
 
 /* =========================================================
  * Types
@@ -112,6 +114,7 @@ export default function SharadHiresInspector({
   onLocatePoint,
   onOpenRegolith,
   onOpenAttenuation,
+  onShowHirise,
   initialPoint = null,
 }: {
   productId: string;
@@ -123,6 +126,8 @@ export default function SharadHiresInspector({
   onLocatePoint?: (lat: number, lon: number) => void;
   onOpenRegolith?: (productId: string) => void;
   onOpenAttenuation?: (productId: string) => void;
+  /** Show a HiRISE image this track crosses (drape it and go there on the map). */
+  onShowHirise?: (crossing: HiriseCrossing) => void;
 }) {
   const hasNote = useMemo(
     () => fieldNotes.some(n => n.product_id === productId),
@@ -1229,6 +1234,20 @@ export default function SharadHiresInspector({
     setCursor({ normX, normY });
   }, [viewX, viewY]);
 
+  // Mirror the cursor onto the map's ground track (via the link bus, so the
+  // page doesn't re-render on every mouse move).
+  useEffect(() => {
+    if (!cursor || !radargramMeta) {
+      emitSharadHover(null);
+      return;
+    }
+    const i = Math.round(cursor.normX * radargramMeta.n_traces);
+    const lat = radargramMeta.lats[i];
+    const lon = radargramMeta.lons[i];
+    emitSharadHover(lat != null && lon != null ? { lat, lon } : null);
+  }, [cursor, radargramMeta]);
+  useEffect(() => () => emitSharadHover(null), []);
+
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (didDragRef.current) return; // Suppress click after drag
     if (moveMode || adjustMode) return;
@@ -2106,6 +2125,9 @@ export default function SharadHiresInspector({
                 onWheel={handleWheel}
                 onClick={handleClick}
               />
+              {radargram && onShowHirise && (
+                <CrossingBands productId={productId} viewX={viewX} onPick={onShowHirise} />
+              )}
             </div>
 
             {/* MOLA elevation profile panel */}

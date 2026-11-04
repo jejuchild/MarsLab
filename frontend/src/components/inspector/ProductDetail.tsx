@@ -31,6 +31,8 @@ export interface ProductDetailHandlers {
   onShow3DView?: (productId: string, lat: number, lon: number) => void;
   onPinSpectrum?: (spectrum: { productId: string; lat: number; lon: number; wavelengths: number[]; reflectance: (number | null)[] }) => void;
   onOpenMineralSequence?: (obsId: string) => void;
+  /** Open a SHARAD hi-res radargram, optionally centred on a ground point. */
+  onOpenRadargram?: (productId: string, point?: { lat: number; lon: number }) => void;
 }
 
 type DetailTab = "Metadata" | "Pixel" | "Spectrum" | "Bands";
@@ -238,6 +240,7 @@ export default function ProductDetail({
           productId={productId}
           lat={product.lat}
           lon={product.lon}
+          onOpenRadargram={handlers.onOpenRadargram}
           onClose={() => setShowHiResViewer(false)}
         />
       )}

@@ -381,6 +381,10 @@ async def at_point(
         if not cache:
             return (lane, [])
         features = cache.get("features", [])
+        if cache_key == "sharad":
+            # Standard tracks without a browse image can't show anything.
+            from .sharad_quickview_index import keep_viewable_sharad
+            features = keep_viewable_sharad(features)
         results = await asyncio.to_thread(
             _search_cache_at_point, cache_key, features, lat, norm_lon, radius_km
         )

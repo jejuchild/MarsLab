@@ -549,6 +549,11 @@ async def get_footprints(
             if feature.get("properties", {}).get("product_id", "").lower().startswith("frt")
         ]
 
+    # Standard SHARAD tracks without a browse image can't show anything.
+    if instrument.upper() == "SHARAD":
+        from .sharad_quickview_index import keep_viewable_sharad
+        matching_features = keep_viewable_sharad(matching_features)
+
     # Filter to high-res products only (those with actual data files on disk)
     if highres_only:
         hr_set = get_highres_set(instrument)
