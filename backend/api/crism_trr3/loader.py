@@ -38,6 +38,23 @@ def get_shape(obs_id: str) -> dict:
     return {"rows": rows, "cols": cols, "bands": bands}
 
 
+SUPPORTED_BANDS = 438
+
+
+class UnsupportedCubeError(ValueError):
+    """Cube whose band set has no wavelength table here (e.g. VNIR/S-detector
+    MSV 90-band or 107-band cubes, whose CDR WA tables are not bundled)."""
+
+
+def require_supported_bands(bands: int) -> None:
+    if bands != SUPPORTED_BANDS:
+        raise UnsupportedCubeError(
+            f"This observation has {bands} bands (VNIR / multispectral survey cube). "
+            f"Spectra and band composites are only available for {SUPPORTED_BANDS}-band "
+            "IR (TRR3 L-detector) cubes; the wavelength table for this band set is not available."
+        )
+
+
 def get_wavelengths() -> np.ndarray:
     """
     Build full 438-band wavelength array.
@@ -55,6 +72,7 @@ def get_pixel_spectrum(obs_id: str, line: int, sample: int):
     Returns (wavelengths, values) arrays.
     """
     mm, rows, cols, bands = get_cube_memmap(obs_id)
+    require_supported_bands(bands)
 
     line = max(0, min(rows - 1, line))
     sample = max(0, min(cols - 1, sample))

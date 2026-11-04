@@ -8,6 +8,8 @@ type CRISMSpectrumTabProps = {
   spectrumData: SpectrumData | null;
   dustAssessment: DustAssessment | null;
   loading: boolean;
+  /** Server-provided reason when no spectrum exists for this product. */
+  unavailableReason?: string | null;
   onPinSpectrum?: (spectrum: {
     productId: string;
     lat: number;
@@ -25,6 +27,7 @@ export default function CRISMSpectrumTab({
   spectrumData,
   dustAssessment,
   loading,
+  unavailableReason,
   onPinSpectrum,
   activeOverlayType,
   onSetOverlay,
@@ -79,8 +82,8 @@ export default function CRISMSpectrumTab({
 
   if (!spectrumData) {
     return (
-      <div className="flex h-64 items-center justify-center text-slate-500 text-sm">
-        Failed to load spectrum data
+      <div className="flex h-64 items-center justify-center px-6 text-center text-slate-500 text-sm">
+        {unavailableReason ?? "Failed to load spectrum data"}
       </div>
     );
   }

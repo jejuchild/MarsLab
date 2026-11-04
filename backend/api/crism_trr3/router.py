@@ -15,7 +15,10 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from .loader import get_cube_memmap, get_shape, get_wavelengths, get_pixel_spectrum
+from .loader import (
+    get_cube_memmap, get_shape, get_wavelengths, get_pixel_spectrum,
+    UnsupportedCubeError, require_supported_bands,
+)
 from api.crism.rgb import nearest_band
 from api.mineral_cnn.constants import FILL_VALUE
 from api.validation import validate_product_id
@@ -55,6 +58,8 @@ def spectrum(obs_id: str, req: SpectrumRequest):
         wavelengths, values = get_pixel_spectrum(obs_id, req.line, req.sample)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except UnsupportedCubeError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     # Build valid mask (non-fill, finite)
     valid = np.isfinite(values) & (values < FILL_VALUE - 1) & (values >= 0)
@@ -77,6 +82,10 @@ def rgb(obs_id: str, req: RGBRequest):
         mm, rows, cols, bands = get_cube_memmap(obs_id)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    try:
+        require_supported_bands(bands)
+    except UnsupportedCubeError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     if req.vmax <= req.vmin:
         raise HTTPException(status_code=400, detail="vmax must be greater than vmin")
@@ -139,6 +148,10 @@ def wavelengths(obs_id: str):
         _, _, _, bands = get_cube_memmap(obs_id)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    try:
+        require_supported_bands(bands)
+    except UnsupportedCubeError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     wl = get_wavelengths()
     if len(wl) != bands:

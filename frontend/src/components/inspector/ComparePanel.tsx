@@ -212,12 +212,16 @@ function CompareCard({
 /** Reflectance spectrum of a CRISM product at the inspected point (sparkline). */
 function SpectrumAtPoint({ product }: { product: InspectorContext }) {
   const pixel = usePixelAtPoint(product);
-  const { spectrumData, loading } = useSpectrumData(
+  const { spectrumData, loading, unavailableReason } = useSpectrumData(
     product.productId, product.instrument, pixel.line, pixel.sample, product.lat, product.lon,
   );
   if (loading) return <p className="text-[10px] text-slate-500">Loading spectrum…</p>;
   if (pixel.line === undefined) return <p className="text-[10px] text-slate-600">Spectrum unavailable at this point</p>;
-  if (!spectrumData) return null;
+  if (!spectrumData) {
+    return unavailableReason ? (
+      <p className="text-[10px] text-slate-500" title={unavailableReason}>Spectrum not available for this cube type</p>
+    ) : null;
+  }
   return <Sparkline data={spectrumData} />;
 }
 

@@ -17,10 +17,13 @@ export default function useSpectrumData(
   spectrumData: SpectrumData | null;
   dustAssessment: DustAssessment | null;
   loading: boolean;
+  unavailableReason: string | null;
 } {
   const [spectrumData, setSpectrumData] = useState<SpectrumData | null>(null);
   const [dustAssessment, setDustAssessment] = useState<DustAssessment | null>(null);
   const [loading, setLoading] = useState(false);
+  /** Why there is no spectrum, when the server says so (e.g. unsupported cube). */
+  const [unavailableReason, setUnavailableReason] = useState<string | null>(null);
 
   useEffect(() => {
     if (!productId || (instrument !== "CRISM" && instrument !== "CRISM_TRR3")) {
@@ -36,6 +39,7 @@ export default function useSpectrumData(
     }
 
     let cancelled = false;
+    setUnavailableReason(null);
     const isTRR3 = instrument === "CRISM_TRR3";
 
     async function fetchSpectrum() {
@@ -57,9 +61,16 @@ export default function useSpectrumData(
 
         if (!response.ok) {
           // 404 = spectral data not available for this product (expected)
-          if (response.status === 404) {
+          if (response.status === 404 || response.status === 422) {
+            const detail = await response.json().then((d) => d?.detail).catch(() => null);
+            if (cancelled) return;
             setSpectrumData(null);
             setDustAssessment(null);
+            setUnavailableReason(
+              typeof detail === "string" && response.status === 422
+                ? detail
+                : "No spectral data is available for this product.",
+            );
             return;
           }
           throw new Error(`Failed to fetch spectrum: ${response.status}`);
@@ -89,5 +100,5 @@ export default function useSpectrumData(
     return () => { cancelled = true; };
   }, [productId, instrument, pixelLine, pixelSample, lat, lon]);
 
-  return { spectrumData, dustAssessment, loading };
+  return { spectrumData, dustAssessment, loading, unavailableReason };
 }

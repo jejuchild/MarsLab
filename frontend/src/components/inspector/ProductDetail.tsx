@@ -110,7 +110,7 @@ export default function ProductDetail({
   const pixel = usePixelAtPoint(product);
 
   // ── CRISM spectrum + metadata ──
-  const { spectrumData, dustAssessment, loading: spectrumLoading } = useSpectrumData(
+  const { spectrumData, dustAssessment, loading: spectrumLoading, unavailableReason } = useSpectrumData(
     productId, instrument,
     pixel.line, pixel.sample,
     product.lat, product.lon,
@@ -177,6 +177,7 @@ export default function ProductDetail({
             spectrumData={spectrumData}
             dustAssessment={dustAssessment}
             loading={spectrumLoading}
+            unavailableReason={unavailableReason}
             onPinSpectrum={handlers.onPinSpectrum}
             activeOverlayType={activeOverlay?.type ?? null}
             onSetOverlay={setOverlay}
