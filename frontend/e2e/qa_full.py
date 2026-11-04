@@ -55,9 +55,19 @@ async def new_page(p, width=1700, height=950, mobile=False):
         has_touch=mobile,
         permissions=["clipboard-read", "clipboard-write"],
     )
-    await ctx.add_init_script("localStorage.setItem('marslab-tour-completed','true')")
+    await ctx.add_init_script("""localStorage.setItem('marslab-tour-completed','true'); window.__errs = [];
+      window.addEventListener('error', ev => window.__errs.push(String((ev.error && (ev.error.stack || ev.error.message)) || ev.message).slice(0, 1200)));""")
     page = await ctx.new_page()
     return browser, page
+
+
+async def dump_page_errors(page, flow):
+    try:
+        errs = await page.evaluate("window.__errs || []")
+    except Exception:
+        return
+    for e in errs[:3]:
+        print(f"  [{flow}] in-page error: {e}")
 
 
 async def chip_state(bar, name):
@@ -256,6 +266,7 @@ async def desktop_flow(p, sink):
     await page.goto(f"{BASE}/news", wait_until="domcontentloaded")
     await page.wait_for_timeout(2500)
     check("removed route redirects to the map", page.url.rstrip("/") == BASE)
+    await dump_page_errors(page, "desktop")
     await browser.close()
 
 
@@ -281,6 +292,7 @@ async def narrow_flow(p, sink):
         strip = page.get_by_role("button", name="Show Inspector next to the viewer")
         check("1366px: Inspector folds to a strip beside the radargram", await strip.count() == 1)
         await shot(page, "narrow_dock")
+    await dump_page_errors(page, "narrow")
     await browser.close()
 
 
@@ -318,7 +330,9 @@ async def api_checks(sink):
 async def main():
     sink = {"pageerror": [], "console": [], "5xx": []}
     async with async_playwright() as p:
-        for flow in (desktop_flow, narrow_flow, mobile_flow):
+        wanted = os.environ.get("QA_FLOWS")
+        flows = [f for f in (desktop_flow, narrow_flow, mobile_flow) if not wanted or f.__name__.split("_")[0] in wanted.split(",")]
+        for flow in flows:
             try:
                 await flow(p, sink)
             except Exception as e:  # keep going; record the crash
