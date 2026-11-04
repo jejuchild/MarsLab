@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense, memo } from "react";
+import type { ReactNode } from "react";
 import useMapNavigation from "../hooks/useMapNavigation";
 import useActiveOverlays from "../hooks/useActiveOverlays";
 import Inspector from "../components/Inspector";
@@ -16,6 +17,7 @@ import TopBar from "../components/TopBar";
 import LayerPanelRaw from "../components/layerpanel/LayerPanel";
 import SharadHiresInspector from "../components/SharadHiresInspector";
 import InstrumentBar from "../components/map/InstrumentBar";
+import DockedViewerRow from "../components/layout/DockedViewerRow";
 import ViewerShell, { ViewerAction } from "../components/viewer/ViewerShell";
 import PanZoomSurface from "../components/viewer/PanZoomSurface";
 import FieldNoteModal from "../components/FieldNoteModal";
@@ -1654,6 +1656,25 @@ export default function MainPage() {
     onOpenCraterDetect: () => handleAnalysisModeChange("crater_detect"),
   }), [handleOpenMineralSequence, handleAnalysisModeChange]);
 
+  const renderInspector = (onCollapse: () => void) =>
+    selected ? (
+      <Inspector
+        context={selected}
+        isMobile={isMobile}
+        onClose={() => setSelected(null)}
+        onCollapse={onCollapse}
+        handlers={inspectorHandlers}
+        recentProducts={recentProducts}
+        onSelectRecent={handleSelectRecent}
+        onRemoveRecent={removeRecentProduct}
+        onOpenRadargram={(pid, point) => { setSharadHiresFocus(point ?? null); setSharadHiresProductId(pid); }}
+        crossActions={inspectorCrossActions}
+      />
+    ) : null;
+  /** Docked viewers keep the Inspector beside them when a product is selected. */
+  const withInspector = (viewer: ReactNode) =>
+    selected && !isMobile ? <DockedViewerRow viewer={viewer} renderInspector={renderInspector} /> : viewer;
+
   const rightPanelContent =
     // Explicit analysis modes take priority (user deliberately opened these)
     regolithProductId && analysisMode === "regolith" ? (
@@ -1692,6 +1713,7 @@ export default function MainPage() {
         />
       </Suspense>
     ) : sharadHiresProductId ? (
+      withInspector(
       <SharadHiresInspector
         productId={sharadHiresProductId}
         initialPoint={sharadHiresFocus}
@@ -1702,6 +1724,7 @@ export default function MainPage() {
         onOpenRegolith={handleOpenRegolith}
         onOpenAttenuation={handleOpenAttenuation}
       />
+      )
     ) : analysisMode === "crater_detect" ? (
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading landform detector...</div>}>
         <CraterDetectPanel
@@ -1720,6 +1743,7 @@ export default function MainPage() {
         />
       </Suspense>
     ) : hiRiseDTM3DPoint ? (
+      withInspector(
       <Suspense fallback={<div className="w-96 bg-[#101622] flex items-center justify-center text-[#6b7c9c] text-sm">Loading 3D viewer…</div>}>
         <HiRiseDTM3DViewer
           point={hiRiseDTM3DPoint}
@@ -1730,19 +1754,9 @@ export default function MainPage() {
           }}
         />
       </Suspense>
+      )
     ) : selected ? (
-      <Inspector
-        context={selected}
-        isMobile={isMobile}
-        onClose={() => setSelected(null)}
-        onCollapse={() => { setRightPanelCollapsed(true); panelManager.recordManualCollapse(); }}
-        handlers={inspectorHandlers}
-        recentProducts={recentProducts}
-        onSelectRecent={handleSelectRecent}
-        onRemoveRecent={removeRecentProduct}
-        onOpenRadargram={(pid, point) => { setSharadHiresFocus(point ?? null); setSharadHiresProductId(pid); }}
-        crossActions={inspectorCrossActions}
-      />
+      renderInspector(() => { setRightPanelCollapsed(true); panelManager.recordManualCollapse(); })
     ) : terrainPoint ? (
       <SlopeAnalysis
         point={terrainPoint}
