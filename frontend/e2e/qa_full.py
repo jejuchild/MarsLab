@@ -36,7 +36,8 @@ async def shot(page, name):
 
 
 def watch(page, sink):
-    page.on("pageerror", lambda e: sink["pageerror"].append(str(e)[:200]))
+    page.on("pageerror", lambda e: sink["pageerror"].append(
+        f"(after: {last_step[0]}) {e.message[:200]} @ {(e.stack or '').splitlines()[1:3]}"))
     page.on("console", lambda m: sink["console"].append(f"(after: {last_step[0]}) {m.text[:300]}") if m.type == "error" else None)
 
     def on_resp(r):
@@ -139,8 +140,14 @@ async def desktop_flow(p, sink):
         thumb = insp.get_by_role("button", name="full screen")
         if await thumb.count():
             await thumb.first.click()
-            await page.wait_for_timeout(7000)
             dlg = page.get_by_role("dialog")
+            try:  # an 8192 px image can take a while to fetch + decode
+                await page.wait_for_function(
+                    "() => { const i = document.querySelector('[role=dialog] img'); return i && i.naturalWidth > 0; }",
+                    timeout=40000)
+                await page.wait_for_timeout(500)
+            except Exception:
+                pass
             check("HiRISE thumbnail opens the viewer", await dlg.count() == 1)
             fit = await page.evaluate("""() => { const i=document.querySelector('[role=dialog] img');
               if(!i||!i.naturalWidth) return null; const b=i.getBoundingClientRect();
@@ -318,7 +325,9 @@ async def main():
                 check(f"{flow.__name__} completed", False, f"{type(e).__name__}: {str(e)[:160]}")
     await api_checks(sink)
 
-    check("no uncaught page errors", not sink["pageerror"], "; ".join(sink["pageerror"][:3]))
+    check("no uncaught page errors", not sink["pageerror"], f"{len(sink['pageerror'])} errors")
+    for e in sink["pageerror"][:4]:
+        print("  pageerror:", e)
     check("no HTTP 5xx responses", not sink["5xx"], "; ".join(sorted(set(sink["5xx"]))[:5]))
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed")

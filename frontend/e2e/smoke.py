@@ -97,7 +97,13 @@ async def main() -> None:
             await inspector.get_by_role("button", name="View High-Res Image").first.click()
             await page.wait_for_timeout(3000)
             viewer_open = await page.locator("div.fixed.inset-0").count()
-            await page.wait_for_timeout(5000)
+            try:
+                await page.wait_for_function(
+                    "() => { const i = document.querySelector('[role=dialog] img'); return i && i.naturalWidth > 0; }",
+                    timeout=40000)
+                await page.wait_for_timeout(500)
+            except Exception:
+                pass
             fits = await page.evaluate("""() => {
               const i = document.querySelector('[role=dialog] img');
               if (!i || !i.naturalWidth) return null;
