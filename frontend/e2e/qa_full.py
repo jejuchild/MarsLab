@@ -214,7 +214,11 @@ async def desktop_flow(p, sink):
       const p = v.camera.pickEllipsoid({x: c.clientWidth/2, y: c.clientHeight/2}, e);
       if (!p) return null; const g = e.cartesianToCartographic(p);
       return [g.latitude * 57.2958, g.longitude * 57.2958, s.mode]; }""")
-    check("3D keeps the inspected site in view", bool(cam) and abs(cam[0] - JEZERO[0]) < 3 and abs(cam[1] - JEZERO[1]) < 3, str(cam and [round(x, 2) for x in cam]))
+    has_handle = await page.evaluate("() => !!window.__marslabViewer")
+    if has_handle:
+        check("3D keeps the inspected site in view", bool(cam) and abs(cam[0] - JEZERO[0]) < 3 and abs(cam[1] - JEZERO[1]) < 3, str(cam and [round(x, 2) for x in cam]))
+    else:
+        print("SKIP 3D camera check (production build has no debug handle)")
     await shot(page, "globe3d")
     await page.get_by_role("button", name="2D Map").first.click()
     await page.wait_for_timeout(4000)

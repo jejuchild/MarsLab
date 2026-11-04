@@ -7,7 +7,7 @@ running dev server and exits non-zero on the first failure.
     pip install playwright && python -m playwright install chromium
     BASE_URL=http://localhost:5173 python frontend/e2e/smoke.py [screenshot_dir]
 
-Requires the dev build (uses the dev-only window.__marslabViewer handle).
+Camera checks need the dev build (window.__marslabViewer); they are skipped on a production build.
 """
 
 import asyncio
@@ -56,10 +56,14 @@ async def main() -> None:
         await page.goto(f"{BASE}/?lat={JEZERO[0]}&lon={JEZERO[1]}", wait_until="domcontentloaded")
         await page.wait_for_timeout(12000)
         cam = await page.evaluate(
-            "() => { const c = window.__marslabViewer.camera.positionCartographic;"
+            "() => { const v = window.__marslabViewer; if (!v) return null;"
+            " const c = v.camera.positionCartographic;"
             " return [c.latitude * 57.29578, c.longitude * 57.29578]; }"
         )
-        check(abs(cam[0] - JEZERO[0]) < 0.2 and abs(cam[1] - JEZERO[1]) < 0.2, "shared link flies to its location")
+        if cam is None:
+            print("SKIP shared link camera check (production build has no debug handle)")
+        else:
+            check(abs(cam[0] - JEZERO[0]) < 0.2 and abs(cam[1] - JEZERO[1]) < 0.2, "shared link flies to its location")
         check("?" not in page.url, "deep-link params are stripped after restore")
 
         # 2. Load HiRISE footprints and inspect a point.
