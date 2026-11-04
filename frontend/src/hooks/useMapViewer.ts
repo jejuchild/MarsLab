@@ -268,6 +268,8 @@ export default function useMapViewer({
       // lets the most recently added (or brought-to-front) overlay win.
       orderIndependentTranslucency: false,
       requestRenderMode: true,
+      // Recovery below replaces Cesium's "rendering has stopped" panel.
+      showRenderLoopErrors: false,
       maximumRenderTimeChange: Infinity,
       animation: false,
       timeline: false,
@@ -294,7 +296,20 @@ export default function useMapViewer({
 
     // P1+P0: Suppress Cesium tile-load and render errors (network CORS failures,
     // trek.nasa.gov opaque responses) so they don't crash the page.
-    viewer.scene.renderError.addEventListener(() => {});
+    // A render exception makes Cesium stop its render loop for good (the map
+    // freezes). Restart it a few times; persistent failures stay stopped.
+    let renderRecoveries = 0;
+    viewer.scene.renderError.addEventListener((_scene: Cesium.Scene, err: unknown) => {
+      console.error("[MarsLab] Cesium render error", err);
+      if (renderRecoveries >= 3) return;
+      renderRecoveries += 1;
+      const v = viewer;
+      setTimeout(() => {
+        if (!v || v.isDestroyed()) return;
+        v.useDefaultRenderLoop = true;
+        v.scene.requestRender();
+      }, 500);
+    });
     viewer.scene.globe.tileLoadProgressEvent?.addEventListener?.(() => {});
     // Suppress tile request errors (CORS from trek.nasa.gov is expected)
     viewer.scene.imageryLayers?.layerAdded?.addEventListener?.(() => {});

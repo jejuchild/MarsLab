@@ -207,16 +207,32 @@ async function cacheFirst(request, cacheName) {
 // ---------------------------------------------------------------------------
 async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
-
-  try {
-    const response = await fetchWithTimeout(request, NETWORK_TIMEOUT_MS);
+  // The request is never aborted: the timeout only decides when to serve a
+  // cached copy instead. With no cached copy we keep waiting — a slow render
+  // (e.g. an 8+ s radargram) used to be cut off and turned into a fake
+  // "Offline" 503 even though the server was about to answer.
+  const network = fetch(request).then((response) => {
     if (response.ok) {
       cache.put(request, response.clone());
       enforceCacheLimit(cacheName);
     }
     return response;
+  });
+  network.catch(() => {}); // a late failure after serving the cache is fine
+
+  let timer;
+  const timedOut = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), NETWORK_TIMEOUT_MS);
+  });
+
+  try {
+    const first = await Promise.race([network, timedOut]);
+    if (first) return first;
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    return await network;
   } catch (err) {
-    // Network failed or timed out — serve from cache
+    // Network failed — serve from cache
     const cached = await cache.match(request);
     if (cached) return cached;
 
@@ -231,6 +247,8 @@ async function networkFirst(request, cacheName) {
       statusText: "Service Unavailable",
       headers: { "Content-Type": "text/plain" },
     });
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -268,29 +286,6 @@ async function staleWhileRevalidate(request, cacheName) {
     status: 503,
     statusText: "Service Unavailable",
     headers: { "Content-Type": "text/plain" },
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Fetch with timeout — rejects if network takes too long
-// ---------------------------------------------------------------------------
-function fetchWithTimeout(request, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      controller.abort();
-      reject(new Error("Network timeout"));
-    }, timeoutMs);
-
-    fetch(request, { signal: controller.signal })
-      .then((response) => {
-        clearTimeout(timer);
-        resolve(response);
-      })
-      .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
   });
 }
 

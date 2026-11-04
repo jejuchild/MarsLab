@@ -30,23 +30,27 @@ def make_rgb(
     b_idx = nearest_band(wavelengths, b_um)
     print(f"[make_rgb] Band indices: R={r_idx} ({wavelengths[r_idx]:.3f}um), G={g_idx} ({wavelengths[g_idx]:.3f}um), B={b_idx} ({wavelengths[b_idx]:.3f}um)")
 
-    # 2. Clean cube - replace ignore values with NaN
-    cube = cube.copy()
-    cube[cube >= IGNORE_VALUE - 1] = np.nan  # 65535 is the ignore value
-    cube[~np.isfinite(cube)] = np.nan
-    cube[cube < 0] = np.nan
+    return stretch_rgb(cube[r_idx], cube[g_idx], cube[b_idx], vmin, vmax)
 
-    # Extract RGB bands
-    R = cube[r_idx]
-    G = cube[g_idx]
-    B = cube[b_idx]
 
-    print(f"[make_rgb] R stats: min={np.nanmin(R):.4f}, max={np.nanmax(R):.4f}, mean={np.nanmean(R):.4f}")
-    print(f"[make_rgb] G stats: min={np.nanmin(G):.4f}, max={np.nanmax(G):.4f}, mean={np.nanmean(G):.4f}")
-    print(f"[make_rgb] B stats: min={np.nanmin(B):.4f}, max={np.nanmax(B):.4f}, mean={np.nanmean(B):.4f}")
-    print(f"[make_rgb] NaN ratios: R={np.isnan(R).mean():.2%}, G={np.isnan(G).mean():.2%}, B={np.isnan(B).mean():.2%}")
+def clean_band(band: np.ndarray) -> np.ndarray:
+    """Copy of one band with ignore/invalid/negative values set to NaN."""
+    band = np.array(band, dtype=np.float32, copy=True)
+    band[band >= IGNORE_VALUE - 1] = np.nan  # 65535 is the ignore value
+    band[~np.isfinite(band)] = np.nan
+    band[band < 0] = np.nan
+    return band
 
-    # 3. Create footprint mask (where data is valid)
+
+def stretch_rgb(R: np.ndarray, G: np.ndarray, B: np.ndarray, vmin: float, vmax: float) -> np.ndarray:
+    """
+    Linear-stretch three (lines, samples) bands into an RGB image in [0, 1].
+    Cleaning is per pixel, so working on three bands gives exactly the
+    result of cleaning the whole cube first (as make_rgb used to).
+    """
+    R, G, B = clean_band(R), clean_band(G), clean_band(B)
+
+    # Footprint mask (where data is valid)
     mask = np.isfinite(G)
 
     def stretch(img):
@@ -60,5 +64,4 @@ def make_rgb(
     Bn = stretch(B)
 
     rgb = np.dstack([Rn, Gn, Bn])
-    print(f"[make_rgb] Output RGB shape: {rgb.shape}, min={rgb.min():.3f}, max={rgb.max():.3f}")
     return rgb

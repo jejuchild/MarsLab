@@ -8,8 +8,8 @@ from PIL import Image
 import importlib
 
 from .resolver import resolve_crism_paths
-from .loader import load_cube, load_wavelength
-from .rgb import make_rgb, IGNORE_VALUE
+from .loader import load_wavelength, read_pixel_spectrum, read_bands
+from .rgb import IGNORE_VALUE, nearest_band, stretch_rgb
 from api.validation import validate_product_id
 
 dust_detection = importlib.import_module("analysis.crism_spectral.dust_detection")
@@ -37,18 +37,13 @@ def crism_rgb(product_id: str, req: RGBRequest):
         print("[CRISM RGB] hdr =", hdr)
         print("[CRISM RGB] img =", img)
         print("[CRISM RGB] wv  =", wv)
-        cube = load_cube(hdr)
         wavelength = load_wavelength(wv)
 
-        rgb = make_rgb(
-            cube,
-            wavelength,
-            req.r_um,
-            req.g_um,
-            req.b_um,
-            req.vmin,
-            req.vmax,
-        )
+        # Read only the three bands needed (the whole ~1 GB cube used to be
+        # loaded and copied on every overlay request).
+        idx = [nearest_band(wavelength, um) for um in (req.r_um, req.g_um, req.b_um)]
+        R, G, B = read_bands(hdr, idx)
+        rgb = stretch_rgb(R, G, B, req.vmin, req.vmax)
 
         # Convert to uint8
         img8 = (rgb * 255).astype("uint8")
@@ -95,20 +90,17 @@ def crism_spectrum(product_id: str, req: SpectrumRequest):
         print(f"[CRISM Spectrum] product_id={product_id}, line={req.line}, sample={req.sample}")
         hdr, img, wv = resolve_crism_paths(product_id)
 
-        cube = load_cube(hdr)  # (bands, lines, samples)
         wavelengths = load_wavelength(wv)  # (bands,) in micrometers
 
-        n_bands, n_lines, n_samples = cube.shape
-        print(f"[CRISM Spectrum] Cube shape: {cube.shape}")
-
-        # Validate coordinates
-        if req.line < 0 or req.line >= n_lines:
-            raise HTTPException(status_code=400, detail=f"Line {req.line} out of range [0, {n_lines})")
-        if req.sample < 0 or req.sample >= n_samples:
+        # Read just this pixel (loading the whole cube took ~14 s per click).
+        try:
+            spectrum, (n_bands, n_lines, n_samples) = read_pixel_spectrum(hdr, req.line, req.sample)
+        except IndexError:
+            import spectral as _sp
+            n_lines, n_samples, _ = _sp.open_image(hdr).shape
+            if req.line < 0 or req.line >= n_lines:
+                raise HTTPException(status_code=400, detail=f"Line {req.line} out of range [0, {n_lines})")
             raise HTTPException(status_code=400, detail=f"Sample {req.sample} out of range [0, {n_samples})")
-
-        # Extract spectrum for this pixel
-        spectrum = cube[:, req.line, req.sample].copy()
 
         # Clean up ignore values
         spectrum[spectrum >= IGNORE_VALUE - 1] = np.nan

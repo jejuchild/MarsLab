@@ -20,8 +20,14 @@ function buildCrismUrls(productId: string): string[] {
   ];
 }
 
-function getImageUrl(productId: string, instrument: InstrumentType): string | string[] {
+function getImageUrl(productId: string, instrument: InstrumentType): string | string[] | null {
   switch (instrument) {
+    case "SHARAD_HIGHRES":
+      // Strongly downsampled radargram (cached server-side after first render).
+      return `/api/sharad_highres/radargram?product_id=${encodeURIComponent(productId)}&downsample=60`;
+    case "CTX":
+      // CTX mosaics are served as map tiles only; there is no single image.
+      return null;
     case "HIRISE":
       // Try JPG (static) first, then transparent PNG (generated endpoint)
       return [
@@ -42,7 +48,7 @@ function getImageUrl(productId: string, instrument: InstrumentType): string | st
 }
 
 export default function QuickviewImage({ productId, instrument }: QuickviewImageProps) {
-  const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "loaded" | "error" | "tiles-only">("loading");
   const [currentUrl, setCurrentUrl] = useState("");
 
   useEffect(() => {
@@ -68,7 +74,9 @@ export default function QuickviewImage({ productId, instrument }: QuickviewImage
 
     const urlOrUrls = getImageUrl(productId, instrument);
 
-    if (Array.isArray(urlOrUrls)) {
+    if (urlOrUrls === null) {
+      setStatus("tiles-only");
+    } else if (Array.isArray(urlOrUrls)) {
       tryLoadImage(urlOrUrls, 0);
     } else {
       const img = new Image();
@@ -87,6 +95,15 @@ export default function QuickviewImage({ productId, instrument }: QuickviewImage
     return (
       <div className="flex h-40 items-center justify-center rounded-lg border border-border-dark bg-surface-dark">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-600 border-t-blue-400" />
+      </div>
+    );
+  }
+
+  if (status === "tiles-only") {
+    return (
+      <div className="flex h-full min-h-28 flex-col items-center justify-center gap-1 rounded-lg border border-border-dark bg-surface-dark px-2 text-center">
+        <span className="material-symbols-outlined text-2xl text-slate-500">map</span>
+        <span className="text-[10px] leading-tight text-slate-400">Map tiles only — use “Show on map”</span>
       </div>
     );
   }
