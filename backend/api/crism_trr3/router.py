@@ -16,8 +16,8 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from .loader import (
-    get_cube_memmap, get_shape, get_wavelengths, get_pixel_spectrum,
-    UnsupportedCubeError, require_supported_bands,
+    get_cube_memmap, get_shape, get_cube_wavelengths, get_pixel_spectrum,
+    UnsupportedCubeError,
 )
 from api.crism.rgb import nearest_band
 from api.mineral_cnn.constants import FILL_VALUE
@@ -82,30 +82,24 @@ def rgb(obs_id: str, req: RGBRequest):
         mm, rows, cols, bands = get_cube_memmap(obs_id)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    if req.vmax <= req.vmin:
+        raise HTTPException(status_code=400, detail="vmax must be greater than vmin")
     try:
-        require_supported_bands(bands)
+        wavelengths = get_cube_wavelengths(obs_id)
     except UnsupportedCubeError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    if req.vmax <= req.vmin:
-        raise HTTPException(status_code=400, detail="vmax must be greater than vmin")
-
-    wavelengths = get_wavelengths()
-    if len(wavelengths) != bands:
-        from api.mineral_cnn.constants import BANDS as IR_WL, IR_START
-        wavelengths = IR_WL
-
-    # Only extract the 3 needed bands (not full cube — saves ~1 GB RAM)
-    r_idx = nearest_band(wavelengths, req.r_um)
-    g_idx = nearest_band(wavelengths, req.g_um)
-    b_idx = nearest_band(wavelengths, req.b_um)
-
-    # Offset for IR-only case
-    offset = IR_START if len(wavelengths) != bands else 0
+    targets = (req.r_um, req.g_um, req.b_um)
+    lo, hi = float(np.min(wavelengths)), float(np.max(wavelengths))
+    if not all(lo - 0.05 <= t <= hi + 0.05 for t in targets):
+        # Requested bands outside this detector's range (e.g. IR defaults on
+        # a VNIR cube): use the visible true-colour bands instead.
+        targets = (0.60, 0.53, 0.44) if lo < 0.5 else (2.53, 1.51, 1.08)
+    r_idx, g_idx, b_idx = (nearest_band(wavelengths, t) for t in targets)
 
     # memmap shape: (rows, bands, cols) — extract 3 bands as (rows, cols) each
     def extract_band(band_idx):
-        band = np.array(mm[:, offset + band_idx, :], dtype=np.float32)
+        band = np.array(mm[:, band_idx, :], dtype=np.float32)
         band[band >= FILL_VALUE - 1] = np.nan
         band[~np.isfinite(band)] = np.nan
         band[band < 0] = np.nan
@@ -149,14 +143,9 @@ def wavelengths(obs_id: str):
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     try:
-        require_supported_bands(bands)
+        wl = get_cube_wavelengths(obs_id)
     except UnsupportedCubeError as e:
         raise HTTPException(status_code=422, detail=str(e))
-
-    wl = get_wavelengths()
-    if len(wl) != bands:
-        from api.mineral_cnn.constants import BANDS as IR_WL
-        wl = IR_WL
 
     return {"wavelengths": wl.tolist(), "count": len(wl)}
 

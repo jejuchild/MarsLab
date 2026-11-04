@@ -174,9 +174,12 @@ export default function BandRatioCalculator({
     (targetWl: number): number | null => {
       const idx = findNearestIndex(targetWl);
       if (idx < 0 || idx >= reflectance.length) return null;
+      // Outside the spectrum's range (e.g. IR band depths on a VNIR cube):
+      // no value rather than the nearest edge band.
+      if (Math.abs(wavelengths[idx]! - targetWl) > 0.05) return null;
       return reflectance[idx]!;
     },
-    [findNearestIndex, reflectance]
+    [findNearestIndex, reflectance, wavelengths]
   );
 
   // Get actual wavelength for a target wavelength (for display)

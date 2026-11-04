@@ -60,6 +60,13 @@ def run_spectral_analysis(
             error=f"Failed to load TRR3 cube: {e}",
         )
 
+    if n_bands != len(wavelengths):
+        # Endmembers are IR mineral spectra; VNIR/survey cubes don't match.
+        return CrismSpectralResult(
+            obs_id=obs_id,
+            error=f"Mineral unmixing needs a {len(wavelengths)}-band IR cube; this one has {n_bands} bands.",
+        )
+
     logger.info(f"[CRISM Spectral] Loaded {obs_id}: {rows}x{cols}, {n_bands} bands")
 
     # Get endmember spectra at CRISM wavelengths
