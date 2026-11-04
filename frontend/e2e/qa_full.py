@@ -319,8 +319,9 @@ async def api_checks(sink):
 
     r = requests.post(f"{BASE}/api/exists/batch", json={"items": [{"instrument": "hirise", "product_id": "PSP_002387_1985"}]}, timeout=60)
     check("API exists/batch", r.ok and "has_core" in r.json())
-    r = requests.post(f"{BASE}/api/crism-trr3/msv00050e6e/spectrum", json={"line": 5, "sample": 5}, timeout=60)
-    check("API TRR3 VNIR cube → 422 with reason", r.status_code == 422 and "bands" in r.json().get("detail", ""))
+    r = requests.post(f"{BASE}/api/crism-trr3/msv00050e6e/spectrum", json={"line": 1000, "sample": 64}, timeout=60)
+    wl = r.json().get("wavelengths", []) if r.ok else []
+    check("API TRR3 VNIR cube → spectrum (0.36–1.06 µm)", bool(wl) and 0.35 < min(wl) < 0.45 and 0.95 < max(wl) < 1.07, str(r.status_code))
     r = get("/api/inspector/at-point", params={"lat": JEZERO[0], "lon": JEZERO[1]})
     check("API inspector at-point", r.ok, str(r.status_code))
     r = get("/.env")

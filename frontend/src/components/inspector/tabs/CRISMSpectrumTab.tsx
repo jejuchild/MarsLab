@@ -93,6 +93,14 @@ export default function CRISMSpectrumTab({
     .map((wl, i) => ({ wavelength: wl, reflectance: spectrumData.reflectance[i] }))
     .filter((p): p is { wavelength: number; reflectance: number } => p.reflectance !== null);
 
+  if (validPoints.length < 2) {
+    return (
+      <div className="flex h-64 items-center justify-center px-6 text-center text-slate-500 text-sm">
+        No valid spectral data at this pixel (outside the image or masked).
+      </div>
+    );
+  }
+
   const reflValues = validPoints.map((p) => p.reflectance);
   const minRefl = Math.min(...reflValues);
   const maxRefl = Math.max(...reflValues);
